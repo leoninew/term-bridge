@@ -25,5 +25,8 @@ build:
     mkdir -p bin
     go build -o bin/termbridge.exe ./cmd/termbridge
 
+dev *args:
+    go run cmd/termbridge/main.go -- {{args}}
+
 clean:
     rm -rf bin
