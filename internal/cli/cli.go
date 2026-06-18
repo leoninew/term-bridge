@@ -19,7 +19,7 @@ type Options struct {
 	ShowVersion bool
 }
 
-func Run(args []string, stdout io.Writer, stderr io.Writer) int {
+func Run(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 	options, err := Parse(args, stderr)
 	if err != nil {
 		printError(stderr, err)
@@ -40,6 +40,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	result, err := app.Run(context.Background(), app.Options{
 		Cwd:     options.Cwd,
 		Command: options.Command,
+		Stdin:   stdin,
+		Stdout:  stdout,
+		Stderr:  stderr,
 	})
 	if err != nil {
 		printError(stderr, err)
@@ -50,6 +53,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return apperrors.ExitCode(err)
 	}
 
+	if result.ExitCode != 0 {
+		return result.ExitCode
+	}
 	return apperrors.ExitSuccess
 }
 

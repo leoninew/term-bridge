@@ -81,7 +81,7 @@ func TestRunHelpWritesStdoutOnly(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"--help"}, &stdout, &stderr)
+	code := Run([]string{"--help"}, bytes.NewReader(nil), &stdout, &stderr)
 
 	if code != apperrors.ExitSuccess {
 		t.Fatalf("Run() code = %d, want %d", code, apperrors.ExitSuccess)
@@ -101,7 +101,7 @@ func TestRunVersionWritesStdoutOnly(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"--version"}, &stdout, &stderr)
+	code := Run([]string{"--version"}, bytes.NewReader(nil), &stdout, &stderr)
 
 	if code != apperrors.ExitSuccess {
 		t.Fatalf("Run() code = %d, want %d", code, apperrors.ExitSuccess)
@@ -118,7 +118,7 @@ func TestRunMissingSeparatorReturnsUsageExit(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"claude"}, &stdout, &stderr)
+	code := Run([]string{"claude"}, bytes.NewReader(nil), &stdout, &stderr)
 
 	if code != apperrors.ExitUsage {
 		t.Fatalf("Run() code = %d, want %d", code, apperrors.ExitUsage)
@@ -135,7 +135,7 @@ func TestRunInvalidCwdReturnsConfigExit(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"--cwd", filepath.Join(t.TempDir(), "missing"), "--", "pwsh"}, &stdout, &stderr)
+	code := Run([]string{"--cwd", filepath.Join(t.TempDir(), "missing"), "--", "pwsh"}, bytes.NewReader(nil), &stdout, &stderr)
 
 	if code != apperrors.ExitConfig {
 		t.Fatalf("Run() code = %d, want %d", code, apperrors.ExitConfig)
@@ -148,25 +148,22 @@ func TestRunInvalidCwdReturnsConfigExit(t *testing.T) {
 	}
 }
 
-func TestRunPlaceholderWritesNoStdoutAndCreatesLog(t *testing.T) {
+func TestRunCommandCreatesLogAndReturnsCommandExitCode(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cwd := t.TempDir()
 	isolateHome(t)
 
-	code := Run([]string{"--cwd", cwd, "--", "pwsh"}, &stdout, &stderr)
+	code := Run([]string{"--cwd", cwd, "--", "cmd.exe", "/C", "exit", "/b", "7"}, bytes.NewReader(nil), &stdout, &stderr)
 
-	if code != apperrors.ExitGeneral {
-		t.Fatalf("Run() code = %d, want %d", code, apperrors.ExitGeneral)
+	if code != 7 {
+		t.Fatalf("Run() code = %d, want 7; stderr=%s", code, stderr.String())
 	}
-	if stdout.Len() != 0 {
-		t.Fatalf("stdout = %q, want empty", stdout.String())
+	if strings.Contains(stdout.String(), "termbridge command runner is not implemented yet") {
+		t.Fatalf("stdout contains old placeholder: %s", stdout.String())
 	}
-	if !strings.Contains(stderr.String(), "termbridge command runner is not implemented yet") {
-		t.Fatalf("stderr missing placeholder: %s", stderr.String())
-	}
-	if !strings.Contains(stderr.String(), "command: pwsh") {
-		t.Fatalf("stderr missing command: %s", stderr.String())
+	if strings.Contains(stderr.String(), "error:") {
+		t.Fatalf("stderr contains TermBridge error for user exit code: %s", stderr.String())
 	}
 	logFile := filepath.Join(cwd, "logs", "termbridge.log")
 	info, err := os.Stat(logFile)
