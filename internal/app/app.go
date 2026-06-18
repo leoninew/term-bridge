@@ -103,7 +103,11 @@ func Run(ctx context.Context, options Options) (Result, error) {
 		return Result{}, err
 	}
 
-	logger, err := logging.New(logging.Config{Level: cfg.LogLevel, Format: cfg.LogFormat, Dir: cfg.LogDir})
+	var logOutput io.Writer
+	if options.Command.Kind == CommandWeb {
+		logOutput = options.Stdout
+	}
+	logger, err := logging.New(logging.Config{Level: cfg.LogLevel, Format: cfg.LogFormat, Dir: cfg.LogDir, Output: logOutput})
 	if err != nil {
 		return Result{}, err
 	}
@@ -248,7 +252,7 @@ func runWeb(ctx context.Context, cfg config.Config, logger *logging.Logger, opti
 		Manager: gopty.NewManager(),
 		Logger:  logger,
 	})
-	server := webserver.New(webserver.Config{Host: options.Command.Web.Host, Port: options.Command.Web.Port, Open: options.Command.Web.Open, Dev: options.Command.Web.Dev}, registry)
+	server := webserver.New(webserver.Config{Host: options.Command.Web.Host, Port: options.Command.Web.Port, Open: options.Command.Web.Open, Dev: options.Command.Web.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit}, registry)
 	err := runWebServer(ctx, server, func(info webserver.Info) {
 		fmt.Fprintf(stdout, "TermBridge web terminal listening on %s\n", info.URL)
 		if options.Command.Web.Dev {

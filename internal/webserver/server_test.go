@@ -1,10 +1,13 @@
 package webserver
 
 import (
+	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"termbridge-go/internal/config"
@@ -43,6 +46,28 @@ func TestSessionsRouteListsEmptySessions(t *testing.T) {
 	}
 	if response.Body.String() == "" {
 		t.Fatal("empty response body")
+	}
+}
+
+func TestServerLogsRequestsWithConfiguredLimits(t *testing.T) {
+	var logBuffer bytes.Buffer
+	server := New(Config{Logger: slog.New(slog.NewJSONHandler(&logBuffer, nil)), RequestBodyLimit: 10, ResponseBodyLimit: 12}, newTestRegistry(t))
+	request := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	request.Header.Set("User-Agent", "test-agent")
+	response := httptest.NewRecorder()
+
+	server.server.Handler.ServeHTTP(response, request)
+
+	entry := decodeLogEntry(t, logBuffer.String())
+	assertLogValue(t, entry, "method", http.MethodGet)
+	assertLogValue(t, entry, "path", "/api/health")
+	assertLogNumber(t, entry, "status", http.StatusOK)
+	responseBody, ok := entry["response_body"].(string)
+	if !ok {
+		t.Fatalf("expected response_body: %+v", entry)
+	}
+	if !strings.HasSuffix(responseBody, truncatedLogBodySuffix) {
+		t.Fatalf("expected truncated response_body, got %q", responseBody)
 	}
 }
 

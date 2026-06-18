@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os/exec"
@@ -19,10 +21,13 @@ import (
 )
 
 type Config struct {
-	Host string
-	Port int
-	Dev  bool
-	Open bool
+	Host              string
+	Port              int
+	Dev               bool
+	Open              bool
+	Logger            *slog.Logger
+	RequestBodyLimit  int
+	ResponseBodyLimit int
 }
 
 type Server struct {
@@ -42,7 +47,7 @@ func New(config Config, registry *webterminal.Registry) *Server {
 	mux.HandleFunc("/api/workspaces", s.handleWorkspaces)
 	mux.HandleFunc("/api/sessions", s.handleSessions)
 	mux.HandleFunc("/api/sessions/", s.handleSession)
-	s.server = &http.Server{Handler: mux}
+	s.server = &http.Server{Handler: logRequests(s.config.Logger, s.config.RequestBodyLimit, s.config.ResponseBodyLimit, mux)}
 	return s
 }
 
@@ -326,6 +331,15 @@ func normalizeConfig(config Config) Config {
 	}
 	if config.Port < 0 || config.Port > 65535 {
 		config.Port = 0
+	}
+	if config.Logger == nil {
+		config.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	if config.RequestBodyLimit <= 0 {
+		config.RequestBodyLimit = 4096
+	}
+	if config.ResponseBodyLimit <= 0 {
+		config.ResponseBodyLimit = 4096
 	}
 	return config
 }

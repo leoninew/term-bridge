@@ -23,14 +23,16 @@ const (
 var defaultConfig []byte
 
 type Config struct {
-	Cwd        string
-	Command    []string
-	LogLevel   string
-	LogFormat  string
-	LogDir     string
-	History    HistoryConfig
-	Runtime    RuntimeConfig
-	ConfigFile string
+	Cwd                  string
+	Command              []string
+	LogLevel             string
+	LogFormat            string
+	LogDir               string
+	LogRequestBodyLimit  int
+	LogResponseBodyLimit int
+	History              HistoryConfig
+	Runtime              RuntimeConfig
+	ConfigFile           string
 }
 
 type HistoryConfig struct {
@@ -89,11 +91,13 @@ func Load(options Options) (Config, error) {
 	}
 
 	cfg := Config{
-		Cwd:       cwd,
-		Command:   append([]string(nil), options.Command...),
-		LogLevel:  strings.ToLower(v.GetString("log.level")),
-		LogFormat: strings.ToLower(v.GetString("log.format")),
-		LogDir:    logDir,
+		Cwd:                  cwd,
+		Command:              append([]string(nil), options.Command...),
+		LogLevel:             strings.ToLower(v.GetString("log.level")),
+		LogFormat:            strings.ToLower(v.GetString("log.format")),
+		LogDir:               logDir,
+		LogRequestBodyLimit:  v.GetInt("log.request_body_limit"),
+		LogResponseBodyLimit: v.GetInt("log.response_body_limit"),
 		History: HistoryConfig{
 			MaxLines:     v.GetInt("history.max_lines"),
 			MaxBytes:     v.GetInt64("history.max_bytes"),
@@ -107,6 +111,9 @@ func Load(options Options) (Config, error) {
 		return Config{}, err
 	}
 	if err := validateLogFormat(cfg.LogFormat); err != nil {
+		return Config{}, err
+	}
+	if err := validateLogBodyLimits(cfg.LogRequestBodyLimit, cfg.LogResponseBodyLimit); err != nil {
 		return Config{}, err
 	}
 	if err := validateHistory(cfg.History); err != nil {
@@ -180,13 +187,15 @@ func fileExists(path string) (bool, error) {
 
 func rejectUnknownKeys(v *viper.Viper) error {
 	allowed := map[string]struct{}{
-		"log.level":              {},
-		"log.format":             {},
-		"log.dir":                {},
-		"history.max_lines":      {},
-		"history.max_bytes":      {},
-		"history.max_line_bytes": {},
-		"runtime.state_dir":      {},
+		"log.level":               {},
+		"log.format":              {},
+		"log.dir":                 {},
+		"log.request_body_limit":  {},
+		"log.response_body_limit": {},
+		"history.max_lines":       {},
+		"history.max_bytes":       {},
+		"history.max_line_bytes":  {},
+		"runtime.state_dir":       {},
 	}
 	for _, key := range v.AllKeys() {
 		if _, ok := allowed[key]; !ok {
@@ -232,6 +241,16 @@ func validateLogFormat(format string) error {
 	default:
 		return apperrors.Config("invalid log format", fmt.Errorf("%q", format))
 	}
+}
+
+func validateLogBodyLimits(requestLimit int, responseLimit int) error {
+	if requestLimit <= 0 {
+		return apperrors.Config("invalid log.request_body_limit", fmt.Errorf("must be positive"))
+	}
+	if responseLimit <= 0 {
+		return apperrors.Config("invalid log.response_body_limit", fmt.Errorf("must be positive"))
+	}
+	return nil
 }
 
 func validateHistory(config HistoryConfig) error {

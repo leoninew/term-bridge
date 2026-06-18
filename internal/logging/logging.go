@@ -13,6 +13,7 @@ type Config struct {
 	Level  string
 	Format string
 	Dir    string
+	Output io.Writer
 }
 
 type Logger struct {
@@ -29,12 +30,17 @@ func New(config Config) (*Logger, error) {
 		return nil, apperrors.Config("open log file", err)
 	}
 
+	output := io.Writer(file)
+	if config.Output != nil {
+		output = io.MultiWriter(file, config.Output)
+	}
+
 	opts := &slog.HandlerOptions{Level: parseLevel(config.Level)}
 	var handler slog.Handler
 	if config.Format == "json" {
-		handler = slog.NewJSONHandler(file, opts)
+		handler = slog.NewJSONHandler(output, opts)
 	} else {
-		handler = slog.NewTextHandler(file, opts)
+		handler = slog.NewTextHandler(output, opts)
 	}
 
 	return &Logger{Slog: slog.New(handler), closer: file}, nil

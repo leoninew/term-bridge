@@ -29,6 +29,12 @@ func TestLoadDefaults(t *testing.T) {
 	if filepath.Clean(cfg.LogDir) != filepath.Clean(wantLogDir) {
 		t.Fatalf("LogDir = %q, want %q", cfg.LogDir, wantLogDir)
 	}
+	if cfg.LogRequestBodyLimit != 4096 {
+		t.Fatalf("LogRequestBodyLimit = %d, want 4096", cfg.LogRequestBodyLimit)
+	}
+	if cfg.LogResponseBodyLimit != 4096 {
+		t.Fatalf("LogResponseBodyLimit = %d, want 4096", cfg.LogResponseBodyLimit)
+	}
 	wantStateDir := filepath.Join(cwd, ".termbridge")
 	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(wantStateDir) {
 		t.Fatalf("StateDir = %q, want %q", cfg.Runtime.StateDir, wantStateDir)
@@ -78,6 +84,31 @@ func TestLoadRejectsInvalidHistoryLimit(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsInvalidLogBodyLimit(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+	}{
+		{name: "request", content: "log:\n  request_body_limit: 0\n"},
+		{name: "response", content: "log:\n  response_body_limit: -1\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateHome(t)
+			cwd := t.TempDir()
+			writeConfig(t, cwd, tc.content)
+
+			_, err := Load(Options{Cwd: cwd})
+			if err == nil {
+				t.Fatal("Load() error = nil, want error")
+			}
+			if !apperrors.IsConfig(err) {
+				t.Fatalf("Load() error = %T, want config error", err)
+			}
+		})
+	}
+}
+
 func TestLoadRejectsUnknownConfigKey(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
@@ -98,7 +129,7 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	configPath := filepath.Join(cwd, FileName)
 	logDir := filepath.Join(cwd, "configured-logs")
 	stateDir := filepath.Join(cwd, "configured-state")
-	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: " + filepath.ToSlash(stateDir) + "\n"
+	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\n  request_body_limit: 128\n  response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: " + filepath.ToSlash(stateDir) + "\n"
 	writeConfig(t, cwd, content)
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -113,6 +144,12 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	}
 	if cfg.LogFormat != "json" {
 		t.Fatalf("LogFormat = %q", cfg.LogFormat)
+	}
+	if cfg.LogRequestBodyLimit != 128 {
+		t.Fatalf("LogRequestBodyLimit = %d, want 128", cfg.LogRequestBodyLimit)
+	}
+	if cfg.LogResponseBodyLimit != 256 {
+		t.Fatalf("LogResponseBodyLimit = %d, want 256", cfg.LogResponseBodyLimit)
 	}
 	if filepath.Clean(cfg.LogDir) != filepath.Clean(logDir) {
 		t.Fatalf("LogDir = %q, want %q", cfg.LogDir, logDir)
