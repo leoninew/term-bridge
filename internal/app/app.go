@@ -171,7 +171,7 @@ func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, opt
 	if stdout == nil {
 		stdout = io.Discard
 	}
-	runtimeResult, err := runRuntime(ctx, logger, spec, runner.IO{Stdin: options.Stdin, Stdout: io.MultiWriter(stdout, historyWriter), Stderr: options.Stderr}, hooks)
+	runtimeResult, err := runRuntime(ctx, logger, spec, runner.IO{Stdin: options.Stdin, Stdout: io.MultiWriter(stdout, historyWriter), Stderr: options.Stderr, TerminalOutput: stdout}, hooks)
 	endedAt := time.Now().UTC()
 	if err != nil {
 		_ = store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "runtime_failed", UpdatedAt: endedAt})

@@ -23,9 +23,10 @@ type Logger interface {
 }
 
 type IO struct {
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
+	Stdin          io.Reader
+	Stdout         io.Writer
+	Stderr         io.Writer
+	TerminalOutput io.Writer
 }
 
 type Hooks struct {
@@ -59,6 +60,9 @@ func (r CommandRunner) Run(ctx context.Context, spec process.ProcessSpec, stream
 	if streams.Stdin == nil {
 		streams.Stdin = emptyReader{}
 	}
+	if streams.TerminalOutput == nil {
+		streams.TerminalOutput = streams.Stdout
+	}
 	if r.InterruptGrace <= 0 {
 		r.InterruptGrace = defaultInterruptGrace
 	}
@@ -72,7 +76,7 @@ func (r CommandRunner) Run(ctx context.Context, spec process.ProcessSpec, stream
 	}
 	spec = spec.WithResolvedCommand(resolved)
 
-	terminal, err := prepareTerminal(streams.Stdin, streams.Stdout)
+	terminal, err := prepareTerminal(streams.Stdin, streams.TerminalOutput)
 	if err != nil {
 		return Result{}, apperrors.Runtime("prepare terminal", err)
 	}

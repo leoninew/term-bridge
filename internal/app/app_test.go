@@ -23,15 +23,19 @@ func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
 	oldRunRuntime := runRuntime
 	defer func() { runRuntime = oldRunRuntime }()
 
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
 	var gotSpec process.ProcessSpec
+	var gotTerminalOutput any
 	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO, hooks runner.Hooks) (runner.Result, error) {
 		gotSpec = spec
+		gotTerminalOutput = streams.TerminalOutput
 		hooks.OnStarted(process.Record{SchemaVersion: 1, PID: 123, Executable: "pwsh", CommandLine: "pwsh -NoLogo", Cwd: spec.Cwd, StartedAt: time.Now().UTC()})
 		_, _ = streams.Stdout.Write([]byte("TERM_BRIDGE_HISTORY_TEST\n"))
 		return runner.Result{ExitCode: 7, Exit: process.ExitResult{Code: 7}, Process: process.Record{StartedAt: time.Now().UTC()}}, nil
 	}
 
-	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandExec, Exec: ExecCommand{Command: []string{"pwsh", "-NoLogo"}}}, Stdin: bytes.NewReader(nil), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}})
+	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandExec, Exec: ExecCommand{Command: []string{"pwsh", "-NoLogo"}}}, Stdin: bytes.NewReader(nil), Stdout: stdout, Stderr: stderr})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -43,6 +47,9 @@ func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
 	}
 	if filepath.Clean(gotSpec.Cwd) != filepath.Clean(cwd) {
 		t.Fatalf("ProcessSpec.Cwd = %q, want %q", gotSpec.Cwd, cwd)
+	}
+	if gotTerminalOutput != stdout {
+		t.Fatalf("TerminalOutput = %#v, want original stdout", gotTerminalOutput)
 	}
 	if got := globOne(t, filepath.Join(cwd, ".termbridge", "*", "*", "history.log")); got == "" {
 		t.Fatal("history.log was not created")
