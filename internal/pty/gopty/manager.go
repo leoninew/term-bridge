@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"os/exec"
+	"strings"
 	"sync"
+	"time"
 
 	gopty "github.com/aymanbagabas/go-pty"
 
@@ -35,21 +38,36 @@ func (m Manager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.S
 	cmd := pt.CommandContext(ctx, spec.EffectiveCommand(), spec.Args...)
 	cmd.Dir = spec.Cwd
 	cmd.Env = spec.Env
+	startedAt := time.Now().UTC()
 	if err := cmd.Start(); err != nil {
 		_ = pt.Close()
 		return nil, err
 	}
 
-	s := &session{pty: pt, cmd: cmd, done: make(chan termpty.Result, 1)}
+	s := &session{
+		pty: pt,
+		cmd: cmd,
+		process: process.Record{
+			SchemaVersion: 1,
+			PID:           cmd.Process.Pid,
+			OwnerPID:      os.Getpid(),
+			Executable:    spec.EffectiveCommand(),
+			CommandLine:   strings.Join(append([]string{spec.Command}, spec.Args...), " "),
+			Cwd:           spec.Cwd,
+			StartedAt:     startedAt,
+		},
+		done: make(chan termpty.Result, 1),
+	}
 	go s.wait()
 	return s, nil
 }
 
 type session struct {
-	pty  gopty.Pty
-	cmd  *gopty.Cmd
-	done chan termpty.Result
-	once sync.Once
+	pty     gopty.Pty
+	cmd     *gopty.Cmd
+	process process.Record
+	done    chan termpty.Result
+	once    sync.Once
 }
 
 func (s *session) Read(p []byte) (int, error) {
@@ -85,6 +103,10 @@ func (s *session) KillTree() error {
 
 func (s *session) Wait() termpty.Result {
 	return <-s.done
+}
+
+func (s *session) ProcessInfo() process.Record {
+	return s.process
 }
 
 func (s *session) wait() {

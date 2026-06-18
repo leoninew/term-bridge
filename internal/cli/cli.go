@@ -12,9 +12,23 @@ import (
 	"termbridge-go/internal/version"
 )
 
+type CommandKind string
+
+const (
+	CommandExec      CommandKind = "exec"
+	CommandWorkspace CommandKind = "workspace"
+	CommandSession   CommandKind = "session"
+)
+
+type ExecOptions struct {
+	Command  []string
+	ShowHelp bool
+}
+
 type Options struct {
 	Cwd         string
-	Command     []string
+	Kind        CommandKind
+	Exec        ExecOptions
 	ShowHelp    bool
 	ShowVersion bool
 }
@@ -37,12 +51,20 @@ func Run(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int
 		return apperrors.ExitSuccess
 	}
 
+	if options.Exec.ShowHelp {
+		PrintExecUsage(stdout)
+		return apperrors.ExitSuccess
+	}
+
 	result, err := app.Run(context.Background(), app.Options{
-		Cwd:     options.Cwd,
-		Command: options.Command,
-		Stdin:   stdin,
-		Stdout:  stdout,
-		Stderr:  stderr,
+		Cwd: options.Cwd,
+		Command: app.Command{
+			Kind: app.CommandKind(options.Kind),
+			Exec: app.ExecCommand{Command: options.Exec.Command},
+		},
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
 	})
 	if err != nil {
 		printError(stderr, err)
@@ -65,7 +87,70 @@ func Parse(args []string, output io.Writer) (Options, error) {
 	flags.SetOutput(output)
 	flags.BoolVar(&options.ShowHelp, "help", false, "show help")
 	flags.BoolVar(&options.ShowVersion, "version", false, "show version")
-	flags.StringVar(&options.Cwd, "cwd", "", "working directory for the command")
+	flags.StringVar(&options.Cwd, "cwd", "", "working directory for TermBridge")
+
+	if len(args) > 0 && args[0] == "--" {
+		return Options{}, apperrors.Usage("old command form is no longer supported; use: termbridge exec -- <command>")
+	}
+
+	commandIndex := len(args)
+	for i, arg := range args {
+		if isCommand(arg) {
+			commandIndex = i
+			break
+		}
+	}
+	if commandIndex == len(args) {
+		if err := flags.Parse(args); err != nil {
+			return Options{}, apperrors.Usage(err.Error())
+		}
+		if options.ShowHelp || options.ShowVersion {
+			return options, nil
+		}
+		if len(flags.Args()) > 0 {
+			return Options{}, apperrors.Usage("unknown command: " + strings.Join(flags.Args(), " "))
+		}
+		return Options{}, apperrors.Usage("missing command")
+	}
+
+	if err := flags.Parse(args[:commandIndex]); err != nil {
+		return Options{}, apperrors.Usage(err.Error())
+	}
+	if len(flags.Args()) > 0 {
+		return Options{}, apperrors.Usage("unexpected arguments before command: " + strings.Join(flags.Args(), " "))
+	}
+
+	command := args[commandIndex]
+	rest := args[commandIndex+1:]
+	switch command {
+	case "exec":
+		options.Kind = CommandExec
+		return parseExec(options, rest, output)
+	case "workspace":
+		options.Kind = CommandWorkspace
+		if len(rest) > 0 {
+			return Options{}, apperrors.Usage("workspace does not accept arguments")
+		}
+		return options, nil
+	case "session":
+		options.Kind = CommandSession
+		if len(rest) > 0 {
+			return Options{}, apperrors.Usage("session does not accept arguments")
+		}
+		return options, nil
+	default:
+		return Options{}, apperrors.Usage("unknown command: " + command)
+	}
+}
+
+func parseExec(options Options, args []string, output io.Writer) (Options, error) {
+	if len(args) == 1 && args[0] == "--help" {
+		options.Exec.ShowHelp = true
+		return options, nil
+	}
+	flags := flag.NewFlagSet("termbridge exec", flag.ContinueOnError)
+	flags.SetOutput(output)
+	flags.BoolVar(&options.Exec.ShowHelp, "help", false, "show exec help")
 
 	separator := len(args)
 	for i, arg := range args {
@@ -74,34 +159,45 @@ func Parse(args []string, output io.Writer) (Options, error) {
 			break
 		}
 	}
-
 	if err := flags.Parse(args[:separator]); err != nil {
 		return Options{}, apperrors.Usage(err.Error())
 	}
-
-	if separator < len(args) {
-		options.Command = args[separator+1:]
-	}
-
-	if separator == len(args) && !options.ShowHelp && !options.ShowVersion {
-		return Options{}, apperrors.Usage("missing -- before command")
-	}
-	if separator < len(args) && len(options.Command) == 0 && !options.ShowHelp && !options.ShowVersion {
-		return Options{}, apperrors.Usage("missing command after --")
+	if options.Exec.ShowHelp {
+		return options, nil
 	}
 	if len(flags.Args()) > 0 {
-		return Options{}, apperrors.Usage("unexpected arguments before --: " + strings.Join(flags.Args(), " "))
+		return Options{}, apperrors.Usage("unexpected exec arguments before --: " + strings.Join(flags.Args(), " "))
 	}
-
+	if separator == len(args) {
+		return Options{}, apperrors.Usage("missing -- before exec command")
+	}
+	options.Exec.Command = args[separator+1:]
+	if len(options.Exec.Command) == 0 {
+		return Options{}, apperrors.Usage("missing command after --")
+	}
 	return options, nil
+}
+
+func isCommand(arg string) bool {
+	switch arg {
+	case "exec", "workspace", "session":
+		return true
+	default:
+		return false
+	}
 }
 
 func PrintUsage(w io.Writer) {
 	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  termbridge [options] -- <command> [args...]")
+	fmt.Fprintln(w, "  termbridge [options] <command> [command options]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Commands:")
+	fmt.Fprintln(w, "  exec       run a command through a PTY")
+	fmt.Fprintln(w, "  workspace  list workspaces")
+	fmt.Fprintln(w, "  session    list sessions")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
-	fmt.Fprintln(w, "  --cwd <dir>     working directory for the command; defaults to current directory")
+	fmt.Fprintln(w, "  --cwd <dir>     working directory for TermBridge; defaults to current directory")
 	fmt.Fprintln(w, "  --version       show version")
 	fmt.Fprintln(w, "  --help          show help")
 	fmt.Fprintln(w)
@@ -109,9 +205,17 @@ func PrintUsage(w io.Writer) {
 	fmt.Fprintln(w, "  TermBridge reads .termbridge.yaml from --cwd/current directory, then from the user home directory.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Examples:")
-	fmt.Fprintln(w, "  termbridge -- claude")
-	fmt.Fprintln(w, "  termbridge --cwd D:\\project -- codex")
-	fmt.Fprintln(w, "  termbridge --cwd D:\\project -- pwsh")
+	fmt.Fprintln(w, "  termbridge exec -- claude")
+	fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- codex")
+	fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- pwsh")
+}
+
+func PrintExecUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  termbridge [options] exec [exec options] -- <command> [args...]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintln(w, "  --help          show exec help")
 }
 
 func printError(w io.Writer, err error) {

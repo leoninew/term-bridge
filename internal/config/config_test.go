@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	apperrors "termbridge-go/internal/errors"
@@ -28,6 +29,19 @@ func TestLoadDefaults(t *testing.T) {
 	if filepath.Clean(cfg.LogDir) != filepath.Clean(wantLogDir) {
 		t.Fatalf("LogDir = %q, want %q", cfg.LogDir, wantLogDir)
 	}
+	wantStateDir := filepath.Join(cwd, ".termbridge")
+	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(wantStateDir) {
+		t.Fatalf("StateDir = %q, want %q", cfg.Runtime.StateDir, wantStateDir)
+	}
+	if cfg.History.MaxLines != 10000 {
+		t.Fatalf("History.MaxLines = %d", cfg.History.MaxLines)
+	}
+	if cfg.History.MaxBytes != 5242880 {
+		t.Fatalf("History.MaxBytes = %d", cfg.History.MaxBytes)
+	}
+	if cfg.History.MaxLineBytes != 65536 {
+		t.Fatalf("History.MaxLineBytes = %d", cfg.History.MaxLineBytes)
+	}
 	if cfg.ConfigFile != "" {
 		t.Fatalf("ConfigFile = %q, want empty", cfg.ConfigFile)
 	}
@@ -40,6 +54,20 @@ func TestLoadRejectsInvalidLogLevel(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeConfig(t, cwd, "log:\n  level: trace\n")
+
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !apperrors.IsConfig(err) {
+		t.Fatalf("Load() error = %T, want config error", err)
+	}
+}
+
+func TestLoadRejectsInvalidHistoryLimit(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeConfig(t, cwd, "history:\n  max_lines: 0\n")
 
 	_, err := Load(Options{Cwd: cwd})
 	if err == nil {
@@ -69,7 +97,8 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	cwd := t.TempDir()
 	configPath := filepath.Join(cwd, FileName)
 	logDir := filepath.Join(cwd, "configured-logs")
-	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\n"
+	stateDir := filepath.Join(cwd, "configured-state")
+	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: " + filepath.ToSlash(stateDir) + "\n"
 	writeConfig(t, cwd, content)
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -87,6 +116,12 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	}
 	if filepath.Clean(cfg.LogDir) != filepath.Clean(logDir) {
 		t.Fatalf("LogDir = %q, want %q", cfg.LogDir, logDir)
+	}
+	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(stateDir) {
+		t.Fatalf("StateDir = %q, want %q", cfg.Runtime.StateDir, stateDir)
+	}
+	if cfg.History.MaxLines != 42 || cfg.History.MaxBytes != 2048 || cfg.History.MaxLineBytes != 128 {
+		t.Fatalf("History = %#v", cfg.History)
 	}
 }
 
@@ -109,6 +144,41 @@ func TestLoadPrefersLocalConfigOverHome(t *testing.T) {
 	}
 	if cfg.LogLevel != "debug" {
 		t.Fatalf("LogLevel = %q, want debug", cfg.LogLevel)
+	}
+}
+
+func TestLoadUsesPackagedDefaultConfigAndUserOverride(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeConfig(t, cwd, "history:\n  max_lines: 42\n")
+
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.History.MaxLines != 42 {
+		t.Fatalf("History.MaxLines = %d, want user override", cfg.History.MaxLines)
+	}
+	if cfg.History.MaxBytes != 5242880 || cfg.History.MaxLineBytes != 65536 {
+		t.Fatalf("History defaults were not merged: %#v", cfg.History)
+	}
+	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Join(cwd, ".termbridge") {
+		t.Fatalf("StateDir = %q", cfg.Runtime.StateDir)
+	}
+}
+
+func TestPublicDefaultConfigMatchesEmbeddedDefaultConfig(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller() failed")
+	}
+	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	publicDefault, err := os.ReadFile(filepath.Join(repoRoot, "configs", "termbridge.default.yaml"))
+	if err != nil {
+		t.Fatalf("ReadFile(public default) error = %v", err)
+	}
+	if string(publicDefault) != string(defaultConfig) {
+		t.Fatal("configs/termbridge.default.yaml differs from embedded internal/config/termbridge.default.yaml")
 	}
 }
 

@@ -26,7 +26,7 @@ build:
     go build -o bin/termbridge.exe ./cmd/termbridge
 
 dev *args:
-    go run cmd/termbridge/main.go -- {{args}}
+    go run cmd/termbridge/main.go exec -- {{args}}
 
 clean:
     rm -rf bin

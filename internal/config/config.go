@@ -1,6 +1,8 @@
 package config
 
 import (
+	"bytes"
+	_ "embed"
 	"errors"
 	"fmt"
 	"os"
@@ -17,13 +19,28 @@ const (
 	FileName  = ".termbridge.yaml"
 )
 
+//go:embed termbridge.default.yaml
+var defaultConfig []byte
+
 type Config struct {
 	Cwd        string
 	Command    []string
 	LogLevel   string
 	LogFormat  string
 	LogDir     string
+	History    HistoryConfig
+	Runtime    RuntimeConfig
 	ConfigFile string
+}
+
+type HistoryConfig struct {
+	MaxLines     int
+	MaxBytes     int64
+	MaxLineBytes int
+}
+
+type RuntimeConfig struct {
+	StateDir string
 }
 
 type Options struct {
@@ -48,31 +65,41 @@ func Load(options Options) (Config, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
 	v.AutomaticEnv()
 
-	v.SetDefault("log.level", "info")
-	v.SetDefault("log.format", "text")
-	v.SetDefault("log.dir", "logs")
+	if err := v.ReadConfig(bytes.NewReader(defaultConfig)); err != nil {
+		return Config{}, apperrors.Internal("read default config", err)
+	}
 
 	if configFile != "" {
 		v.SetConfigFile(configFile)
-		if err := v.ReadInConfig(); err != nil {
+		if err := v.MergeInConfig(); err != nil {
 			return Config{}, apperrors.Config("read config file", err)
 		}
-		if err := rejectUnknownKeys(v); err != nil {
-			return Config{}, err
-		}
+	}
+	if err := rejectUnknownKeys(v); err != nil {
+		return Config{}, err
 	}
 
 	logDir, err := resolveLogDir(cwd, v.GetString("log.dir"))
 	if err != nil {
 		return Config{}, err
 	}
+	stateDir, err := resolveStateDir(cwd, v.GetString("runtime.state_dir"))
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
-		Cwd:        cwd,
-		Command:    append([]string(nil), options.Command...),
-		LogLevel:   strings.ToLower(v.GetString("log.level")),
-		LogFormat:  strings.ToLower(v.GetString("log.format")),
-		LogDir:     logDir,
+		Cwd:       cwd,
+		Command:   append([]string(nil), options.Command...),
+		LogLevel:  strings.ToLower(v.GetString("log.level")),
+		LogFormat: strings.ToLower(v.GetString("log.format")),
+		LogDir:    logDir,
+		History: HistoryConfig{
+			MaxLines:     v.GetInt("history.max_lines"),
+			MaxBytes:     v.GetInt64("history.max_bytes"),
+			MaxLineBytes: v.GetInt("history.max_line_bytes"),
+		},
+		Runtime:    RuntimeConfig{StateDir: stateDir},
 		ConfigFile: configFile,
 	}
 
@@ -80,6 +107,9 @@ func Load(options Options) (Config, error) {
 		return Config{}, err
 	}
 	if err := validateLogFormat(cfg.LogFormat); err != nil {
+		return Config{}, err
+	}
+	if err := validateHistory(cfg.History); err != nil {
 		return Config{}, err
 	}
 	if err := ensureLogDir(cfg.LogDir); err != nil {
@@ -150,9 +180,13 @@ func fileExists(path string) (bool, error) {
 
 func rejectUnknownKeys(v *viper.Viper) error {
 	allowed := map[string]struct{}{
-		"log.level":  {},
-		"log.format": {},
-		"log.dir":    {},
+		"log.level":              {},
+		"log.format":             {},
+		"log.dir":                {},
+		"history.max_lines":      {},
+		"history.max_bytes":      {},
+		"history.max_line_bytes": {},
+		"runtime.state_dir":      {},
 	}
 	for _, key := range v.AllKeys() {
 		if _, ok := allowed[key]; !ok {
@@ -165,6 +199,16 @@ func rejectUnknownKeys(v *viper.Viper) error {
 func resolveLogDir(cwd string, path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", apperrors.Config("invalid log dir", fmt.Errorf("empty path"))
+	}
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path), nil
+	}
+	return filepath.Join(cwd, path), nil
+}
+
+func resolveStateDir(cwd string, path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", apperrors.Config("invalid runtime state dir", fmt.Errorf("empty path"))
 	}
 	if filepath.IsAbs(path) {
 		return filepath.Clean(path), nil
@@ -188,6 +232,19 @@ func validateLogFormat(format string) error {
 	default:
 		return apperrors.Config("invalid log format", fmt.Errorf("%q", format))
 	}
+}
+
+func validateHistory(config HistoryConfig) error {
+	if config.MaxLines <= 0 {
+		return apperrors.Config("invalid history max_lines", fmt.Errorf("must be positive"))
+	}
+	if config.MaxBytes <= 0 {
+		return apperrors.Config("invalid history max_bytes", fmt.Errorf("must be positive"))
+	}
+	if config.MaxLineBytes <= 0 {
+		return apperrors.Config("invalid history max_line_bytes", fmt.Errorf("must be positive"))
+	}
+	return nil
 }
 
 func ensureLogDir(path string) error {

@@ -1,0 +1,12 @@
+log:
+  level: info
+  format: text
+  dir: logs
+
+history:
+  max_lines: 10000
+  max_bytes: 5242880
+  max_line_bytes: 65536
+
+runtime:
+  state_dir: .termbridge

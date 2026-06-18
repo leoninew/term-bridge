@@ -21,6 +21,10 @@ type Session interface {
 	Wait() Result
 }
 
+type ProcessReporter interface {
+	ProcessInfo() process.Record
+}
+
 type Result struct {
 	ExitCode int
 	Err      error

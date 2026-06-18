@@ -11,20 +11,23 @@ import (
 	apperrors "termbridge-go/internal/errors"
 )
 
-func TestParseCommandWithDefaultCwd(t *testing.T) {
-	cfg, err := Parse([]string{"--", "claude", "--dangerously-skip-permissions"}, &bytes.Buffer{})
+func TestParseExecCommandWithDefaultCwd(t *testing.T) {
+	cfg, err := Parse([]string{"exec", "--", "claude", "--dangerously-skip-permissions"}, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
 
 	want := []string{"claude", "--dangerously-skip-permissions"}
-	if !reflect.DeepEqual(cfg.Command, want) {
-		t.Fatalf("Command = %#v, want %#v", cfg.Command, want)
+	if cfg.Kind != CommandExec {
+		t.Fatalf("Kind = %q", cfg.Kind)
+	}
+	if !reflect.DeepEqual(cfg.Exec.Command, want) {
+		t.Fatalf("Command = %#v, want %#v", cfg.Exec.Command, want)
 	}
 }
 
-func TestParseCommandWithExplicitCwd(t *testing.T) {
-	cfg, err := Parse([]string{"--cwd", `D:\project`, "--", "pwsh"}, &bytes.Buffer{})
+func TestParseExecCommandWithExplicitCwd(t *testing.T) {
+	cfg, err := Parse([]string{"--cwd", `D:\project`, "exec", "--", "pwsh"}, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
@@ -32,13 +35,30 @@ func TestParseCommandWithExplicitCwd(t *testing.T) {
 	if cfg.Cwd != `D:\project` {
 		t.Fatalf("Cwd = %q", cfg.Cwd)
 	}
-	if !reflect.DeepEqual(cfg.Command, []string{"pwsh"}) {
-		t.Fatalf("Command = %#v", cfg.Command)
+	if !reflect.DeepEqual(cfg.Exec.Command, []string{"pwsh"}) {
+		t.Fatalf("Command = %#v", cfg.Exec.Command)
+	}
+}
+
+func TestParseWorkspaceAndSessionCommands(t *testing.T) {
+	workspace, err := Parse([]string{"workspace"}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Parse(workspace) error = %v", err)
+	}
+	if workspace.Kind != CommandWorkspace {
+		t.Fatalf("workspace.Kind = %q", workspace.Kind)
+	}
+	session, err := Parse([]string{"session"}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Parse(session) error = %v", err)
+	}
+	if session.Kind != CommandSession {
+		t.Fatalf("session.Kind = %q", session.Kind)
 	}
 }
 
 func TestParseRejectsLogFlags(t *testing.T) {
-	_, err := Parse([]string{"--log-level", "debug", "--", "pwsh"}, &bytes.Buffer{})
+	_, err := Parse([]string{"--log-level", "debug", "exec", "--", "pwsh"}, &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("Parse() error = nil, want error")
 	}
@@ -47,7 +67,7 @@ func TestParseRejectsLogFlags(t *testing.T) {
 	}
 }
 
-func TestParseRequiresSeparator(t *testing.T) {
+func TestParseRequiresSubcommand(t *testing.T) {
 	_, err := Parse([]string{"claude"}, &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("Parse() error = nil, want error")
@@ -57,8 +77,28 @@ func TestParseRequiresSeparator(t *testing.T) {
 	}
 }
 
-func TestParseRequiresCommandAfterSeparator(t *testing.T) {
-	_, err := Parse([]string{"--"}, &bytes.Buffer{})
+func TestParseRejectsOldGrammar(t *testing.T) {
+	_, err := Parse([]string{"--", "claude"}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("Parse() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "old command form") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestParseExecRequiresSeparator(t *testing.T) {
+	_, err := Parse([]string{"exec", "claude"}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("Parse() error = nil, want error")
+	}
+	if !apperrors.IsUsage(err) {
+		t.Fatalf("Parse() error type = %T, want usage error", err)
+	}
+}
+
+func TestParseExecRequiresCommandAfterSeparator(t *testing.T) {
+	_, err := Parse([]string{"exec", "--"}, &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("Parse() error = nil, want error")
 	}
@@ -77,6 +117,16 @@ func TestParseVersionWithoutCommand(t *testing.T) {
 	}
 }
 
+func TestParseExecHelp(t *testing.T) {
+	cfg, err := Parse([]string{"exec", "--help"}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if !cfg.Exec.ShowHelp {
+		t.Fatal("Exec.ShowHelp = false, want true")
+	}
+}
+
 func TestRunHelpWritesStdoutOnly(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -86,7 +136,7 @@ func TestRunHelpWritesStdoutOnly(t *testing.T) {
 	if code != apperrors.ExitSuccess {
 		t.Fatalf("Run() code = %d, want %d", code, apperrors.ExitSuccess)
 	}
-	if !strings.Contains(stdout.String(), "termbridge [options] -- <command>") {
+	if !strings.Contains(stdout.String(), "termbridge [options] <command>") || !strings.Contains(stdout.String(), "workspace") {
 		t.Fatalf("stdout missing usage: %s", stdout.String())
 	}
 	if strings.Contains(stdout.String(), "--log-level") || strings.Contains(stdout.String(), "--config") {
@@ -114,7 +164,7 @@ func TestRunVersionWritesStdoutOnly(t *testing.T) {
 	}
 }
 
-func TestRunMissingSeparatorReturnsUsageExit(t *testing.T) {
+func TestRunMissingCommandReturnsUsageExit(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -126,7 +176,7 @@ func TestRunMissingSeparatorReturnsUsageExit(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	if !strings.Contains(stderr.String(), "missing -- before command") {
+	if !strings.Contains(stderr.String(), "unknown command") {
 		t.Fatalf("stderr missing usage error: %s", stderr.String())
 	}
 }
@@ -135,7 +185,7 @@ func TestRunInvalidCwdReturnsConfigExit(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"--cwd", filepath.Join(t.TempDir(), "missing"), "--", "pwsh"}, bytes.NewReader(nil), &stdout, &stderr)
+	code := Run([]string{"--cwd", filepath.Join(t.TempDir(), "missing"), "exec", "--", "pwsh"}, bytes.NewReader(nil), &stdout, &stderr)
 
 	if code != apperrors.ExitConfig {
 		t.Fatalf("Run() code = %d, want %d", code, apperrors.ExitConfig)
@@ -148,13 +198,13 @@ func TestRunInvalidCwdReturnsConfigExit(t *testing.T) {
 	}
 }
 
-func TestRunCommandCreatesLogAndReturnsCommandExitCode(t *testing.T) {
+func TestRunCommandCreatesLogStateAndReturnsCommandExitCode(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cwd := t.TempDir()
 	isolateHome(t)
 
-	code := Run([]string{"--cwd", cwd, "--", "cmd.exe", "/C", "exit", "/b", "7"}, bytes.NewReader(nil), &stdout, &stderr)
+	code := Run([]string{"--cwd", cwd, "exec", "--", "cmd.exe", "/C", "exit", "/b", "7"}, bytes.NewReader(nil), &stdout, &stderr)
 
 	if code != 7 {
 		t.Fatalf("Run() code = %d, want 7; stderr=%s", code, stderr.String())
@@ -172,6 +222,13 @@ func TestRunCommandCreatesLogAndReturnsCommandExitCode(t *testing.T) {
 	}
 	if info.Size() == 0 {
 		t.Fatal("log file is empty")
+	}
+	matches, err := filepath.Glob(filepath.Join(cwd, ".termbridge", "*", "*", "exit.json"))
+	if err != nil {
+		t.Fatalf("Glob() error = %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("exit.json matches = %#v", matches)
 	}
 }
 

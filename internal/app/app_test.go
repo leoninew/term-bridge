@@ -3,8 +3,11 @@ package app
 import (
 	"bytes"
 	"context"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	apperrors "termbridge-go/internal/errors"
 	"termbridge-go/internal/logging"
@@ -12,7 +15,7 @@ import (
 	"termbridge-go/internal/runner"
 )
 
-func TestRunCallsRuntimeAndReturnsExitCode(t *testing.T) {
+func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
@@ -21,12 +24,14 @@ func TestRunCallsRuntimeAndReturnsExitCode(t *testing.T) {
 	defer func() { runRuntime = oldRunRuntime }()
 
 	var gotSpec process.ProcessSpec
-	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO) (runner.Result, error) {
+	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO, hooks runner.Hooks) (runner.Result, error) {
 		gotSpec = spec
-		return runner.Result{ExitCode: 7}, nil
+		hooks.OnStarted(process.Record{SchemaVersion: 1, PID: 123, Executable: "pwsh", CommandLine: "pwsh -NoLogo", Cwd: spec.Cwd, StartedAt: time.Now().UTC()})
+		_, _ = streams.Stdout.Write([]byte("TERM_BRIDGE_HISTORY_TEST\n"))
+		return runner.Result{ExitCode: 7, Exit: process.ExitResult{Code: 7}, Process: process.Record{StartedAt: time.Now().UTC()}}, nil
 	}
 
-	result, err := Run(context.Background(), Options{Cwd: cwd, Command: []string{"pwsh", "-NoLogo"}, Stdin: bytes.NewReader(nil), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}})
+	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandExec, Exec: ExecCommand{Command: []string{"pwsh", "-NoLogo"}}}, Stdin: bytes.NewReader(nil), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -39,9 +44,15 @@ func TestRunCallsRuntimeAndReturnsExitCode(t *testing.T) {
 	if filepath.Clean(gotSpec.Cwd) != filepath.Clean(cwd) {
 		t.Fatalf("ProcessSpec.Cwd = %q, want %q", gotSpec.Cwd, cwd)
 	}
+	if got := globOne(t, filepath.Join(cwd, ".termbridge", "*", "*", "history.log")); got == "" {
+		t.Fatal("history.log was not created")
+	}
+	if got := globOne(t, filepath.Join(cwd, ".termbridge", "*", "*", "exit.json")); got == "" {
+		t.Fatal("exit.json was not created")
+	}
 }
 
-func TestRunReturnsRuntimeErrorFromRunner(t *testing.T) {
+func TestRunReturnsRuntimeErrorFromRunnerAndMarksFailed(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
@@ -49,11 +60,11 @@ func TestRunReturnsRuntimeErrorFromRunner(t *testing.T) {
 	oldRunRuntime := runRuntime
 	defer func() { runRuntime = oldRunRuntime }()
 
-	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO) (runner.Result, error) {
+	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO, hooks runner.Hooks) (runner.Result, error) {
 		return runner.Result{}, apperrors.Runtime("runner failed", nil)
 	}
 
-	result, err := Run(context.Background(), Options{Cwd: cwd, Command: []string{"pwsh"}, Stdin: bytes.NewReader(nil), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}})
+	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandExec, Exec: ExecCommand{Command: []string{"pwsh"}}}, Stdin: bytes.NewReader(nil), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}})
 	if err == nil {
 		t.Fatal("Run() error = nil, want runtime error")
 	}
@@ -63,4 +74,90 @@ func TestRunReturnsRuntimeErrorFromRunner(t *testing.T) {
 	if len(result.Command) != 1 || result.Command[0] != "pwsh" {
 		t.Fatalf("Result.Command = %#v", result.Command)
 	}
+	stateFile := globOne(t, filepath.Join(cwd, ".termbridge", "*", "*", "state.json"))
+	if stateFile == "" {
+		t.Fatal("state.json was not created")
+	}
+}
+
+func TestRunExecUsesConfiguredStateDirAndHistoryLimits(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	cwd := t.TempDir()
+	configuredStateDir := filepath.Join(cwd, "runtime-state")
+	configContent := "history:\n  max_lines: 1\n  max_bytes: 8\n  max_line_bytes: 4\nruntime:\n  state_dir: " + filepath.ToSlash(configuredStateDir) + "\n"
+	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(config) error = %v", err)
+	}
+	oldRunRuntime := runRuntime
+	defer func() { runRuntime = oldRunRuntime }()
+	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO, hooks runner.Hooks) (runner.Result, error) {
+		hooks.OnStarted(process.Record{SchemaVersion: 1, PID: 123, Executable: "pwsh", CommandLine: "pwsh", Cwd: spec.Cwd, StartedAt: time.Now().UTC()})
+		_, _ = streams.Stdout.Write([]byte("abcdef\nsecond\n"))
+		return runner.Result{ExitCode: 0, Exit: process.ExitResult{Code: 0}, Process: process.Record{StartedAt: time.Now().UTC()}}, nil
+	}
+
+	_, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandExec, Exec: ExecCommand{Command: []string{"pwsh"}}}, Stdin: bytes.NewReader(nil), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	defaultState := globOne(t, filepath.Join(cwd, ".termbridge", "*", "*", "session.json"))
+	if defaultState != "" {
+		t.Fatalf("default .termbridge state was created despite configured state_dir: %s", defaultState)
+	}
+	historyPath := globOne(t, filepath.Join(configuredStateDir, "*", "*", "history.log"))
+	if historyPath == "" {
+		t.Fatal("configured state dir history.log was not created")
+	}
+	data, err := os.ReadFile(historyPath)
+	if err != nil {
+		t.Fatalf("ReadFile(history) error = %v", err)
+	}
+	if string(data) != "seco" {
+		t.Fatalf("history = %q, want configured one-line four-byte truncation", data)
+	}
+}
+
+func TestRunWorkspaceAndSessionList(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	cwd := t.TempDir()
+	oldRunRuntime := runRuntime
+	defer func() { runRuntime = oldRunRuntime }()
+	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO, hooks runner.Hooks) (runner.Result, error) {
+		hooks.OnStarted(process.Record{SchemaVersion: 1, PID: 123, Executable: "pwsh", CommandLine: "pwsh", Cwd: spec.Cwd, StartedAt: time.Now().UTC()})
+		return runner.Result{ExitCode: 0, Exit: process.ExitResult{Code: 0}, Process: process.Record{StartedAt: time.Now().UTC()}}, nil
+	}
+	_, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandExec, Exec: ExecCommand{Command: []string{"pwsh"}}}, Stdin: bytes.NewReader(nil), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}})
+	if err != nil {
+		t.Fatalf("Run(exec) error = %v", err)
+	}
+	var workspaceOut bytes.Buffer
+	if _, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandWorkspace}, Stdout: &workspaceOut}); err != nil {
+		t.Fatalf("Run(workspace) error = %v", err)
+	}
+	if !strings.Contains(workspaceOut.String(), "WORKSPACE ID") || !strings.Contains(workspaceOut.String(), filepath.Base(cwd)) {
+		t.Fatalf("workspace output = %s", workspaceOut.String())
+	}
+	var sessionOut bytes.Buffer
+	if _, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandSession}, Stdout: &sessionOut}); err != nil {
+		t.Fatalf("Run(session) error = %v", err)
+	}
+	if !strings.Contains(sessionOut.String(), "SESSION ID") || !strings.Contains(sessionOut.String(), "stopped") {
+		t.Fatalf("session output = %s", sessionOut.String())
+	}
+}
+
+func globOne(t *testing.T, pattern string) string {
+	t.Helper()
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		t.Fatalf("Glob(%q) error = %v", pattern, err)
+	}
+	if len(matches) == 0 {
+		return ""
+	}
+	return matches[0]
 }
