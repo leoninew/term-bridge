@@ -24,7 +24,7 @@ func (OSAliveChecker) Check(record process.Record) AliveStatus {
 	if err != nil {
 		return AliveMissing
 	}
-	defer windows.CloseHandle(handle)
+	defer func() { _ = windows.CloseHandle(handle) }()
 
 	var code uint32
 	if err := windows.GetExitCodeProcess(handle, &code); err != nil {

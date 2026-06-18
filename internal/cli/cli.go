@@ -18,6 +18,7 @@ const (
 	CommandExec      CommandKind = "exec"
 	CommandWorkspace CommandKind = "workspace"
 	CommandSession   CommandKind = "session"
+	CommandWeb       CommandKind = "web"
 )
 
 type ExecOptions struct {
@@ -25,10 +26,19 @@ type ExecOptions struct {
 	ShowHelp bool
 }
 
+type WebOptions struct {
+	Host     string
+	Port     int
+	Open     bool
+	Dev      bool
+	ShowHelp bool
+}
+
 type Options struct {
 	Cwd         string
 	Kind        CommandKind
 	Exec        ExecOptions
+	Web         WebOptions
 	ShowHelp    bool
 	ShowVersion bool
 }
@@ -56,11 +66,17 @@ func Run(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int
 		return apperrors.ExitSuccess
 	}
 
+	if options.Web.ShowHelp {
+		PrintWebUsage(stdout)
+		return apperrors.ExitSuccess
+	}
+
 	result, err := app.Run(context.Background(), app.Options{
 		Cwd: options.Cwd,
 		Command: app.Command{
 			Kind: app.CommandKind(options.Kind),
 			Exec: app.ExecCommand{Command: options.Exec.Command},
+			Web:  app.WebCommand{Host: options.Web.Host, Port: options.Web.Port, Open: options.Web.Open, Dev: options.Web.Dev},
 		},
 		Stdin:  stdin,
 		Stdout: stdout,
@@ -138,9 +154,39 @@ func Parse(args []string, output io.Writer) (Options, error) {
 			return Options{}, apperrors.Usage("session does not accept arguments")
 		}
 		return options, nil
+	case "web":
+		options.Kind = CommandWeb
+		return parseWeb(options, rest, output)
 	default:
 		return Options{}, apperrors.Usage("unknown command: " + command)
 	}
+}
+
+func parseWeb(options Options, args []string, output io.Writer) (Options, error) {
+	if len(args) == 1 && args[0] == "--help" {
+		options.Web.ShowHelp = true
+		return options, nil
+	}
+	flags := flag.NewFlagSet("termbridge web", flag.ContinueOnError)
+	flags.SetOutput(output)
+	flags.StringVar(&options.Web.Host, "host", "127.0.0.1", "web server host")
+	flags.IntVar(&options.Web.Port, "port", 0, "web server port")
+	flags.BoolVar(&options.Web.Open, "open", false, "open browser after server starts")
+	flags.BoolVar(&options.Web.Dev, "dev", false, "enable development server friendly behavior")
+	flags.BoolVar(&options.Web.ShowHelp, "help", false, "show web help")
+	if err := flags.Parse(args); err != nil {
+		return Options{}, apperrors.Usage(err.Error())
+	}
+	if options.Web.ShowHelp {
+		return options, nil
+	}
+	if len(flags.Args()) > 0 {
+		return Options{}, apperrors.Usage("web does not accept positional arguments: " + strings.Join(flags.Args(), " "))
+	}
+	if options.Web.Port < 0 || options.Web.Port > 65535 {
+		return Options{}, apperrors.Usage("web port must be between 0 and 65535")
+	}
+	return options, nil
 }
 
 func parseExec(options Options, args []string, output io.Writer) (Options, error) {
@@ -180,7 +226,7 @@ func parseExec(options Options, args []string, output io.Writer) (Options, error
 
 func isCommand(arg string) bool {
 	switch arg {
-	case "exec", "workspace", "session":
+	case "exec", "workspace", "session", "web":
 		return true
 	default:
 		return false
@@ -195,6 +241,7 @@ func PrintUsage(w io.Writer) {
 	fmt.Fprintln(w, "  exec       run a command through a PTY")
 	fmt.Fprintln(w, "  workspace  list workspaces")
 	fmt.Fprintln(w, "  session    list sessions")
+	fmt.Fprintln(w, "  web        start local Web terminal server")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
 	fmt.Fprintln(w, "  --cwd <dir>     working directory for TermBridge; defaults to current directory")
@@ -208,6 +255,19 @@ func PrintUsage(w io.Writer) {
 	fmt.Fprintln(w, "  termbridge exec -- claude")
 	fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- codex")
 	fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- pwsh")
+	fmt.Fprintln(w, "  termbridge web --dev")
+}
+
+func PrintWebUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  termbridge [options] web [web options]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintln(w, "  --host <host>    web server host; defaults to 127.0.0.1")
+	fmt.Fprintln(w, "  --port <port>    web server port; defaults to 0 (auto-select)")
+	fmt.Fprintln(w, "  --open           open browser after server starts")
+	fmt.Fprintln(w, "  --dev            enable Vite dev-server friendly behavior")
+	fmt.Fprintln(w, "  --help           show web help")
 }
 
 func PrintExecUsage(w io.Writer) {

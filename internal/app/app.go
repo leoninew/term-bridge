@@ -21,6 +21,8 @@ import (
 	"termbridge-go/internal/runner"
 	"termbridge-go/internal/session"
 	"termbridge-go/internal/state"
+	"termbridge-go/internal/webserver"
+	"termbridge-go/internal/webterminal"
 	"termbridge-go/internal/workspace"
 )
 
@@ -30,15 +32,24 @@ const (
 	CommandExec      CommandKind = "exec"
 	CommandWorkspace CommandKind = "workspace"
 	CommandSession   CommandKind = "session"
+	CommandWeb       CommandKind = "web"
 )
 
 type Command struct {
 	Kind CommandKind
 	Exec ExecCommand
+	Web  WebCommand
 }
 
 type ExecCommand struct {
 	Command []string
+}
+
+type WebCommand struct {
+	Host string
+	Port int
+	Open bool
+	Dev  bool
 }
 
 type Options struct {
@@ -63,6 +74,17 @@ var runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.
 		Hooks:          hooks,
 	}
 	return r.Run(ctx, spec, streams)
+}
+
+var runWebServer = func(ctx context.Context, server *webserver.Server, onListening func(webserver.Info)) error {
+	listener, info, err := server.Listen()
+	if err != nil {
+		return err
+	}
+	if onListening != nil {
+		onListening(info)
+	}
+	return server.Serve(ctx, listener)
 }
 
 func Run(ctx context.Context, options Options) (Result, error) {
@@ -95,6 +117,9 @@ func Run(ctx context.Context, options Options) (Result, error) {
 		return runWorkspaceList(cfg, options.Stdout)
 	case CommandSession:
 		return runSessionList(cfg, options.Stdout)
+	case CommandWeb:
+		logger.Info("termbridge web command parsed", "cwd", cfg.Cwd, "host", options.Command.Web.Host, "port", options.Command.Web.Port, "dev", options.Command.Web.Dev, "config", cfg.ConfigFile)
+		return runWeb(ctx, cfg, logger, options)
 	default:
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("missing command")
 	}
@@ -208,6 +233,32 @@ func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, opt
 	}
 
 	return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...), ExitCode: runtimeResult.ExitCode}, nil
+}
+
+func runWeb(ctx context.Context, cfg config.Config, logger *logging.Logger, options Options) (Result, error) {
+	stdout := options.Stdout
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	registry := webterminal.NewRegistry(webterminal.Config{
+		Cwd:     cfg.Cwd,
+		Store:   state.NewStore(cfg.Runtime.StateDir),
+		LogDir:  cfg.LogDir,
+		History: cfg.History,
+		Manager: gopty.NewManager(),
+		Logger:  logger,
+	})
+	server := webserver.New(webserver.Config{Host: options.Command.Web.Host, Port: options.Command.Web.Port, Open: options.Command.Web.Open, Dev: options.Command.Web.Dev}, registry)
+	err := runWebServer(ctx, server, func(info webserver.Info) {
+		fmt.Fprintf(stdout, "TermBridge web terminal listening on %s\n", info.URL)
+		if options.Command.Web.Dev {
+			fmt.Fprintln(stdout, "Dev mode enabled: start the Vite dev server from web/ and proxy /api to this URL.")
+		}
+	})
+	if err != nil && err != context.Canceled {
+		return Result{Cwd: cfg.Cwd}, err
+	}
+	return Result{Cwd: cfg.Cwd}, nil
 }
 
 func runWorkspaceList(cfg config.Config, stdout io.Writer) (Result, error) {

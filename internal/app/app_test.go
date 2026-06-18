@@ -13,6 +13,7 @@ import (
 	"termbridge-go/internal/logging"
 	"termbridge-go/internal/process"
 	"termbridge-go/internal/runner"
+	"termbridge-go/internal/webserver"
 )
 
 func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
@@ -84,6 +85,35 @@ func TestRunReturnsRuntimeErrorFromRunnerAndMarksFailed(t *testing.T) {
 	stateFile := globOne(t, filepath.Join(cwd, ".termbridge", "*", "*", "state.json"))
 	if stateFile == "" {
 		t.Fatal("state.json was not created")
+	}
+}
+
+func TestRunWebStartsServerWithConfiguredRuntime(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	cwd := t.TempDir()
+	oldRunWebServer := runWebServer
+	defer func() { runWebServer = oldRunWebServer }()
+	var gotServer *webserver.Server
+	runWebServer = func(ctx context.Context, server *webserver.Server, onListening func(webserver.Info)) error {
+		gotServer = server
+		onListening(webserver.Info{URL: "http://127.0.0.1:12345"})
+		return context.Canceled
+	}
+	stdout := &bytes.Buffer{}
+	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandWeb, Web: WebCommand{Host: "127.0.0.1", Port: 0, Dev: true}}, Stdout: stdout, Stderr: &bytes.Buffer{}})
+	if err != nil {
+		t.Fatalf("Run(web) error = %v", err)
+	}
+	if filepath.Clean(result.Cwd) != filepath.Clean(cwd) {
+		t.Fatalf("Result.Cwd = %q, want %q", result.Cwd, cwd)
+	}
+	if gotServer == nil {
+		t.Fatal("runWebServer was not called")
+	}
+	if !strings.Contains(stdout.String(), "http://127.0.0.1:12345") || !strings.Contains(stdout.String(), "Dev mode enabled") {
+		t.Fatalf("stdout = %s", stdout.String())
 	}
 }
 

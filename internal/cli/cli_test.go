@@ -57,6 +57,42 @@ func TestParseWorkspaceAndSessionCommands(t *testing.T) {
 	}
 }
 
+func TestParseWebCommand(t *testing.T) {
+	cfg, err := Parse([]string{"--cwd", `D:\project`, "web", "--host", "127.0.0.1", "--port", "8080", "--open", "--dev"}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Parse(web) error = %v", err)
+	}
+	if cfg.Kind != CommandWeb {
+		t.Fatalf("Kind = %q, want web", cfg.Kind)
+	}
+	if cfg.Cwd != `D:\project` {
+		t.Fatalf("Cwd = %q", cfg.Cwd)
+	}
+	if cfg.Web.Host != "127.0.0.1" || cfg.Web.Port != 8080 || !cfg.Web.Open || !cfg.Web.Dev {
+		t.Fatalf("Web = %#v", cfg.Web)
+	}
+}
+
+func TestParseWebHelp(t *testing.T) {
+	cfg, err := Parse([]string{"web", "--help"}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Parse(web --help) error = %v", err)
+	}
+	if !cfg.Web.ShowHelp {
+		t.Fatal("Web.ShowHelp = false, want true")
+	}
+}
+
+func TestParseWebRejectsPositionalArgs(t *testing.T) {
+	_, err := Parse([]string{"web", "pwsh"}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("Parse() error = nil, want error")
+	}
+	if !apperrors.IsUsage(err) {
+		t.Fatalf("Parse() error type = %T, want usage error", err)
+	}
+}
+
 func TestParseRejectsLogFlags(t *testing.T) {
 	_, err := Parse([]string{"--log-level", "debug", "exec", "--", "pwsh"}, &bytes.Buffer{})
 	if err == nil {
