@@ -14,6 +14,7 @@
       </div>
     </header>
     <div ref="terminalElement" class="terminal-container" />
+    <p v-if="replaying" class="terminal-error">Replaying bounded history…</p>
     <p v-if="socket.error.value" class="terminal-error">{{ socket.error.value }}</p>
   </section>
 </template>
@@ -23,6 +24,7 @@
   import type { ServerControlMessage } from '../../protocol/terminal'
   import { createXterm } from './useXterm'
   import { useTerminalSocket } from '../../features/sessions/useTerminalSocket'
+  import { closeSession as closeSessionApi } from '../../features/sessions/api'
 
   const props = defineProps<{
     wsUrl: string | null
@@ -34,14 +36,23 @@
   }>()
 
   const terminalElement = ref<HTMLElement | null>(null)
+  const replaying = ref(false)
   let xterm: ReturnType<typeof createXterm> | null = null
 
   const socket = useTerminalSocket(
     (data) => xterm?.write(data),
     (message) => {
       emit('state', message)
+      if (message.type === 'replay_started') {
+        replaying.value = true
+      }
+      if (message.type === 'replay_finished') {
+        replaying.value = false
+      }
       if (message.type === 'error') {
-        xterm?.terminal.writeln(`\r\n[termbridge:${message.code}] ${message.message}`)
+        xterm?.terminal.writeln(
+          `\r\n[termbridge:${message.code}] ${safeTerminalText(message.message)}`,
+        )
       }
       if (message.type === 'exited') {
         xterm?.terminal.writeln(`\r\n[termbridge] process exited with code ${message.exit_code}`)
@@ -60,12 +71,23 @@
 
   function detach() {
     socket.sendControl({ type: 'detach' })
+  }
+
+  async function closeSession() {
+    if (!props.sessionId) {
+      return
+    }
+    await closeSessionApi(props.sessionId)
     socket.close()
   }
 
-  function closeSession() {
-    socket.sendControl({ type: 'close' })
-    socket.close()
+  function safeTerminalText(value: string): string {
+    return Array.from(value)
+      .filter((char) => {
+        const code = char.charCodeAt(0)
+        return code >= 0x20 && code !== 0x7f && code !== 0x9b
+      })
+      .join('')
   }
 
   onMounted(() => {

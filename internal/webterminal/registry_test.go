@@ -15,6 +15,52 @@ import (
 	"termbridge-go/internal/state"
 )
 
+func TestCreateSessionExpandsHomeCwd(t *testing.T) {
+	root := t.TempDir()
+	home := t.TempDir()
+	workdir := filepath.Join(home, "Downloads")
+	if err := os.Mkdir(workdir, 0o755); err != nil {
+		t.Fatalf("Mkdir() error = %v", err)
+	}
+	t.Setenv("HOME", home)
+	fake := newFakeSession()
+	manager := &fakeManager{session: fake}
+	registry := NewRegistry(Config{Cwd: home, CwdAllowlist: []string{home}, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
+
+	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Cwd: "~/Downloads", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	want, err := filepath.EvalSymlinks(workdir)
+	if err != nil {
+		t.Fatalf("EvalSymlinks() error = %v", err)
+	}
+	if manager.specs[0].Cwd != want {
+		t.Fatalf("spec cwd = %q, want %q", manager.specs[0].Cwd, want)
+	}
+}
+
+func TestCreateSessionAcceptsHomeCwdWhenHomeAllowed(t *testing.T) {
+	root := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	fake := newFakeSession()
+	manager := &fakeManager{session: fake}
+	registry := NewRegistry(Config{Cwd: home, CwdAllowlist: []string{home}, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
+
+	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Cwd: "~", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	want, err := filepath.EvalSymlinks(home)
+	if err != nil {
+		t.Fatalf("EvalSymlinks() error = %v", err)
+	}
+	if manager.specs[0].Cwd != want {
+		t.Fatalf("spec cwd = %q, want %q", manager.specs[0].Cwd, want)
+	}
+}
+
 func TestCreateSessionPersistsRuntimeRecords(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()
@@ -94,20 +140,21 @@ func TestHistoryReturnsWrittenOutput(t *testing.T) {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 	fake.output <- []byte("PTY_OUTPUT\n")
+	var data []byte
 	deadline := time.Now().Add(time.Second)
 	for {
-		data, err := os.ReadFile(state.NewStore(root).HistoryPath(response.WorkspaceKey, response.SessionID))
-		if err == nil && string(data) == "PTY_OUTPUT\n" {
+		var err error
+		data, err = registry.History(response.SessionID)
+		if err != nil {
+			t.Fatalf("History() error = %v", err)
+		}
+		if string(data) == "PTY_OUTPUT\n" {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("history was not written, data=%q err=%v", data, err)
+			t.Fatalf("history was not written, data=%q", data)
 		}
 		time.Sleep(10 * time.Millisecond)
-	}
-	data, err := registry.History(response.SessionID)
-	if err != nil {
-		t.Fatalf("History() error = %v", err)
 	}
 	if string(data) != "PTY_OUTPUT\n" {
 		t.Fatalf("History() = %q", data)

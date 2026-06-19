@@ -31,7 +31,8 @@ const (
 	AttachmentDetached    AttachmentState = "detached"
 	AttachmentReattaching AttachmentState = "reattaching"
 
-	DefaultClientQueueSize = 64
+	DefaultClientQueueSize  = 64
+	DefaultClientQueueBytes = 4 * 1024 * 1024
 )
 
 type AttachmentState string
@@ -44,6 +45,8 @@ type Config struct {
 	Manager         termpty.Manager
 	Logger          *logging.Logger
 	ClientQueueSize int
+	CwdAllowlist    []string
+	EnvDenylist     []string
 }
 
 type Registry struct {
@@ -55,6 +58,8 @@ type Registry struct {
 	logger          *logging.Logger
 	ids             identity.Generator
 	clientQueueSize int
+	cwdAllowlist    []string
+	envDenylist     []string
 
 	mu       sync.Mutex
 	runtimes map[string]*SessionRuntime
@@ -110,16 +115,22 @@ type Outbound struct {
 }
 
 type Client struct {
-	id      string
-	runtime *SessionRuntime
-	queue   chan Outbound
-	once    sync.Once
+	id          string
+	runtime     *SessionRuntime
+	queue       chan Outbound
+	once        sync.Once
+	mu          sync.Mutex
+	queuedBytes int
 }
 
 func NewRegistry(config Config) *Registry {
 	queueSize := config.ClientQueueSize
 	if queueSize <= 0 {
 		queueSize = DefaultClientQueueSize
+	}
+	cwdAllowlist := append([]string(nil), config.CwdAllowlist...)
+	if len(cwdAllowlist) == 0 {
+		cwdAllowlist = []string{config.Cwd}
 	}
 	return &Registry{
 		cwd:             config.Cwd,
@@ -130,6 +141,8 @@ func NewRegistry(config Config) *Registry {
 		logger:          config.Logger,
 		ids:             identity.NewULIDGenerator(),
 		clientQueueSize: queueSize,
+		cwdAllowlist:    cwdAllowlist,
+		envDenylist:     append([]string(nil), config.EnvDenylist...),
 		runtimes:        map[string]*SessionRuntime{},
 	}
 }
@@ -142,9 +155,9 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 	if strings.TrimSpace(cwd) == "" {
 		cwd = r.cwd
 	}
-	absCwd, err := filepath.Abs(cwd)
+	absCwd, err := r.resolveAllowedCwd(cwd)
 	if err != nil {
-		return CreateSessionResponse{}, apperrors.Config("resolve session cwd", err)
+		return CreateSessionResponse{}, err
 	}
 	if info, err := os.Stat(absCwd); err != nil {
 		return CreateSessionResponse{}, apperrors.Config("invalid session cwd", err)
@@ -162,11 +175,16 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 		return CreateSessionResponse{}, apperrors.Runtime("resolve workspace", err)
 	}
 
+	env := filterEnv(os.Environ(), r.envDenylist)
+	envStrategy := "inherit"
+	if len(r.envDenylist) > 0 {
+		envStrategy = "inherit_denylist"
+	}
 	commandRecord := session.CommandRecord{
 		Command:     request.Command[0],
 		Args:        append([]string(nil), request.Command[1:]...),
-		EnvStrategy: "inherit",
-		EnvCount:    len(os.Environ()),
+		EnvStrategy: envStrategy,
+		EnvCount:    len(env),
 	}
 	manager := session.Manager{Store: r.store, IDs: r.ids}
 	sess, err := manager.Create(session.CreateOptions{
@@ -197,6 +215,7 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 		_ = r.store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "build_process_spec_failed", UpdatedAt: time.Now().UTC()})
 		return CreateSessionResponse{}, apperrors.Runtime("build process spec", err)
 	}
+	spec.Env = env
 	resolved, err := process.ResolveExecutable(spec.Command)
 	if err != nil {
 		_ = historyWriter.Close()
@@ -244,6 +263,16 @@ func (r *Registry) Attach(sessionID string) (*Client, error) {
 	return runtime.attach()
 }
 
+func (r *Registry) CloseSession(sessionID string, reason string) error {
+	r.mu.Lock()
+	runtime := r.runtimes[sessionID]
+	r.mu.Unlock()
+	if runtime == nil {
+		return apperrors.Runtime("session not closable", fmt.Errorf("live PTY handle not found for %s", sessionID))
+	}
+	return runtime.closeSession(reason)
+}
+
 func (r *Registry) ListWorkspaces() ([]WorkspaceSummary, error) {
 	workspaces, _, err := r.store.ListWorkspaces()
 	if err != nil {
@@ -289,6 +318,14 @@ func (r *Registry) GetSession(sessionID string) (SessionSummary, error) {
 }
 
 func (r *Registry) History(sessionID string) ([]byte, error) {
+	r.mu.Lock()
+	runtime := r.runtimes[sessionID]
+	r.mu.Unlock()
+	if runtime != nil {
+		if err := runtime.history.Flush(); err != nil {
+			return nil, apperrors.Runtime("flush history", err)
+		}
+	}
 	views, _, err := r.store.ListSessions()
 	if err != nil {
 		return nil, apperrors.Runtime("list sessions", err)
@@ -306,6 +343,93 @@ func (r *Registry) History(sessionID string) ([]byte, error) {
 		}
 	}
 	return nil, apperrors.Runtime("load session", os.ErrNotExist)
+}
+
+func (r *Registry) resolveAllowedCwd(path string) (string, error) {
+	path, err := expandHome(path)
+	if err != nil {
+		return "", apperrors.Config("resolve session cwd", err)
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", apperrors.Config("resolve session cwd", err)
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", apperrors.Config("resolve session cwd", err)
+	}
+	resolved = filepath.Clean(resolved)
+	for _, root := range r.cwdAllowlist {
+		allowed, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			continue
+		}
+		allowed = filepath.Clean(allowed)
+		if pathWithin(resolved, allowed) {
+			return resolved, nil
+		}
+	}
+	return "", apperrors.Config("session cwd outside allowlist", fmt.Errorf("%s", resolved))
+}
+
+func expandHome(path string) (string, error) {
+	if path == "~" {
+		return os.UserHomeDir()
+	}
+	if strings.HasPrefix(path, "~/") || strings.HasPrefix(path, "~\\") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, path[2:]), nil
+	}
+	if strings.HasPrefix(path, "~") {
+		return "", fmt.Errorf("unsupported home path %q", path)
+	}
+	return path, nil
+}
+
+func pathWithin(path string, root string) bool {
+	path = filepath.Clean(path)
+	root = filepath.Clean(root)
+	if strings.EqualFold(path, root) {
+		return true
+	}
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	return rel != "." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".."
+}
+
+func filterEnv(env []string, denylist []string) []string {
+	if len(denylist) == 0 {
+		return append([]string(nil), env...)
+	}
+	out := make([]string, 0, len(env))
+	for _, entry := range env {
+		name := entry
+		if index := strings.IndexByte(entry, '='); index >= 0 {
+			name = entry[:index]
+		}
+		if envNameDenied(name, denylist) {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+func envNameDenied(name string, denylist []string) bool {
+	for _, pattern := range denylist {
+		if pattern == "" {
+			continue
+		}
+		if ok, _ := filepath.Match(pattern, name); ok || strings.EqualFold(name, pattern) || strings.Contains(strings.ToUpper(name), strings.ToUpper(pattern)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Registry) removeRuntime(sessionID string) {
@@ -355,13 +479,47 @@ func (c *Client) CloseSession() error {
 	return c.runtime.closeSession("client_close")
 }
 
+func (c *Client) SendControl(message terminalproto.ServerMessage) bool {
+	return c.enqueue(Outbound{Kind: OutboundText, Text: message})
+}
+
 func (c *Client) enqueue(outbound Outbound) bool {
+	size := outboundSize(outbound)
+	c.mu.Lock()
+	if c.queuedBytes+size > DefaultClientQueueBytes {
+		c.mu.Unlock()
+		return false
+	}
+	c.queuedBytes += size
+	c.mu.Unlock()
 	select {
 	case c.queue <- outbound:
 		return true
 	default:
+		c.markSent(outbound)
 		return false
 	}
+}
+
+func (c *Client) MarkSent(outbound Outbound) {
+	c.markSent(outbound)
+}
+
+func (c *Client) markSent(outbound Outbound) {
+	size := outboundSize(outbound)
+	c.mu.Lock()
+	c.queuedBytes -= size
+	if c.queuedBytes < 0 {
+		c.queuedBytes = 0
+	}
+	c.mu.Unlock()
+}
+
+func outboundSize(outbound Outbound) int {
+	if outbound.Kind == OutboundBinary {
+		return len(outbound.Binary)
+	}
+	return 512 + len(outbound.Text.Message)
 }
 
 func (c *Client) closeQueue() {

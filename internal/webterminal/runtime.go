@@ -1,7 +1,9 @@
 package webterminal
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -45,19 +47,61 @@ func (r *SessionRuntime) start() {
 
 func (r *SessionRuntime) attach() (*Client, error) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.closed {
+		r.mu.Unlock()
 		return nil, fmt.Errorf("session is closed")
 	}
 	id, err := r.registry.ids.NewID()
 	if err != nil {
+		r.mu.Unlock()
 		return nil, err
 	}
 	client := &Client{id: id, runtime: r, queue: make(chan Outbound, r.registry.clientQueueSize)}
+	attachment := AttachmentAttached
+	r.mu.Unlock()
+
+	if err := r.enqueueReplay(client, attachment); err != nil {
+		client.closeQueue()
+		return nil, err
+	}
+
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		client.closeQueue()
+		return nil, fmt.Errorf("session is closed")
+	}
 	r.clients[id] = client
-	r.attachment = AttachmentAttached
-	client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeStarted, SessionID: r.session.ID, WorkspaceID: r.session.WorkspaceID, WorkspaceKey: r.session.WorkspaceKey, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(r.attachment)}})
+	r.attachment = attachment
+	r.mu.Unlock()
 	return client, nil
+}
+
+func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentState) error {
+	if !client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeStarted, SessionID: r.session.ID, WorkspaceID: r.session.WorkspaceID, WorkspaceKey: r.session.WorkspaceKey, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(attachment)}}) {
+		return fmt.Errorf("client queue full")
+	}
+	if !client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeReplayStarted}}) {
+		return fmt.Errorf("client queue full")
+	}
+	if err := r.history.Flush(); err != nil {
+		return err
+	}
+	historyPath := r.registry.store.HistoryPath(r.session.WorkspaceKey, r.session.ID)
+	data, err := os.ReadFile(historyPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if len(data) > 0 {
+		if !client.enqueue(Outbound{Kind: OutboundBinary, Binary: data}) {
+			return fmt.Errorf("client queue full")
+		}
+	}
+	truncated := false
+	if !client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeReplayFinished, Truncated: &truncated}}) {
+		return fmt.Errorf("client queue full")
+	}
+	return nil
 }
 
 func (r *SessionRuntime) attachmentState() AttachmentState {

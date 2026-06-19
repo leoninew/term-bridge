@@ -22,7 +22,7 @@ exec *args:
     go run cmd/termbridge/main.go exec -- {{args}}
 
 backend:
-    go run cmd/termbridge/main.go web --host 127.0.0.1 --port 9010 --dev
+    go run cmd/termbridge/main.go web --host localhost --port 9010 --dev
 
 frontend:
     cd web && yarn dev

@@ -245,14 +245,16 @@ func runWeb(ctx context.Context, cfg config.Config, logger *logging.Logger, opti
 		stdout = io.Discard
 	}
 	registry := webterminal.NewRegistry(webterminal.Config{
-		Cwd:     cfg.Cwd,
-		Store:   state.NewStore(cfg.Runtime.StateDir),
-		LogDir:  cfg.LogDir,
-		History: cfg.History,
-		Manager: gopty.NewManager(),
-		Logger:  logger,
+		Cwd:          cfg.Cwd,
+		Store:        state.NewStore(cfg.Runtime.StateDir),
+		LogDir:       cfg.LogDir,
+		History:      cfg.History,
+		Manager:      gopty.NewManager(),
+		Logger:       logger,
+		CwdAllowlist: cfg.Web.CwdAllowlist,
+		EnvDenylist:  cfg.Web.EnvDenylist,
 	})
-	server := webserver.New(webserver.Config{Host: options.Command.Web.Host, Port: options.Command.Web.Port, Open: options.Command.Web.Open, Dev: options.Command.Web.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit}, registry)
+	server := webserver.New(webserver.Config{Host: options.Command.Web.Host, Port: options.Command.Web.Port, Open: options.Command.Web.Open, Dev: options.Command.Web.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit, AllowedOrigins: cfg.Web.AllowedOrigins}, registry)
 	err := runWebServer(ctx, server, func(info webserver.Info) {
 		fmt.Fprintf(stdout, "TermBridge web terminal listening on %s\n", info.URL)
 		if options.Command.Web.Dev {

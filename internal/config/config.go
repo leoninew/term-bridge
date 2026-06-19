@@ -32,6 +32,7 @@ type Config struct {
 	LogResponseBodyLimit int
 	History              HistoryConfig
 	Runtime              RuntimeConfig
+	Web                  WebConfig
 	ConfigFile           string
 }
 
@@ -43,6 +44,12 @@ type HistoryConfig struct {
 
 type RuntimeConfig struct {
 	StateDir string
+}
+
+type WebConfig struct {
+	AllowedOrigins []string
+	CwdAllowlist   []string
+	EnvDenylist    []string
 }
 
 type Options struct {
@@ -90,6 +97,10 @@ func Load(options Options) (Config, error) {
 		return Config{}, err
 	}
 
+	cwdAllowlist, err := resolvePathList(cwd, v.GetStringSlice("web.cwd_allowlist"))
+	if err != nil {
+		return Config{}, err
+	}
 	cfg := Config{
 		Cwd:                  cwd,
 		Command:              append([]string(nil), options.Command...),
@@ -103,7 +114,12 @@ func Load(options Options) (Config, error) {
 			MaxBytes:     v.GetInt64("history.max_bytes"),
 			MaxLineBytes: v.GetInt("history.max_line_bytes"),
 		},
-		Runtime:    RuntimeConfig{StateDir: stateDir},
+		Runtime: RuntimeConfig{StateDir: stateDir},
+		Web: WebConfig{
+			AllowedOrigins: cleanStringSlice(v.GetStringSlice("web.allowed_origins")),
+			CwdAllowlist:   cwdAllowlist,
+			EnvDenylist:    cleanStringSlice(v.GetStringSlice("web.env.denylist")),
+		},
 		ConfigFile: configFile,
 	}
 
@@ -196,6 +212,9 @@ func rejectUnknownKeys(v *viper.Viper) error {
 		"history.max_bytes":       {},
 		"history.max_line_bytes":  {},
 		"runtime.state_dir":       {},
+		"web.allowed_origins":     {},
+		"web.cwd_allowlist":       {},
+		"web.env.denylist":        {},
 	}
 	for _, key := range v.AllKeys() {
 		if _, ok := allowed[key]; !ok {
@@ -223,6 +242,58 @@ func resolveStateDir(cwd string, path string) (string, error) {
 		return filepath.Clean(path), nil
 	}
 	return filepath.Join(cwd, path), nil
+}
+
+func resolvePathList(cwd string, paths []string) ([]string, error) {
+	cleaned := cleanStringSlice(paths)
+	if len(cleaned) == 0 {
+		cleaned = []string{cwd}
+	}
+	out := make([]string, 0, len(cleaned))
+	for _, path := range cleaned {
+		var err error
+		path, err = expandHome(path)
+		if err != nil {
+			return nil, apperrors.Config("resolve web cwd allowlist", err)
+		}
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(cwd, path)
+		}
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return nil, apperrors.Config("resolve web cwd allowlist", err)
+		}
+		out = append(out, filepath.Clean(abs))
+	}
+	return out, nil
+}
+
+func expandHome(path string) (string, error) {
+	if path == "~" {
+		return os.UserHomeDir()
+	}
+	if strings.HasPrefix(path, "~/") || strings.HasPrefix(path, "~\\") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, path[2:]), nil
+	}
+	if strings.HasPrefix(path, "~") {
+		return "", fmt.Errorf("unsupported home path %q", path)
+	}
+	return path, nil
+}
+
+func cleanStringSlice(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func validateLogLevel(level string) error {

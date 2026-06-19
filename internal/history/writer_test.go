@@ -16,6 +16,7 @@ func TestWriterKeepsSmallOutput(t *testing.T) {
 	if _, err := writer.Write([]byte("one\ntwo\n")); err != nil {
 		t.Fatalf("Write() error = %v", err)
 	}
+	flush(t, writer)
 	data := readFile(t, path)
 	if data != "one\ntwo\n" {
 		t.Fatalf("history = %q", data)
@@ -31,6 +32,7 @@ func TestWriterTrimsByLines(t *testing.T) {
 	if _, err := writer.Write([]byte("one\ntwo\nthree\n")); err != nil {
 		t.Fatalf("Write() error = %v", err)
 	}
+	flush(t, writer)
 	data := readFile(t, path)
 	if data != "two\nthree\n" {
 		t.Fatalf("history = %q", data)
@@ -49,6 +51,7 @@ func TestWriterTrimsByBytes(t *testing.T) {
 	if _, err := writer.Write([]byte("aaaa\nbbbb\n")); err != nil {
 		t.Fatalf("Write() error = %v", err)
 	}
+	flush(t, writer)
 	data := readFile(t, path)
 	if data != "bbbb\n" {
 		t.Fatalf("history = %q", data)
@@ -64,6 +67,7 @@ func TestWriterLimitsLongLine(t *testing.T) {
 	if _, err := writer.Write([]byte("abcdef\n")); err != nil {
 		t.Fatalf("Write() error = %v", err)
 	}
+	flush(t, writer)
 	data := readFile(t, path)
 	if data != "abcd" {
 		t.Fatalf("history = %q", data)
@@ -95,4 +99,11 @@ func readFile(t *testing.T, path string) string {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
 	return string(data)
+}
+
+func flush(t *testing.T, writer *Writer) {
+	t.Helper()
+	if err := writer.Flush(); err != nil {
+		t.Fatalf("Flush() error = %v", err)
+	}
 }

@@ -4,10 +4,9 @@ export type LifecycleState = 'starting' | 'running' | 'stopping' | 'stopped' | '
 export type AttachmentState = 'unattached' | 'attached' | 'detached' | 'reattaching'
 
 export type ClientControlMessage =
-  | { type: 'hello'; last_seq?: number }
+  | { type: 'hello' }
   | { type: 'resize'; cols: number; rows: number }
   | { type: 'detach' }
-  | { type: 'close' }
   | { type: 'ping'; nonce: string }
 
 export type ServerControlMessage =
@@ -20,6 +19,8 @@ export type ServerControlMessage =
       lifecycle_state?: LifecycleState
       attachment_state?: AttachmentState
     }
+  | { type: 'replay_started' }
+  | { type: 'replay_finished'; truncated?: boolean }
   | {
       type: 'state'
       state?: LifecycleState
@@ -75,6 +76,38 @@ export function decodeControl(data: string): ServerControlMessage {
   const parsed = JSON.parse(data) as ServerControlMessage
   if (!parsed || typeof parsed.type !== 'string') {
     throw new Error('invalid server control message')
+  }
+  switch (parsed.type) {
+    case 'started':
+      if (!parsed.session_id || !parsed.workspace_id || !parsed.state) {
+        throw new Error('invalid started message')
+      }
+      break
+    case 'state':
+      if (!parsed.state && !parsed.lifecycle_state) {
+        throw new Error('invalid state message')
+      }
+      break
+    case 'exited':
+      if (typeof parsed.exit_code !== 'number' || !parsed.state) {
+        throw new Error('invalid exited message')
+      }
+      break
+    case 'error':
+      if (!parsed.code || !parsed.message) {
+        throw new Error('invalid error message')
+      }
+      break
+    case 'pong':
+      if (typeof parsed.nonce !== 'string') {
+        throw new Error('invalid pong message')
+      }
+      break
+    case 'replay_started':
+    case 'replay_finished':
+      break
+    default:
+      throw new Error(`unknown server control message ${(parsed as { type: string }).type}`)
   }
   return parsed
 }

@@ -35,7 +35,10 @@ func (m Manager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.S
 		_ = pt.Resize(size.Cols, size.Rows)
 	}
 
-	cmd := pt.CommandContext(ctx, spec.EffectiveCommand(), spec.Args...)
+	// Use context.Background() to prevent the process from being killed
+	// when the HTTP request context is cancelled.
+	// The process lifecycle is managed by the session runtime, not the HTTP request.
+	cmd := pt.CommandContext(context.Background(), spec.EffectiveCommand(), spec.Args...)
 	cmd.Dir = spec.Cwd
 	cmd.Env = spec.Env
 	startedAt := time.Now().UTC()

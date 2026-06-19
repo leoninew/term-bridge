@@ -24,7 +24,7 @@
         </label>
         <label>
           <span>Command</span>
-          <input v-model="commandText" placeholder="pwsh -NoLogo" />
+          <input v-model="commandText" placeholder="zsh" />
         </label>
         <button type="submit">New session</button>
       </form>
@@ -53,10 +53,14 @@
 
       <section v-else class="history-panel">
         <h3>History / metadata</h3>
-        <pre>{{
-          historyText ||
-          'Select a stopped session to inspect bounded history, or create a new session.'
-        }}</pre>
+        <HistoryTerminalView v-if="historyText" :history="historyText" />
+        <details v-if="historyText">
+          <summary>Raw history</summary>
+          <pre>{{ historyText }}</pre>
+        </details>
+        <pre v-else>
+Select a stopped session to inspect bounded history, or create a new session.</pre
+        >
       </section>
     </section>
   </main>
@@ -64,6 +68,7 @@
 
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
+  import HistoryTerminalView from './components/terminal/HistoryTerminalView.vue'
   import TerminalView from './components/terminal/TerminalView.vue'
   import WorkspaceSessionSidebar from './components/workspace/WorkspaceSessionSidebar.vue'
   import type { ServerControlMessage, SessionSummary, WorkspaceSummary } from './protocol/terminal'
@@ -76,7 +81,7 @@
   const selectedSession = ref<SessionSummary | null>(null)
   const wsUrl = ref<string | null>(null)
   const historyText = ref('')
-  const commandText = ref('pwsh -NoLogo')
+  const commandText = ref('zsh')
   const cwd = ref('')
   const error = ref<string | null>(null)
   const loading = ref(false)
@@ -109,7 +114,13 @@
       return
     }
     error.value = null
-    const created = await createSession({ cwd: cwd.value, command, cols: 120, rows: 32 })
+    const size = estimateTerminalSize()
+    const created = await createSession({
+      cwd: cwd.value,
+      command,
+      cols: size.cols,
+      rows: size.rows,
+    })
     wsUrl.value = created.ws_url
     await refresh()
     selectedSession.value =
@@ -131,7 +142,17 @@
     }
   }
 
-  onMounted(() => {
-    void refresh()
+  function estimateTerminalSize(): { cols: number; rows: number } {
+    const cols = Math.max(80, Math.min(10000, Math.floor((window.innerWidth - 360) / 9)))
+    const rows = Math.max(24, Math.min(10000, Math.floor((window.innerHeight - 260) / 18)))
+    return { cols, rows }
+  }
+
+  onMounted(async () => {
+    try {
+      await refresh()
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+    }
   })
 </script>

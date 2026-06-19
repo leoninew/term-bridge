@@ -56,6 +56,20 @@ func TestLoadDefaults(t *testing.T) {
 	}
 }
 
+func TestResolvePathListExpandsHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	paths, err := resolvePathList(t.TempDir(), []string{"~/Downloads"})
+	if err != nil {
+		t.Fatalf("resolvePathList() error = %v", err)
+	}
+	want := filepath.Join(home, "Downloads")
+	if len(paths) != 1 || filepath.Clean(paths[0]) != filepath.Clean(want) {
+		t.Fatalf("paths = %#v, want %q", paths, want)
+	}
+}
+
 func TestLoadRejectsInvalidLogLevel(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()

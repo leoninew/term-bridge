@@ -3,7 +3,6 @@ import type {
   CreateSessionResponse,
   SessionSummary,
 } from '../../protocol/terminal'
-
 export async function listSessions(): Promise<SessionSummary[]> {
   const response = await fetch('/api/sessions')
   if (!response.ok) {
@@ -32,4 +31,13 @@ export async function readHistory(sessionId: string): Promise<string> {
     throw new Error(`read history failed: ${response.status}`)
   }
   return response.text()
+}
+
+export async function closeSession(sessionId: string): Promise<void> {
+  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/close`, {
+    method: 'POST',
+  })
+  if (!response.ok) {
+    throw new Error(`close session failed: ${response.status}`)
+  }
 }

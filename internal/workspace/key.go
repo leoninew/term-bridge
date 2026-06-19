@@ -32,7 +32,7 @@ func KeyForPath(path string) (string, string, error) {
 }
 
 func NameForPath(path string, key string) string {
-	name := filepath.Base(filepath.Clean(path))
+	name := lastPathSegment(filepath.Clean(path))
 	if name == "." || name == string(filepath.Separator) || name == "" {
 		if len(key) > 8 {
 			return key[:8]
@@ -40,4 +40,16 @@ func NameForPath(path string, key string) string {
 		return key
 	}
 	return name
+}
+
+func lastPathSegment(path string) string {
+	path = strings.TrimRight(path, `/\`)
+	if path == "" {
+		return ""
+	}
+	index := strings.LastIndexAny(path, `/\`)
+	if index == -1 {
+		return path
+	}
+	return path[index+1:]
 }

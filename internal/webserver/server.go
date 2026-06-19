@@ -28,6 +28,7 @@ type Config struct {
 	Logger            *slog.Logger
 	RequestBodyLimit  int
 	ResponseBodyLimit int
+	AllowedOrigins    []string
 }
 
 type Server struct {
@@ -44,9 +45,9 @@ func New(config Config, registry *webterminal.Registry) *Server {
 	mux := http.NewServeMux()
 	s := &Server{config: normalizeConfig(config), registry: registry}
 	mux.HandleFunc("/api/health", s.handleHealth)
-	mux.HandleFunc("/api/workspaces", s.handleWorkspaces)
-	mux.HandleFunc("/api/sessions", s.handleSessions)
-	mux.HandleFunc("/api/sessions/", s.handleSession)
+	mux.HandleFunc("/api/workspaces", s.withOriginGuard(s.handleWorkspaces))
+	mux.HandleFunc("/api/sessions", s.withOriginGuard(s.handleSessions))
+	mux.HandleFunc("/api/sessions/", s.withOriginGuard(s.handleSession))
 	s.server = &http.Server{Handler: logRequests(s.config.Logger, s.config.RequestBodyLimit, s.config.ResponseBodyLimit, mux)}
 	return s
 }
@@ -169,6 +170,16 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch parts[1] {
+	case "close":
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w)
+			return
+		}
+		if err := s.registry.CloseSession(sessionID, "api_close"); err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"state": "closing"})
 	case "history":
 		if r.Method != http.MethodGet {
 			methodNotAllowed(w)
@@ -198,11 +209,12 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request, session
 		writeError(w, err)
 		return
 	}
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{terminalproto.Subprotocol}, InsecureSkipVerify: true})
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{terminalproto.Subprotocol}, OriginPatterns: s.originPatterns(r)})
 	if err != nil {
 		client.Detach("websocket_accept_failed")
 		return
 	}
+	conn.SetReadLimit(terminalproto.MaxBinaryFrameBytes)
 	defer conn.Close(websocket.StatusNormalClosure, "closed")
 	s.serveWebSocket(r.Context(), conn, client)
 }
@@ -228,6 +240,7 @@ func (s *Server) serveWebSocket(ctx context.Context, conn *websocket.Conn, clien
 				}
 			}
 			writeCancel()
+			client.MarkSent(outbound)
 			if err != nil {
 				client.Detach("websocket_write_failed")
 				return
@@ -244,16 +257,23 @@ func (s *Server) serveWebSocket(ctx context.Context, conn *websocket.Conn, clien
 		}
 		switch messageType {
 		case websocket.MessageBinary:
+			if len(data) > terminalproto.MaxBinaryFrameBytes {
+				client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "binary_frame_too_large", Message: "binary frame too large"})
+				client.Detach("binary_frame_too_large")
+				cancel()
+				<-writerDone
+				return
+			}
 			if err := client.WriteInput(data); err != nil {
-				writeControl(ctx, conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "write_failed", Message: err.Error()})
+				client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "write_failed", Message: err.Error()})
 			}
 		case websocket.MessageText:
 			message, err := terminalproto.DecodeClient(data)
 			if err != nil {
-				writeControl(ctx, conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "invalid_control", Message: err.Error()})
+				client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "invalid_control", Message: err.Error()})
 				continue
 			}
-			if !handleControl(ctx, conn, client, message) {
+			if !handleControl(client, message) {
 				cancel()
 				<-writerDone
 				return
@@ -262,40 +282,57 @@ func (s *Server) serveWebSocket(ctx context.Context, conn *websocket.Conn, clien
 	}
 }
 
-func handleControl(ctx context.Context, conn *websocket.Conn, client *webterminal.Client, message terminalproto.ClientMessage) bool {
+func handleControl(client *webterminal.Client, message terminalproto.ClientMessage) bool {
 	switch message.Type {
 	case terminalproto.TypeHello:
 		return true
 	case terminalproto.TypeResize:
 		if err := client.Resize(message.Cols, message.Rows); err != nil {
-			writeControl(ctx, conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "resize_failed", Message: err.Error()})
+			client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "resize_failed", Message: err.Error()})
 		}
 		return true
 	case terminalproto.TypeDetach:
 		client.Detach("client_detached")
 		return false
-	case terminalproto.TypeClose:
-		if err := client.CloseSession(); err != nil {
-			writeControl(ctx, conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "close_failed", Message: err.Error()})
-		}
-		return false
 	case terminalproto.TypePing:
-		writeControl(ctx, conn, terminalproto.ServerMessage{Type: terminalproto.TypePong, Nonce: message.Nonce})
+		client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypePong, Nonce: message.Nonce})
 		return true
 	default:
-		writeControl(ctx, conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "unknown_control", Message: fmt.Sprintf("unknown control %q", message.Type)})
+		client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "unknown_control", Message: fmt.Sprintf("unknown control %q", message.Type)})
 		return true
 	}
 }
 
-func writeControl(ctx context.Context, conn *websocket.Conn, message terminalproto.ServerMessage) {
-	data, err := terminalproto.EncodeServer(message)
-	if err != nil {
-		return
+func (s *Server) withOriginGuard(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.originAllowed(r) {
+			writeJSON(w, http.StatusForbidden, errorBody("forbidden_origin", "origin is not allowed"))
+			return
+		}
+		handler(w, r)
 	}
-	writeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	_ = conn.Write(writeCtx, websocket.MessageText, data)
+}
+
+func (s *Server) originAllowed(r *http.Request) bool {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return true
+	}
+	if origin == "http://"+r.Host || origin == "https://"+r.Host {
+		return true
+	}
+	for _, allowed := range s.config.AllowedOrigins {
+		if origin == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) originPatterns(r *http.Request) []string {
+	patterns := []string{"http://" + r.Host, "https://" + r.Host}
+	patterns = append(patterns, s.config.AllowedOrigins...)
+	return patterns
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
@@ -327,7 +364,7 @@ func methodNotAllowed(w http.ResponseWriter) {
 
 func normalizeConfig(config Config) Config {
 	if strings.TrimSpace(config.Host) == "" {
-		config.Host = "127.0.0.1"
+		config.Host = "localhost"
 	}
 	if config.Port < 0 || config.Port > 65535 {
 		config.Port = 0

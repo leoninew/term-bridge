@@ -11,30 +11,30 @@ const (
 	TypeHello  = "hello"
 	TypeResize = "resize"
 	TypeDetach = "detach"
-	TypeClose  = "close"
 	TypePing   = "ping"
 
-	TypeStarted = "started"
-	TypeState   = "state"
-	TypeExited  = "exited"
-	TypeError   = "error"
-	TypePong    = "pong"
+	TypeStarted        = "started"
+	TypeReplayStarted  = "replay_started"
+	TypeReplayFinished = "replay_finished"
+	TypeState          = "state"
+	TypeExited         = "exited"
+	TypeError          = "error"
+	TypePong           = "pong"
 
 	MaxJSONMessageBytes = 16 * 1024
 	MaxBinaryFrameBytes = 1024 * 1024
 	MinCols             = 1
-	MaxCols             = 500
+	MaxCols             = 10000
 	MinRows             = 1
-	MaxRows             = 200
+	MaxRows             = 10000
 	MaxPingNonceBytes   = 256
 )
 
 type ClientMessage struct {
-	Type    string `json:"type"`
-	LastSeq *int64 `json:"last_seq,omitempty"`
-	Cols    int    `json:"cols,omitempty"`
-	Rows    int    `json:"rows,omitempty"`
-	Nonce   string `json:"nonce,omitempty"`
+	Type  string `json:"type"`
+	Cols  int    `json:"cols,omitempty"`
+	Rows  int    `json:"rows,omitempty"`
+	Nonce string `json:"nonce,omitempty"`
 }
 
 type ServerMessage struct {
@@ -50,6 +50,7 @@ type ServerMessage struct {
 	Code            string `json:"code,omitempty"`
 	Message         string `json:"message,omitempty"`
 	Nonce           string `json:"nonce,omitempty"`
+	Truncated       *bool  `json:"truncated,omitempty"`
 }
 
 func DecodeClient(data []byte) (ClientMessage, error) {
@@ -68,7 +69,7 @@ func DecodeClient(data []byte) (ClientMessage, error) {
 
 func ValidateClient(message ClientMessage) error {
 	switch message.Type {
-	case TypeHello, TypeDetach, TypeClose:
+	case TypeHello, TypeDetach:
 		return nil
 	case TypeResize:
 		return ValidateSize(message.Cols, message.Rows)
@@ -109,7 +110,32 @@ func MustEncodeServer(message ServerMessage) []byte {
 
 func validateServer(message ServerMessage) error {
 	switch message.Type {
-	case TypeStarted, TypeState, TypeExited, TypeError, TypePong:
+	case TypeStarted:
+		if message.SessionID == "" || message.WorkspaceID == "" || message.State == "" && message.LifecycleState == "" {
+			return fmt.Errorf("invalid started message")
+		}
+		return nil
+	case TypeReplayStarted, TypeReplayFinished:
+		return nil
+	case TypeState:
+		if message.LifecycleState == "" && message.State == "" {
+			return fmt.Errorf("invalid state message")
+		}
+		return nil
+	case TypeExited:
+		if message.ExitCode == nil || message.State == "" && message.LifecycleState == "" {
+			return fmt.Errorf("invalid exited message")
+		}
+		return nil
+	case TypeError:
+		if message.Code == "" || message.Message == "" {
+			return fmt.Errorf("invalid error message")
+		}
+		return nil
+	case TypePong:
+		if len([]byte(message.Nonce)) > MaxPingNonceBytes {
+			return fmt.Errorf("pong nonce too large")
+		}
 		return nil
 	default:
 		return fmt.Errorf("unknown server message type %q", message.Type)

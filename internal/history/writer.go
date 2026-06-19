@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Config struct {
@@ -12,19 +13,26 @@ type Config struct {
 	MaxLineBytes int
 }
 
+const (
+	flushPendingBytes = 64 * 1024
+	flushInterval     = 200 * time.Millisecond
+)
+
 type Writer struct {
-	path      string
-	config    Config
-	lines     [][]byte
-	partial   []byte
-	truncated bool
+	path        string
+	config      Config
+	lines       [][]byte
+	partial     []byte
+	truncated   bool
+	pending     int
+	lastFlushed time.Time
 }
 
 func NewWriter(path string, config Config) (*Writer, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
-	return &Writer{path: path, config: config}, nil
+	return &Writer{path: path, config: config, lastFlushed: time.Now()}, nil
 }
 
 func (w *Writer) Write(p []byte) (int, error) {
@@ -44,7 +52,8 @@ func (w *Writer) Write(p []byte) (int, error) {
 		w.addLine(line)
 		p = p[idx+1:]
 	}
-	return written, w.flush()
+	w.pending += written
+	return written, w.flushIfNeeded()
 }
 
 func (w *Writer) Close() error {
@@ -52,7 +61,16 @@ func (w *Writer) Close() error {
 		w.addLine(w.partial)
 		w.partial = nil
 	}
-	return w.flush()
+	return w.Flush()
+}
+
+func (w *Writer) Flush() error {
+	if err := w.flush(); err != nil {
+		return err
+	}
+	w.pending = 0
+	w.lastFlushed = time.Now()
+	return nil
 }
 
 func (w *Writer) Truncated() bool {
@@ -99,6 +117,13 @@ func (w *Writer) totalBytes() int64 {
 	}
 	total += int64(len(w.partial))
 	return total
+}
+
+func (w *Writer) flushIfNeeded() error {
+	if w.pending >= flushPendingBytes || time.Since(w.lastFlushed) >= flushInterval {
+		return w.Flush()
+	}
+	return nil
 }
 
 func (w *Writer) flush() error {

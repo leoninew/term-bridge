@@ -25,8 +25,18 @@ func TestDecodeClientRejectsUnknownType(t *testing.T) {
 	}
 }
 
+func TestDecodeClientAcceptsLargeResize(t *testing.T) {
+	message, err := DecodeClient([]byte(`{"type":"resize","cols":1200,"rows":600}`))
+	if err != nil {
+		t.Fatalf("DecodeClient() error = %v", err)
+	}
+	if message.Cols != 1200 || message.Rows != 600 {
+		t.Fatalf("message = %#v", message)
+	}
+}
+
 func TestDecodeClientRejectsResizeOutOfRange(t *testing.T) {
-	_, err := DecodeClient([]byte(`{"type":"resize","cols":501,"rows":32}`))
+	_, err := DecodeClient([]byte(`{"type":"resize","cols":10001,"rows":32}`))
 	if err == nil {
 		t.Fatal("DecodeClient() error = nil, want error")
 	}

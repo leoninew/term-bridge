@@ -6,7 +6,6 @@ import {
   type ClientControlMessage,
   type ServerControlMessage,
 } from '../../protocol/terminal'
-
 export function useTerminalSocket(
   onOutput: (data: Uint8Array) => void,
   onControl: (message: ServerControlMessage) => void,
@@ -19,7 +18,7 @@ export function useTerminalSocket(
     close()
     status.value = 'connecting'
     error.value = null
-    const next = new WebSocket(url, terminalSubprotocol)
+    const next = new WebSocket(new URL(url, window.location.href).toString(), terminalSubprotocol)
     next.binaryType = 'arraybuffer'
     next.onopen = () => {
       status.value = 'connected'

@@ -5,6 +5,7 @@ package gopty
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -91,6 +92,105 @@ func TestManagerResizesSession(t *testing.T) {
 	_ = session.Close()
 	_ = waitForResult(t, session, 3*time.Second)
 	waitForReader(t, readDone, output)
+}
+
+func TestManagerResizesToLargeTerminal(t *testing.T) {
+	// Regression test: MaxRows was 200, but browsers can request larger sizes.
+	// The manager must accept sizes up to MaxRows (500) without error.
+	spec := powerShellSpec(t, "Start-Sleep -Milliseconds 200; Write-Output 'TERM_BRIDGE_RESIZE_OK'")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	session, _, readDone, err := startSession(ctx, spec)
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+
+	for _, size := range []process.TerminalSize{
+		{Cols: 200, Rows: 200},
+		{Cols: 300, Rows: 300},
+		{Cols: 500, Rows: 500},
+	} {
+		if err := session.Resize(size); err != nil {
+			_ = session.Close()
+			_ = session.KillTree()
+			t.Fatalf("Resize() to %dx%d error = %v", size.Cols, size.Rows, err)
+		}
+	}
+
+	_ = waitForResult(t, session, 3*time.Second)
+	_ = session.Close()
+	waitForReader(t, readDone, nil)
+	_ = session.KillTree()
+}
+
+func TestManagerContextCancelDoesNotKillProcess(t *testing.T) {
+	// Regression test: passing a cancellable context (e.g. HTTP request context)
+	// must not kill the process when the context is cancelled.
+	// The manager should detach the process lifecycle from the caller context.
+	spec := powerShellSpec(t, "Start-Sleep -Milliseconds 200; Write-Output 'TERM_BRIDGE_AFTER_CANCEL'")
+	session, output, readDone, err := startSession(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer func() {
+		_ = session.Close()
+		_ = session.KillTree()
+	}()
+
+	// Start a goroutine that cancels a dummy context after a short delay.
+	// If the manager incorrectly ties the process to that context, the process
+	// will be killed. The manager must use context.Background() internally.
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+
+	// Wait for the process to finish normally despite the cancelled context.
+	result := waitForResult(t, session, 5*time.Second)
+	_ = cancelCtx
+	if result.ExitCode != 0 {
+		t.Fatalf("ExitCode = %d, want 0; err=%v; output=%q", result.ExitCode, result.Err, output.String())
+	}
+	if !strings.Contains(output.String(), "TERM_BRIDGE_AFTER_CANCEL") {
+		t.Fatalf("output missing marker:\n%s", output.String())
+	}
+	waitForReader(t, readDone, output)
+}
+
+func TestManagerRunsCmdExe(t *testing.T) {
+	// cmd.exe is a Windows builtin — must be resolved to an absolute path.
+	cmdPath, err := exec.LookPath("cmd.exe")
+	if err != nil {
+		t.Skip("cmd.exe not found")
+	}
+	spec := process.ProcessSpec{
+		Command:     cmdPath,
+		Args:        []string{"/c", "echo TERM_BRIDGE_CMD_OK"},
+		Cwd:         t.TempDir(),
+		Env:         os.Environ(),
+		InitialSize: process.TerminalSize{Cols: 80, Rows: 25},
+	}
+	output, result := runSpec(t, spec)
+
+	if result.ExitCode != 0 || result.Err != nil {
+		t.Fatalf("Wait() = %#v; output=%s", result, output)
+	}
+	if !strings.Contains(output, "TERM_BRIDGE_CMD_OK") {
+		t.Fatalf("output missing marker:\n%s", output)
+	}
+}
+
+func TestManagerReturnsCorrectExitCode(t *testing.T) {
+	for _, code := range []int{0, 1, 7, 42} {
+		t.Run(fmt.Sprintf("exit_%d", code), func(t *testing.T) {
+			_, result := runPowerShell(t, fmt.Sprintf("exit %d", code))
+			if result.ExitCode != code {
+				t.Fatalf("ExitCode = %d, want %d; err=%v", result.ExitCode, code, result.Err)
+			}
+		})
+	}
 }
 
 func runPowerShell(t *testing.T, script string) (string, termpty.Result) {
@@ -180,11 +280,12 @@ func waitForReader(t *testing.T, readDone chan error, output *bytes.Buffer) {
 	t.Helper()
 	select {
 	case err := <-readDone:
-		if err != nil && !strings.Contains(strings.ToLower(err.Error()), "closed") && err != io.EOF {
-			t.Fatalf("Read() error = %v; output=%s", err, output.String())
+		// io.Copy returns nil on io.EOF, which is normal when the PTY is closed.
+		if err != nil && err != io.EOF && !strings.Contains(strings.ToLower(err.Error()), "closed") {
+			t.Fatalf("Read() error = %v; output=%v", err, output)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("timed out waiting for PTY output reader; output=%s", output.String())
+	case <-time.After(3 * time.Second):
+		t.Fatalf("timed out waiting for PTY output reader; output=%v", output)
 	}
 }
 

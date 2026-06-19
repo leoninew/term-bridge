@@ -51,7 +51,10 @@ func TestSessionsRouteListsEmptySessions(t *testing.T) {
 
 func TestServerLogsRequestsWithConfiguredLimits(t *testing.T) {
 	var logBuffer bytes.Buffer
-	server := New(Config{Logger: slog.New(slog.NewJSONHandler(&logBuffer, nil)), RequestBodyLimit: 10, ResponseBodyLimit: 12}, newTestRegistry(t))
+	config := Config{Logger: slog.New(slog.NewJSONHandler(&logBuffer, nil))}
+	config.RequestBodyLimit = 10
+	config.ResponseBodyLimit = 12
+	server := New(config, newTestRegistry(t))
 	request := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	request.Header.Set("User-Agent", "test-agent")
 	response := httptest.NewRecorder()

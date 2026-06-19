@@ -2,9 +2,11 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -240,7 +242,7 @@ func TestRunCommandCreatesLogStateAndReturnsCommandExitCode(t *testing.T) {
 	cwd := t.TempDir()
 	isolateHome(t)
 
-	code := Run([]string{"--cwd", cwd, "exec", "--", "cmd.exe", "/C", "exit", "/b", "7"}, bytes.NewReader(nil), &stdout, &stderr)
+	code := Run(append([]string{"--cwd", cwd, "exec", "--"}, exitCommand(7)...), bytes.NewReader(nil), &stdout, &stderr)
 
 	if code != 7 {
 		t.Fatalf("Run() code = %d, want 7; stderr=%s", code, stderr.String())
@@ -266,6 +268,13 @@ func TestRunCommandCreatesLogStateAndReturnsCommandExitCode(t *testing.T) {
 	if len(matches) != 1 {
 		t.Fatalf("exit.json matches = %#v", matches)
 	}
+}
+
+func exitCommand(code int) []string {
+	if runtime.GOOS == "windows" {
+		return []string{"cmd.exe", "/C", "exit", "/b", fmt.Sprint(code)}
+	}
+	return []string{"sh", "-c", fmt.Sprintf("exit %d", code)}
 }
 
 func isolateHome(t *testing.T) string {
