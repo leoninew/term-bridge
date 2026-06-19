@@ -255,7 +255,7 @@ func runWeb(ctx context.Context, cfg config.Config, logger *logging.Logger, opti
 		CwdAllowlist: cfg.Web.CwdAllowlist,
 		EnvDenylist:  cfg.Web.EnvDenylist,
 	})
-	server := webserver.New(webserver.Config{Host: options.Command.Web.Host, Port: options.Command.Web.Port, Open: options.Command.Web.Open, Dev: options.Command.Web.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit, AllowedOrigins: cfg.Web.AllowedOrigins}, registry)
+	server := webserver.New(webserver.Config{Host: options.Command.Web.Host, Port: options.Command.Web.Port, Open: options.Command.Web.Open, Dev: options.Command.Web.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit, AllowedOrigins: cfg.Web.AllowedOrigins, DebugErrors: cfg.Web.Error.Debug}, registry)
 	err := runWebServer(ctx, server, func(info webserver.Info) {
 		fmt.Fprintf(stdout, "TermBridge web terminal listening on %s\n", info.URL)
 		if options.Command.Web.Dev {

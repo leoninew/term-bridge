@@ -9,6 +9,7 @@ import {
 export function useTerminalSocket(
   onOutput: (data: Uint8Array) => void,
   onControl: (message: ServerControlMessage) => void,
+  onError: (message: string) => void,
 ) {
   const socket = shallowRef<WebSocket | null>(null)
   const status = ref<'idle' | 'connecting' | 'connected' | 'closed' | 'error'>('idle')
@@ -30,6 +31,7 @@ export function useTerminalSocket(
           onControl(decodeControl(event.data))
         } catch (err) {
           error.value = err instanceof Error ? err.message : String(err)
+          onError(error.value)
         }
         return
       }
@@ -40,6 +42,7 @@ export function useTerminalSocket(
     next.onerror = () => {
       status.value = 'error'
       error.value = 'websocket error'
+      onError(error.value)
     }
     next.onclose = () => {
       status.value = 'closed'

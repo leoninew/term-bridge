@@ -1,9 +1,6 @@
 package errors
 
-import (
-	"errors"
-	"fmt"
-)
+import "errors"
 
 const (
 	ExitSuccess = 0
@@ -19,6 +16,7 @@ const (
 	KindConfig   Kind = "config"
 	KindInternal Kind = "internal"
 	KindRuntime  Kind = "runtime"
+	KindNotFound Kind = "not_found"
 )
 
 type Error struct {
@@ -57,6 +55,10 @@ func Runtime(message string, err error) error {
 	return &Error{Kind: KindRuntime, Msg: message, Err: err}
 }
 
+func NotFound(message string, err error) error {
+	return &Error{Kind: KindNotFound, Msg: message, Err: err}
+}
+
 func ExitCode(err error) int {
 	if err == nil {
 		return ExitSuccess
@@ -91,16 +93,28 @@ func IsConfig(err error) bool {
 	return KindOf(err) == KindConfig
 }
 
-func FormatUser(err error) string {
+func IsNotFound(err error) bool {
+	return KindOf(err) == KindNotFound
+}
+
+func Message(err error) string {
 	if err == nil {
 		return ""
 	}
 	var appErr *Error
 	if errors.As(err, &appErr) && appErr.Msg != "" {
-		if appErr.Err == nil {
-			return appErr.Msg
-		}
-		return fmt.Sprintf("%s: %v", appErr.Msg, appErr.Err)
+		return appErr.Msg
 	}
 	return err.Error()
+}
+
+func Debug(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+func FormatUser(err error) string {
+	return Debug(err)
 }

@@ -15,13 +15,13 @@
         />
       </SplitterPanel>
 
-      <SplitterResizeHandle class="group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[#05070d] outline-none focus-visible:bg-sky-950/60">
-        <span class="w-px bg-slate-800 transition group-hover:bg-sky-700 group-focus-visible:bg-sky-500" />
+      <SplitterResizeHandle class="group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[#05070d] outline-none">
+        <span class="w-px bg-slate-800 transition group-hover:bg-slate-700" />
       </SplitterResizeHandle>
 
       <SplitterPanel id="terminal-workbench" :min-size="55">
         <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14]">
-        <p v-if="error" class="mx-3 mt-3 rounded-md border border-red-900/80 bg-red-950/80 px-2 py-1.5 text-red-100">
+        <p v-if="error" class="mx-3 mt-3 rounded-md border border-slate-800 bg-slate-950/80 px-2 py-1.5 text-red-100">
           {{ error }}
         </p>
 
@@ -45,10 +45,10 @@
                   :key="tab.sessionId"
                   class="group relative flex max-w-56 shrink-0 items-center rounded-md border px-0.5 text-sm transition"
                   :class="activeTabId === tab.sessionId
-                    ? 'border-sky-500/40 bg-slate-900 text-slate-50 shadow-lg shadow-sky-950/30 after:absolute after:inset-x-2 after:-bottom-1.5 after:h-0.5 after:rounded-full after:bg-sky-400'
+                    ? 'border-slate-700 bg-slate-900 text-slate-50'
                     : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:border-slate-700 hover:bg-slate-900/80'"
                 >
-                  <TabsTrigger :value="tab.sessionId" class="tab-drag-handle flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+                  <TabsTrigger :value="tab.sessionId" class="tab-drag-handle flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 outline-none">
                     <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
                     <span class="truncate">{{ sessionTitle(tab.sessionId) }}</span>
                   </TabsTrigger>
@@ -77,11 +77,12 @@
               :ws-url="`/api/sessions/${activeSession.id}/ws`"
               :session-id="activeSession.id"
               @state="handleTerminalState"
+              @terminal-error="handleTerminalError"
             />
 
             <section v-else class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <div v-if="activeTab.historyLoading" class="flex flex-1 items-center justify-center text-slate-500">Loading bounded history…</div>
-              <div v-else-if="activeTab.historyError" class="rounded-md border border-red-900/80 bg-red-950/80 px-2 py-1.5 text-red-100">
+              <div v-else-if="activeTab.historyError" class="rounded-md border border-slate-800 bg-slate-950/80 px-2 py-1.5 text-red-100">
                 {{ activeTab.historyError }}
               </div>
               <HistoryTerminalView
@@ -96,7 +97,7 @@
           <section v-if="openedTabs.length === 0" class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-slate-500">
             <h3 class="text-lg font-semibold text-slate-300">No terminal tab is open</h3>
             <p>Select a session from the workspace tree, or start a new command.</p>
-            <button type="button" class="rounded-md border border-sky-700 bg-sky-950 px-2.5 py-1.5 text-sky-100 hover:bg-sky-900" @click="openCreateDialog">
+            <button type="button" class="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-slate-100 hover:bg-slate-800" @click="openCreateDialog">
               New session
             </button>
           </section>
@@ -544,7 +545,9 @@
       tab.historyText = await readHistory(sessionId)
       tab.historyLoaded = true
     } catch (err) {
-      tab.historyError = errorMessage(err)
+      const message = errorMessage(err)
+      tab.historyError = message
+      pushToast('error', 'Read history failed', message)
     } finally {
       tab.historyLoading = false
     }
@@ -634,9 +637,16 @@
   }
 
   function handleTerminalState(message: ServerControlMessage) {
+    if (message.type === 'error') {
+      pushToast('error', `Terminal error: ${message.code}`, message.message)
+    }
     if (message.type === 'state' || message.type === 'exited') {
       void refresh()
     }
+  }
+
+  function handleTerminalError(message: string) {
+    pushToast('error', 'Terminal connection failed', message)
   }
 
   function pushToast(kind: ToastKind, title: string, description?: string) {

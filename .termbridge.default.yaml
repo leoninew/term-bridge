@@ -20,3 +20,5 @@ web:
     - /Users/leon
   env:
     denylist: []
+  error:
+    debug: false

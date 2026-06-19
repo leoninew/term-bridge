@@ -29,6 +29,7 @@ type Config struct {
 	RequestBodyLimit  int
 	ResponseBodyLimit int
 	AllowedOrigins    []string
+	DebugErrors       bool
 }
 
 type Server struct {
@@ -114,10 +115,10 @@ func (s *Server) handleWorkspaces(w http.ResponseWriter, r *http.Request) {
 		}
 		workspaces, err := s.registry.ListWorkspaces()
 		if err != nil {
-			writeError(w, err)
+			s.writeError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces})
+		writeJSON(w, http.StatusOK, workspaces)
 		return
 	}
 	if path == "/tree" {
@@ -127,7 +128,7 @@ func (s *Server) handleWorkspaces(w http.ResponseWriter, r *http.Request) {
 		}
 		tree, err := s.registry.WorkspaceTree()
 		if err != nil {
-			writeError(w, err)
+			s.writeError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, tree)
@@ -139,25 +140,25 @@ func (s *Server) handleWorkspaces(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var request webterminal.UpdateWorkspaceOrderRequest
-		if !decodeJSONRequest(w, r, &request) {
+		if !s.decodeJSONRequest(w, r, &request) {
 			return
 		}
 		workspaces, err := s.registry.UpdateWorkspaceOrder(request.WorkspaceIds)
 		if err != nil {
-			writeError(w, err)
+			s.writeError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces})
+		writeJSON(w, http.StatusOK, workspaces)
 		return
 	}
-	http.NotFound(w, r)
+	apiNotFound(w)
 }
 
 func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/workspaces/")
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) == 0 || parts[0] == "" {
-		http.NotFound(w, r)
+		apiNotFound(w)
 		return
 	}
 	if len(parts) == 1 && parts[0] == "tree" {
@@ -167,7 +168,7 @@ func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 		}
 		tree, err := s.registry.WorkspaceTree()
 		if err != nil {
-			writeError(w, err)
+			s.writeError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, tree)
@@ -179,15 +180,15 @@ func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var request webterminal.UpdateWorkspaceOrderRequest
-		if !decodeJSONRequest(w, r, &request) {
+		if !s.decodeJSONRequest(w, r, &request) {
 			return
 		}
 		workspaces, err := s.registry.UpdateWorkspaceOrder(request.WorkspaceIds)
 		if err != nil {
-			writeError(w, err)
+			s.writeError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces})
+		writeJSON(w, http.StatusOK, workspaces)
 		return
 	}
 	workspaceId := parts[0]
@@ -197,7 +198,7 @@ func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := s.registry.DeleteWorkspace(workspaceId); err != nil {
-			writeError(w, err)
+			s.writeError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -210,13 +211,13 @@ func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 		}
 		sessions, err := s.registry.ListSessionsByWorkspaceId(workspaceId)
 		if err != nil {
-			writeError(w, err)
+			s.writeError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"sessions": sessions})
+		writeJSON(w, http.StatusOK, sessions)
 		return
 	}
-	http.NotFound(w, r)
+	apiNotFound(w)
 }
 
 func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
@@ -224,18 +225,18 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		sessions, err := s.registry.ListSessions()
 		if err != nil {
-			writeError(w, err)
+			s.writeError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, sessions)
 	case http.MethodPost:
 		var request webterminal.CreateSessionRequest
-		if !decodeJSONRequest(w, r, &request) {
+		if !s.decodeJSONRequest(w, r, &request) {
 			return
 		}
 		response, err := s.registry.CreateSession(r.Context(), request)
 		if err != nil {
-			writeError(w, err)
+			s.writeError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusCreated, response)
@@ -248,7 +249,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/sessions/")
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) == 0 || parts[0] == "" {
-		http.NotFound(w, r)
+		apiNotFound(w)
 		return
 	}
 	sessionId := parts[0]
@@ -257,24 +258,24 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		case http.MethodGet:
 			summary, err := s.registry.GetSession(sessionId)
 			if err != nil {
-				writeError(w, err)
+				s.writeError(w, err)
 				return
 			}
 			writeJSON(w, http.StatusOK, summary)
 		case http.MethodPatch:
 			var request webterminal.UpdateSessionRequest
-			if !decodeJSONRequest(w, r, &request) {
+			if !s.decodeJSONRequest(w, r, &request) {
 				return
 			}
 			summary, err := s.registry.UpdateSession(sessionId, request)
 			if err != nil {
-				writeError(w, err)
+				s.writeError(w, err)
 				return
 			}
 			writeJSON(w, http.StatusOK, summary)
 		case http.MethodDelete:
 			if err := s.registry.DeleteSession(sessionId); err != nil {
-				writeError(w, err)
+				s.writeError(w, err)
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
@@ -284,7 +285,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) != 2 {
-		http.NotFound(w, r)
+		apiNotFound(w)
 		return
 	}
 	switch parts[1] {
@@ -294,7 +295,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := s.registry.CloseSession(sessionId, "api_close"); err != nil {
-			writeError(w, err)
+			s.writeError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"state": "closing"})
@@ -305,7 +306,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		}
 		data, err := s.registry.History(sessionId)
 		if err != nil {
-			writeError(w, err)
+			s.writeError(w, err)
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -317,14 +318,14 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		}
 		s.handleWebSocket(w, r, sessionId)
 	default:
-		http.NotFound(w, r)
+		apiNotFound(w)
 	}
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request, sessionId string) {
 	client, err := s.registry.Attach(sessionId)
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, err)
 		return
 	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{terminalproto.Subprotocol}, OriginPatterns: s.originPatterns(r)})
@@ -376,22 +377,22 @@ func (s *Server) serveWebSocket(ctx context.Context, conn *websocket.Conn, clien
 		switch messageType {
 		case websocket.MessageBinary:
 			if len(data) > terminalproto.MaxBinaryFrameBytes {
-				client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "binary_frame_too_large", Message: "binary frame too large"})
+				client.SendControl(s.protocolError("binary_frame_too_large", "binary frame too large", nil))
 				client.Detach("binary_frame_too_large")
 				cancel()
 				<-writerDone
 				return
 			}
 			if err := client.WriteInput(data); err != nil {
-				client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "write_failed", Message: err.Error()})
+				client.SendControl(s.protocolError("write_failed", "write failed", err))
 			}
 		case websocket.MessageText:
 			message, err := terminalproto.DecodeClient(data)
 			if err != nil {
-				client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "invalid_control", Message: err.Error()})
+				client.SendControl(s.protocolError("invalid_control", "invalid control message", err))
 				continue
 			}
-			if !handleControl(client, message) {
+			if !s.handleControl(client, message) {
 				cancel()
 				<-writerDone
 				return
@@ -400,13 +401,13 @@ func (s *Server) serveWebSocket(ctx context.Context, conn *websocket.Conn, clien
 	}
 }
 
-func handleControl(client *webterminal.Client, message terminalproto.ClientMessage) bool {
+func (s *Server) handleControl(client *webterminal.Client, message terminalproto.ClientMessage) bool {
 	switch message.Type {
 	case terminalproto.TypeHello:
 		return true
 	case terminalproto.TypeResize:
 		if err := client.Resize(message.Cols, message.Rows); err != nil {
-			client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "resize_failed", Message: err.Error()})
+			client.SendControl(s.protocolError("resize_failed", "resize failed", err))
 		}
 		return true
 	case terminalproto.TypeDetach:
@@ -416,7 +417,7 @@ func handleControl(client *webterminal.Client, message terminalproto.ClientMessa
 		client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypePong, Nonce: message.Nonce})
 		return true
 	default:
-		client.SendControl(terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "unknown_control", Message: fmt.Sprintf("unknown control %q", message.Type)})
+		client.SendControl(s.protocolError("unknown_control", "unknown control message", fmt.Errorf("unknown control %q", message.Type)))
 		return true
 	}
 }
@@ -424,7 +425,7 @@ func handleControl(client *webterminal.Client, message terminalproto.ClientMessa
 func (s *Server) withOriginGuard(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.originAllowed(r) {
-			writeJSON(w, http.StatusForbidden, errorBody("forbidden_origin", "origin is not allowed"))
+			writeAPIError(w, http.StatusForbidden, "forbidden_origin", "origin is not allowed", "")
 			return
 		}
 		handler(w, r)
@@ -453,10 +454,16 @@ func (s *Server) originPatterns(r *http.Request) []string {
 	return patterns
 }
 
-func decodeJSONRequest(w http.ResponseWriter, r *http.Request, value any) bool {
+type apiErrorResponse struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Error   string `json:"error"`
+}
+
+func (s *Server) decodeJSONRequest(w http.ResponseWriter, r *http.Request, value any) bool {
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, terminalproto.MaxJSONMessageBytes))
 	if err := decoder.Decode(value); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorBody("invalid_request", err.Error()))
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid request", s.debugError(err))
 		return false
 	}
 	return true
@@ -468,25 +475,47 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-func writeError(w http.ResponseWriter, err error) {
-	status := http.StatusInternalServerError
-	code := "runtime_error"
-	if apperrors.IsUsage(err) {
-		status = http.StatusBadRequest
-		code = "usage_error"
-	} else if apperrors.IsConfig(err) {
-		status = http.StatusBadRequest
-		code = "config_error"
-	}
-	writeJSON(w, status, errorBody(code, apperrors.FormatUser(err)))
+func (s *Server) writeError(w http.ResponseWriter, err error) {
+	status, code := statusCodeForError(err)
+	writeAPIError(w, status, code, apperrors.Message(err), s.debugError(err))
 }
 
-func errorBody(code string, message string) map[string]any {
-	return map[string]any{"error": map[string]string{"code": code, "message": message}}
+func statusCodeForError(err error) (int, string) {
+	switch apperrors.KindOf(err) {
+	case apperrors.KindNotFound:
+		return http.StatusNotFound, "not_found"
+	case apperrors.KindUsage:
+		return http.StatusBadRequest, "usage_error"
+	case apperrors.KindConfig:
+		return http.StatusBadRequest, "config_error"
+	case apperrors.KindRuntime:
+		return http.StatusInternalServerError, "runtime_error"
+	default:
+		return http.StatusInternalServerError, "internal_error"
+	}
+}
+
+func writeAPIError(w http.ResponseWriter, status int, code string, message string, debug string) {
+	writeJSON(w, status, apiErrorResponse{Code: code, Message: message, Error: debug})
+}
+
+func (s *Server) debugError(err error) string {
+	if !s.config.DebugErrors {
+		return ""
+	}
+	return apperrors.Debug(err)
+}
+
+func (s *Server) protocolError(code string, message string, err error) terminalproto.ServerMessage {
+	return terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: code, Message: message, Error: s.debugError(err)}
+}
+
+func apiNotFound(w http.ResponseWriter) {
+	writeAPIError(w, http.StatusNotFound, "not_found", "not found", "")
 }
 
 func methodNotAllowed(w http.ResponseWriter) {
-	writeJSON(w, http.StatusMethodNotAllowed, errorBody("method_not_allowed", "method not allowed"))
+	writeAPIError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", "")
 }
 
 func normalizeConfig(config Config) Config {

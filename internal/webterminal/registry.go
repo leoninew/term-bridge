@@ -378,7 +378,7 @@ func (r *Registry) ListSessionsByWorkspaceId(workspaceId string) ([]WorkspaceSes
 	views, _, err := r.store.ListSessionsByWorkspaceId(workspaceId)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, apperrors.Usage("workspace not found")
+			return nil, apperrors.NotFound("workspace not found", err)
 		}
 		return nil, apperrors.Runtime("list workspace sessions", err)
 	}
@@ -426,7 +426,10 @@ func (r *Registry) UpdateWorkspaceOrder(workspaceIds []string) ([]WorkspaceSumma
 	}
 	updated, err := r.store.UpdateWorkspaceOrder(workspaceIds, time.Now().UTC())
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) || strings.Contains(err.Error(), "duplicate workspace_id") {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, apperrors.NotFound("workspace not found", err)
+		}
+		if strings.Contains(err.Error(), "duplicate workspace_id") {
 			return nil, apperrors.Usage(err.Error())
 		}
 		return nil, apperrors.Runtime("update workspace order", err)
@@ -442,7 +445,7 @@ func (r *Registry) DeleteWorkspace(workspaceId string) error {
 	ws, err := r.store.FindWorkspaceById(workspaceId)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return apperrors.Usage("workspace not found")
+			return apperrors.NotFound("workspace not found", err)
 		}
 		return apperrors.Runtime("load workspace", err)
 	}
@@ -494,7 +497,7 @@ func (r *Registry) History(sessionId string) ([]byte, error) {
 			return data, nil
 		}
 	}
-	return nil, apperrors.Runtime("load session", os.ErrNotExist)
+	return nil, apperrors.NotFound("session not found", os.ErrNotExist)
 }
 
 func (r *Registry) resolveAllowedCwd(path string) (string, error) {
@@ -606,7 +609,7 @@ func (r *Registry) findSessionView(sessionId string) (session.View, error) {
 			return view, nil
 		}
 	}
-	return session.View{}, apperrors.Usage("session not found")
+	return session.View{}, apperrors.NotFound("session not found", nil)
 }
 
 func (r *Registry) summariesFromViews(views []session.View) []SessionSummary {

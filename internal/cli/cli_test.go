@@ -240,6 +240,7 @@ func TestRunCommandCreatesLogStateAndReturnsCommandExitCode(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
 	isolateHome(t)
 
 	code := Run(append([]string{"--cwd", cwd, "exec", "--"}, exitCommand(7)...), bytes.NewReader(nil), &stdout, &stderr)
@@ -275,6 +276,17 @@ func exitCommand(code int) []string {
 		return []string{"cmd.exe", "/C", "exit", "/b", fmt.Sprint(code)}
 	}
 	return []string{"sh", "-c", fmt.Sprintf("exit %d", code)}
+}
+
+func writeDefaultConfig(t *testing.T, dir string) {
+	t.Helper()
+	content, err := os.ReadFile(filepath.Join("..", "..", ".termbridge.default.yaml"))
+	if err != nil {
+		t.Fatalf("ReadFile(default config) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".termbridge.default.yaml"), content, 0o644); err != nil {
+		t.Fatalf("WriteFile(default config) error = %v", err)
+	}
 }
 
 func isolateHome(t *testing.T) string {

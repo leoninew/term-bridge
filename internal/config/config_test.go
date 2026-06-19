@@ -13,6 +13,7 @@ import (
 func TestLoadDefaults(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
 
 	cfg, err := Load(Options{Cwd: cwd, Command: []string{"pwsh"}})
 	if err != nil {
@@ -50,6 +51,9 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.ConfigFile != "" {
 		t.Fatalf("ConfigFile = %q, want empty", cfg.ConfigFile)
+	}
+	if cfg.Web.Error.Debug {
+		t.Fatal("Web.Error.Debug = true, want false")
 	}
 	if !reflect.DeepEqual(cfg.Command, []string{"pwsh"}) {
 		t.Fatalf("Command = %#v", cfg.Command)
@@ -176,6 +180,20 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	}
 }
 
+func TestLoadReadsWebErrorDebugConfig(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeConfig(t, cwd, "web:\n  error:\n    debug: true\n")
+
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !cfg.Web.Error.Debug {
+		t.Fatal("Web.Error.Debug = false, want true")
+	}
+}
+
 func TestLoadPrefersLocalConfigOverHome(t *testing.T) {
 	home := isolateHome(t)
 	if err := os.WriteFile(filepath.Join(home, FileName), []byte("log:\n  level: error\n"), 0o644); err != nil {
@@ -218,40 +236,29 @@ func TestLoadUsesPackagedDefaultConfigAndUserOverride(t *testing.T) {
 	}
 }
 
-func TestPublicDefaultConfigMatchesEmbeddedDefaultConfig(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller() failed")
-	}
-	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-	publicDefault, err := os.ReadFile(filepath.Join(repoRoot, "configs", "termbridge.default.yaml"))
-	if err != nil {
-		t.Fatalf("ReadFile(public default) error = %v", err)
-	}
-	if string(publicDefault) != string(defaultConfig) {
-		t.Fatal("configs/termbridge.default.yaml differs from embedded internal/config/termbridge.default.yaml")
+func TestDefaultConfigFileExists(t *testing.T) {
+	if _, err := os.ReadFile(repoDefaultConfigPath(t)); err != nil {
+		t.Fatalf("ReadFile(default config) error = %v", err)
 	}
 }
 
-func TestLoadReadsHomeConfigWhenLocalMissing(t *testing.T) {
+func TestLoadIgnoresHomeConfigWhenLocalMissing(t *testing.T) {
 	home := isolateHome(t)
-	logDir := filepath.Join(home, "home-logs")
-	homeConfig := filepath.Join(home, FileName)
-	content := []byte("log:\n  level: warn\n  dir: " + filepath.ToSlash(logDir) + "\n")
-	if err := os.WriteFile(homeConfig, content, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(home, FileName), []byte("log:\n  level: warn\n"), 0o644); err != nil {
 		t.Fatalf("os.WriteFile() error = %v", err)
 	}
 
 	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.ConfigFile != homeConfig {
-		t.Fatalf("ConfigFile = %q, want %q", cfg.ConfigFile, homeConfig)
+	if cfg.ConfigFile != "" {
+		t.Fatalf("ConfigFile = %q, want empty", cfg.ConfigFile)
 	}
-	if cfg.LogLevel != "warn" {
-		t.Fatalf("LogLevel = %q, want warn", cfg.LogLevel)
+	if cfg.LogLevel != "info" {
+		t.Fatalf("LogLevel = %q, want info", cfg.LogLevel)
 	}
 }
 
@@ -265,7 +272,28 @@ func isolateHome(t *testing.T) string {
 
 func writeConfig(t *testing.T, dir string, content string) {
 	t.Helper()
+	writeDefaultConfig(t, dir)
 	if err := os.WriteFile(filepath.Join(dir, FileName), []byte(content), 0o644); err != nil {
 		t.Fatalf("os.WriteFile() error = %v", err)
 	}
+}
+
+func writeDefaultConfig(t *testing.T, dir string) {
+	t.Helper()
+	content, err := os.ReadFile(repoDefaultConfigPath(t))
+	if err != nil {
+		t.Fatalf("ReadFile(default config) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, DefaultFileName), content, 0o644); err != nil {
+		t.Fatalf("WriteFile(default config) error = %v", err)
+	}
+}
+
+func repoDefaultConfigPath(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller() failed")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", DefaultFileName))
 }

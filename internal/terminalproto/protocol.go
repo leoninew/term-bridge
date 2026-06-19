@@ -49,6 +49,7 @@ type ServerMessage struct {
 	ExitCode        *int   `json:"exit_code,omitempty"`
 	Code            string `json:"code,omitempty"`
 	Message         string `json:"message,omitempty"`
+	Error           string `json:"error,omitempty"`
 	Nonce           string `json:"nonce,omitempty"`
 	Truncated       *bool  `json:"truncated,omitempty"`
 }

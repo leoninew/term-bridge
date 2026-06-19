@@ -9,12 +9,12 @@
             v-model="searchQuery"
             type="search"
             placeholder="Search"
-            class="h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 py-1.5 pl-8 pr-2 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-sky-700"
+            class="h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 py-1.5 pl-8 pr-2 text-sm text-slate-200 outline-none placeholder:text-slate-600"
           />
         </label>
         <button
           type="button"
-          class="flex size-8 shrink-0 items-center justify-center rounded-md border border-sky-800/70 bg-sky-950/70 text-sky-200 hover:bg-sky-900/70"
+          class="flex size-8 shrink-0 items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
           aria-label="New session"
           @click="emit('newSession')"
         >
@@ -68,7 +68,7 @@
             type="button"
             class="flex w-full min-w-0 items-center gap-1.5 rounded-md border px-1.5 py-1.5 text-left transition"
             :class="activeSessionId === sessionItem(item).session.id
-              ? 'border-sky-500/40 bg-sky-950/40 text-slate-100'
+              ? 'border-slate-700 bg-slate-900 text-slate-100'
               : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900/50 hover:text-slate-200'"
             :style="{ paddingLeft: `${item.level * 18 + 8}px` }"
             @click="selectSession(sessionItem(item).session, handleSelect)"

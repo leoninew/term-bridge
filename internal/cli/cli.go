@@ -249,7 +249,7 @@ func PrintUsage(w io.Writer) {
 	fmt.Fprintln(w, "  --help          show help")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Config files:")
-	fmt.Fprintln(w, "  TermBridge reads .termbridge.yaml from --cwd/current directory, then from the user home directory.")
+	fmt.Fprintln(w, "  TermBridge reads .termbridge.default.yaml, then .termbridge.yaml from --cwd/current directory.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Examples:")
 	fmt.Fprintln(w, "  termbridge exec -- claude")

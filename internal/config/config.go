@@ -1,8 +1,6 @@
 package config
 
 import (
-	"bytes"
-	_ "embed"
 	"errors"
 	"fmt"
 	"os"
@@ -15,12 +13,10 @@ import (
 )
 
 const (
-	EnvPrefix = "TERMBRIDGE"
-	FileName  = ".termbridge.yaml"
+	EnvPrefix       = "TERMBRIDGE"
+	DefaultFileName = ".termbridge.default.yaml"
+	FileName        = ".termbridge.yaml"
 )
-
-//go:embed termbridge.default.yaml
-var defaultConfig []byte
 
 type Config struct {
 	Cwd                  string
@@ -50,6 +46,11 @@ type WebConfig struct {
 	AllowedOrigins []string
 	CwdAllowlist   []string
 	EnvDenylist    []string
+	Error          WebErrorConfig
+}
+
+type WebErrorConfig struct {
+	Debug bool
 }
 
 type Options struct {
@@ -63,6 +64,7 @@ func Load(options Options) (Config, error) {
 		return Config{}, err
 	}
 
+	defaultConfigFile := filepath.Join(cwd, DefaultFileName)
 	configFile, err := discoverConfig(cwd)
 	if err != nil {
 		return Config{}, err
@@ -74,8 +76,9 @@ func Load(options Options) (Config, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
 	v.AutomaticEnv()
 
-	if err := v.ReadConfig(bytes.NewReader(defaultConfig)); err != nil {
-		return Config{}, apperrors.Internal("read default config", err)
+	v.SetConfigFile(defaultConfigFile)
+	if err := v.ReadInConfig(); err != nil {
+		return Config{}, apperrors.Config("read default config file", err)
 	}
 
 	if configFile != "" {
@@ -119,6 +122,7 @@ func Load(options Options) (Config, error) {
 			AllowedOrigins: cleanStringSlice(v.GetStringSlice("web.allowed_origins")),
 			CwdAllowlist:   cwdAllowlist,
 			EnvDenylist:    cleanStringSlice(v.GetStringSlice("web.env.denylist")),
+			Error:          WebErrorConfig{Debug: v.GetBool("web.error.debug")},
 		},
 		ConfigFile: configFile,
 	}
@@ -172,18 +176,6 @@ func discoverConfig(effectiveCwd string) (string, error) {
 	} else if exists {
 		return local, nil
 	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", apperrors.Config("resolve home directory", err)
-	}
-	homeConfig := filepath.Join(home, FileName)
-	if exists, err := fileExists(homeConfig); err != nil {
-		return "", apperrors.Config("check home config file", err)
-	} else if exists {
-		return homeConfig, nil
-	}
-
 	return "", nil
 }
 
@@ -215,6 +207,7 @@ func rejectUnknownKeys(v *viper.Viper) error {
 		"web.allowed_origins":     {},
 		"web.cwd_allowlist":       {},
 		"web.env.denylist":        {},
+		"web.error.debug":         {},
 	}
 	for _, key := range v.AllKeys() {
 		if _, ok := allowed[key]; !ok {

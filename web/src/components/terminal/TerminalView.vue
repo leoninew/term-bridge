@@ -19,6 +19,7 @@
 
   const emit = defineEmits<{
     state: [message: ServerControlMessage]
+    terminalError: [message: string]
   }>()
 
   const terminalElement = ref<HTMLElement | null>(null)
@@ -44,6 +45,7 @@
         xterm?.terminal.writeln(`\r\n[termbridge] process exited with code ${message.exit_code}`)
       }
     },
+    (message) => emit('terminalError', message),
   )
 
   function connect() {

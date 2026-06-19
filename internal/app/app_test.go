@@ -21,6 +21,7 @@ func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
 	oldRunRuntime := runRuntime
 	defer func() { runRuntime = oldRunRuntime }()
 
@@ -65,6 +66,7 @@ func TestRunReturnsRuntimeErrorFromRunnerAndMarksFailed(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
 	oldRunRuntime := runRuntime
 	defer func() { runRuntime = oldRunRuntime }()
 
@@ -93,6 +95,7 @@ func TestRunWebStartsServerWithConfiguredRuntime(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
 	oldRunWebServer := runWebServer
 	defer func() { runWebServer = oldRunWebServer }()
 	var gotServer *webserver.Server
@@ -122,6 +125,7 @@ func TestRunExecUsesConfiguredStateDirAndHistoryLimits(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
 	configuredStateDir := filepath.Join(cwd, "runtime-state")
 	configContent := "history:\n  max_lines: 1\n  max_bytes: 8\n  max_line_bytes: 4\nruntime:\n  state_dir: " + filepath.ToSlash(configuredStateDir) + "\n"
 	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
@@ -161,6 +165,7 @@ func TestRunWorkspaceAndSessionList(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
 	oldRunRuntime := runRuntime
 	defer func() { runRuntime = oldRunRuntime }()
 	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO, hooks runner.Hooks) (runner.Result, error) {
@@ -184,6 +189,17 @@ func TestRunWorkspaceAndSessionList(t *testing.T) {
 	}
 	if !strings.Contains(sessionOut.String(), "SESSION ID") || !strings.Contains(sessionOut.String(), "stopped") {
 		t.Fatalf("session output = %s", sessionOut.String())
+	}
+}
+
+func writeDefaultConfig(t *testing.T, dir string) {
+	t.Helper()
+	content, err := os.ReadFile(filepath.Join("..", "..", ".termbridge.default.yaml"))
+	if err != nil {
+		t.Fatalf("ReadFile(default config) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".termbridge.default.yaml"), content, 0o644); err != nil {
+		t.Fatalf("WriteFile(default config) error = %v", err)
 	}
 }
 

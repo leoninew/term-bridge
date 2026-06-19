@@ -96,7 +96,6 @@ p {
   color: #e2e8f0;
   font-size: 14px;
   padding: 14px;
-  box-shadow: 0 24px 80px rgb(0 0 0 / 0.5);
 }
 
 .dialog-title {
@@ -141,10 +140,6 @@ p {
   color: #e2e8f0;
   outline: none;
   padding: 5px 8px;
-}
-
-.dialog-form input:focus {
-  border-color: #0284c7;
 }
 
 .dialog-actions {
@@ -220,7 +215,6 @@ p {
   color: #e2e8f0;
   font-size: 14px;
   padding: 10px 32px 10px 10px;
-  box-shadow: 0 16px 40px rgb(0 0 0 / 0.35);
 }
 
 .toast-success {
