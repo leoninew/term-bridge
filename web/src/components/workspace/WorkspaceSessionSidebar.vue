@@ -1,56 +1,231 @@
 <template>
-  <aside class="sidebar">
-    <header class="sidebar-header">
-      <div>
-        <span class="eyebrow">Workspace / Session</span>
-        <h1>TermBridge</h1>
+  <aside class="flex h-full min-w-0 flex-col overflow-hidden bg-[#070b12]">
+    <header class="flex h-11 shrink-0 items-center border-b border-slate-800/80 bg-[#0a0f18] px-2">
+      <div class="flex w-full items-center gap-1.5">
+        <label class="relative min-w-0 flex-1">
+          <span class="sr-only">Search sessions</span>
+          <Search class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+          <input
+            v-model="searchQuery"
+            type="search"
+            placeholder="Search"
+            class="h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 py-1.5 pl-8 pr-2 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-sky-700"
+          />
+        </label>
+        <button
+          type="button"
+          class="flex size-8 shrink-0 items-center justify-center rounded-md border border-sky-800/70 bg-sky-950/70 text-sky-200 hover:bg-sky-900/70"
+          aria-label="New session"
+          @click="emit('newSession')"
+        >
+          <Plus class="size-4" />
+        </button>
       </div>
-      <button type="button" @click="emit('refresh')">Refresh</button>
     </header>
 
-    <div v-if="workspaces.length === 0" class="empty-state">
-      No workspaces yet. Create a session to initialize one.
+    <div class="min-h-0 flex-1 overflow-y-auto p-1.5">
+      <div v-if="workspaceTree.length === 0" class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500">
+        No workspaces yet. Create a session to initialize one.
+      </div>
+      <div v-else-if="treeItems.length === 0" class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500">
+        {{ normalizedSearchQuery ? `No sessions match “${searchQuery}”.` : 'No active sessions.' }}
+      </div>
+
+      <TreeRoot
+        v-else
+        v-slot="{ flattenItems }"
+        v-model:expanded="expandedKeys"
+        class="flex flex-col gap-0.5"
+        :items="treeItems"
+        :get-key="treeItemKey"
+        :get-children="treeItemChildren"
+      >
+        <TreeItem
+          v-for="item in flattenItems"
+          v-slot="{ isExpanded, handleToggle, handleSelect }"
+          :key="treeItemData(item).value"
+          v-bind="item.bind"
+          as-child
+        >
+          <button
+            v-if="isWorkspaceTreeItem(treeItemData(item))"
+            type="button"
+            class="group flex w-full min-w-0 items-center gap-1.5 rounded-md border border-transparent px-1.5 py-1.5 text-left text-slate-300 hover:border-slate-800 hover:bg-slate-900/40"
+            :style="{ paddingLeft: `${item.level * 18 + 8}px` }"
+            @click="handleToggle"
+          >
+            <ChevronRight
+              class="size-3.5 shrink-0 text-slate-600 transition-transform"
+              :class="{ 'rotate-90': isExpanded }"
+              aria-hidden="true"
+            />
+            <Folder class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+            <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{ workspaceItem(item).workspace.name }}</span>
+          </button>
+
+          <button
+            v-else
+            type="button"
+            class="flex w-full min-w-0 items-center gap-1.5 rounded-md border px-1.5 py-1.5 text-left transition"
+            :class="activeSessionId === sessionItem(item).session.id
+              ? 'border-sky-500/40 bg-sky-950/40 text-slate-100'
+              : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900/50 hover:text-slate-200'"
+            :style="{ paddingLeft: `${item.level * 18 + 8}px` }"
+            @click="selectSession(sessionItem(item).session, handleSelect)"
+          >
+            <span class="size-3.5 shrink-0" aria-hidden="true" />
+            <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+            <span class="min-w-0 flex-1 truncate text-sm">{{ sessionItem(item).session.name || sessionItem(item).session.command }}</span>
+          </button>
+        </TreeItem>
+      </TreeRoot>
     </div>
 
-    <section v-for="workspace in workspaces" :key="workspace.key" class="workspace-group">
-      <h2>{{ workspace.name }}</h2>
-      <p :title="workspace.path">{{ workspace.path }}</p>
-      <button
-        v-for="session in sessionsFor(workspace.key)"
-        :key="session.id"
-        type="button"
-        class="session-item"
-        :class="{ selected: selectedSessionId === session.id }"
-        @click="emit('select', session)"
-      >
-        <span class="session-command">{{ session.command }}</span>
-        <span class="session-meta">
-          {{ session.lifecycle_state }}
-          <template v-if="session.attachment_state"> · {{ session.attachment_state }}</template>
-          <template v-if="session.exit_code !== undefined">
-            · exit {{ session.exit_code }}</template
-          >
-        </span>
-      </button>
-    </section>
+    <footer class="flex h-8 shrink-0 items-center gap-1.5 border-t border-slate-800/80 bg-[#0a0f18] px-2 text-sm text-slate-500">
+      <Settings class="size-4" />
+      <span>设置</span>
+    </footer>
   </aside>
 </template>
 
 <script setup lang="ts">
-  import type { SessionSummary, WorkspaceSummary } from '../../protocol/terminal'
+  import { computed, ref, watch } from 'vue'
+  import { ChevronRight, Folder, Plus, Search, Settings, SquareTerminal } from '@lucide/vue'
+  import { TreeItem, TreeRoot } from 'reka-ui'
+  import type { SessionSummary, WorkspaceSummary, WorkspaceTreeSummary } from '../../protocol/terminal'
+
+  type WorkspaceTreeItem = {
+    kind: 'workspace'
+    value: string
+    workspace: WorkspaceSummary
+    children: SessionTreeItem[]
+  }
+
+  type SessionTreeItem = {
+    kind: 'session'
+    value: string
+    session: SessionSummary
+  }
+
+  type TreeItemModel = WorkspaceTreeItem | SessionTreeItem
+  type FlattenedTreeItem = { value: TreeItemModel } & Record<string, unknown>
 
   const props = defineProps<{
-    workspaces: WorkspaceSummary[]
-    sessions: SessionSummary[]
-    selectedSessionId: string | null
+    workspaceTree: WorkspaceTreeSummary[]
+    activeSessionId: string | null
   }>()
 
   const emit = defineEmits<{
     select: [session: SessionSummary]
     refresh: []
+    newSession: []
+    renameSession: [session: SessionSummary]
+    deleteSession: [session: SessionSummary]
+    removeWorkspace: [workspace: WorkspaceSummary]
+    unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
   }>()
 
-  function sessionsFor(workspaceKey: string) {
-    return props.sessions.filter((session) => session.workspace_key === workspaceKey)
+  const searchQuery = ref('')
+  const expandedKeys = ref<string[]>([])
+  const initializedExpandedKeys = new Set<string>()
+
+  const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
+
+  const treeItems = computed<WorkspaceTreeItem[]>(() => {
+    return props.workspaceTree
+      .map((workspace) => {
+        const children = sessionsFor(workspace).map((session) => ({
+          kind: 'session' as const,
+          value: `session:${session.id}`,
+          session,
+        }))
+        return {
+          kind: 'workspace' as const,
+          value: `workspace:${workspace.id}`,
+          workspace,
+          children,
+        }
+      })
+      .filter((workspace) => workspace.children.length > 0)
+  })
+
+  watch(
+    treeItems,
+    (items) => {
+      const nextExpanded = new Set(expandedKeys.value)
+      for (const item of items) {
+        if (!initializedExpandedKeys.has(item.value) && item.children.some((child) => isActiveSession(child.session))) {
+          initializedExpandedKeys.add(item.value)
+          nextExpanded.add(item.value)
+        }
+      }
+      expandedKeys.value = Array.from(nextExpanded)
+    },
+    { immediate: true },
+  )
+
+  function treeItemKey(item: TreeItemModel) {
+    return item.value
+  }
+
+  function treeItemChildren(item: TreeItemModel) {
+    return item.kind === 'workspace' ? item.children : undefined
+  }
+
+  function treeItemData(item: unknown): TreeItemModel {
+    return (item as FlattenedTreeItem).value
+  }
+
+  function isWorkspaceTreeItem(item: TreeItemModel): item is WorkspaceTreeItem {
+    return item.kind === 'workspace'
+  }
+
+
+  function workspaceItem(item: unknown): WorkspaceTreeItem {
+    return treeItemData(item) as WorkspaceTreeItem
+  }
+
+  function sessionItem(item: unknown): SessionTreeItem {
+    return treeItemData(item) as SessionTreeItem
+  }
+
+  function selectSession(session: SessionSummary, handleSelect: () => void) {
+    handleSelect()
+    emit('select', session)
+  }
+
+  function isActiveSession(session: SessionSummary) {
+    return ['starting', 'running', 'stopping'].includes(session.lifecycle_state)
+  }
+
+  function sessionsFor(workspace: WorkspaceTreeSummary): SessionSummary[] {
+    return workspace.children
+      .map((session) => ({
+        ...session,
+        workspace_id: session.workspace_id ?? workspace.id,
+        workspace_key: session.workspace_key ?? workspace.key,
+      }))
+      .filter((session) => {
+        if (!normalizedSearchQuery.value) {
+          return isActiveSession(session)
+        }
+        return sessionMatchesSearch(session, workspace)
+      })
+  }
+
+  function sessionMatchesSearch(session: SessionSummary, workspace: WorkspaceSummary) {
+    const haystack = [
+      session.id,
+      session.name,
+      session.command,
+      session.cwd,
+      session.lifecycle_state,
+      session.attachment_state ?? '',
+      workspace.name,
+      workspace.path,
+    ]
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(normalizedSearchQuery.value)
   }
 </script>

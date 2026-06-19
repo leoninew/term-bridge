@@ -1,21 +1,8 @@
 <template>
   <section class="terminal-shell">
-    <header class="terminal-toolbar">
-      <div>
-        <span class="eyebrow">Terminal</span>
-        <strong>{{ sessionId ?? 'No session selected' }}</strong>
-      </div>
-      <div class="terminal-actions">
-        <span class="socket-status" :data-state="socket.status.value">
-          {{ socket.status.value }}
-        </span>
-        <button type="button" :disabled="!wsUrl" @click="detach">Detach</button>
-        <button type="button" class="danger" :disabled="!wsUrl" @click="closeSession">Close</button>
-      </div>
-    </header>
     <div ref="terminalElement" class="terminal-container" />
-    <p v-if="replaying" class="terminal-error">Replaying bounded history…</p>
-    <p v-if="socket.error.value" class="terminal-error">{{ socket.error.value }}</p>
+    <p v-if="replaying" class="terminal-message warning">Replaying bounded history…</p>
+    <p v-if="socket.error.value" class="terminal-message error">{{ socket.error.value }}</p>
   </section>
 </template>
 
@@ -24,7 +11,6 @@
   import type { ServerControlMessage } from '../../protocol/terminal'
   import { createXterm } from './useXterm'
   import { useTerminalSocket } from '../../features/sessions/useTerminalSocket'
-  import { closeSession as closeSessionApi } from '../../features/sessions/api'
 
   const props = defineProps<{
     wsUrl: string | null
@@ -67,18 +53,6 @@
     const url = new URL(props.wsUrl, window.location.href)
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     socket.connect(url.toString())
-  }
-
-  function detach() {
-    socket.sendControl({ type: 'detach' })
-  }
-
-  async function closeSession() {
-    if (!props.sessionId) {
-      return
-    }
-    await closeSessionApi(props.sessionId)
-    socket.close()
   }
 
   function safeTerminalText(value: string): string {

@@ -1,139 +1,636 @@
 <template>
-  <main class="app-shell">
-    <WorkspaceSessionSidebar
-      :workspaces="workspaces"
-      :sessions="sessions"
-      :selected-session-id="selectedSession?.id ?? null"
-      @select="selectSession"
-      @refresh="refresh"
-    />
+  <ToastProvider>
+    <SplitterGroup direction="horizontal" class="flex h-screen min-h-screen overflow-hidden bg-[#05070d] text-sm text-slate-200">
+      <SplitterPanel id="workspace-sidebar" :default-size="22" :min-size="16" :max-size="35">
+        <WorkspaceSessionSidebar
+          :workspace-tree="workspaceTree"
+          :active-session-id="activeTabId"
+          @select="openSessionTab"
+          @refresh="refresh"
+          @new-session="openCreateDialog"
+          @rename-session="openRenameDialog"
+          @delete-session="openDeleteSessionDialog"
+          @remove-workspace="openRemoveWorkspaceDialog"
+          @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
+        />
+      </SplitterPanel>
 
-    <section class="main-pane">
-      <header class="topbar">
-        <div>
-          <span class="eyebrow">M2.5 Web Terminal</span>
-          <h2>Gate-ready local terminal prototype</h2>
-        </div>
-        <span v-if="loading" class="status-pill">Loading…</span>
-      </header>
+      <SplitterResizeHandle class="group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[#05070d] outline-none focus-visible:bg-sky-950/60">
+        <span class="w-px bg-slate-800 transition group-hover:bg-sky-700 group-focus-visible:bg-sky-500" />
+      </SplitterResizeHandle>
 
-      <form class="new-session" @submit.prevent="startSession">
-        <label>
-          <span>Cwd</span>
-          <input v-model="cwd" placeholder="empty = backend cwd" />
-        </label>
-        <label>
-          <span>Command</span>
-          <input v-model="commandText" placeholder="zsh" />
-        </label>
-        <button type="submit">New session</button>
-      </form>
+      <SplitterPanel id="terminal-workbench" :min-size="55">
+        <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14]">
+        <p v-if="error" class="mx-3 mt-3 rounded-md border border-red-900/80 bg-red-950/80 px-2 py-1.5 text-red-100">
+          {{ error }}
+        </p>
 
-      <p v-if="error" class="error-banner">{{ error }}</p>
-
-      <section v-if="selectedSession" class="session-summary">
-        <div><strong>Session</strong> {{ selectedSession.id }}</div>
-        <div><strong>Cwd</strong> {{ selectedSession.cwd }}</div>
-        <div><strong>Command</strong> {{ selectedSession.command }}</div>
-        <div>
-          <strong>State</strong> {{ selectedSession.lifecycle_state }}
-          <template v-if="selectedSession.attachment_state">
-            / {{ selectedSession.attachment_state }}
-          </template>
-        </div>
-      </section>
-
-      <TerminalView
-        v-if="selectedCanAttach"
-        :key="selectedSession?.id"
-        :ws-url="wsUrl"
-        :session-id="selectedSession?.id ?? null"
-        @state="handleTerminalState"
-      />
-
-      <section v-else class="history-panel">
-        <h3>History / metadata</h3>
-        <HistoryTerminalView v-if="historyText" :history="historyText" />
-        <details v-if="historyText">
-          <summary>Raw history</summary>
-          <pre>{{ historyText }}</pre>
-        </details>
-        <pre v-else>
-Select a stopped session to inspect bounded history, or create a new session.</pre
+        <TabsRoot
+          :model-value="activeTabId ?? undefined"
+          class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+          @update:model-value="activateOpenedTab"
         >
-      </section>
-    </section>
-  </main>
+          <div class="flex h-11 shrink-0 items-center border-b border-slate-800/80 bg-[#0a0f18] px-2">
+            <TabsList as-child>
+              <VueDraggable
+                v-model="openedTabs"
+                tag="div"
+                class="flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
+                :animation="150"
+                handle=".tab-drag-handle"
+                item-key="sessionId"
+              >
+                <div
+                  v-for="tab in openedTabs"
+                  :key="tab.sessionId"
+                  class="group relative flex max-w-56 shrink-0 items-center rounded-md border px-0.5 text-sm transition"
+                  :class="activeTabId === tab.sessionId
+                    ? 'border-sky-500/40 bg-slate-900 text-slate-50 shadow-lg shadow-sky-950/30 after:absolute after:inset-x-2 after:-bottom-1.5 after:h-0.5 after:rounded-full after:bg-sky-400'
+                    : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:border-slate-700 hover:bg-slate-900/80'"
+                >
+                  <TabsTrigger :value="tab.sessionId" class="tab-drag-handle flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+                    <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                    <span class="truncate">{{ sessionTitle(tab.sessionId) }}</span>
+                  </TabsTrigger>
+                  <button
+                    type="button"
+                    class="rounded-md p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+                    :aria-label="`Close ${sessionTitle(tab.sessionId)} tab`"
+                    @click.stop="closeTab(tab.sessionId)"
+                  >
+                    <X class="size-3.5" />
+                  </button>
+                </div>
+              </VueDraggable>
+            </TabsList>
+          </div>
+
+          <TabsContent
+            v-if="activeSession && activeTab"
+            :key="activeSession.id"
+            :value="activeSession.id"
+            class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14] p-2"
+          >
+            <TerminalView
+              v-if="activeSession.lifecycle_state === 'running'"
+              :key="activeSession.id"
+              :ws-url="`/api/sessions/${activeSession.id}/ws`"
+              :session-id="activeSession.id"
+              @state="handleTerminalState"
+            />
+
+            <section v-else class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              <div v-if="activeTab.historyLoading" class="flex flex-1 items-center justify-center text-slate-500">Loading bounded history…</div>
+              <div v-else-if="activeTab.historyError" class="rounded-md border border-red-900/80 bg-red-950/80 px-2 py-1.5 text-red-100">
+                {{ activeTab.historyError }}
+              </div>
+              <HistoryTerminalView
+                v-else-if="activeTab.historyText"
+                :key="`${activeSession.id}-history`"
+                :history="activeTab.historyText"
+              />
+              <div v-else class="flex flex-1 items-center justify-center text-slate-500">No bounded history is available for this session.</div>
+            </section>
+          </TabsContent>
+
+          <section v-if="openedTabs.length === 0" class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-slate-500">
+            <h3 class="text-lg font-semibold text-slate-300">No terminal tab is open</h3>
+            <p>Select a session from the workspace tree, or start a new command.</p>
+            <button type="button" class="rounded-md border border-sky-700 bg-sky-950 px-2.5 py-1.5 text-sky-100 hover:bg-sky-900" @click="openCreateDialog">
+              New session
+            </button>
+          </section>
+        </TabsRoot>
+
+        <footer class="flex h-8 shrink-0 items-center gap-1.5 overflow-hidden border-t border-slate-800/80 bg-[#0a0f18] px-3 text-sm text-slate-500">
+          <template v-if="activeSession">
+            <span>Status</span>
+            <span class="text-slate-200">{{ activeLifecycleLabel }}</span>
+            <span class="text-slate-700">·</span>
+            <span>Command</span>
+            <span class="min-w-0 truncate text-slate-200">{{ activeSession.command }}</span>
+          </template>
+          <span v-else>No active session</span>
+        </footer>
+        </section>
+      </SplitterPanel>
+    </SplitterGroup>
+
+    <DialogRoot v-model:open="createDialogOpen">
+      <DialogPortal>
+        <DialogOverlay class="dialog-overlay" />
+        <DialogContent class="dialog-content">
+          <DialogTitle class="dialog-title">New session</DialogTitle>
+          <DialogDescription class="dialog-description">
+            Start a backend-supported terminal session.
+          </DialogDescription>
+          <form class="dialog-form" @submit.prevent="startSession">
+            <label>
+              <span>name</span>
+              <input ref="sessionNameInput" v-model="sessionName" placeholder="Session name" />
+            </label>
+            <label>
+              <span>cwd</span>
+              <input v-model="cwd" placeholder="Working directory" />
+            </label>
+            <label>
+              <span>command</span>
+              <input v-model="commandText" placeholder="command" />
+            </label>
+            <div class="dialog-actions">
+              <DialogClose as-child>
+                <button type="button" class="button button-secondary">Cancel</button>
+              </DialogClose>
+              <button type="submit" class="button button-primary" :disabled="creatingSession">
+                {{ creatingSession ? 'Creating…' : 'Create' }}
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </DialogPortal>
+    </DialogRoot>
+
+    <DialogRoot v-model:open="renameDialogOpen">
+      <DialogPortal>
+        <DialogOverlay class="dialog-overlay" />
+        <DialogContent class="dialog-content">
+          <DialogTitle class="dialog-title">Rename session</DialogTitle>
+          <DialogDescription class="dialog-description">
+            Only the session name can be changed by the current backend API.
+          </DialogDescription>
+          <form class="dialog-form" @submit.prevent="renameSelectedSession">
+            <label>
+              <span>name</span>
+              <input ref="renameInput" v-model="renameText" placeholder="Session name" />
+            </label>
+            <div class="dialog-actions">
+              <DialogClose as-child>
+                <button type="button" class="button button-secondary">Cancel</button>
+              </DialogClose>
+              <button type="submit" class="button button-primary" :disabled="renamingSession">
+                {{ renamingSession ? 'Renaming…' : 'Rename' }}
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </DialogPortal>
+    </DialogRoot>
+
+    <AlertDialogRoot v-model:open="deleteSessionDialogOpen">
+      <AlertDialogPortal>
+        <AlertDialogOverlay class="dialog-overlay" />
+        <AlertDialogContent class="dialog-content">
+          <AlertDialogTitle class="dialog-title">Delete session</AlertDialogTitle>
+          <AlertDialogDescription class="dialog-description">
+            <template v-if="selectedSession && isActiveLifecycle(selectedSession)">
+              Running, starting, and stopping sessions cannot be deleted. Close the terminal session first.
+            </template>
+            <template v-else>
+              Delete “{{ selectedSession ? sessionDisplayName(selectedSession) : 'this session' }}”? This uses the backend DELETE session endpoint for stopped or terminal sessions.
+            </template>
+          </AlertDialogDescription>
+          <div class="dialog-actions">
+            <AlertDialogCancel as-child>
+              <button type="button" class="button button-secondary">Cancel</button>
+            </AlertDialogCancel>
+            <AlertDialogAction as-child>
+              <button
+                type="button"
+                class="button button-danger"
+                :disabled="!selectedSession || isActiveLifecycle(selectedSession) || deletingSession"
+                @click="deleteSelectedSession"
+              >
+                {{ deletingSession ? 'Deleting…' : 'Delete' }}
+              </button>
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialogPortal>
+    </AlertDialogRoot>
+
+    <AlertDialogRoot v-model:open="removeWorkspaceDialogOpen">
+      <AlertDialogPortal>
+        <AlertDialogOverlay class="dialog-overlay" />
+        <AlertDialogContent class="dialog-content">
+          <AlertDialogTitle class="dialog-title">Remove workspace record</AlertDialogTitle>
+          <AlertDialogDescription class="dialog-description">
+            This removes the TermBridge workspace record and related records allowed by the backend. It does not delete directories or files from disk. The current backend has no filesystem directory delete API.
+          </AlertDialogDescription>
+          <div v-if="selectedWorkspace" class="dialog-note">
+            {{ selectedWorkspace.name }} — {{ selectedWorkspace.path }}
+          </div>
+          <div class="dialog-actions">
+            <AlertDialogCancel as-child>
+              <button type="button" class="button button-secondary">Cancel</button>
+            </AlertDialogCancel>
+            <AlertDialogAction as-child>
+              <button
+                type="button"
+                class="button button-danger"
+                :disabled="!selectedWorkspace || removingWorkspace"
+                @click="removeSelectedWorkspace"
+              >
+                {{ removingWorkspace ? 'Removing…' : 'Remove workspace' }}
+              </button>
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialogPortal>
+    </AlertDialogRoot>
+
+    <ToastRoot
+      v-for="toast in toasts"
+      :key="toast.id"
+      class="toast-root"
+      :class="`toast-${toast.kind}`"
+      :duration="5000"
+      @update:open="(open) => !open && dismissToast(toast.id)"
+    >
+      <ToastTitle class="toast-title">{{ toast.title }}</ToastTitle>
+      <ToastDescription v-if="toast.description" class="toast-description">
+        {{ toast.description }}
+      </ToastDescription>
+      <ToastClose class="toast-close">×</ToastClose>
+    </ToastRoot>
+    <ToastViewport class="toast-viewport" />
+  </ToastProvider>
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue'
+  import { computed, nextTick, onMounted, ref, watch } from 'vue'
+  import { SquareTerminal, X } from '@lucide/vue'
+  import { VueDraggable } from 'vue-draggable-plus'
+  import {
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogOverlay,
+    AlertDialogPortal,
+    AlertDialogRoot,
+    AlertDialogTitle,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogOverlay,
+    DialogPortal,
+    DialogRoot,
+    DialogTitle,
+    SplitterGroup,
+    SplitterPanel,
+    SplitterResizeHandle,
+    TabsContent,
+    TabsList,
+    TabsRoot,
+    TabsTrigger,
+    ToastClose,
+    ToastDescription,
+    ToastProvider,
+    ToastRoot,
+    ToastTitle,
+    ToastViewport,
+  } from 'reka-ui'
   import HistoryTerminalView from './components/terminal/HistoryTerminalView.vue'
   import TerminalView from './components/terminal/TerminalView.vue'
   import WorkspaceSessionSidebar from './components/workspace/WorkspaceSessionSidebar.vue'
-  import type { ServerControlMessage, SessionSummary, WorkspaceSummary } from './protocol/terminal'
+  import type {
+    ServerControlMessage,
+    SessionSummary,
+    WorkspaceSummary,
+    WorkspaceTreeSummary,
+  } from './protocol/terminal'
   import { commandFromText } from './protocol/terminal'
-  import { createSession, listSessions, readHistory } from './features/sessions/api'
-  import { listWorkspaces } from './features/workspaces/api'
+  import {
+    createSession,
+    deleteSession,
+    readHistory,
+    updateSession,
+  } from './features/sessions/api'
+  import { deleteWorkspace, listWorkspaceTree } from './features/workspaces/api'
 
+  type OpenSessionTab = {
+    sessionId: string
+    historyText: string
+    historyLoaded: boolean
+    historyLoading: boolean
+    historyError: string | null
+  }
+
+  type ToastKind = 'success' | 'error' | 'info'
+  type AppToast = { id: number; kind: ToastKind; title: string; description?: string }
+
+  const workspaceTree = ref<WorkspaceTreeSummary[]>([])
   const workspaces = ref<WorkspaceSummary[]>([])
   const sessions = ref<SessionSummary[]>([])
-  const selectedSession = ref<SessionSummary | null>(null)
-  const wsUrl = ref<string | null>(null)
-  const historyText = ref('')
+  const openedTabs = ref<OpenSessionTab[]>([])
+  const activeTabId = ref<string | null>(null)
+  const sessionName = ref('')
   const commandText = ref('zsh')
   const cwd = ref('')
   const error = ref<string | null>(null)
   const loading = ref(false)
+  const creatingSession = ref(false)
+  const renamingSession = ref(false)
+  const deletingSession = ref(false)
+  const removingWorkspace = ref(false)
+  const createDialogOpen = ref(false)
+  const renameDialogOpen = ref(false)
+  const deleteSessionDialogOpen = ref(false)
+  const removeWorkspaceDialogOpen = ref(false)
+  const selectedSession = ref<SessionSummary | null>(null)
+  const selectedWorkspace = ref<WorkspaceSummary | null>(null)
+  const renameText = ref('')
+  const toasts = ref<AppToast[]>([])
+  const sessionNameInput = ref<{ focus: () => void; select: () => void } | null>(null)
+  const renameInput = ref<{ focus: () => void; select: () => void } | null>(null)
+  let toastId = 0
 
-  const selectedCanAttach = computed(() => selectedSession.value?.lifecycle_state === 'running')
+  const activeSession = computed(() =>
+    sessions.value.find((session) => session.id === activeTabId.value) ?? null,
+  )
+
+  const activeTab = computed(() =>
+    openedTabs.value.find((tab) => tab.sessionId === activeTabId.value) ?? null,
+  )
+
+  const activeLifecycleLabel = computed(() => {
+    const state = activeSession.value?.lifecycle_state
+    return state ? state.charAt(0).toUpperCase() + state.slice(1) : ''
+  })
 
   async function refresh() {
     loading.value = true
     error.value = null
     try {
-      const [nextWorkspaces, nextSessions] = await Promise.all([listWorkspaces(), listSessions()])
-      workspaces.value = nextWorkspaces
-      sessions.value = nextSessions
-      if (selectedSession.value) {
-        selectedSession.value =
-          nextSessions.find((session) => session.id === selectedSession.value?.id) ??
-          selectedSession.value
+      const workspaceTree = await listWorkspaceTree()
+      applyWorkspaceTree(workspaceTree)
+      if (activeTabId.value) {
+        await ensureHistoryLoaded(activeTabId.value)
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err)
+      const message = errorMessage(err)
+      error.value = message
+      pushToast('error', 'Refresh failed', message)
     } finally {
       loading.value = false
     }
   }
 
   async function startSession() {
+    if (creatingSession.value) {
+      return
+    }
+    const name = sessionName.value.trim()
+    const trimmedCwd = cwd.value.trim()
     const command = commandFromText(commandText.value)
+    if (!name) {
+      error.value = 'Session name is required.'
+      pushToast('error', 'Create session failed', error.value)
+      return
+    }
+    if (!trimmedCwd) {
+      error.value = 'Working directory is required.'
+      pushToast('error', 'Create session failed', error.value)
+      return
+    }
     if (command.length === 0) {
-      error.value = 'command is required'
+      error.value = 'Command is required.'
+      pushToast('error', 'Create session failed', error.value)
       return
     }
     error.value = null
-    const size = estimateTerminalSize()
-    const created = await createSession({
-      cwd: cwd.value,
-      command,
-      cols: size.cols,
-      rows: size.rows,
-    })
-    wsUrl.value = created.ws_url
-    await refresh()
-    selectedSession.value =
-      sessions.value.find((session) => session.id === created.session_id) ?? null
+    creatingSession.value = true
+    try {
+      const size = estimateTerminalSize()
+      const created = await createSession({
+        name,
+        cwd: trimmedCwd,
+        command,
+        cols: size.cols,
+        rows: size.rows,
+      })
+      await refresh()
+      const session = sessions.value.find((item) => item.id === created.session_id)
+      if (!session) {
+        throw new Error('Session was created, but it was not returned by the refreshed session list.')
+      }
+      createDialogOpen.value = false
+      await openSessionTab(session)
+      pushToast('success', 'Session created', sessionDisplayName(session))
+    } catch (err) {
+      const message = errorMessage(err)
+      error.value = message
+      pushToast('error', 'Create session failed', message)
+    } finally {
+      creatingSession.value = false
+    }
   }
 
-  async function selectSession(session: SessionSummary) {
-    selectedSession.value = session
-    wsUrl.value = session.lifecycle_state === 'running' ? `/api/sessions/${session.id}/ws` : null
-    historyText.value = ''
-    if (session.lifecycle_state !== 'running') {
-      historyText.value = await readHistory(session.id)
+  async function renameSelectedSession() {
+    if (!selectedSession.value || renamingSession.value) {
+      return
     }
+    const name = renameText.value.trim()
+    if (!name) {
+      pushToast('error', 'Rename session failed', 'Name is required.')
+      return
+    }
+    renamingSession.value = true
+    try {
+      await updateSession(selectedSession.value.id, { name })
+      await refresh()
+      renameDialogOpen.value = false
+      pushToast('success', 'Session renamed', name)
+    } catch (err) {
+      pushToast('error', 'Rename session failed', errorMessage(err))
+    } finally {
+      renamingSession.value = false
+    }
+  }
+
+  async function deleteSelectedSession() {
+    if (!selectedSession.value || deletingSession.value || isActiveLifecycle(selectedSession.value)) {
+      return
+    }
+    const session = selectedSession.value
+    deletingSession.value = true
+    try {
+      await deleteSession(session.id)
+      closeTab(session.id)
+      await refresh()
+      deleteSessionDialogOpen.value = false
+      pushToast('success', 'Session deleted', sessionDisplayName(session))
+    } catch (err) {
+      pushToast('error', 'Delete session failed', errorMessage(err))
+    } finally {
+      deletingSession.value = false
+    }
+  }
+
+  async function removeSelectedWorkspace() {
+    if (!selectedWorkspace.value || removingWorkspace.value) {
+      return
+    }
+    const workspace = selectedWorkspace.value
+    removingWorkspace.value = true
+    try {
+      await deleteWorkspace(workspace.id)
+      openedTabs.value = openedTabs.value.filter((tab) => {
+        const session = sessionFor(tab.sessionId)
+        return session?.workspace_id !== workspace.id
+      })
+      if (activeSession.value?.workspace_id === workspace.id) {
+        activeTabId.value = openedTabs.value[0]?.sessionId ?? null
+      }
+      await refresh()
+      removeWorkspaceDialogOpen.value = false
+      pushToast('success', 'Workspace removed', `${workspace.name} record was removed. Files on disk were not deleted.`)
+    } catch (err) {
+      pushToast('error', 'Remove workspace failed', errorMessage(err))
+    } finally {
+      removingWorkspace.value = false
+    }
+  }
+
+  async function openSessionTab(session: SessionSummary) {
+    if (!openedTabs.value.some((tab) => tab.sessionId === session.id)) {
+      openedTabs.value.push({
+        sessionId: session.id,
+        historyText: '',
+        historyLoaded: false,
+        historyLoading: false,
+        historyError: null,
+      })
+    }
+    setActiveTab(session.id)
+    await ensureHistoryLoaded(session.id)
+  }
+
+  function setActiveTab(sessionId: string) {
+    activeTabId.value = sessionId
+  }
+
+  function activateOpenedTab(value: string | number) {
+    const sessionId = String(value)
+    setActiveTab(sessionId)
+    void ensureHistoryLoaded(sessionId)
+  }
+
+  function closeTab(sessionId: string) {
+    const closingIndex = openedTabs.value.findIndex((tab) => tab.sessionId === sessionId)
+    if (closingIndex === -1) {
+      return
+    }
+    openedTabs.value.splice(closingIndex, 1)
+    if (activeTabId.value !== sessionId) {
+      return
+    }
+    activeTabId.value =
+      openedTabs.value[Math.min(closingIndex, openedTabs.value.length - 1)]?.sessionId ?? null
+    if (activeTabId.value) {
+      void ensureHistoryLoaded(activeTabId.value)
+    }
+  }
+
+  async function ensureHistoryLoaded(sessionId: string) {
+    const session = sessionFor(sessionId)
+    const tab = openedTabs.value.find((item) => item.sessionId === sessionId)
+    if (!session || !tab || session.lifecycle_state === 'running' || tab.historyLoaded || tab.historyLoading) {
+      return
+    }
+    tab.historyLoading = true
+    tab.historyError = null
+    try {
+      tab.historyText = await readHistory(sessionId)
+      tab.historyLoaded = true
+    } catch (err) {
+      tab.historyError = errorMessage(err)
+    } finally {
+      tab.historyLoading = false
+    }
+  }
+
+  function openCreateDialog() {
+    createDialogOpen.value = true
+    if (!sessionName.value.trim()) {
+      sessionName.value = commandText.value.trim()
+    }
+    void nextTick(() => {
+      sessionNameInput.value?.focus()
+      sessionNameInput.value?.select()
+    })
+  }
+
+  function openRenameDialog(session: SessionSummary) {
+    selectedSession.value = session
+    renameText.value = session.name || session.command || ''
+    renameDialogOpen.value = true
+    void nextTick(() => {
+      renameInput.value?.focus()
+      renameInput.value?.select()
+    })
+  }
+
+  function openDeleteSessionDialog(session: SessionSummary) {
+    selectedSession.value = session
+    deleteSessionDialogOpen.value = true
+    if (isActiveLifecycle(session)) {
+      pushToast('info', 'Session cannot be deleted yet', 'Close the terminal session before deleting it.')
+    }
+  }
+
+  function openRemoveWorkspaceDialog(workspace: WorkspaceSummary) {
+    selectedWorkspace.value = workspace
+    removeWorkspaceDialogOpen.value = true
+  }
+
+  function explainUnsupportedDirectoryDelete(workspace: WorkspaceSummary) {
+    selectedWorkspace.value = workspace
+    pushToast(
+      'info',
+      'Directory delete is not supported',
+      'TermBridge can remove workspace records, but the backend has no filesystem directory delete API.',
+    )
+  }
+
+  function applyWorkspaceTree(nextWorkspaceTree: WorkspaceTreeSummary[]) {
+    workspaceTree.value = nextWorkspaceTree
+    workspaces.value = nextWorkspaceTree.map(workspaceSummaryFromTree)
+    sessions.value = nextWorkspaceTree.flatMap((workspace) =>
+      workspace.children.map((session) => ({
+        ...session,
+        workspace_id: session.workspace_id ?? workspace.id,
+        workspace_key: session.workspace_key ?? workspace.key,
+      })),
+    )
+  }
+
+  function workspaceSummaryFromTree(workspace: WorkspaceTreeSummary): WorkspaceSummary {
+    return {
+      id: workspace.id,
+      key: workspace.key,
+      name: workspace.name,
+      path: workspace.path,
+      sort_order: workspace.sort_order,
+      updated_at: workspace.updated_at,
+    }
+  }
+
+  function sessionFor(sessionId: string) {
+    return sessions.value.find((session) => session.id === sessionId) ?? null
+  }
+
+  function sessionTitle(sessionId: string) {
+    const session = sessionFor(sessionId)
+    return session ? sessionDisplayName(session) : sessionId.slice(0, 8)
+  }
+
+  function sessionDisplayName(session: SessionSummary) {
+    return session.name || session.command || session.id.slice(0, 8)
+  }
+
+  function isActiveLifecycle(session: SessionSummary) {
+    return ['running', 'starting', 'stopping'].includes(session.lifecycle_state)
   }
 
   function handleTerminalState(message: ServerControlMessage) {
@@ -142,17 +639,31 @@ Select a stopped session to inspect bounded history, or create a new session.</p
     }
   }
 
+  function pushToast(kind: ToastKind, title: string, description?: string) {
+    toasts.value.push({ id: ++toastId, kind, title, description })
+  }
+
+  function dismissToast(id: number) {
+    toasts.value = toasts.value.filter((toast) => toast.id !== id)
+  }
+
+  function errorMessage(err: unknown) {
+    return err instanceof Error ? err.message : String(err)
+  }
+
   function estimateTerminalSize(): { cols: number; rows: number } {
     const cols = Math.max(80, Math.min(10000, Math.floor((window.innerWidth - 360) / 9)))
-    const rows = Math.max(24, Math.min(10000, Math.floor((window.innerHeight - 260) / 18)))
+    const rows = Math.max(24, Math.min(10000, Math.floor((window.innerHeight - 180) / 18)))
     return { cols, rows }
   }
 
-  onMounted(async () => {
-    try {
-      await refresh()
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err)
+  watch(commandText, (nextCommand) => {
+    if (!sessionName.value.trim()) {
+      sessionName.value = nextCommand.trim()
     }
+  })
+
+  onMounted(async () => {
+    await refresh()
   })
 </script>

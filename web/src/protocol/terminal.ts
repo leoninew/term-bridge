@@ -29,19 +29,27 @@ export type ServerControlMessage =
       reason?: string
     }
   | { type: 'exited'; exit_code: number; state: 'stopped' | 'failed' }
-  | { type: 'error'; code: string; message: string }
+  | { type: 'error'; code: string; message: string; error?: string }
   | { type: 'pong'; nonce: string }
+
+export type ApiErrorResponse = {
+  code: string
+  message: string
+  error: string
+}
 
 export type WorkspaceSummary = {
   id: string
   key: string
   name: string
   path: string
+  sort_order: number
   updated_at: string
 }
 
 export type SessionSummary = {
   id: string
+  name: string
   workspace_id: string
   workspace_key: string
   command: string
@@ -53,11 +61,25 @@ export type SessionSummary = {
   log_path: string
 }
 
+export type WorkspaceTreeSession = Omit<SessionSummary, 'workspace_id' | 'workspace_key'> & {
+  workspace_id?: string
+  workspace_key?: string
+}
+
+export type WorkspaceTreeSummary = WorkspaceSummary & {
+  children: WorkspaceTreeSession[]
+}
+
 export type CreateSessionRequest = {
+  name: string
   cwd: string
   command: string[]
   cols: number
   rows: number
+}
+
+export type UpdateSessionRequest = {
+  name: string
 }
 
 export type CreateSessionResponse = {

@@ -1,11 +1,5 @@
 <template>
   <section class="terminal-shell">
-    <header class="terminal-toolbar">
-      <div>
-        <span class="eyebrow">History replay</span>
-        <strong>readonly xterm</strong>
-      </div>
-    </header>
     <div ref="terminalElement" class="terminal-container" />
   </section>
 </template>

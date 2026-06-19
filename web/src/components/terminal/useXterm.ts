@@ -24,12 +24,13 @@ export function createXterm(
     convertEol: true,
     cursorBlink: true,
     fontFamily: 'Cascadia Mono, Consolas, monospace',
-    fontSize: 14,
+    fontSize: 12,
     scrollback: 5000,
     theme: {
-      background: '#0b1020',
+      background: '#020617',
       foreground: '#d7deea',
       cursor: '#f8fafc',
+      selectionBackground: '#1e3a5f',
     },
   })
   const fitAddon = new FitAddon()
