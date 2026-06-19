@@ -78,7 +78,7 @@ func (r *SessionRuntime) attach() (*Client, error) {
 }
 
 func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentState) error {
-	if !client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeStarted, SessionID: r.session.ID, WorkspaceID: r.session.WorkspaceID, WorkspaceKey: r.session.WorkspaceKey, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(attachment)}}) {
+	if !client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeStarted, SessionId: r.session.ID, WorkspaceId: r.session.WorkspaceId, WorkspaceKey: r.session.WorkspaceKey, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(attachment)}}) {
 		return fmt.Errorf("client queue full")
 	}
 	if !client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeReplayStarted}}) {

@@ -18,7 +18,7 @@ func TestStoreSavesAndListsRecords(t *testing.T) {
 	if err := store.SaveWorkspace(ws); err != nil {
 		t.Fatalf("SaveWorkspace() error = %v", err)
 	}
-	sess := session.Session{SchemaVersion: session.SchemaVersion, ID: "02", WorkspaceID: ws.ID, WorkspaceKey: ws.Key, LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "pwsh", Args: []string{"-NoLogo"}}, CreatedAt: now, UpdatedAt: now}
+	sess := session.Session{SchemaVersion: session.SchemaVersion, ID: "02", WorkspaceId: ws.ID, WorkspaceKey: ws.Key, LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "pwsh", Args: []string{"-NoLogo"}}, CreatedAt: now, UpdatedAt: now}
 	if err := store.SaveSession(sess); err != nil {
 		t.Fatalf("SaveSession() error = %v", err)
 	}
@@ -55,6 +55,65 @@ func TestStoreSavesAndListsRecords(t *testing.T) {
 	}
 	if sessions[0].ExitCode == nil || *sessions[0].ExitCode != 7 {
 		t.Fatalf("ExitCode = %#v", sessions[0].ExitCode)
+	}
+}
+
+func TestStoreOrdersAndDeletesWorkspaceSessions(t *testing.T) {
+	store := NewStore(filepath.Join(t.TempDir(), ".termbridge"))
+	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	first := workspace.Workspace{SchemaVersion: workspace.SchemaVersion, ID: "first", Key: "firstkey", Name: "first", Path: t.TempDir(), SortOrder: 2, CreatedAt: now, UpdatedAt: now}
+	second := workspace.Workspace{SchemaVersion: workspace.SchemaVersion, ID: "second", Key: "secondkey", Name: "second", Path: t.TempDir(), SortOrder: 1, CreatedAt: now, UpdatedAt: now}
+	for _, ws := range []workspace.Workspace{first, second} {
+		if err := store.SaveWorkspace(ws); err != nil {
+			t.Fatalf("SaveWorkspace() error = %v", err)
+		}
+	}
+	workspaces, _, err := store.ListWorkspaces()
+	if err != nil {
+		t.Fatalf("ListWorkspaces() error = %v", err)
+	}
+	if len(workspaces) != 2 || workspaces[0].ID != second.ID || workspaces[1].ID != first.ID {
+		t.Fatalf("workspaces = %#v", workspaces)
+	}
+	sess := session.Session{SchemaVersion: session.SchemaVersion, ID: "session", Name: "Session", WorkspaceId: second.ID, WorkspaceKey: second.Key, LaunchCwd: second.Path, Command: session.CommandRecord{Command: "zsh"}, CreatedAt: now, UpdatedAt: now}
+	if err := store.SaveSession(sess); err != nil {
+		t.Fatalf("SaveSession() error = %v", err)
+	}
+	storedWorkspace, err := store.LoadWorkspace(second.Key)
+	if err != nil {
+		t.Fatalf("LoadWorkspace() error = %v", err)
+	}
+	if len(storedWorkspace.Children) != 1 || storedWorkspace.Children[0].Name != "Session" {
+		t.Fatalf("workspace children = %#v", storedWorkspace.Children)
+	}
+	if err := store.SaveState(second.Key, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, UpdatedAt: now}); err != nil {
+		t.Fatalf("SaveState() error = %v", err)
+	}
+	views, _, err := store.ListSessionsByWorkspaceId(second.ID)
+	if err != nil {
+		t.Fatalf("ListSessionsByWorkspaceId() error = %v", err)
+	}
+	if len(views) != 1 || views[0].Session.Name != "Session" {
+		t.Fatalf("views = %#v", views)
+	}
+	if err := store.DeleteSession(second.Key, sess.ID); err != nil {
+		t.Fatalf("DeleteSession() error = %v", err)
+	}
+	if _, err := store.LoadSession(second.Key, sess.ID); err == nil {
+		t.Fatal("LoadSession() error = nil, want deleted session")
+	}
+	storedWorkspace, err = store.LoadWorkspace(second.Key)
+	if err != nil {
+		t.Fatalf("LoadWorkspace() after delete session error = %v", err)
+	}
+	if len(storedWorkspace.Children) != 0 {
+		t.Fatalf("workspace children after delete = %#v", storedWorkspace.Children)
+	}
+	if err := store.DeleteWorkspace(second.Key); err != nil {
+		t.Fatalf("DeleteWorkspace() error = %v", err)
+	}
+	if _, err := store.LoadWorkspace(second.Key); err == nil {
+		t.Fatal("LoadWorkspace() error = nil, want deleted workspace")
 	}
 }
 

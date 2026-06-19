@@ -46,6 +46,7 @@ func New(config Config, registry *webterminal.Registry) *Server {
 	s := &Server{config: normalizeConfig(config), registry: registry}
 	mux.HandleFunc("/api/health", s.handleHealth)
 	mux.HandleFunc("/api/workspaces", s.withOriginGuard(s.handleWorkspaces))
+	mux.HandleFunc("/api/workspaces/", s.withOriginGuard(s.handleWorkspace))
 	mux.HandleFunc("/api/sessions", s.withOriginGuard(s.handleSessions))
 	mux.HandleFunc("/api/sessions/", s.withOriginGuard(s.handleSession))
 	s.server = &http.Server{Handler: logRequests(s.config.Logger, s.config.RequestBodyLimit, s.config.ResponseBodyLimit, mux)}
@@ -105,16 +106,117 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWorkspaces(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		methodNotAllowed(w)
+	path := strings.TrimPrefix(r.URL.Path, "/api/workspaces")
+	if path == "" || path == "/" {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w)
+			return
+		}
+		workspaces, err := s.registry.ListWorkspaces()
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces})
 		return
 	}
-	workspaces, err := s.registry.ListWorkspaces()
-	if err != nil {
-		writeError(w, err)
+	if path == "/tree" {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w)
+			return
+		}
+		tree, err := s.registry.WorkspaceTree()
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, tree)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces})
+	if path == "/order" {
+		if r.Method != http.MethodPatch {
+			methodNotAllowed(w)
+			return
+		}
+		var request webterminal.UpdateWorkspaceOrderRequest
+		if !decodeJSONRequest(w, r, &request) {
+			return
+		}
+		workspaces, err := s.registry.UpdateWorkspaceOrder(request.WorkspaceIds)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces})
+		return
+	}
+	http.NotFound(w, r)
+}
+
+func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/workspaces/")
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	if len(parts) == 1 && parts[0] == "tree" {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w)
+			return
+		}
+		tree, err := s.registry.WorkspaceTree()
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, tree)
+		return
+	}
+	if len(parts) == 1 && parts[0] == "order" {
+		if r.Method != http.MethodPatch {
+			methodNotAllowed(w)
+			return
+		}
+		var request webterminal.UpdateWorkspaceOrderRequest
+		if !decodeJSONRequest(w, r, &request) {
+			return
+		}
+		workspaces, err := s.registry.UpdateWorkspaceOrder(request.WorkspaceIds)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces})
+		return
+	}
+	workspaceId := parts[0]
+	if len(parts) == 1 {
+		if r.Method != http.MethodDelete {
+			methodNotAllowed(w)
+			return
+		}
+		if err := s.registry.DeleteWorkspace(workspaceId); err != nil {
+			writeError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "sessions" {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w)
+			return
+		}
+		sessions, err := s.registry.ListSessionsByWorkspaceId(workspaceId)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"sessions": sessions})
+		return
+	}
+	http.NotFound(w, r)
 }
 
 func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
@@ -125,12 +227,10 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 			writeError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"sessions": sessions})
+		writeJSON(w, http.StatusOK, sessions)
 	case http.MethodPost:
 		var request webterminal.CreateSessionRequest
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, terminalproto.MaxJSONMessageBytes))
-		if err := decoder.Decode(&request); err != nil {
-			writeJSON(w, http.StatusBadRequest, errorBody("invalid_request", err.Error()))
+		if !decodeJSONRequest(w, r, &request) {
 			return
 		}
 		response, err := s.registry.CreateSession(r.Context(), request)
@@ -151,18 +251,36 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	sessionID := parts[0]
+	sessionId := parts[0]
 	if len(parts) == 1 {
-		if r.Method != http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
+			summary, err := s.registry.GetSession(sessionId)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, summary)
+		case http.MethodPatch:
+			var request webterminal.UpdateSessionRequest
+			if !decodeJSONRequest(w, r, &request) {
+				return
+			}
+			summary, err := s.registry.UpdateSession(sessionId, request)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, summary)
+		case http.MethodDelete:
+			if err := s.registry.DeleteSession(sessionId); err != nil {
+				writeError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
 			methodNotAllowed(w)
-			return
 		}
-		summary, err := s.registry.GetSession(sessionID)
-		if err != nil {
-			writeError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, summary)
 		return
 	}
 	if len(parts) != 2 {
@@ -175,7 +293,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 			methodNotAllowed(w)
 			return
 		}
-		if err := s.registry.CloseSession(sessionID, "api_close"); err != nil {
+		if err := s.registry.CloseSession(sessionId, "api_close"); err != nil {
 			writeError(w, err)
 			return
 		}
@@ -185,7 +303,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 			methodNotAllowed(w)
 			return
 		}
-		data, err := s.registry.History(sessionID)
+		data, err := s.registry.History(sessionId)
 		if err != nil {
 			writeError(w, err)
 			return
@@ -197,14 +315,14 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 			methodNotAllowed(w)
 			return
 		}
-		s.handleWebSocket(w, r, sessionID)
+		s.handleWebSocket(w, r, sessionId)
 	default:
 		http.NotFound(w, r)
 	}
 }
 
-func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request, sessionID string) {
-	client, err := s.registry.Attach(sessionID)
+func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request, sessionId string) {
+	client, err := s.registry.Attach(sessionId)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -333,6 +451,15 @@ func (s *Server) originPatterns(r *http.Request) []string {
 	patterns := []string{"http://" + r.Host, "https://" + r.Host}
 	patterns = append(patterns, s.config.AllowedOrigins...)
 	return patterns
+}
+
+func decodeJSONRequest(w http.ResponseWriter, r *http.Request, value any) bool {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, terminalproto.MaxJSONMessageBytes))
+	if err := decoder.Decode(value); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorBody("invalid_request", err.Error()))
+		return false
+	}
+	return true
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

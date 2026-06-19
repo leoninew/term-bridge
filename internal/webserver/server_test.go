@@ -44,8 +44,55 @@ func TestSessionsRouteListsEmptySessions(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", response.Code)
 	}
-	if response.Body.String() == "" {
-		t.Fatal("empty response body")
+	var body []webterminal.SessionSummary
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body == nil {
+		t.Fatalf("body = %#v, want array", body)
+	}
+}
+
+func TestCreateSessionRequiresName(t *testing.T) {
+	server := New(Config{}, newTestRegistry(t))
+	request := httptest.NewRequest(http.MethodPost, "/api/sessions", strings.NewReader(`{"command":["go","version"]}`))
+	response := httptest.NewRecorder()
+
+	server.server.Handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", response.Code)
+	}
+}
+
+func TestWorkspaceTreeRoute(t *testing.T) {
+	server := New(Config{}, newTestRegistry(t))
+	request := httptest.NewRequest(http.MethodGet, "/api/workspaces/tree", nil)
+	response := httptest.NewRecorder()
+
+	server.server.Handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.Code)
+	}
+	var body []webterminal.WorkspaceTreeNode
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body == nil {
+		t.Fatalf("body = %#v, want array", body)
+	}
+}
+
+func TestWorkspaceOrderRequiresIds(t *testing.T) {
+	server := New(Config{}, newTestRegistry(t))
+	request := httptest.NewRequest(http.MethodPatch, "/api/workspaces/order", strings.NewReader(`{"workspace_ids":[]}`))
+	response := httptest.NewRecorder()
+
+	server.server.Handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", response.Code)
 	}
 }
 

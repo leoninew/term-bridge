@@ -21,9 +21,9 @@ type AliveChecker interface {
 }
 
 type RecoveryStore interface {
-	LoadProcess(workspaceKey string, sessionID string) (process.Record, error)
-	LoadExit(workspaceKey string, sessionID string) (process.ExitRecord, error)
-	SaveState(workspaceKey string, sessionID string, value StateRecord) error
+	LoadProcess(workspaceKey string, sessionId string) (process.Record, error)
+	LoadExit(workspaceKey string, sessionId string) (process.ExitRecord, error)
+	SaveState(workspaceKey string, sessionId string, value StateRecord) error
 }
 
 type Recoverer struct {

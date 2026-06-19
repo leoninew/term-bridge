@@ -9,7 +9,7 @@ import (
 
 type Store interface {
 	SaveSession(Session) error
-	SaveState(workspaceKey string, sessionID string, value StateRecord) error
+	SaveState(workspaceKey string, sessionId string, value StateRecord) error
 }
 
 type Manager struct {
@@ -20,6 +20,7 @@ type Manager struct {
 
 type CreateOptions struct {
 	Workspace workspace.Workspace
+	Name      string
 	LaunchCwd string
 	Command   CommandRecord
 	History   HistoryRecord
@@ -35,7 +36,8 @@ func (m Manager) Create(options CreateOptions) (Session, error) {
 	session := Session{
 		SchemaVersion: SchemaVersion,
 		ID:            id,
-		WorkspaceID:   options.Workspace.ID,
+		Name:          options.Name,
+		WorkspaceId:   options.Workspace.ID,
 		WorkspaceKey:  options.Workspace.Key,
 		LaunchCwd:     options.LaunchCwd,
 		Command:       options.Command,

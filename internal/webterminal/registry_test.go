@@ -27,7 +27,7 @@ func TestCreateSessionExpandsHomeCwd(t *testing.T) {
 	manager := &fakeManager{session: fake}
 	registry := NewRegistry(Config{Cwd: home, CwdAllowlist: []string{home}, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
 
-	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Cwd: "~/Downloads", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Cwd: "~/Downloads", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -48,7 +48,7 @@ func TestCreateSessionAcceptsHomeCwdWhenHomeAllowed(t *testing.T) {
 	manager := &fakeManager{session: fake}
 	registry := NewRegistry(Config{Cwd: home, CwdAllowlist: []string{home}, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
 
-	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Cwd: "~", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Home shell", Cwd: "~", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -68,11 +68,11 @@ func TestCreateSessionPersistsRuntimeRecords(t *testing.T) {
 	manager := &fakeManager{session: fake}
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
 
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
-	if response.SessionID == "" || response.WorkspaceID == "" || response.WSURL == "" {
+	if response.SessionId == "" || response.WorkspaceId == "" || response.WSURL == "" {
 		t.Fatalf("response = %#v", response)
 	}
 	if len(manager.specs) != 1 {
@@ -82,21 +82,21 @@ func TestCreateSessionPersistsRuntimeRecords(t *testing.T) {
 		t.Fatalf("InitialSize = %#v", manager.specs[0].InitialSize)
 	}
 	store := state.NewStore(root)
-	if _, err := store.LoadSession(response.WorkspaceKey, response.SessionID); err != nil {
+	if _, err := store.LoadSession(response.WorkspaceKey, response.SessionId); err != nil {
 		t.Fatalf("LoadSession() error = %v", err)
 	}
-	stateRecord, err := store.LoadState(response.WorkspaceKey, response.SessionID)
+	stateRecord, err := store.LoadState(response.WorkspaceKey, response.SessionId)
 	if err != nil {
 		t.Fatalf("LoadState() error = %v", err)
 	}
 	if stateRecord.State != session.StateRunning {
 		t.Fatalf("state = %q, want running", stateRecord.State)
 	}
-	if _, err := store.LoadProcess(response.WorkspaceKey, response.SessionID); err != nil {
+	if _, err := store.LoadProcess(response.WorkspaceKey, response.SessionId); err != nil {
 		t.Fatalf("LoadProcess() error = %v", err)
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionID)
+	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
 }
 
 func TestAttachDetachAndInput(t *testing.T) {
@@ -104,11 +104,11 @@ func TestAttachDetachAndInput(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
-	client, err := registry.Attach(response.SessionID)
+	client, err := registry.Attach(response.SessionId)
 	if err != nil {
 		t.Fatalf("Attach() error = %v", err)
 	}
@@ -127,7 +127,7 @@ func TestAttachDetachAndInput(t *testing.T) {
 		t.Fatalf("summaries = %#v", summaries)
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionID)
+	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
 }
 
 func TestHistoryReturnsWrittenOutput(t *testing.T) {
@@ -135,7 +135,7 @@ func TestHistoryReturnsWrittenOutput(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -144,7 +144,7 @@ func TestHistoryReturnsWrittenOutput(t *testing.T) {
 	deadline := time.Now().Add(time.Second)
 	for {
 		var err error
-		data, err = registry.History(response.SessionID)
+		data, err = registry.History(response.SessionId)
 		if err != nil {
 			t.Fatalf("History() error = %v", err)
 		}
@@ -160,18 +160,156 @@ func TestHistoryReturnsWrittenOutput(t *testing.T) {
 		t.Fatalf("History() = %q", data)
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionID)
+	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
 }
 
-func waitExit(t *testing.T, store state.Store, workspaceKey string, sessionID string) {
+func TestCreateSessionRequiresName(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: newFakeSession()}})
+
+	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Command: []string{"go", "version"}})
+	if err == nil {
+		t.Fatal("CreateSession() error = nil, want error")
+	}
+}
+
+func TestUpdateSessionChangesName(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Old name", Command: []string{"go", "version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	summary, err := registry.UpdateSession(response.SessionId, UpdateSessionRequest{Name: "New name"})
+	if err != nil {
+		t.Fatalf("UpdateSession() error = %v", err)
+	}
+	if summary.Name != "New name" {
+		t.Fatalf("Name = %q, want New name", summary.Name)
+	}
+	stored, err := state.NewStore(root).LoadSession(response.WorkspaceKey, response.SessionId)
+	if err != nil {
+		t.Fatalf("LoadSession() error = %v", err)
+	}
+	if stored.Name != "New name" {
+		t.Fatalf("stored name = %q", stored.Name)
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+}
+
+func TestUpdateSessionRejectsUnsupportedFields(t *testing.T) {
+	var request UpdateSessionRequest
+	if err := request.UnmarshalJSON([]byte(`{"name":"ok","cwd":"/tmp"}`)); err == nil {
+		t.Fatal("UnmarshalJSON() error = nil, want unsupported field error")
+	}
+}
+
+func TestDeleteSessionRejectsRunningAndAllowsStopped(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	if err := registry.DeleteSession(response.SessionId); err == nil {
+		t.Fatal("DeleteSession() error = nil, want running session rejection")
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+	waitRuntimeRemoved(t, registry, response.SessionId)
+	if err := registry.DeleteSession(response.SessionId); err != nil {
+		t.Fatalf("DeleteSession() stopped error = %v", err)
+	}
+	if _, err := state.NewStore(root).LoadSession(response.WorkspaceKey, response.SessionId); err == nil {
+		t.Fatal("LoadSession() error = nil, want deleted session")
+	}
+}
+
+func TestWorkspaceTreeAndOrder(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	tree, err := registry.WorkspaceTree()
+	if err != nil {
+		t.Fatalf("WorkspaceTree() error = %v", err)
+	}
+	if len(tree) != 1 || tree[0].ID != response.WorkspaceId || len(tree[0].Children) != 1 || tree[0].Children[0].Name != "Go version" {
+		t.Fatalf("tree = %#v", tree)
+	}
+	workspaces, err := registry.UpdateWorkspaceOrder([]string{response.WorkspaceId})
+	if err != nil {
+		t.Fatalf("UpdateWorkspaceOrder() error = %v", err)
+	}
+	if len(workspaces) != 1 || workspaces[0].SortOrder != 1 {
+		t.Fatalf("workspaces = %#v", workspaces)
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+}
+
+func TestDeleteWorkspaceProtectsRunningSessions(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	if err := registry.DeleteWorkspace(response.WorkspaceId); err == nil {
+		t.Fatal("DeleteWorkspace() error = nil, want running session rejection")
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+	waitRuntimeRemoved(t, registry, response.SessionId)
+	if err := registry.DeleteWorkspace(response.WorkspaceId); err != nil {
+		t.Fatalf("DeleteWorkspace() stopped error = %v", err)
+	}
+	if _, err := state.NewStore(root).LoadWorkspace(response.WorkspaceKey); err == nil {
+		t.Fatal("LoadWorkspace() error = nil, want deleted workspace")
+	}
+}
+
+func waitExit(t *testing.T, store state.Store, workspaceKey string, sessionId string) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
 	for {
-		if _, err := store.LoadExit(workspaceKey, sessionID); err == nil {
+		exitReady := false
+		if _, err := store.LoadExit(workspaceKey, sessionId); err == nil {
+			exitReady = true
+		}
+		stateRecord, stateErr := store.LoadState(workspaceKey, sessionId)
+		if exitReady && stateErr == nil && stateRecord.State == session.StateStopped {
 			return
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("exit record was not written for %s", sessionID)
+			t.Fatalf("session did not stop for %s", sessionId)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func waitRuntimeRemoved(t *testing.T, registry *Registry, sessionId string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for {
+		if !registry.hasRuntime(sessionId) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("runtime was not removed for %s", sessionId)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

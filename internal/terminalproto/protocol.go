@@ -39,8 +39,8 @@ type ClientMessage struct {
 
 type ServerMessage struct {
 	Type            string `json:"type"`
-	SessionID       string `json:"session_id,omitempty"`
-	WorkspaceID     string `json:"workspace_id,omitempty"`
+	SessionId       string `json:"session_id,omitempty"`
+	WorkspaceId     string `json:"workspace_id,omitempty"`
 	WorkspaceKey    string `json:"workspace_key,omitempty"`
 	State           string `json:"state,omitempty"`
 	LifecycleState  string `json:"lifecycle_state,omitempty"`
@@ -111,7 +111,7 @@ func MustEncodeServer(message ServerMessage) []byte {
 func validateServer(message ServerMessage) error {
 	switch message.Type {
 	case TypeStarted:
-		if message.SessionID == "" || message.WorkspaceID == "" || message.State == "" && message.LifecycleState == "" {
+		if message.SessionId == "" || message.WorkspaceId == "" || message.State == "" && message.LifecycleState == "" {
 			return fmt.Errorf("invalid started message")
 		}
 		return nil

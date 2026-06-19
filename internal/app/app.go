@@ -148,6 +148,7 @@ func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, opt
 	manager := session.Manager{Store: store, IDs: ids}
 	sess, err := manager.Create(session.CreateOptions{
 		Workspace: ws,
+		Name:      strings.Join(cfg.Command, " "),
 		LaunchCwd: cfg.Cwd,
 		Command:   commandRecord,
 		History: session.HistoryRecord{
@@ -323,7 +324,7 @@ func runSessionList(cfg config.Config, stdout io.Writer) (Result, error) {
 		if view.ExitCode != nil {
 			exit = fmt.Sprintf("%d", *view.ExitCode)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", view.Session.ID, view.Session.WorkspaceID, view.State.State, exit, view.CommandText, view.Session.LaunchCwd, view.Session.UpdatedAt.Format(time.RFC3339), view.Session.LogPath)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", view.Session.ID, view.Session.WorkspaceId, view.State.State, exit, view.CommandText, view.Session.LaunchCwd, view.Session.UpdatedAt.Format(time.RFC3339), view.Session.LogPath)
 	}
 	_ = w.Flush()
 	return Result{Cwd: cfg.Cwd}, nil

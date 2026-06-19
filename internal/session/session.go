@@ -21,7 +21,8 @@ type HistoryRecord struct {
 type Session struct {
 	SchemaVersion int           `json:"schema_version"`
 	ID            string        `json:"session_id"`
-	WorkspaceID   string        `json:"workspace_id"`
+	Name          string        `json:"name"`
+	WorkspaceId   string        `json:"workspace_id"`
 	WorkspaceKey  string        `json:"workspace_key"`
 	LaunchCwd     string        `json:"launch_cwd"`
 	Command       CommandRecord `json:"command"`
