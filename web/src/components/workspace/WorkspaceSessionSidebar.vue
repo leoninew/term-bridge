@@ -31,54 +31,80 @@
         {{ normalizedSearchQuery ? `No sessions match “${searchQuery}”.` : 'No active sessions.' }}
       </div>
 
-      <TreeRoot
+      <VueDraggable
         v-else
-        v-slot="{ flattenItems }"
-        v-model:expanded="expandedKeys"
-        class="flex flex-col gap-0.5"
-        :items="treeItems"
-        :get-key="treeItemKey"
-        :get-children="treeItemChildren"
+        v-model="draggableTreeItems"
+        tag="div"
+        class="flex flex-col"
+        item-key="value"
+        handle=".workspace-drag-handle"
+        :animation="150"
+        :disabled="Boolean(normalizedSearchQuery)"
+        @end="reorderDraggedWorkspaces"
       >
-        <TreeItem
-          v-for="item in flattenItems"
-          v-slot="{ isExpanded, handleToggle, handleSelect }"
-          :key="treeItemData(item).value"
-          v-bind="item.bind"
-          as-child
-        >
-          <button
-            v-if="isWorkspaceTreeItem(treeItemData(item))"
-            type="button"
-            class="group flex w-full min-w-0 items-center gap-1.5 rounded-md border border-transparent px-1.5 py-1.5 text-left text-slate-300 hover:border-slate-800 hover:bg-slate-900/40"
-            :style="{ paddingLeft: `${item.level * 18 + 8}px` }"
-            @click="handleToggle"
+        <div v-for="workspace in draggableTreeItems" :key="workspace.value" class="min-w-0">
+          <div
+            role="button"
+            tabindex="0"
+            class="workspace-drag-handle group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border border-transparent px-1 py-0.5 text-left text-slate-300 hover:border-slate-800 hover:bg-slate-900/40"
+            :style="{ paddingLeft: '6px' }"
+            @click="toggleWorkspace(workspace.value)"
+            @keydown.enter.prevent="toggleWorkspace(workspace.value)"
+            @keydown.space.prevent="toggleWorkspace(workspace.value)"
           >
-            <ChevronRight
-              class="size-3.5 shrink-0 text-slate-600 transition-transform"
-              :class="{ 'rotate-90': isExpanded }"
-              aria-hidden="true"
-            />
-            <Folder class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
-            <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{ workspaceItem(item).workspace.name }}</span>
-          </button>
+            <FolderOpen v-if="workspaceExpanded(workspace.value)" class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+            <Folder v-else class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+            <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{ workspace.workspace.name }}</span>
+            <button
+              type="button"
+              class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 opacity-0 hover:bg-slate-800 hover:text-red-200 group-hover:opacity-100"
+              :aria-label="`Remove ${workspace.workspace.name} workspace`"
+              @click.stop="emit('removeWorkspace', workspace.workspace)"
+            >
+              <Trash2 class="size-3.5" />
+            </button>
+          </div>
 
-          <button
-            v-else
-            type="button"
-            class="flex w-full min-w-0 items-center gap-1.5 rounded-md border px-1.5 py-1.5 text-left transition"
-            :class="activeSessionId === sessionItem(item).session.id
-              ? 'border-slate-700 bg-slate-900 text-slate-100'
-              : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900/50 hover:text-slate-200'"
-            :style="{ paddingLeft: `${item.level * 18 + 8}px` }"
-            @click="selectSession(sessionItem(item).session, handleSelect)"
-          >
-            <span class="size-3.5 shrink-0" aria-hidden="true" />
-            <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
-            <span class="min-w-0 flex-1 truncate text-sm">{{ sessionItem(item).session.name || sessionItem(item).session.command }}</span>
-          </button>
-        </TreeItem>
-      </TreeRoot>
+          <template v-if="workspaceExpanded(workspace.value)">
+            <div
+              v-for="session in workspace.children"
+              :key="session.value"
+              role="button"
+              tabindex="0"
+              class="group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-left transition"
+              :class="activeSessionId === session.session.id
+                ? 'border-slate-700 bg-slate-900 text-slate-100'
+                : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900/50 hover:text-slate-200'"
+              :style="{ paddingLeft: '38px' }"
+              @click="selectSession(session.session)"
+              @keydown.enter.prevent="selectSession(session.session)"
+              @keydown.space.prevent="selectSession(session.session)"
+            >
+              <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+              <span class="min-w-0 flex-1 truncate text-sm">{{ session.session.name || session.session.command }}</span>
+              <span class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+                <button
+                  type="button"
+                  class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
+                  :aria-label="`Rename ${session.session.name || session.session.command} session`"
+                  @click.stop="emit('renameSession', session.session)"
+                >
+                  <Pencil class="size-3.5" />
+                </button>
+                <button
+                  v-if="canDeleteSession(session.session)"
+                  type="button"
+                  class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
+                  :aria-label="`Delete ${session.session.name || session.session.command} session`"
+                  @click.stop="emit('deleteSession', session.session)"
+                >
+                  <Trash2 class="size-3.5" />
+                </button>
+              </span>
+            </div>
+          </template>
+        </div>
+      </VueDraggable>
     </div>
 
     <footer class="flex h-8 shrink-0 items-center gap-1.5 border-t border-slate-800/80 bg-[#0a0f18] px-2 text-sm text-slate-500">
@@ -90,8 +116,8 @@
 
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
-  import { ChevronRight, Folder, Plus, Search, Settings, SquareTerminal } from '@lucide/vue'
-  import { TreeItem, TreeRoot } from 'reka-ui'
+  import { Folder, FolderOpen, Pencil, Plus, Search, Settings, SquareTerminal, Trash2 } from '@lucide/vue'
+  import { VueDraggable } from 'vue-draggable-plus'
   import type { SessionSummary, WorkspaceSummary, WorkspaceTreeSummary } from '../../protocol/terminal'
 
   type WorkspaceTreeItem = {
@@ -107,9 +133,6 @@
     session: SessionSummary
   }
 
-  type TreeItemModel = WorkspaceTreeItem | SessionTreeItem
-  type FlattenedTreeItem = { value: TreeItemModel } & Record<string, unknown>
-
   const props = defineProps<{
     workspaceTree: WorkspaceTreeSummary[]
     activeSessionId: string | null
@@ -123,11 +146,13 @@
     deleteSession: [session: SessionSummary]
     removeWorkspace: [workspace: WorkspaceSummary]
     unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
+    reorderWorkspaces: [workspaceIds: string[]]
   }>()
 
   const searchQuery = ref('')
   const expandedKeys = ref<string[]>([])
   const initializedExpandedKeys = new Set<string>()
+  const draggableTreeItems = ref<WorkspaceTreeItem[]>([])
 
   const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
 
@@ -146,12 +171,13 @@
           children,
         }
       })
-      .filter((workspace) => workspace.children.length > 0)
+      .filter((item) => !normalizedSearchQuery.value || item.children.length > 0 || workspaceMatchesSearch(item.workspace))
   })
 
   watch(
     treeItems,
     (items) => {
+      draggableTreeItems.value = items
       const nextExpanded = new Set(expandedKeys.value)
       for (const item of items) {
         if (!initializedExpandedKeys.has(item.value) && item.children.some((child) => isActiveSession(child.session))) {
@@ -164,38 +190,37 @@
     { immediate: true },
   )
 
-  function treeItemKey(item: TreeItemModel) {
-    return item.value
+  function reorderDraggedWorkspaces() {
+    if (normalizedSearchQuery.value) {
+      return
+    }
+    emit('reorderWorkspaces', draggableTreeItems.value.map((item) => item.workspace.id))
   }
 
-  function treeItemChildren(item: TreeItemModel) {
-    return item.kind === 'workspace' ? item.children : undefined
+  function toggleWorkspace(workspaceValue: string) {
+    const nextExpanded = new Set(expandedKeys.value)
+    if (nextExpanded.has(workspaceValue)) {
+      nextExpanded.delete(workspaceValue)
+    } else {
+      nextExpanded.add(workspaceValue)
+    }
+    expandedKeys.value = Array.from(nextExpanded)
   }
 
-  function treeItemData(item: unknown): TreeItemModel {
-    return (item as FlattenedTreeItem).value
+  function workspaceExpanded(workspaceValue: string) {
+    return expandedKeys.value.includes(workspaceValue)
   }
 
-  function isWorkspaceTreeItem(item: TreeItemModel): item is WorkspaceTreeItem {
-    return item.kind === 'workspace'
-  }
-
-
-  function workspaceItem(item: unknown): WorkspaceTreeItem {
-    return treeItemData(item) as WorkspaceTreeItem
-  }
-
-  function sessionItem(item: unknown): SessionTreeItem {
-    return treeItemData(item) as SessionTreeItem
-  }
-
-  function selectSession(session: SessionSummary, handleSelect: () => void) {
-    handleSelect()
+  function selectSession(session: SessionSummary) {
     emit('select', session)
   }
 
   function isActiveSession(session: SessionSummary) {
     return ['starting', 'running', 'stopping'].includes(session.lifecycle_state)
+  }
+
+  function canDeleteSession(session: SessionSummary) {
+    return ['stopped', 'failed'].includes(session.lifecycle_state)
   }
 
   function sessionsFor(workspace: WorkspaceTreeSummary): SessionSummary[] {
@@ -205,12 +230,14 @@
         workspace_id: session.workspace_id ?? workspace.id,
         workspace_key: session.workspace_key ?? workspace.key,
       }))
-      .filter((session) => {
-        if (!normalizedSearchQuery.value) {
-          return isActiveSession(session)
-        }
-        return sessionMatchesSearch(session, workspace)
-      })
+      .filter((session) => !normalizedSearchQuery.value || sessionMatchesSearch(session, workspace))
+  }
+
+  function workspaceMatchesSearch(workspace: WorkspaceSummary) {
+    const haystack = [workspace.id, workspace.key, workspace.name, workspace.path]
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(normalizedSearchQuery.value)
   }
 
   function sessionMatchesSearch(session: SessionSummary, workspace: WorkspaceSummary) {

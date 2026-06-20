@@ -12,6 +12,7 @@
           @delete-session="openDeleteSessionDialog"
           @remove-workspace="openRemoveWorkspaceDialog"
           @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
+          @reorder-workspaces="reorderWorkspaces"
         />
       </SplitterPanel>
 
@@ -307,7 +308,7 @@
     readHistory,
     updateSession,
   } from './features/sessions/api'
-  import { deleteWorkspace, listWorkspaceTree } from './features/workspaces/api'
+  import { deleteWorkspace, listWorkspaceTree, updateWorkspaceOrder } from './features/workspaces/api'
 
   type OpenSessionTab = {
     sessionId: string
@@ -438,8 +439,9 @@
     }
     renamingSession.value = true
     try {
-      await updateSession(selectedSession.value.id, { name })
-      await refresh()
+      const updated = await updateSession(selectedSession.value.id, { name })
+      updateSessionInState(updated)
+      selectedSession.value = updated
       renameDialogOpen.value = false
       pushToast('success', 'Session renamed', name)
     } catch (err) {
@@ -457,8 +459,9 @@
     deletingSession.value = true
     try {
       await deleteSession(session.id)
+      removeSessionFromState(session.id)
       closeTab(session.id)
-      await refresh()
+      selectedSession.value = null
       deleteSessionDialogOpen.value = false
       pushToast('success', 'Session deleted', sessionDisplayName(session))
     } catch (err) {
@@ -476,20 +479,29 @@
     removingWorkspace.value = true
     try {
       await deleteWorkspace(workspace.id)
-      openedTabs.value = openedTabs.value.filter((tab) => {
-        const session = sessionFor(tab.sessionId)
-        return session?.workspace_id !== workspace.id
-      })
-      if (activeSession.value?.workspace_id === workspace.id) {
-        activeTabId.value = openedTabs.value[0]?.sessionId ?? null
-      }
-      await refresh()
+      removeWorkspaceFromState(workspace.id)
+      selectedWorkspace.value = null
       removeWorkspaceDialogOpen.value = false
       pushToast('success', 'Workspace removed', `${workspace.name} record was removed. Files on disk were not deleted.`)
     } catch (err) {
       pushToast('error', 'Remove workspace failed', errorMessage(err))
     } finally {
       removingWorkspace.value = false
+    }
+  }
+
+  async function reorderWorkspaces(workspaceIds: string[]) {
+    const previousTree = workspaceTree.value
+    workspaceTree.value = orderWorkspaceTree(previousTree, workspaceIds)
+    try {
+      const orderedWorkspaces = await updateWorkspaceOrder(workspaceIds)
+      workspaceTree.value = orderWorkspaceTree(workspaceTree.value, orderedWorkspaces.map((workspace) => workspace.id))
+      workspaces.value = orderedWorkspaces
+    } catch (err) {
+      pushToast('error', 'Update workspace order failed', errorMessage(err))
+      workspaceTree.value = previousTree
+      workspaces.value = previousTree.map(workspaceSummaryFromTree)
+      await refresh()
     }
   }
 
@@ -608,6 +620,52 @@
     )
   }
 
+  function updateSessionInState(updated: SessionSummary) {
+    sessions.value = sessions.value.map((session) => (session.id === updated.id ? updated : session))
+    workspaceTree.value = workspaceTree.value.map((workspace) => ({
+      ...workspace,
+      children: workspace.children.map((session) => {
+        if (session.id !== updated.id) {
+          return session
+        }
+        return {
+          id: updated.id,
+          name: updated.name,
+          command: updated.command,
+          cwd: updated.cwd,
+          lifecycle_state: updated.lifecycle_state,
+          attachment_state: updated.attachment_state,
+          exit_code: updated.exit_code,
+          updated_at: updated.updated_at,
+          log_path: updated.log_path,
+        }
+      }),
+    }))
+  }
+
+  function removeSessionFromState(sessionId: string) {
+    sessions.value = sessions.value.filter((session) => session.id !== sessionId)
+    workspaceTree.value = workspaceTree.value.map((workspace) => ({
+      ...workspace,
+      children: workspace.children.filter((session) => session.id !== sessionId),
+    }))
+  }
+
+  function removeWorkspaceFromState(workspaceId: string) {
+    const removedSessionIds = new Set(
+      workspaceTree.value
+        .find((workspace) => workspace.id === workspaceId)
+        ?.children.map((session) => session.id) ?? [],
+    )
+    workspaceTree.value = workspaceTree.value.filter((workspace) => workspace.id !== workspaceId)
+    workspaces.value = workspaces.value.filter((workspace) => workspace.id !== workspaceId)
+    sessions.value = sessions.value.filter((session) => session.workspace_id !== workspaceId)
+    openedTabs.value = openedTabs.value.filter((tab) => !removedSessionIds.has(tab.sessionId))
+    if (activeSession.value?.workspace_id === workspaceId || (activeTabId.value && removedSessionIds.has(activeTabId.value))) {
+      activeTabId.value = openedTabs.value[0]?.sessionId ?? null
+    }
+  }
+
   function workspaceSummaryFromTree(workspace: WorkspaceTreeSummary): WorkspaceSummary {
     return {
       id: workspace.id,
@@ -617,6 +675,15 @@
       sort_order: workspace.sort_order,
       updated_at: workspace.updated_at,
     }
+  }
+
+  function orderWorkspaceTree(tree: WorkspaceTreeSummary[], workspaceIds: string[]) {
+    const order = new Map(workspaceIds.map((workspaceId, index) => [workspaceId, index]))
+    return [...tree].sort((left, right) => {
+      const leftOrder = order.get(left.id) ?? Number.MAX_SAFE_INTEGER
+      const rightOrder = order.get(right.id) ?? Number.MAX_SAFE_INTEGER
+      return leftOrder - rightOrder
+    })
   }
 
   function sessionFor(sessionId: string) {
