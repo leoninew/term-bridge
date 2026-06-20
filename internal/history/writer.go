@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,7 @@ const (
 )
 
 type Writer struct {
+	mu          sync.Mutex
 	path        string
 	config      Config
 	lines       [][]byte
@@ -40,6 +42,8 @@ func (w *Writer) Write(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	for len(p) > 0 {
 		idx := bytes.IndexByte(p, '\n')
 		if idx < 0 {
@@ -53,27 +57,28 @@ func (w *Writer) Write(p []byte) (int, error) {
 		p = p[idx+1:]
 	}
 	w.pending += written
-	return written, w.flushIfNeeded()
+	return written, w.flushIfNeededLocked()
 }
 
 func (w *Writer) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	if len(w.partial) > 0 {
 		w.addLine(w.partial)
 		w.partial = nil
 	}
-	return w.Flush()
+	return w.flushLocked()
 }
 
 func (w *Writer) Flush() error {
-	if err := w.flush(); err != nil {
-		return err
-	}
-	w.pending = 0
-	w.lastFlushed = time.Now()
-	return nil
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.flushLocked()
 }
 
 func (w *Writer) Truncated() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	return w.truncated
 }
 
@@ -119,18 +124,23 @@ func (w *Writer) totalBytes() int64 {
 	return total
 }
 
-func (w *Writer) flushIfNeeded() error {
+func (w *Writer) flushIfNeededLocked() error {
 	if w.pending >= flushPendingBytes || time.Since(w.lastFlushed) >= flushInterval {
-		return w.Flush()
+		return w.flushLocked()
 	}
 	return nil
 }
 
-func (w *Writer) flush() error {
+func (w *Writer) flushLocked() error {
 	var data []byte
 	for _, line := range w.lines {
 		data = append(data, line...)
 	}
 	data = append(data, w.partial...)
-	return os.WriteFile(w.path, data, 0o644)
+	if err := os.WriteFile(w.path, data, 0o644); err != nil {
+		return err
+	}
+	w.pending = 0
+	w.lastFlushed = time.Now()
+	return nil
 }

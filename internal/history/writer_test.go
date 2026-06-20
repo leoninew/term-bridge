@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestWriterKeepsSmallOutput(t *testing.T) {
@@ -88,6 +89,56 @@ func TestWriterPreservesPartialLine(t *testing.T) {
 	}
 	data := readFile(t, path)
 	if !strings.Contains(data, "partial") {
+		t.Fatalf("history = %q", data)
+	}
+}
+
+func TestWriterBatchesSmallWritesUntilFlush(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.log")
+	writer, err := NewWriter(path, Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 128})
+	if err != nil {
+		t.Fatalf("NewWriter() error = %v", err)
+	}
+	if _, err := writer.Write([]byte("one\n")); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
+		t.Fatalf("history flushed before threshold: %q", data)
+	}
+	flush(t, writer)
+	if data := readFile(t, path); data != "one\n" {
+		t.Fatalf("history = %q", data)
+	}
+}
+
+func TestWriterFlushesAfterPendingBytes(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.log")
+	writer, err := NewWriter(path, Config{MaxLines: 10000, MaxBytes: 1024 * 1024, MaxLineBytes: 1024})
+	if err != nil {
+		t.Fatalf("NewWriter() error = %v", err)
+	}
+	large := strings.Repeat("x", flushPendingBytes) + "\n"
+	if _, err := writer.Write([]byte(large)); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	if data := readFile(t, path); len(data) == 0 {
+		t.Fatal("history was not flushed after pending byte threshold")
+	}
+}
+
+func TestWriterFlushesAfterInterval(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.log")
+	writer, err := NewWriter(path, Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 128})
+	if err != nil {
+		t.Fatalf("NewWriter() error = %v", err)
+	}
+	writer.mu.Lock()
+	writer.lastFlushed = time.Now().Add(-flushInterval)
+	writer.mu.Unlock()
+	if _, err := writer.Write([]byte("interval\n")); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	if data := readFile(t, path); data != "interval\n" {
 		t.Fatalf("history = %q", data)
 	}
 }

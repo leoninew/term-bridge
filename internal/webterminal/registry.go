@@ -39,28 +39,30 @@ const (
 type AttachmentState string
 
 type Config struct {
-	Cwd             string
-	Store           state.Store
-	LogDir          string
-	History         config.HistoryConfig
-	Manager         termpty.Manager
-	Logger          *logging.Logger
-	ClientQueueSize int
-	CwdAllowlist    []string
-	EnvDenylist     []string
+	Cwd              string
+	Store            state.Store
+	LogDir           string
+	History          config.HistoryConfig
+	Manager          termpty.Manager
+	Logger           *logging.Logger
+	ClientQueueSize  int
+	ClientQueueBytes int
+	CwdAllowlist     []string
+	EnvDenylist      []string
 }
 
 type Registry struct {
-	cwd             string
-	store           state.Store
-	logDir          string
-	historyConfig   config.HistoryConfig
-	manager         termpty.Manager
-	logger          *logging.Logger
-	ids             identity.Generator
-	clientQueueSize int
-	cwdAllowlist    []string
-	envDenylist     []string
+	cwd              string
+	store            state.Store
+	logDir           string
+	historyConfig    config.HistoryConfig
+	manager          termpty.Manager
+	logger           *logging.Logger
+	ids              identity.Generator
+	clientQueueSize  int
+	clientQueueBytes int
+	cwdAllowlist     []string
+	envDenylist      []string
 
 	mu       sync.Mutex
 	runtimes map[string]*SessionRuntime
@@ -180,22 +182,27 @@ func NewRegistry(config Config) *Registry {
 	if queueSize <= 0 {
 		queueSize = DefaultClientQueueSize
 	}
+	queueBytes := config.ClientQueueBytes
+	if queueBytes <= 0 {
+		queueBytes = DefaultClientQueueBytes
+	}
 	cwdAllowlist := append([]string(nil), config.CwdAllowlist...)
 	if len(cwdAllowlist) == 0 {
 		cwdAllowlist = []string{config.Cwd}
 	}
 	return &Registry{
-		cwd:             config.Cwd,
-		store:           config.Store,
-		logDir:          config.LogDir,
-		historyConfig:   config.History,
-		manager:         config.Manager,
-		logger:          config.Logger,
-		ids:             identity.NewULIDGenerator(),
-		clientQueueSize: queueSize,
-		cwdAllowlist:    cwdAllowlist,
-		envDenylist:     append([]string(nil), config.EnvDenylist...),
-		runtimes:        map[string]*SessionRuntime{},
+		cwd:              config.Cwd,
+		store:            config.Store,
+		logDir:           config.LogDir,
+		historyConfig:    config.History,
+		manager:          config.Manager,
+		logger:           config.Logger,
+		ids:              identity.NewULIDGenerator(),
+		clientQueueSize:  queueSize,
+		clientQueueBytes: queueBytes,
+		cwdAllowlist:     cwdAllowlist,
+		envDenylist:      append([]string(nil), config.EnvDenylist...),
+		runtimes:         map[string]*SessionRuntime{},
 	}
 }
 
@@ -698,7 +705,7 @@ func (c *Client) SendControl(message terminalproto.ServerMessage) bool {
 func (c *Client) enqueue(outbound Outbound) bool {
 	size := outboundSize(outbound)
 	c.mu.Lock()
-	if c.queuedBytes+size > DefaultClientQueueBytes {
+	if c.queuedBytes+size > c.runtime.registry.clientQueueBytes {
 		c.mu.Unlock()
 		return false
 	}

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -163,6 +164,38 @@ func TestHistoryReturnsWrittenOutput(t *testing.T) {
 	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
 }
 
+func TestSlowClientDetachDoesNotStopRuntimeOrHistory(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 4096, MaxLineBytes: 4096}, Manager: &fakeManager{session: fake}, ClientQueueSize: 4, ClientQueueBytes: 4096})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Large output", Command: []string{"go", "version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	client, err := registry.Attach(response.SessionId)
+	if err != nil {
+		t.Fatalf("Attach() error = %v", err)
+	}
+	drainClient(t, client)
+	for i := 0; i < 8; i++ {
+		fake.output <- []byte("TERM_BRIDGE_LARGE_OUTPUT_" + strings.Repeat("x", 128) + "\n")
+	}
+	waitRuntimeAttachment(t, registry, response.SessionId, AttachmentDetached)
+	data, err := registry.History(response.SessionId)
+	if err != nil {
+		t.Fatalf("History() error = %v", err)
+	}
+	if !strings.Contains(string(data), "TERM_BRIDGE_LARGE_OUTPUT_") {
+		t.Fatalf("history missing output: %q", data)
+	}
+	if !registry.hasRuntime(response.SessionId) {
+		t.Fatal("runtime stopped after slow client detach")
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+}
+
 func TestCreateSessionRequiresName(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()
@@ -312,6 +345,42 @@ func waitRuntimeRemoved(t *testing.T, registry *Registry, sessionId string) {
 			t.Fatalf("runtime was not removed for %s", sessionId)
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func waitRuntimeAttachment(t *testing.T, registry *Registry, sessionId string, want AttachmentState) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for {
+		registry.mu.Lock()
+		runtime := registry.runtimes[sessionId]
+		registry.mu.Unlock()
+		if runtime != nil && runtime.attachmentState() == want {
+			return
+		}
+		if time.Now().After(deadline) {
+			got := AttachmentUnattached
+			if runtime != nil {
+				got = runtime.attachmentState()
+			}
+			t.Fatalf("attachment = %q, want %q", got, want)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func drainClient(t *testing.T, client *Client) {
+	t.Helper()
+	for {
+		select {
+		case outbound, ok := <-client.Outbound():
+			if !ok {
+				return
+			}
+			client.MarkSent(outbound)
+		default:
+			return
+		}
 	}
 }
 

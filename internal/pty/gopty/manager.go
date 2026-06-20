@@ -46,10 +46,18 @@ func (m Manager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.S
 		_ = pt.Close()
 		return nil, err
 	}
+	killTree, cleanupTree, err := attachProcessTree(cmd)
+	if err != nil {
+		_ = pt.Close()
+		_ = cmd.Process.Kill()
+		return nil, err
+	}
 
 	s := &session{
-		pty: pt,
-		cmd: cmd,
+		pty:         pt,
+		cmd:         cmd,
+		killTree:    killTree,
+		cleanupTree: cleanupTree,
 		process: process.Record{
 			SchemaVersion: 1,
 			PID:           cmd.Process.Pid,
@@ -66,11 +74,13 @@ func (m Manager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.S
 }
 
 type session struct {
-	pty     gopty.Pty
-	cmd     *gopty.Cmd
-	process process.Record
-	done    chan termpty.Result
-	once    sync.Once
+	pty         gopty.Pty
+	cmd         *gopty.Cmd
+	killTree    func() error
+	cleanupTree func() error
+	process     process.Record
+	done        chan termpty.Result
+	once        sync.Once
 }
 
 func (s *session) Read(p []byte) (int, error) {
@@ -98,6 +108,9 @@ func (s *session) Close() error {
 }
 
 func (s *session) KillTree() error {
+	if s.killTree != nil {
+		return s.killTree()
+	}
 	if s.cmd == nil || s.cmd.Process == nil {
 		return nil
 	}
@@ -114,6 +127,9 @@ func (s *session) ProcessInfo() process.Record {
 
 func (s *session) wait() {
 	err := s.cmd.Wait()
+	if s.cleanupTree != nil {
+		_ = s.cleanupTree()
+	}
 	code := 0
 	if s.cmd.ProcessState != nil {
 		code = s.cmd.ProcessState.ExitCode()

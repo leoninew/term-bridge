@@ -4,3 +4,4 @@ bin/
 logs/
 .termbridge/
 .termbridge.yaml
+.pomelo-pw/output/

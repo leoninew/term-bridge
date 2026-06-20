@@ -223,7 +223,7 @@ func (r *SessionRuntime) waitLoop() {
 func (r *SessionRuntime) publishBinary(chunk []byte) {
 	clients := r.clientsSnapshot()
 	for _, client := range clients {
-		if ok := client.enqueue(Outbound{Kind: OutboundBinary, Binary: copyBytes(chunk)}); !ok {
+		if ok := client.enqueue(Outbound{Kind: OutboundBinary, Binary: chunk}); !ok {
 			client.Detach("client_queue_full")
 		}
 	}

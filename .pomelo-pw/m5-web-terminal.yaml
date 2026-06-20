@@ -1,0 +1,136 @@
+name: m5-web-terminal
+description: Verify TermBridge local Web/workbench session creation, history replay, resize, and close behavior.
+
+variables:
+  base_url: "http://localhost:5173"
+  cwd: "/Volumes/media/SourceCodes/mywork/TermBridge-go"
+  marker: "POMELO_M5_WEB_TERMINAL_OK"
+
+steps:
+  - type: set-viewport
+    width: 1440
+    height: 960
+
+  - type: navigate
+    url: "{{base_url}}"
+
+  - type: wait
+    network_idle: true
+    timeout: 10000
+
+  - type: wait
+    selector: "text=没有打开的终端标签页"
+    timeout: 10000
+
+  - type: screenshot
+    file: "01-workbench-loaded.png"
+    full_page: true
+
+  - type: evaluate
+    script: |
+      localStorage.setItem('termbridge.locale', 'zh-CN');
+      return true;
+
+  - type: evaluate
+    script: |
+      return (async () => {
+        const marker = '{{marker}}';
+        const cwd = '{{cwd}}';
+        const res = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: `pomelo-${marker}`,
+            cwd,
+            command: ['/bin/sh', '-lc', `printf '${marker}\\n'; sleep 1`],
+            cols: 100,
+            rows: 30
+          })
+        });
+        if (!res.ok) {
+          throw new Error(`create session failed: ${res.status} ${await res.text()}`);
+        }
+        const created = await res.json();
+        window.__pomeloSessionId = created.session_id;
+        return created;
+      })();
+
+  - type: wait
+    delay: 500
+
+  - type: evaluate
+    script: |
+      return (async () => {
+        const sessions = await (await fetch('/api/sessions')).json();
+        const session = sessions.find((item) => item.id === window.__pomeloSessionId);
+        if (!session) {
+          throw new Error('created session is missing from /api/sessions');
+        }
+        if (!session.command.includes('{{marker}}') && session.name !== 'pomelo-{{marker}}') {
+          throw new Error(`unexpected session summary: ${JSON.stringify(session)}`);
+        }
+        return session;
+      })();
+
+  - type: screenshot
+    file: "02-session-created.png"
+    full_page: true
+
+  - type: evaluate
+    script: |
+      return (async () => {
+        const id = window.__pomeloSessionId;
+        const deadline = Date.now() + 10000;
+        let history = '';
+        while (Date.now() < deadline) {
+          const res = await fetch(`/api/sessions/${encodeURIComponent(id)}/history`);
+          if (!res.ok) {
+            throw new Error(`history failed: ${res.status} ${await res.text()}`);
+          }
+          history = await res.text();
+          if (history.includes('{{marker}}')) {
+            window.__pomeloHistory = history;
+            return history;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+        throw new Error(`marker not found in history: ${history}`);
+      })();
+
+  - type: set-viewport
+    width: 1024
+    height: 720
+
+  - type: wait
+    delay: 500
+
+  - type: screenshot
+    file: "03-resized-workbench.png"
+    full_page: true
+
+  - type: evaluate
+    script: |
+      return (async () => {
+        const id = window.__pomeloSessionId;
+        const close = await fetch(`/api/sessions/${encodeURIComponent(id)}/close`, { method: 'POST' });
+        if (!close.ok && close.status !== 409 && close.status !== 404) {
+          const body = await close.text();
+          if (close.status !== 500 || !body.includes('session not closable')) {
+            throw new Error('close failed: ' + close.status + ' ' + body);
+          }
+        }
+        const deadline = Date.now() + 10000;
+        while (Date.now() < deadline) {
+          const sessions = await (await fetch('/api/sessions')).json();
+          const session = sessions.find((item) => item.id === id);
+          if (!session || ['stopped', 'failed'].includes(session.lifecycle_state)) {
+            return session ?? null;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+        throw new Error('session did not reach terminal state after close');
+      })();
+
+  - type: screenshot
+    file: "04-session-closed.png"
+    full_page: true
