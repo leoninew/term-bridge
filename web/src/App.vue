@@ -56,7 +56,7 @@
                   <button
                     type="button"
                     class="rounded-md p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
-                    :aria-label="`Close ${sessionTitle(tab.sessionId)} tab`"
+                    :aria-label="t('workbench.closeTabAria', { name: sessionTitle(tab.sessionId) })"
                     @click.stop="closeTab(tab.sessionId)"
                   >
                     <X class="size-3.5" />
@@ -82,7 +82,7 @@
             />
 
             <section v-else class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-              <div v-if="activeTab.historyLoading" class="flex flex-1 items-center justify-center text-slate-500">Loading bounded history…</div>
+              <div v-if="activeTab.historyLoading" class="flex flex-1 items-center justify-center text-slate-500">{{ t('workbench.loadingHistory') }}</div>
               <div v-else-if="activeTab.historyError" class="rounded-md border border-slate-800 bg-slate-950/80 px-2 py-1.5 text-red-100">
                 {{ activeTab.historyError }}
               </div>
@@ -91,28 +91,28 @@
                 :key="`${activeSession.id}-history`"
                 :history="activeTab.historyText"
               />
-              <div v-else class="flex flex-1 items-center justify-center text-slate-500">No bounded history is available for this session.</div>
+              <div v-else class="flex flex-1 items-center justify-center text-slate-500">{{ t('workbench.noHistory') }}</div>
             </section>
           </TabsContent>
 
           <section v-if="openedTabs.length === 0" class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-slate-500">
-            <h3 class="text-lg font-semibold text-slate-300">No terminal tab is open</h3>
-            <p>Select a session from the workspace tree, or start a new command.</p>
+            <h3 class="text-lg font-semibold text-slate-300">{{ t('workbench.noTabTitle') }}</h3>
+            <p>{{ t('workbench.noTabDescription') }}</p>
             <button type="button" class="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-slate-100 hover:bg-slate-800" @click="openCreateDialog">
-              New session
+              {{ t('workbench.newSession') }}
             </button>
           </section>
         </TabsRoot>
 
         <footer class="flex h-8 shrink-0 items-center gap-1.5 overflow-hidden border-t border-slate-800/80 bg-[#0a0f18] px-3 text-sm text-slate-500">
           <template v-if="activeSession">
-            <span>Status</span>
+            <span>{{ t('workbench.status') }}</span>
             <span class="text-slate-200">{{ activeLifecycleLabel }}</span>
             <span class="text-slate-700">·</span>
-            <span>Command</span>
+            <span>{{ t('workbench.command') }}</span>
             <span class="min-w-0 truncate text-slate-200">{{ activeSession.command }}</span>
           </template>
-          <span v-else>No active session</span>
+          <span v-else>{{ t('workbench.noActiveSession') }}</span>
         </footer>
         </section>
       </SplitterPanel>
@@ -122,29 +122,29 @@
       <DialogPortal>
         <DialogOverlay class="dialog-overlay" />
         <DialogContent class="dialog-content">
-          <DialogTitle class="dialog-title">New session</DialogTitle>
+          <DialogTitle class="dialog-title">{{ t('dialog.newSessionTitle') }}</DialogTitle>
           <DialogDescription class="dialog-description">
-            Start a backend-supported terminal session.
+            {{ t('dialog.newSessionDescription') }}
           </DialogDescription>
           <form class="dialog-form" @submit.prevent="startSession">
             <label>
-              <span>name</span>
-              <input ref="sessionNameInput" v-model="sessionName" placeholder="Session name" />
+              <span>{{ t('dialog.name') }}</span>
+              <input ref="sessionNameInput" v-model="sessionName" :placeholder="t('dialog.sessionNamePlaceholder')" />
             </label>
             <label>
-              <span>cwd</span>
-              <input v-model="cwd" placeholder="Working directory" />
+              <span>{{ t('dialog.cwd') }}</span>
+              <input v-model="cwd" :placeholder="t('dialog.workingDirectoryPlaceholder')" />
             </label>
             <label>
-              <span>command</span>
-              <input v-model="commandText" placeholder="command" />
+              <span>{{ t('dialog.command') }}</span>
+              <input v-model="commandText" :placeholder="t('dialog.commandPlaceholder')" />
             </label>
             <div class="dialog-actions">
               <DialogClose as-child>
-                <button type="button" class="button button-secondary">Cancel</button>
+                <button type="button" class="button button-secondary">{{ t('common.cancel') }}</button>
               </DialogClose>
               <button type="submit" class="button button-primary" :disabled="creatingSession">
-                {{ creatingSession ? 'Creating…' : 'Create' }}
+                {{ creatingSession ? t('common.creating') : t('common.create') }}
               </button>
             </div>
           </form>
@@ -156,21 +156,21 @@
       <DialogPortal>
         <DialogOverlay class="dialog-overlay" />
         <DialogContent class="dialog-content">
-          <DialogTitle class="dialog-title">Rename session</DialogTitle>
+          <DialogTitle class="dialog-title">{{ t('dialog.renameSessionTitle') }}</DialogTitle>
           <DialogDescription class="dialog-description">
-            Only the session name can be changed by the current backend API.
+            {{ t('dialog.renameSessionDescription') }}
           </DialogDescription>
           <form class="dialog-form" @submit.prevent="renameSelectedSession">
             <label>
-              <span>name</span>
-              <input ref="renameInput" v-model="renameText" placeholder="Session name" />
+              <span>{{ t('dialog.name') }}</span>
+              <input ref="renameInput" v-model="renameText" :placeholder="t('dialog.sessionNamePlaceholder')" />
             </label>
             <div class="dialog-actions">
               <DialogClose as-child>
-                <button type="button" class="button button-secondary">Cancel</button>
+                <button type="button" class="button button-secondary">{{ t('common.cancel') }}</button>
               </DialogClose>
               <button type="submit" class="button button-primary" :disabled="renamingSession">
-                {{ renamingSession ? 'Renaming…' : 'Rename' }}
+                {{ renamingSession ? t('common.renaming') : t('common.rename') }}
               </button>
             </div>
           </form>
@@ -182,18 +182,18 @@
       <AlertDialogPortal>
         <AlertDialogOverlay class="dialog-overlay" />
         <AlertDialogContent class="dialog-content">
-          <AlertDialogTitle class="dialog-title">Delete session</AlertDialogTitle>
+          <AlertDialogTitle class="dialog-title">{{ t('dialog.deleteSessionTitle') }}</AlertDialogTitle>
           <AlertDialogDescription class="dialog-description">
             <template v-if="selectedSession && isActiveLifecycle(selectedSession)">
-              Running, starting, and stopping sessions cannot be deleted. Close the terminal session first.
+              {{ t('dialog.deleteActiveSessionDescription') }}
             </template>
             <template v-else>
-              Delete “{{ selectedSession ? sessionDisplayName(selectedSession) : 'this session' }}”? This uses the backend DELETE session endpoint for stopped or terminal sessions.
+              {{ t('dialog.deleteSessionDescription', { name: selectedSession ? sessionDisplayName(selectedSession) : t('dialog.fallbackSession') }) }}
             </template>
           </AlertDialogDescription>
           <div class="dialog-actions">
             <AlertDialogCancel as-child>
-              <button type="button" class="button button-secondary">Cancel</button>
+              <button type="button" class="button button-secondary">{{ t('common.cancel') }}</button>
             </AlertDialogCancel>
             <AlertDialogAction as-child>
               <button
@@ -202,7 +202,7 @@
                 :disabled="!selectedSession || isActiveLifecycle(selectedSession) || deletingSession"
                 @click="deleteSelectedSession"
               >
-                {{ deletingSession ? 'Deleting…' : 'Delete' }}
+                {{ deletingSession ? t('common.deleting') : t('common.delete') }}
               </button>
             </AlertDialogAction>
           </div>
@@ -214,16 +214,16 @@
       <AlertDialogPortal>
         <AlertDialogOverlay class="dialog-overlay" />
         <AlertDialogContent class="dialog-content">
-          <AlertDialogTitle class="dialog-title">Remove workspace record</AlertDialogTitle>
+          <AlertDialogTitle class="dialog-title">{{ t('dialog.removeWorkspaceTitle') }}</AlertDialogTitle>
           <AlertDialogDescription class="dialog-description">
-            This removes the TermBridge workspace record and related records allowed by the backend. It does not delete directories or files from disk. The current backend has no filesystem directory delete API.
+            {{ t('dialog.removeWorkspaceDescription') }}
           </AlertDialogDescription>
           <div v-if="selectedWorkspace" class="dialog-note">
             {{ selectedWorkspace.name }} — {{ selectedWorkspace.path }}
           </div>
           <div class="dialog-actions">
             <AlertDialogCancel as-child>
-              <button type="button" class="button button-secondary">Cancel</button>
+              <button type="button" class="button button-secondary">{{ t('common.cancel') }}</button>
             </AlertDialogCancel>
             <AlertDialogAction as-child>
               <button
@@ -232,7 +232,7 @@
                 :disabled="!selectedWorkspace || removingWorkspace"
                 @click="removeSelectedWorkspace"
               >
-                {{ removingWorkspace ? 'Removing…' : 'Remove workspace' }}
+                {{ removingWorkspace ? t('common.removing') : t('common.removeWorkspace') }}
               </button>
             </AlertDialogAction>
           </div>
@@ -260,6 +260,7 @@
 
 <script setup lang="ts">
   import { computed, nextTick, onMounted, ref, watch } from 'vue'
+  import { useI18n } from 'vue-i18n'
   import { SquareTerminal, X } from '@lucide/vue'
   import { VueDraggable } from 'vue-draggable-plus'
   import {
@@ -321,6 +322,7 @@
   type ToastKind = 'success' | 'error' | 'info'
   type AppToast = { id: number; kind: ToastKind; title: string; description?: string }
 
+  const { t } = useI18n()
   const workspaceTree = ref<WorkspaceTreeSummary[]>([])
   const workspaces = ref<WorkspaceSummary[]>([])
   const sessions = ref<SessionSummary[]>([])
@@ -372,7 +374,7 @@
     } catch (err) {
       const message = errorMessage(err)
       error.value = message
-      pushToast('error', 'Refresh failed', message)
+      pushToast('error', t('toast.refreshFailed'), message)
     } finally {
       loading.value = false
     }
@@ -386,18 +388,18 @@
     const trimmedCwd = cwd.value.trim()
     const command = commandFromText(commandText.value)
     if (!name) {
-      error.value = 'Session name is required.'
-      pushToast('error', 'Create session failed', error.value)
+      error.value = t('message.sessionNameRequired')
+      pushToast('error', t('toast.createSessionFailed'), error.value)
       return
     }
     if (!trimmedCwd) {
-      error.value = 'Working directory is required.'
-      pushToast('error', 'Create session failed', error.value)
+      error.value = t('message.workingDirectoryRequired')
+      pushToast('error', t('toast.createSessionFailed'), error.value)
       return
     }
     if (command.length === 0) {
-      error.value = 'Command is required.'
-      pushToast('error', 'Create session failed', error.value)
+      error.value = t('message.commandRequired')
+      pushToast('error', t('toast.createSessionFailed'), error.value)
       return
     }
     error.value = null
@@ -414,15 +416,15 @@
       await refresh()
       const session = sessions.value.find((item) => item.id === created.session_id)
       if (!session) {
-        throw new Error('Session was created, but it was not returned by the refreshed session list.')
+        throw new Error(t('message.createdSessionMissing'))
       }
       createDialogOpen.value = false
       await openSessionTab(session)
-      pushToast('success', 'Session created', sessionDisplayName(session))
+      pushToast('success', t('toast.sessionCreated'), sessionDisplayName(session))
     } catch (err) {
       const message = errorMessage(err)
       error.value = message
-      pushToast('error', 'Create session failed', message)
+      pushToast('error', t('toast.createSessionFailed'), message)
     } finally {
       creatingSession.value = false
     }
@@ -434,7 +436,7 @@
     }
     const name = renameText.value.trim()
     if (!name) {
-      pushToast('error', 'Rename session failed', 'Name is required.')
+      pushToast('error', t('toast.renameSessionFailed'), t('message.nameRequired'))
       return
     }
     renamingSession.value = true
@@ -443,9 +445,9 @@
       updateSessionInState(updated)
       selectedSession.value = updated
       renameDialogOpen.value = false
-      pushToast('success', 'Session renamed', name)
+      pushToast('success', t('toast.sessionRenamed'), name)
     } catch (err) {
-      pushToast('error', 'Rename session failed', errorMessage(err))
+      pushToast('error', t('toast.renameSessionFailed'), errorMessage(err))
     } finally {
       renamingSession.value = false
     }
@@ -463,9 +465,9 @@
       closeTab(session.id)
       selectedSession.value = null
       deleteSessionDialogOpen.value = false
-      pushToast('success', 'Session deleted', sessionDisplayName(session))
+      pushToast('success', t('toast.sessionDeleted'), sessionDisplayName(session))
     } catch (err) {
-      pushToast('error', 'Delete session failed', errorMessage(err))
+      pushToast('error', t('toast.deleteSessionFailed'), errorMessage(err))
     } finally {
       deletingSession.value = false
     }
@@ -482,9 +484,9 @@
       removeWorkspaceFromState(workspace.id)
       selectedWorkspace.value = null
       removeWorkspaceDialogOpen.value = false
-      pushToast('success', 'Workspace removed', `${workspace.name} record was removed. Files on disk were not deleted.`)
+      pushToast('success', t('toast.workspaceRemoved'), t('message.workspaceRemoved', { name: workspace.name }))
     } catch (err) {
-      pushToast('error', 'Remove workspace failed', errorMessage(err))
+      pushToast('error', t('toast.removeWorkspaceFailed'), errorMessage(err))
     } finally {
       removingWorkspace.value = false
     }
@@ -498,7 +500,7 @@
       workspaceTree.value = orderWorkspaceTree(workspaceTree.value, orderedWorkspaces.map((workspace) => workspace.id))
       workspaces.value = orderedWorkspaces
     } catch (err) {
-      pushToast('error', 'Update workspace order failed', errorMessage(err))
+      pushToast('error', t('toast.updateWorkspaceOrderFailed'), errorMessage(err))
       workspaceTree.value = previousTree
       workspaces.value = previousTree.map(workspaceSummaryFromTree)
       await refresh()
@@ -559,7 +561,7 @@
     } catch (err) {
       const message = errorMessage(err)
       tab.historyError = message
-      pushToast('error', 'Read history failed', message)
+      pushToast('error', t('toast.readHistoryFailed'), message)
     } finally {
       tab.historyLoading = false
     }
@@ -590,7 +592,7 @@
     selectedSession.value = session
     deleteSessionDialogOpen.value = true
     if (isActiveLifecycle(session)) {
-      pushToast('info', 'Session cannot be deleted yet', 'Close the terminal session before deleting it.')
+      pushToast('info', t('toast.sessionCannotBeDeletedYet'), t('message.closeSessionBeforeDelete'))
     }
   }
 
@@ -603,8 +605,8 @@
     selectedWorkspace.value = workspace
     pushToast(
       'info',
-      'Directory delete is not supported',
-      'TermBridge can remove workspace records, but the backend has no filesystem directory delete API.',
+      t('toast.directoryDeleteUnsupported'),
+      t('message.directoryDeleteUnsupported'),
     )
   }
 
@@ -705,7 +707,7 @@
 
   function handleTerminalState(message: ServerControlMessage) {
     if (message.type === 'error') {
-      pushToast('error', `Terminal error: ${message.code}`, message.message)
+      pushToast('error', t('toast.terminalError', { code: message.code }), message.message)
     }
     if (message.type === 'state' || message.type === 'exited') {
       void refresh()
@@ -713,7 +715,7 @@
   }
 
   function handleTerminalError(message: string) {
-    pushToast('error', 'Terminal connection failed', message)
+    pushToast('error', t('toast.terminalConnectionFailed'), message)
   }
 
   function pushToast(kind: ToastKind, title: string, description?: string) {

@@ -3,19 +3,19 @@
     <header class="flex h-11 shrink-0 items-center border-b border-slate-800/80 bg-[#0a0f18] px-2">
       <div class="flex w-full items-center gap-1.5">
         <label class="relative min-w-0 flex-1">
-          <span class="sr-only">Search sessions</span>
+          <span class="sr-only">{{ t('sidebar.searchSessions') }}</span>
           <Search class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
           <input
             v-model="searchQuery"
             type="search"
-            placeholder="Search"
+            :placeholder="t('sidebar.searchPlaceholder')"
             class="h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 py-1.5 pl-8 pr-2 text-sm text-slate-200 outline-none placeholder:text-slate-600"
           />
         </label>
         <button
           type="button"
           class="flex size-8 shrink-0 items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-          aria-label="New session"
+          :aria-label="t('sidebar.newSession')"
           @click="emit('newSession')"
         >
           <Plus class="size-4" />
@@ -25,10 +25,10 @@
 
     <div class="min-h-0 flex-1 overflow-y-auto p-1.5">
       <div v-if="workspaceTree.length === 0" class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500">
-        No workspaces yet. Create a session to initialize one.
+        {{ t('sidebar.emptyWorkspaces') }}
       </div>
       <div v-else-if="treeItems.length === 0" class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500">
-        {{ normalizedSearchQuery ? `No sessions match “${searchQuery}”.` : 'No active sessions.' }}
+        {{ normalizedSearchQuery ? t('sidebar.noSessionsMatch', { query: searchQuery }) : t('sidebar.noActiveSessions') }}
       </div>
 
       <VueDraggable
@@ -58,7 +58,7 @@
             <button
               type="button"
               class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 opacity-0 hover:bg-slate-800 hover:text-red-200 group-hover:opacity-100"
-              :aria-label="`Remove ${workspace.workspace.name} workspace`"
+              :aria-label="t('sidebar.removeWorkspaceAria', { name: workspace.workspace.name })"
               @click.stop="emit('removeWorkspace', workspace.workspace)"
             >
               <Trash2 class="size-3.5" />
@@ -86,7 +86,7 @@
                 <button
                   type="button"
                   class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
-                  :aria-label="`Rename ${session.session.name || session.session.command} session`"
+                  :aria-label="t('sidebar.renameSessionAria', { name: session.session.name || session.session.command })"
                   @click.stop="emit('renameSession', session.session)"
                 >
                   <Pencil class="size-3.5" />
@@ -95,7 +95,7 @@
                   v-if="canDeleteSession(session.session)"
                   type="button"
                   class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
-                  :aria-label="`Delete ${session.session.name || session.session.command} session`"
+                  :aria-label="t('sidebar.deleteSessionAria', { name: session.session.name || session.session.command })"
                   @click.stop="emit('deleteSession', session.session)"
                 >
                   <Trash2 class="size-3.5" />
@@ -107,17 +107,71 @@
       </VueDraggable>
     </div>
 
-    <footer class="flex h-8 shrink-0 items-center gap-1.5 border-t border-slate-800/80 bg-[#0a0f18] px-2 text-sm text-slate-500">
-      <Settings class="size-4" />
-      <span>设置</span>
+    <footer class="flex h-8 shrink-0 items-center border-t border-slate-800/80 bg-[#0a0f18] px-2 text-sm text-slate-500">
+      <DropdownMenuRoot>
+        <DropdownMenuTrigger
+          class="flex h-6 items-center gap-1.5 rounded px-1.5 text-slate-500 outline-none hover:bg-slate-900 hover:text-slate-200 focus:bg-slate-900 focus:text-slate-200"
+          :aria-label="t('common.settings')"
+          :title="t('common.settings')"
+        >
+          <Settings class="size-4" />
+          <span>{{ t('common.settings') }}</span>
+        </DropdownMenuTrigger>
+        <DropdownMenuPortal>
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            :side-offset="8"
+            class="z-50 min-w-44 rounded-md border border-slate-800 bg-slate-950 p-1 text-sm text-slate-200 shadow-xl"
+          >
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 outline-none hover:bg-slate-800 focus:bg-slate-800">
+                <span class="inline-flex items-center gap-2">{{ t('common.language') }}</span>
+                <ChevronRight class="size-4 text-slate-500" />
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent
+                  :side-offset="8"
+                  class="z-50 min-w-36 rounded-md border border-slate-800 bg-slate-950 p-1 text-sm text-slate-200 shadow-xl"
+                >
+                  <DropdownMenuRadioGroup :model-value="locale" @update:model-value="changeLocale">
+                    <DropdownMenuRadioItem
+                      v-for="item in localeOptions"
+                      :key="item.value"
+                      :value="item.value"
+                      class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-slate-800 focus:bg-slate-800"
+                    >
+                      <Check :class="locale === item.value ? 'opacity-100' : 'opacity-0'" class="size-4 text-blue-500" />
+                      {{ item.label }}
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+          </DropdownMenuContent>
+        </DropdownMenuPortal>
+      </DropdownMenuRoot>
     </footer>
   </aside>
 </template>
 
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
-  import { Folder, FolderOpen, Pencil, Plus, Search, Settings, SquareTerminal, Trash2 } from '@lucide/vue'
+  import { useI18n } from 'vue-i18n'
+  import { Check, ChevronRight, Folder, FolderOpen, Pencil, Plus, Search, Settings, SquareTerminal, Trash2 } from '@lucide/vue'
+  import {
+    DropdownMenuContent,
+    DropdownMenuPortal,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuRoot,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger,
+  } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
+  import { localeLabels, locales, setLocale, type AppLocale } from '../../i18n'
   import type { SessionSummary, WorkspaceSummary, WorkspaceTreeSummary } from '../../protocol/terminal'
 
   type WorkspaceTreeItem = {
@@ -149,12 +203,20 @@
     reorderWorkspaces: [workspaceIds: string[]]
   }>()
 
+  const { t, locale } = useI18n()
   const searchQuery = ref('')
   const expandedKeys = ref<string[]>([])
   const initializedExpandedKeys = new Set<string>()
   const draggableTreeItems = ref<WorkspaceTreeItem[]>([])
 
   const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
+  const localeOptions = computed(() => locales.map((value) => ({ value, label: localeLabels[value] })))
+
+  function changeLocale(value: unknown) {
+    if (typeof value === 'string' && locales.includes(value as AppLocale)) {
+      setLocale(value as AppLocale)
+    }
+  }
 
   const treeItems = computed<WorkspaceTreeItem[]>(() => {
     return props.workspaceTree
