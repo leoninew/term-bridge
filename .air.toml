@@ -1,0 +1,29 @@
+root = "."
+tmp_dir = "bin/air"
+
+[build]
+cmd = "go build -o ./bin/air/termbridge ./cmd/termbridge"
+bin = "./bin/air/termbridge"
+args_bin = ["web", "--host", "localhost", "--port", "9010", "--dev"]
+include_ext = ["go", "yaml", "yml"]
+exclude_dir = [".git", ".termbridge", "bin", "docs", "logs", "web", "tmp", "vendor"]
+exclude_file = []
+exclude_regex = ["_test.go"]
+exclude_unchanged = true
+follow_symlink = false
+kill_delay = "500ms"
+log = "build-errors.log"
+send_interrupt = true
+stop_on_error = true
+
+[log]
+time = true
+
+[color]
+main = "magenta"
+watcher = "cyan"
+build = "yellow"
+runner = "green"
+
+[misc]
+clean_on_exit = true

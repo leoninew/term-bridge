@@ -12,6 +12,21 @@ TermBridge-go 是 TermBridge 的 Go 重写版本，一个本地浏览器工作�
 
 - Go 1.25+
 - [just](https://github.com/casey/just)
+- [Air](https://github.com/air-verse/air)
+
+## 开发方式
+
+### 后端热加载
+
+```bash
+just backend
+```
+
+### 前端开发服务
+
+```bash
+just frontend
+```
 
 ## 使用方式
 
