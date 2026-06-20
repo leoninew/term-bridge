@@ -33,5 +33,24 @@ just frontend
 ### 在当前目录运行命令
 
 ```powershell
-termbridge -- claude
+termbridge exec -- claude
+```
+
+### 在指定目录运行命令
+
+```powershell
+termbridge --cwd D:\project exec -- claude
+```
+
+### 查看本地会话和工作区
+
+```powershell
+termbridge session
+termbridge workspace
+```
+
+### 启动本地 Web workbench
+
+```powershell
+termbridge web --dev
 ```

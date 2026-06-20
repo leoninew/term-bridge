@@ -174,8 +174,20 @@ func TestRunHelpWritesStdoutOnly(t *testing.T) {
 	if code != apperrors.ExitSuccess {
 		t.Fatalf("Run() code = %d, want %d", code, apperrors.ExitSuccess)
 	}
-	if !strings.Contains(stdout.String(), "termbridge [options] <command>") || !strings.Contains(stdout.String(), "workspace") {
-		t.Fatalf("stdout missing usage: %s", stdout.String())
+	usage := stdout.String()
+	for _, want := range []string{
+		"termbridge [options] <command>",
+		"exec",
+		"workspace",
+		"session",
+		"web",
+		"termbridge exec -- claude",
+		"termbridge --cwd D:\\project exec -- codex",
+		"termbridge web --dev",
+	} {
+		if !strings.Contains(usage, want) {
+			t.Fatalf("stdout missing %q: %s", want, usage)
+		}
 	}
 	if strings.Contains(stdout.String(), "--log-level") || strings.Contains(stdout.String(), "--config") {
 		t.Fatalf("stdout exposes config-only flags: %s", stdout.String())

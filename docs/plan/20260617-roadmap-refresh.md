@@ -1,5 +1,5 @@
 # Roadmap 里程碑计划
-最后修改时间: 2026-06-17 15:17:47
+最后修改时间: 2026-06-20 17:23:23
 
 Review status: Accepted
 
@@ -58,7 +58,7 @@ Process
 但本地阶段不要求用户先理解或操作常驻 Agent / Workspace create / attach 流程。本地一等入口收敛为：
 
 ```text
-termbridge [options] -- <command...>
+termbridge [options] exec -- <command...>
 ```
 
 ## Plan goal
@@ -80,17 +80,17 @@ termbridge [options] -- <command...>
 本地阶段标准使用方式：
 
 ```text
-termbridge [options] -- <command...>
+termbridge [options] exec -- <command...>
 ```
 
 示例：
 
 ```text
-termbridge -- claude
-termbridge -- codex
-termbridge -- pwsh
-termbridge --cwd D:\project -- claude
-termbridge --cwd D:\project -- npm run dev
+termbridge exec -- claude
+termbridge exec -- codex
+termbridge exec -- pwsh
+termbridge --cwd D:\project exec -- claude
+termbridge --cwd D:\project exec -- npm run dev
 ```
 
 默认 cwd 为当前目录；也可以通过 `--cwd` 指定目录。
@@ -209,11 +209,11 @@ Gateway Web Terminal
 
 ```text
 M0: Runtime 技术决策（已阶段性完成）
-M1: Go CLI Skeleton
-M2: PTY Command Runner MVP
-M2.5: Web Terminal Technical Spike
-M3: Session / Workspace Runtime Model
-M4: Local Product Surface: CLI first, GUI optional container
+M1: Go CLI Skeleton（已完成）
+M2: PTY Command Runner MVP（核心已完成）
+M2.5: Web Terminal Technical Spike（已实现，风险进入 M5）
+M3: Session / Workspace Runtime Model（主体已完成）
+M4: Local Product Surface: CLI first, GUI optional container（收口中）
 M5: Runtime Hardening
 M6: Gateway Web Terminal MVP
 M7: Multi-device Beta
@@ -291,6 +291,10 @@ Continue with Go + go-pty and CLI-first local delivery.
 
 ## M1：Go CLI Skeleton
 
+状态：已完成。
+
+当前实现已经具备 CLI entrypoint、命令解析、`--help`、`--version`、`--cwd`、`exec --` 命令分隔、config loading、structured logging、基础错误模型和测试覆盖。
+
 ### Objective
 
 建立 `termbridge` CLI 的最小骨架。
@@ -306,7 +310,7 @@ command-line parser
 --help
 --version
 --cwd option skeleton
--- separator parsing skeleton
+exec -- separator parsing skeleton
 config loading skeleton
 structured logging
 basic error model
@@ -326,28 +330,24 @@ internal/errors
 
 目录命名可以在实现前微调，但必须保持 CLI-first 边界清晰。
 
-### CLI draft
+### CLI shape
 
 ```text
 termbridge --help
 termbridge --version
-termbridge --cwd <directory> -- <command...>
-termbridge -- <command...>
+termbridge exec -- <command...>
+termbridge --cwd <directory> exec -- <command...>
+termbridge exec --help
+termbridge web --dev
 ```
 
-可后续考虑语法糖：
-
-```text
-termbridge <command...>
-```
-
-但 M1/M2 的规范语义以 `--` 分隔为准。
+命令执行使用显式 `exec --` 分隔 TermBridge 选项与用户命令参数。
 
 ### Acceptance criteria
 
 ```text
 1. termbridge 可构建并从命令行启动。
-2. --help 明确展示 [options] -- <command...> 模型。
+2. --help 明确展示 `termbridge [options] exec -- <command...>` 模型。
 3. --version 返回版本和 runtime 信息。
 4. --cwd 能被解析并做基础校验。
 5. 未提供 command 时 fail fast，输出明确错误。
@@ -377,16 +377,20 @@ termbridge <command...>
 进入 M2 前必须确认：
 
 ```text
-termbridge [options] -- <command...> 的 CLI 入口和错误边界成立。
+termbridge [options] exec -- <command...> 的 CLI 入口和错误边界成立。
 ```
 
 ---
 
 ## M2：PTY Command Runner MVP
 
+状态：核心已完成；可靠性验证和 hardening 风险进入 M5。
+
+当前实现已经具备 PTY abstraction、CommandRunner、ProcessSpec、stdin/stdout relay、resize relay、Ctrl+C 基础处理、exit code 传递、cwd/env 支持和基本 cleanup。进程树清理、Claude Code / Codex 真实交互、长时间运行和复杂 interrupt 行为进入 M5。
+
 ### Objective
 
-实现最小可用的 PTY command runner：用户通过 `termbridge [options] -- <command...>` 在 PTY runtime 中运行任意命令。
+实现最小可用的 PTY command runner：用户通过 `termbridge [options] exec -- <command...>` 在 PTY runtime 中运行任意命令。
 
 目标链路：
 
@@ -467,10 +471,10 @@ InterruptStrategy
 基础行为：
 
 ```text
-termbridge -- claude
-termbridge --cwd D:\project -- codex
-termbridge --cwd D:\project -- pwsh
-termbridge --cwd D:\project -- npm run dev
+termbridge exec -- claude
+termbridge --cwd D:\project exec -- codex
+termbridge --cwd D:\project exec -- pwsh
+termbridge --cwd D:\project exec -- npm run dev
 ```
 
 规则：
@@ -478,7 +482,7 @@ termbridge --cwd D:\project -- npm run dev
 ```text
 1. 未传 --cwd 时使用当前目录。
 2. --cwd 必须存在且是目录。
-3. -- 后的内容原样作为用户命令和参数。
+3. `exec --` 后的内容原样作为用户命令和参数。
 4. 命令退出后 termbridge 返回对应 exit code。
 5. TermBridge 自身错误使用明确的非零 exit code。
 ```
@@ -517,7 +521,7 @@ Ctrl+C 不是 detach。
 ### Acceptance criteria
 
 ```text
-1. termbridge -- <command...> 可以运行用户命令。
+1. termbridge exec -- <command...> 可以运行用户命令。
 2. --cwd 指定目录生效。
 3. stdin/stdout relay 可用，交互式命令可操作。
 4. terminal resize 能传递到底层 PTY。
@@ -533,7 +537,7 @@ Ctrl+C 不是 detach。
 unit: CLI argument parsing
 unit: ProcessSpec validation
 unit: executable path resolve
-integration: termbridge -- pwsh -NoLogo
+integration: termbridge exec -- pwsh -NoLogo
 integration: cwd / env
 integration: long output
 manual: Claude Code real interaction
@@ -561,9 +565,13 @@ termbridge CLI command runner 能稳定运行真实交互命令，并能可靠�
 
 ## M2.5：Web Terminal Technical Spike
 
+状态：已实现；large output、slow client backpressure、history flush 和高频内存分配风险进入 M5。
+
+当前实现已经具备本地 Web terminal/workbench、xterm.js 前端、WebSocket relay、stdin/stdout bridge、resize bridge、session create/attach/detach/close 和 history replay。该本地 Web/workbench 是 CLI-first 本地产品面的辅助入口，不拥有 runtime。
+
 ### Objective
 
-在 Gateway 前提前验证 Web terminal 技术风险，但不把 local Web 作为正式本地交付形态。
+在 Gateway 前提前验证 Web terminal 技术风险，并为本地 workbench 提供辅助入口；正式远程 Web 产品入口仍放到 Gateway 阶段。
 
 ### Target shape
 
@@ -597,10 +605,9 @@ browser input notes
 ### Non-goals
 
 ```text
-不做本地正式 Web 产品。
-不做完整 workspace UI。
 不做 auth / Gate / device routing。
 不替代 CLI。
+不让 Web/workbench 拥有 PTY / Process / Workspace runtime。
 ```
 
 ### Acceptance criteria
@@ -629,6 +636,10 @@ M6 前必须完成该 spike 或同等验证。
 
 ## M3：Session / Workspace Runtime Model
 
+状态：主体已完成。
+
+当前实现已经具备 session/workspace metadata、runtime state、bounded history、local session record、process/exit/log record、workspace/session listing。M4 的基础 recent 能力由 session metadata、session listing 和 history 承接，不新增显式 `recent` 命令或 UX。
+
 ### Objective
 
 在 CLI command runner 成立后，引入 Session / Workspace runtime model，用于 history、metadata、restart、GUI container 和未来 Gateway 映射。
@@ -656,7 +667,7 @@ in-memory history buffer
 optional local session record
 restart metadata skeleton
 logs location
-basic list/recent command support
+basic list support; session metadata/listing/history provide recent command visibility
 ```
 
 ### Suggested components
@@ -732,6 +743,10 @@ Session / Workspace model 支撑产品化，但没有破坏 CLI-first 使用方�
 
 ## M4：Local Product Surface: CLI first, GUI optional container
 
+状态：收口中。
+
+当前 CLI 产品面已经具备 clear help、clear errors、config file support、log path exposure、workspace/session listing 和 local Web/workbench 辅助入口。M4 收口重点是文档同步、可自动化检查的单元测试补齐，以及进入 M5 前的人工验证项边界。
+
 ### Objective
 
 把本地 CLI 产品面打磨到可日常使用；如需要 GUI，GUI 只作为 CLI 容器。
@@ -742,11 +757,12 @@ Session / Workspace model 支撑产品化，但没有破坏 CLI-first 使用方�
 clear help
 clear error messages
 config file support
-recent command support
-logs command or log path exposure
+session metadata/listing/history provide recent command visibility
+log path exposure
 shell completion（可选）
 common runtime shortcuts（可选）
-manual verification checklist
+automated tests for stable checks
+manual verification items for interactive/runtime scenarios
 ```
 
 ### Optional deliverables: GUI container
@@ -785,10 +801,10 @@ Workspace ownership
 
 ```text
 1. 用户可以只通过 CLI 完成本地主要使用。
-2. termbridge [options] -- <command...> 的帮助和错误信息清晰。
+2. termbridge [options] exec -- <command...> 的帮助和错误信息清晰。
 3. Ctrl+C / exit code / cleanup 行为可预测。
 4. GUI 如果存在，只调用或容器化 CLI/runtime。
-5. 本地产品不依赖 local Web UI。
+5. 本地产品不依赖 local Web UI 才能完成核心 CLI 使用；local Web/workbench 作为辅助产品面存在，不拥有 runtime。
 ```
 
 ### Risks
@@ -798,13 +814,39 @@ GUI 如果为了体验绕过 CLI runtime，会产生第二套 Agent。
 CLI polish 不足会导致用户依赖未成型的 GUI/Web。
 ```
 
+### M4 closeout checklist
+
+可自动化检查应由单元测试覆盖：
+
+```text
+1. CLI help 展示 exec / workspace / session / web 和当前命令示例。
+2. CLI 参数解析支持 `termbridge exec -- <command...>`。
+3. CLI 参数解析支持 `termbridge --cwd <dir> exec -- <command...>`。
+4. CLI 参数错误、缺少 command、缺少 `--`、缺少 `--` 后 command 时返回 usage error。
+5. workspace/session list 能输出 workspace、session、command、cwd、log path 等基础 product surface 信息。
+```
+
+保留为人工验证项：
+
+```text
+1. Claude Code / Codex 真实 TUI 交互。
+2. Ctrl+C 在 Claude Code / Codex / shell 中的真实 interrupt 行为。
+3. 大量输出、慢客户端 backpressure、高频 resize。
+4. 进程树清理和长时间运行稳定性。
+5. local Web/workbench 的输入、输出、resize、attach/detach、history replay。
+```
+
 ### Gate
 
 进入 M5 前必须确认：
 
 ```text
-CLI 作为本地一等产品面可用；GUI 可选且不拥有 runtime。
+CLI 作为本地一等产品面可用；GUI/Web 可选且不拥有 runtime；可自动化的 M4 product-surface 检查已有单元测试或明确测试入口。
 ```
+
+### Closeout decision
+
+M4 可在完成文档同步和单元测试补齐后关闭；上述人工验证项进入 M5 Runtime Hardening。
 
 ---
 
@@ -1105,14 +1147,14 @@ service / tunnel mode（Gateway 阶段后续）
 
 ```text
 目标：termbridge CLI 可启动、可解析参数、可观测。
-交付：--help、--version、--cwd、-- separator、logging、error model、test command。
+交付：--help、--version、--cwd、exec -- separator、logging、error model、test command。
 验收：CLI 入口和错误边界成立。
 ```
 
 ### Week 3：M2 PTY Command Runner MVP
 
 ```text
-目标：termbridge [options] -- <command...> 可运行真实命令。
+目标：termbridge [options] exec -- <command...> 可运行真实命令。
 交付：PTY abstraction、CommandRunner、stdin/stdout relay、resize、Ctrl+C、exit code。
 验收：Claude/Codex/shell 基础交互可用。
 ```
@@ -1129,7 +1171,7 @@ service / tunnel mode（Gateway 阶段后续）
 
 ```text
 目标：为 history、GUI container、Gateway 映射建立 runtime model。
-交付：state model、bounded history、logs、metadata、recent command。
+交付：state model、bounded history、logs、metadata、session listing/history 提供基础 recent 能力。
 验收：CLI 使用不变，内部模型可承接后续产品化。
 ```
 

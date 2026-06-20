@@ -1,6 +1,6 @@
 # TermBridge-go 设计文档
 
-最后修改时间: 2026-06-17
+最后修改时间: 2026-06-20
 
 ## 背景
 
@@ -279,20 +279,21 @@ ttyd + tmux 的封装工具
 4. **本地交付方向**: CLI first
 5. **GUI 定位**: CLI 容器，不拥有 runtime
 6. **Web 策略**: Gateway 前技术验证，Gateway 后正式产品入口
+7. **命令执行入口**: 命令执行入口为 `termbridge [options] exec -- <command...>`
 
 ### 设计原则
 
-1. **CLI 是本地唯一一等入口**：本地阶段标准使用方式为 `termbridge [options] -- <command...>`
-2. **GUI 是 CLI 容器，不是另一套 Agent**：GUI 不能直接创建 PTY、拥有 Process lifecycle、维护 Workspace state
-3. **Web 技术验证前置，正式 Web 放到 Gateway**：避免 Gateway 阶段同时暴露多个风险
-4. **Go + go-pty 必须被 abstraction 隔离**：业务层不直接依赖 go-pty.Pty
-5. **Ctrl+C 是停止当前命令，不是 detach**：必须区分 interrupt foreground process / close session / kill process tree
-6. **先 CLI Runtime，后本地产品面，再 Gateway**：不在 CLI runtime 稳定前提前建设复杂 Web / GUI / Gateway
+1. **CLI 是本地唯一一等入口**：本地阶段标准使用方式为 `termbridge [options] exec -- <command...>`
+2. **显式 exec 子命令承载命令运行**：用户命令统一放在 `exec --` 之后，避免 TermBridge 选项与用户命令参数混淆
+3. **GUI 是 CLI 容器，不是另一套 Agent**：GUI 不能直接创建 PTY、拥有 Process lifecycle、维护 Workspace state
+4. **Web 技术验证前置，正式 Web 放到 Gateway**：本地 Web/workbench 可以作为辅助产品面存在，但不改变 CLI-first 与 runtime ownership 边界
+5. **Go + go-pty 必须被 abstraction 隔离**：业务层不直接依赖 go-pty.Pty
+6. **Ctrl+C 是停止当前命令，不是 detach**：必须区分 interrupt foreground process / close session / kill process tree
+7. **先 CLI Runtime，后本地产品面，再 Gateway**：不在 CLI runtime 稳定前提前建设复杂 Gateway
 
 ### 后续仍需决策
 
-1. `termbridge <命令>` 是否作为 `termbridge -- <命令>` 的语法糖支持
-2. `Ctrl+C` 升级策略的具体交互：是否第一次 soft interrupt，第二次 hard stop，或使用超时自动升级
-3. GUI 容器调用 CLI 的具体方式：spawn CLI、local IPC，还是复用同一 Go runtime package
-4. Web terminal spike 放在 M2.5 独立阶段，还是并入 M3/M5 gate
-5. Session / Workspace 在本地 CLI 阶段是否默认持久化，还是先只作为 runtime 内部概念
+1. `Ctrl+C` 升级策略在真实 Claude Code / Codex 交互中的具体行为：是否第一次 soft interrupt，第二次 hard stop，或使用超时自动升级
+2. GUI 容器调用 CLI 的具体方式：spawn CLI、local IPC，还是复用同一 Go runtime package
+3. Web terminal spike 中暴露的大量输出、backpressure、history 刷盘等问题如何在 M5 hardening 中处理
+4. Session / Workspace 在本地 CLI 阶段的持久化边界：哪些 metadata 作为产品能力，哪些 live runtime 仅存在于当前进程内
