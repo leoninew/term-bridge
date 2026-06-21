@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"termbridge-go/internal/agent"
 	apperrors "termbridge-go/internal/errors"
+	"termbridge-go/internal/gateway"
 	"termbridge-go/internal/logging"
 	"termbridge-go/internal/process"
 	"termbridge-go/internal/runner"
@@ -116,6 +118,69 @@ func TestRunWebStartsServerWithConfiguredRuntime(t *testing.T) {
 		t.Fatal("runWebServer was not called")
 	}
 	if !strings.Contains(stdout.String(), "http://127.0.0.1:12345") || !strings.Contains(stdout.String(), "Dev mode enabled") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
+func TestRunGatewayStartsServer(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	oldRunGatewayServer := runGatewayServer
+	defer func() { runGatewayServer = oldRunGatewayServer }()
+	var gotServer *gateway.Server
+	runGatewayServer = func(ctx context.Context, server *gateway.Server, onListening func(gateway.Info)) error {
+		gotServer = server
+		onListening(gateway.Info{URL: "http://127.0.0.1:8080"})
+		return context.Canceled
+	}
+	stdout := &bytes.Buffer{}
+	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandGateway, Gateway: GatewayCommand{Host: "127.0.0.1", Port: 8080, Dev: true}}, Stdout: stdout, Stderr: &bytes.Buffer{}})
+	if err != nil {
+		t.Fatalf("Run(gateway) error = %v", err)
+	}
+	if filepath.Clean(result.Cwd) != filepath.Clean(cwd) {
+		t.Fatalf("Result.Cwd = %q, want %q", result.Cwd, cwd)
+	}
+	if gotServer == nil {
+		t.Fatal("runGatewayServer was not called")
+	}
+	if !strings.Contains(stdout.String(), "http://127.0.0.1:8080") || !strings.Contains(stdout.String(), "admin/admin") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
+func TestRunAgentStartsClient(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	oldRunAgentClient := runAgentClient
+	defer func() { runAgentClient = oldRunAgentClient }()
+	var gotClient *agent.Client
+	runAgentClient = func(ctx context.Context, client *agent.Client) error {
+		gotClient = client
+		return context.Canceled
+	}
+	stdout := &bytes.Buffer{}
+	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandAgent, Agent: AgentCommand{GatewayURL: "http://127.0.0.1:8080", DeviceName: "local-mac"}}, Stdout: stdout, Stderr: &bytes.Buffer{}})
+	if err != nil {
+		t.Fatalf("Run(agent) error = %v", err)
+	}
+	if filepath.Clean(result.Cwd) != filepath.Clean(cwd) {
+		t.Fatalf("Result.Cwd = %q, want %q", result.Cwd, cwd)
+	}
+	if gotClient == nil {
+		t.Fatal("runAgentClient was not called")
+	}
+	gotConfig := gotClient.Config()
+	if gotConfig.GatewayURL != "http://127.0.0.1:8080" || gotConfig.DeviceName != "local-mac" {
+		t.Fatalf("agent config = %#v", gotConfig)
+	}
+	if !strings.Contains(stdout.String(), "http://127.0.0.1:8080") {
 		t.Fatalf("stdout = %s", stdout.String())
 	}
 }

@@ -19,6 +19,8 @@ const (
 	CommandWorkspace CommandKind = "workspace"
 	CommandSession   CommandKind = "session"
 	CommandWeb       CommandKind = "web"
+	CommandGateway   CommandKind = "gateway"
+	CommandAgent     CommandKind = "agent"
 )
 
 type ExecOptions struct {
@@ -34,11 +36,28 @@ type WebOptions struct {
 	ShowHelp bool
 }
 
+type GatewayOptions struct {
+	Host     string
+	Port     int
+	Open     bool
+	Dev      bool
+	ShowHelp bool
+}
+
+type AgentOptions struct {
+	GatewayURL         string
+	DeviceName         string
+	SeedSessionCommand string
+	ShowHelp           bool
+}
+
 type Options struct {
 	Cwd         string
 	Kind        CommandKind
 	Exec        ExecOptions
 	Web         WebOptions
+	Gateway     GatewayOptions
+	Agent       AgentOptions
 	ShowHelp    bool
 	ShowVersion bool
 }
@@ -71,12 +90,24 @@ func Run(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int
 		return apperrors.ExitSuccess
 	}
 
+	if options.Gateway.ShowHelp {
+		PrintGatewayUsage(stdout)
+		return apperrors.ExitSuccess
+	}
+
+	if options.Agent.ShowHelp {
+		PrintAgentUsage(stdout)
+		return apperrors.ExitSuccess
+	}
+
 	result, err := app.Run(context.Background(), app.Options{
 		Cwd: options.Cwd,
 		Command: app.Command{
-			Kind: app.CommandKind(options.Kind),
-			Exec: app.ExecCommand{Command: options.Exec.Command},
-			Web:  app.WebCommand{Host: options.Web.Host, Port: options.Web.Port, Open: options.Web.Open, Dev: options.Web.Dev},
+			Kind:    app.CommandKind(options.Kind),
+			Exec:    app.ExecCommand{Command: options.Exec.Command},
+			Web:     app.WebCommand{Host: options.Web.Host, Port: options.Web.Port, Open: options.Web.Open, Dev: options.Web.Dev},
+			Gateway: app.GatewayCommand{Host: options.Gateway.Host, Port: options.Gateway.Port, Open: options.Gateway.Open, Dev: options.Gateway.Dev},
+			Agent:   app.AgentCommand{GatewayURL: options.Agent.GatewayURL, DeviceName: options.Agent.DeviceName, SeedSessionCommand: options.Agent.SeedSessionCommand},
 		},
 		Stdin:  stdin,
 		Stdout: stdout,
@@ -157,6 +188,12 @@ func Parse(args []string, output io.Writer) (Options, error) {
 	case "web":
 		options.Kind = CommandWeb
 		return parseWeb(options, rest, output)
+	case "gateway":
+		options.Kind = CommandGateway
+		return parseGateway(options, rest, output)
+	case "agent":
+		options.Kind = CommandAgent
+		return parseAgent(options, rest, output)
 	default:
 		return Options{}, apperrors.Usage("unknown command: " + command)
 	}
@@ -185,6 +222,59 @@ func parseWeb(options Options, args []string, output io.Writer) (Options, error)
 	}
 	if options.Web.Port < 0 || options.Web.Port > 65535 {
 		return Options{}, apperrors.Usage("web port must be between 0 and 65535")
+	}
+	return options, nil
+}
+
+func parseGateway(options Options, args []string, output io.Writer) (Options, error) {
+	if len(args) == 1 && args[0] == "--help" {
+		options.Gateway.ShowHelp = true
+		return options, nil
+	}
+	flags := flag.NewFlagSet("termbridge gateway", flag.ContinueOnError)
+	flags.SetOutput(output)
+	flags.StringVar(&options.Gateway.Host, "host", "127.0.0.1", "gateway server host")
+	flags.IntVar(&options.Gateway.Port, "port", 8080, "gateway server port")
+	flags.BoolVar(&options.Gateway.Open, "open", false, "open browser after gateway starts")
+	flags.BoolVar(&options.Gateway.Dev, "dev", false, "enable development server friendly behavior")
+	flags.BoolVar(&options.Gateway.ShowHelp, "help", false, "show gateway help")
+	if err := flags.Parse(args); err != nil {
+		return Options{}, apperrors.Usage(err.Error())
+	}
+	if options.Gateway.ShowHelp {
+		return options, nil
+	}
+	if len(flags.Args()) > 0 {
+		return Options{}, apperrors.Usage("gateway does not accept positional arguments: " + strings.Join(flags.Args(), " "))
+	}
+	if options.Gateway.Port < 0 || options.Gateway.Port > 65535 {
+		return Options{}, apperrors.Usage("gateway port must be between 0 and 65535")
+	}
+	return options, nil
+}
+
+func parseAgent(options Options, args []string, output io.Writer) (Options, error) {
+	if len(args) == 1 && args[0] == "--help" {
+		options.Agent.ShowHelp = true
+		return options, nil
+	}
+	flags := flag.NewFlagSet("termbridge agent", flag.ContinueOnError)
+	flags.SetOutput(output)
+	flags.StringVar(&options.Agent.GatewayURL, "gateway-url", "", "gateway URL")
+	flags.StringVar(&options.Agent.DeviceName, "device-name", "", "device display name")
+	flags.StringVar(&options.Agent.SeedSessionCommand, "seed-session-command", "", "create a dev-only running session in the agent runtime before connecting")
+	flags.BoolVar(&options.Agent.ShowHelp, "help", false, "show agent help")
+	if err := flags.Parse(args); err != nil {
+		return Options{}, apperrors.Usage(err.Error())
+	}
+	if options.Agent.ShowHelp {
+		return options, nil
+	}
+	if len(flags.Args()) > 0 {
+		return Options{}, apperrors.Usage("agent does not accept positional arguments: " + strings.Join(flags.Args(), " "))
+	}
+	if strings.TrimSpace(options.Agent.GatewayURL) == "" {
+		return Options{}, apperrors.Usage("agent requires --gateway-url")
 	}
 	return options, nil
 }
@@ -226,7 +316,7 @@ func parseExec(options Options, args []string, output io.Writer) (Options, error
 
 func isCommand(arg string) bool {
 	switch arg {
-	case "exec", "workspace", "session", "web":
+	case "exec", "workspace", "session", "web", "gateway", "agent":
 		return true
 	default:
 		return false
@@ -242,6 +332,8 @@ func PrintUsage(w io.Writer) {
 	fmt.Fprintln(w, "  workspace  list workspaces")
 	fmt.Fprintln(w, "  session    list sessions")
 	fmt.Fprintln(w, "  web        start local Web terminal server")
+	fmt.Fprintln(w, "  gateway    start Gateway Web terminal service")
+	fmt.Fprintln(w, "  agent      connect this runtime to a Gateway")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
 	fmt.Fprintln(w, "  --cwd <dir>     working directory for TermBridge; defaults to current directory")
@@ -256,6 +348,8 @@ func PrintUsage(w io.Writer) {
 	fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- codex")
 	fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- pwsh")
 	fmt.Fprintln(w, "  termbridge web --dev")
+	fmt.Fprintln(w, "  termbridge gateway --host 127.0.0.1 --port 8080")
+	fmt.Fprintln(w, "  termbridge agent --gateway-url http://127.0.0.1:8080")
 }
 
 func PrintWebUsage(w io.Writer) {
@@ -276,6 +370,29 @@ func PrintExecUsage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
 	fmt.Fprintln(w, "  --help          show exec help")
+}
+
+func PrintGatewayUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  termbridge [options] gateway [gateway options]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintln(w, "  --host <host>    gateway server host; defaults to 127.0.0.1")
+	fmt.Fprintln(w, "  --port <port>    gateway server port; defaults to 8080")
+	fmt.Fprintln(w, "  --open           open browser after gateway starts")
+	fmt.Fprintln(w, "  --dev            enable development server friendly behavior")
+	fmt.Fprintln(w, "  --help           show gateway help")
+}
+
+func PrintAgentUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  termbridge [options] agent --gateway-url <url> [agent options]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintln(w, "  --gateway-url <url>          gateway URL")
+	fmt.Fprintln(w, "  --device-name <name>         device display name")
+	fmt.Fprintln(w, "  --seed-session-command <cmd> create a dev-only running session in the agent runtime before connecting")
+	fmt.Fprintln(w, "  --help                       show agent help")
 }
 
 func printError(w io.Writer, err error) {

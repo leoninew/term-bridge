@@ -95,6 +95,95 @@ func TestParseWebRejectsPositionalArgs(t *testing.T) {
 	}
 }
 
+func TestParseGatewayCommand(t *testing.T) {
+	cfg, err := Parse([]string{"--cwd", `D:\project`, "gateway", "--host", "0.0.0.0", "--port", "9090", "--open", "--dev"}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Parse(gateway) error = %v", err)
+	}
+	if cfg.Kind != CommandGateway {
+		t.Fatalf("Kind = %q, want gateway", cfg.Kind)
+	}
+	if cfg.Cwd != `D:\project` {
+		t.Fatalf("Cwd = %q", cfg.Cwd)
+	}
+	if cfg.Gateway.Host != "0.0.0.0" || cfg.Gateway.Port != 9090 || !cfg.Gateway.Open || !cfg.Gateway.Dev {
+		t.Fatalf("Gateway = %#v", cfg.Gateway)
+	}
+}
+
+func TestParseGatewayHelp(t *testing.T) {
+	cfg, err := Parse([]string{"gateway", "--help"}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Parse(gateway --help) error = %v", err)
+	}
+	if !cfg.Gateway.ShowHelp {
+		t.Fatal("Gateway.ShowHelp = false, want true")
+	}
+}
+
+func TestParseGatewayRejectsPositionalArgs(t *testing.T) {
+	_, err := Parse([]string{"gateway", "extra"}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("Parse() error = nil, want error")
+	}
+	if !apperrors.IsUsage(err) {
+		t.Fatalf("Parse() error type = %T, want usage error", err)
+	}
+}
+
+func TestParseGatewayRejectsInvalidPort(t *testing.T) {
+	_, err := Parse([]string{"gateway", "--port", "65536"}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("Parse() error = nil, want error")
+	}
+	if !apperrors.IsUsage(err) {
+		t.Fatalf("Parse() error type = %T, want usage error", err)
+	}
+}
+
+func TestParseAgentCommand(t *testing.T) {
+	cfg, err := Parse([]string{"agent", "--gateway-url", "http://127.0.0.1:8080", "--device-name", "local-mac"}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Parse(agent) error = %v", err)
+	}
+	if cfg.Kind != CommandAgent {
+		t.Fatalf("Kind = %q, want agent", cfg.Kind)
+	}
+	if cfg.Agent.GatewayURL != "http://127.0.0.1:8080" || cfg.Agent.DeviceName != "local-mac" {
+		t.Fatalf("Agent = %#v", cfg.Agent)
+	}
+}
+
+func TestParseAgentHelp(t *testing.T) {
+	cfg, err := Parse([]string{"agent", "--help"}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Parse(agent --help) error = %v", err)
+	}
+	if !cfg.Agent.ShowHelp {
+		t.Fatal("Agent.ShowHelp = false, want true")
+	}
+}
+
+func TestParseAgentRequiresGatewayURL(t *testing.T) {
+	_, err := Parse([]string{"agent"}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("Parse() error = nil, want error")
+	}
+	if !apperrors.IsUsage(err) {
+		t.Fatalf("Parse() error type = %T, want usage error", err)
+	}
+}
+
+func TestParseAgentRejectsPositionalArgs(t *testing.T) {
+	_, err := Parse([]string{"agent", "--gateway-url", "http://127.0.0.1:8080", "extra"}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("Parse() error = nil, want error")
+	}
+	if !apperrors.IsUsage(err) {
+		t.Fatalf("Parse() error type = %T, want usage error", err)
+	}
+}
+
 func TestParseRejectsLogFlags(t *testing.T) {
 	_, err := Parse([]string{"--log-level", "debug", "exec", "--", "pwsh"}, &bytes.Buffer{})
 	if err == nil {
@@ -181,9 +270,13 @@ func TestRunHelpWritesStdoutOnly(t *testing.T) {
 		"workspace",
 		"session",
 		"web",
+		"gateway",
+		"agent",
 		"termbridge exec -- claude",
 		"termbridge --cwd D:\\project exec -- codex",
 		"termbridge web --dev",
+		"termbridge gateway --host 127.0.0.1 --port 8080",
+		"termbridge agent --gateway-url http://127.0.0.1:8080",
 	} {
 		if !strings.Contains(usage, want) {
 			t.Fatalf("stdout missing %q: %s", want, usage)

@@ -13,6 +13,7 @@
           />
         </label>
         <button
+          v-if="props.allowMutations"
           type="button"
           class="flex size-8 shrink-0 items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
           :aria-label="t('sidebar.newSession')"
@@ -39,7 +40,7 @@
         item-key="value"
         handle=".workspace-drag-handle"
         :animation="150"
-        :disabled="Boolean(normalizedSearchQuery)"
+        :disabled="Boolean(normalizedSearchQuery) || !props.allowMutations"
         @end="reorderDraggedWorkspaces"
       >
         <div v-for="workspace in draggableTreeItems" :key="workspace.value" class="min-w-0">
@@ -56,6 +57,7 @@
             <Folder v-else class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
             <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{ workspace.workspace.name }}</span>
             <button
+              v-if="props.allowMutations"
               type="button"
               class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 opacity-0 hover:bg-slate-800 hover:text-red-200 group-hover:opacity-100"
               :aria-label="t('sidebar.removeWorkspaceAria', { name: workspace.workspace.name })"
@@ -82,7 +84,7 @@
             >
               <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
               <span class="min-w-0 flex-1 truncate text-sm">{{ session.session.name || session.session.command }}</span>
-              <span class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+              <span v-if="props.allowMutations" class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
                 <button
                   type="button"
                   class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
@@ -190,6 +192,7 @@
   const props = defineProps<{
     workspaceTree: WorkspaceTreeSummary[]
     activeSessionId: string | null
+    allowMutations?: boolean
   }>()
 
   const emit = defineEmits<{
@@ -253,7 +256,7 @@
   )
 
   function reorderDraggedWorkspaces() {
-    if (normalizedSearchQuery.value) {
+    if (normalizedSearchQuery.value || !props.allowMutations) {
       return
     }
     emit('reorderWorkspaces', draggableTreeItems.value.map((item) => item.workspace.id))

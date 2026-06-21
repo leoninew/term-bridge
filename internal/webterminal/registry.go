@@ -47,7 +47,6 @@ type Config struct {
 	Logger           *logging.Logger
 	ClientQueueSize  int
 	ClientQueueBytes int
-	CwdAllowlist     []string
 	EnvDenylist      []string
 }
 
@@ -61,7 +60,6 @@ type Registry struct {
 	ids              identity.Generator
 	clientQueueSize  int
 	clientQueueBytes int
-	cwdAllowlist     []string
 	envDenylist      []string
 
 	mu       sync.Mutex
@@ -186,10 +184,6 @@ func NewRegistry(config Config) *Registry {
 	if queueBytes <= 0 {
 		queueBytes = DefaultClientQueueBytes
 	}
-	cwdAllowlist := append([]string(nil), config.CwdAllowlist...)
-	if len(cwdAllowlist) == 0 {
-		cwdAllowlist = []string{config.Cwd}
-	}
 	return &Registry{
 		cwd:              config.Cwd,
 		store:            config.Store,
@@ -200,7 +194,6 @@ func NewRegistry(config Config) *Registry {
 		ids:              identity.NewULIDGenerator(),
 		clientQueueSize:  queueSize,
 		clientQueueBytes: queueBytes,
-		cwdAllowlist:     cwdAllowlist,
 		envDenylist:      append([]string(nil), config.EnvDenylist...),
 		runtimes:         map[string]*SessionRuntime{},
 	}
@@ -218,7 +211,7 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 	if strings.TrimSpace(cwd) == "" {
 		cwd = r.cwd
 	}
-	absCwd, err := r.resolveAllowedCwd(cwd)
+	absCwd, err := resolveSessionCwd(cwd)
 	if err != nil {
 		return CreateSessionResponse{}, err
 	}
@@ -507,7 +500,7 @@ func (r *Registry) History(sessionId string) ([]byte, error) {
 	return nil, apperrors.NotFound("session not found", os.ErrNotExist)
 }
 
-func (r *Registry) resolveAllowedCwd(path string) (string, error) {
+func resolveSessionCwd(path string) (string, error) {
 	path, err := expandHome(path)
 	if err != nil {
 		return "", apperrors.Config("resolve session cwd", err)
@@ -520,18 +513,7 @@ func (r *Registry) resolveAllowedCwd(path string) (string, error) {
 	if err != nil {
 		return "", apperrors.Config("resolve session cwd", err)
 	}
-	resolved = filepath.Clean(resolved)
-	for _, root := range r.cwdAllowlist {
-		allowed, err := filepath.EvalSymlinks(root)
-		if err != nil {
-			continue
-		}
-		allowed = filepath.Clean(allowed)
-		if pathWithin(resolved, allowed) {
-			return resolved, nil
-		}
-	}
-	return "", apperrors.Config("session cwd outside allowlist", fmt.Errorf("%s", resolved))
+	return filepath.Clean(resolved), nil
 }
 
 func expandHome(path string) (string, error) {
@@ -549,19 +531,6 @@ func expandHome(path string) (string, error) {
 		return "", fmt.Errorf("unsupported home path %q", path)
 	}
 	return path, nil
-}
-
-func pathWithin(path string, root string) bool {
-	path = filepath.Clean(path)
-	root = filepath.Clean(root)
-	if strings.EqualFold(path, root) {
-		return true
-	}
-	rel, err := filepath.Rel(root, path)
-	if err != nil {
-		return false
-	}
-	return rel != "." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".."
 }
 
 func filterEnv(env []string, denylist []string) []string {

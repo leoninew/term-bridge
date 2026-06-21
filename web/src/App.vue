@@ -1,10 +1,42 @@
 <template>
   <ToastProvider>
-    <SplitterGroup direction="horizontal" class="flex h-screen min-h-screen overflow-hidden bg-[#05070d] text-sm text-slate-200">
+    <section v-if="gatewayAvailable && !gatewayAuthenticated" class="flex h-screen min-h-screen items-center justify-center bg-[#05070d] p-6 text-sm text-slate-200">
+      <form class="w-full max-w-sm rounded-xl border border-slate-800 bg-[#0a0f18] p-5 shadow-xl" @submit.prevent="loginGateway">
+        <h1 class="text-lg font-semibold text-slate-100">{{ t('gateway.loginTitle') }}</h1>
+        <p class="mt-1 text-slate-500">{{ t('gateway.loginDescription') }}</p>
+        <label class="mt-4 block">
+          <span class="text-slate-400">{{ t('gateway.username') }}</span>
+          <input v-model="gatewayUsernameInput" class="mt-1 h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-2 text-slate-100 outline-none" autocomplete="username" />
+        </label>
+        <label class="mt-3 block">
+          <span class="text-slate-400">{{ t('gateway.password') }}</span>
+          <input v-model="gatewayPasswordInput" type="password" class="mt-1 h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-2 text-slate-100 outline-none" autocomplete="current-password" />
+        </label>
+        <button type="submit" class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50 hover:bg-blue-500 disabled:opacity-60" :disabled="gatewayLoggingIn">
+          {{ gatewayLoggingIn ? t('gateway.signingIn') : t('gateway.signIn') }}
+        </button>
+      </form>
+    </section>
+
+    <SplitterGroup v-else direction="horizontal" class="flex h-screen min-h-screen overflow-hidden bg-[#05070d] text-sm text-slate-200">
       <SplitterPanel id="workspace-sidebar" :default-size="22" :min-size="16" :max-size="35">
+        <div v-if="gatewayAvailable && gatewayAuthenticated" class="border-b border-slate-800/80 bg-[#0a0f18] p-2 text-sm">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-medium text-slate-200">{{ t('gateway.devices') }}</span>
+            <button type="button" class="rounded px-1.5 py-0.5 text-slate-500 hover:bg-slate-900 hover:text-slate-200" @click="logoutGateway">{{ t('gateway.logout') }}</button>
+          </div>
+          <select v-model="selectedGatewayDeviceId" class="mt-2 h-8 w-full rounded-md border border-slate-800 bg-slate-950 px-2 text-slate-100 outline-none" @change="selectGatewayDevice">
+            <option value="">{{ t('gateway.localWorkbench') }}</option>
+            <option v-for="device in gatewayDevices" :key="device.id" :value="device.id">
+              {{ device.name }} · {{ device.online ? t('gateway.online') : t('gateway.offline') }}
+            </option>
+          </select>
+          <p v-if="isGatewayBackend" class="mt-1.5 text-xs text-slate-500">{{ t('gateway.attachOnly') }}</p>
+        </div>
         <WorkspaceSessionSidebar
           :workspace-tree="workspaceTree"
           :active-session-id="activeTabId"
+          :allow-mutations="allowMutations"
           @select="openSessionTab"
           @refresh="refresh"
           @new-session="openCreateDialog"
@@ -22,10 +54,6 @@
 
       <SplitterPanel id="terminal-workbench" :min-size="55">
         <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14]">
-        <p v-if="error" class="mx-3 mt-3 rounded-md border border-slate-800 bg-slate-950/80 px-2 py-1.5 text-red-100">
-          {{ error }}
-        </p>
-
         <TabsRoot
           :model-value="activeTabId ?? undefined"
           class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
@@ -75,7 +103,7 @@
             <TerminalView
               v-if="activeSession.lifecycle_state === 'running'"
               :key="activeSession.id"
-              :ws-url="`/api/sessions/${activeSession.id}/ws`"
+              :ws-url="terminalWsUrl(activeSession.id)"
               :session-id="activeSession.id"
               @state="handleTerminalState"
               @terminal-error="handleTerminalError"
@@ -97,8 +125,8 @@
 
           <section v-if="openedTabs.length === 0" class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-slate-500">
             <h3 class="text-lg font-semibold text-slate-300">{{ t('workbench.noTabTitle') }}</h3>
-            <p>{{ t('workbench.noTabDescription') }}</p>
-            <button type="button" class="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-slate-100 hover:bg-slate-800" @click="openCreateDialog">
+            <p>{{ isGatewayBackend ? t('gateway.selectExistingSession') : t('workbench.noTabDescription') }}</p>
+            <button v-if="allowMutations" type="button" class="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-slate-100 hover:bg-slate-800" @click="openCreateDialog">
               {{ t('workbench.newSession') }}
             </button>
           </section>
@@ -309,6 +337,15 @@
     readHistory,
     updateSession,
   } from './features/sessions/api'
+  import {
+    gatewayLogin,
+    gatewayLogout,
+    gatewayMe,
+    listGatewayDevices,
+    listGatewayWorkspaceTree,
+    readGatewayHistory,
+    type GatewayDeviceSummary,
+  } from './features/gateway/api'
   import { deleteWorkspace, listWorkspaceTree, updateWorkspaceOrder } from './features/workspaces/api'
 
   type OpenSessionTab = {
@@ -331,7 +368,6 @@
   const sessionName = ref('')
   const commandText = ref('zsh')
   const cwd = ref('')
-  const error = ref<string | null>(null)
   const loading = ref(false)
   const creatingSession = ref(false)
   const renamingSession = ref(false)
@@ -345,6 +381,13 @@
   const selectedWorkspace = ref<WorkspaceSummary | null>(null)
   const renameText = ref('')
   const toasts = ref<AppToast[]>([])
+  const gatewayAvailable = ref(false)
+  const gatewayAuthenticated = ref(false)
+  const gatewayLoggingIn = ref(false)
+  const gatewayUsernameInput = ref('admin')
+  const gatewayPasswordInput = ref('admin')
+  const gatewayDevices = ref<GatewayDeviceSummary[]>([])
+  const selectedGatewayDeviceId = ref('')
   const sessionNameInput = ref<{ focus: () => void; select: () => void } | null>(null)
   const renameInput = ref<{ focus: () => void; select: () => void } | null>(null)
   let toastId = 0
@@ -362,25 +405,111 @@
     return state ? state.charAt(0).toUpperCase() + state.slice(1) : ''
   })
 
+  const selectedGatewayDevice = computed(() =>
+    gatewayDevices.value.find((device) => device.id === selectedGatewayDeviceId.value) ?? null,
+  )
+
+  const activeBackend = computed(() => {
+    const gatewayDeviceId = selectedGatewayDeviceId.value
+    if (!gatewayDeviceId) {
+      return {
+        kind: 'local' as const,
+        allowMutations: true,
+        async loadWorkspaceTree() {
+          return listWorkspaceTree()
+        },
+        async readHistory(sessionId: string) {
+          return readHistory(sessionId)
+        },
+        terminalWsUrl(sessionId: string) {
+          return `/api/sessions/${encodeURIComponent(sessionId)}/ws`
+        },
+      }
+    }
+    return {
+      kind: 'gateway' as const,
+      allowMutations: false,
+      async loadWorkspaceTree() {
+        gatewayDevices.value = await listGatewayDevices()
+        const device = selectedGatewayDevice.value
+        if (!device || !device.online) {
+          throw new Error(t('gateway.routeUnavailable'))
+        }
+        return listGatewayWorkspaceTree(gatewayDeviceId)
+      },
+      async readHistory(sessionId: string) {
+        return readGatewayHistory(gatewayDeviceId, sessionId)
+      },
+      terminalWsUrl(sessionId: string) {
+        return `/api/gateway/devices/${encodeURIComponent(gatewayDeviceId)}/sessions/${encodeURIComponent(sessionId)}/ws`
+      },
+    }
+  })
+
+  const allowMutations = computed(() => activeBackend.value.allowMutations)
+  const isGatewayBackend = computed(() => activeBackend.value.kind === 'gateway')
+
   async function refresh() {
     loading.value = true
-    error.value = null
     try {
-      const workspaceTree = await listWorkspaceTree()
-      applyWorkspaceTree(workspaceTree)
+      applyWorkspaceTree(await activeBackend.value.loadWorkspaceTree())
       if (activeTabId.value) {
         await ensureHistoryLoaded(activeTabId.value)
       }
     } catch (err) {
-      const message = errorMessage(err)
-      error.value = message
-      pushToast('error', t('toast.refreshFailed'), message)
+      notifyError(t('toast.refreshFailed'), err)
     } finally {
       loading.value = false
     }
   }
 
+  async function loginGateway() {
+    if (gatewayLoggingIn.value) {
+      return
+    }
+    gatewayLoggingIn.value = true
+    try {
+      await gatewayLogin(gatewayUsernameInput.value, gatewayPasswordInput.value)
+      gatewayAuthenticated.value = true
+      gatewayDevices.value = await listGatewayDevices()
+      selectedGatewayDeviceId.value = gatewayDevices.value.find((device) => device.online)?.id ?? ''
+      await resetWorkbenchForSourceChange()
+      await refresh()
+    } catch (err) {
+      notifyError(t('gateway.loginFailed'), err)
+    } finally {
+      gatewayLoggingIn.value = false
+    }
+  }
+
+  async function logoutGateway() {
+    try {
+      await gatewayLogout()
+    } catch (err) {
+      notifyError(t('gateway.logoutFailed'), err)
+    }
+    gatewayAuthenticated.value = false
+    gatewayDevices.value = []
+    selectedGatewayDeviceId.value = ''
+    await resetWorkbenchForSourceChange()
+    await refresh()
+  }
+
+  async function selectGatewayDevice() {
+    await resetWorkbenchForSourceChange()
+    await refresh()
+  }
+
+  async function resetWorkbenchForSourceChange() {
+    openedTabs.value = []
+    activeTabId.value = null
+    applyWorkspaceTree([])
+  }
+
   async function startSession() {
+    if (!ensureMutationAllowed()) {
+      return
+    }
     if (creatingSession.value) {
       return
     }
@@ -388,21 +517,17 @@
     const trimmedCwd = cwd.value.trim()
     const command = commandFromText(commandText.value)
     if (!name) {
-      error.value = t('message.sessionNameRequired')
-      pushToast('error', t('toast.createSessionFailed'), error.value)
+      pushToast('error', t('toast.createSessionFailed'), t('message.sessionNameRequired'))
       return
     }
     if (!trimmedCwd) {
-      error.value = t('message.workingDirectoryRequired')
-      pushToast('error', t('toast.createSessionFailed'), error.value)
+      pushToast('error', t('toast.createSessionFailed'), t('message.workingDirectoryRequired'))
       return
     }
     if (command.length === 0) {
-      error.value = t('message.commandRequired')
-      pushToast('error', t('toast.createSessionFailed'), error.value)
+      pushToast('error', t('toast.createSessionFailed'), t('message.commandRequired'))
       return
     }
-    error.value = null
     creatingSession.value = true
     try {
       const size = estimateTerminalSize()
@@ -422,15 +547,16 @@
       await openSessionTab(session)
       pushToast('success', t('toast.sessionCreated'), sessionDisplayName(session))
     } catch (err) {
-      const message = errorMessage(err)
-      error.value = message
-      pushToast('error', t('toast.createSessionFailed'), message)
+      notifyError(t('toast.createSessionFailed'), err)
     } finally {
       creatingSession.value = false
     }
   }
 
   async function renameSelectedSession() {
+    if (!ensureMutationAllowed()) {
+      return
+    }
     if (!selectedSession.value || renamingSession.value) {
       return
     }
@@ -447,13 +573,16 @@
       renameDialogOpen.value = false
       pushToast('success', t('toast.sessionRenamed'), name)
     } catch (err) {
-      pushToast('error', t('toast.renameSessionFailed'), errorMessage(err))
+      notifyError(t('toast.renameSessionFailed'), err)
     } finally {
       renamingSession.value = false
     }
   }
 
   async function deleteSelectedSession() {
+    if (!ensureMutationAllowed()) {
+      return
+    }
     if (!selectedSession.value || deletingSession.value || isActiveLifecycle(selectedSession.value)) {
       return
     }
@@ -467,13 +596,16 @@
       deleteSessionDialogOpen.value = false
       pushToast('success', t('toast.sessionDeleted'), sessionDisplayName(session))
     } catch (err) {
-      pushToast('error', t('toast.deleteSessionFailed'), errorMessage(err))
+      notifyError(t('toast.deleteSessionFailed'), err)
     } finally {
       deletingSession.value = false
     }
   }
 
   async function removeSelectedWorkspace() {
+    if (!ensureMutationAllowed()) {
+      return
+    }
     if (!selectedWorkspace.value || removingWorkspace.value) {
       return
     }
@@ -486,13 +618,16 @@
       removeWorkspaceDialogOpen.value = false
       pushToast('success', t('toast.workspaceRemoved'), t('message.workspaceRemoved', { name: workspace.name }))
     } catch (err) {
-      pushToast('error', t('toast.removeWorkspaceFailed'), errorMessage(err))
+      notifyError(t('toast.removeWorkspaceFailed'), err)
     } finally {
       removingWorkspace.value = false
     }
   }
 
   async function reorderWorkspaces(workspaceIds: string[]) {
+    if (!ensureMutationAllowed()) {
+      return
+    }
     const previousTree = workspaceTree.value
     workspaceTree.value = orderWorkspaceTree(previousTree, workspaceIds)
     try {
@@ -500,7 +635,7 @@
       workspaceTree.value = orderWorkspaceTree(workspaceTree.value, orderedWorkspaces.map((workspace) => workspace.id))
       workspaces.value = orderedWorkspaces
     } catch (err) {
-      pushToast('error', t('toast.updateWorkspaceOrderFailed'), errorMessage(err))
+      notifyError(t('toast.updateWorkspaceOrderFailed'), err)
       workspaceTree.value = previousTree
       workspaces.value = previousTree.map(workspaceSummaryFromTree)
       await refresh()
@@ -556,7 +691,7 @@
     tab.historyLoading = true
     tab.historyError = null
     try {
-      tab.historyText = await readHistory(sessionId)
+      tab.historyText = await activeBackend.value.readHistory(sessionId)
       tab.historyLoaded = true
     } catch (err) {
       const message = errorMessage(err)
@@ -568,6 +703,9 @@
   }
 
   function openCreateDialog() {
+    if (!ensureMutationAllowed()) {
+      return
+    }
     createDialogOpen.value = true
     if (!sessionName.value.trim()) {
       sessionName.value = commandText.value.trim()
@@ -579,6 +717,9 @@
   }
 
   function openRenameDialog(session: SessionSummary) {
+    if (!ensureMutationAllowed()) {
+      return
+    }
     selectedSession.value = session
     renameText.value = session.name || session.command || ''
     renameDialogOpen.value = true
@@ -589,6 +730,9 @@
   }
 
   function openDeleteSessionDialog(session: SessionSummary) {
+    if (!ensureMutationAllowed()) {
+      return
+    }
     selectedSession.value = session
     deleteSessionDialogOpen.value = true
     if (isActiveLifecycle(session)) {
@@ -597,6 +741,9 @@
   }
 
   function openRemoveWorkspaceDialog(workspace: WorkspaceSummary) {
+    if (!ensureMutationAllowed()) {
+      return
+    }
     selectedWorkspace.value = workspace
     removeWorkspaceDialogOpen.value = true
   }
@@ -705,6 +852,18 @@
     return ['running', 'starting', 'stopping'].includes(session.lifecycle_state)
   }
 
+  function terminalWsUrl(sessionId: string) {
+    return activeBackend.value.terminalWsUrl(sessionId)
+  }
+
+  function ensureMutationAllowed() {
+    if (allowMutations.value) {
+      return true
+    }
+    pushToast('info', t('gateway.attachOnlyTitle'), t('gateway.attachOnly'))
+    return false
+  }
+
   function handleTerminalState(message: ServerControlMessage) {
     if (message.type === 'error') {
       pushToast('error', t('toast.terminalError', { code: message.code }), message.message)
@@ -720,6 +879,10 @@
 
   function pushToast(kind: ToastKind, title: string, description?: string) {
     toasts.value.push({ id: ++toastId, kind, title, description })
+  }
+
+  function notifyError(title: string, err: unknown) {
+    pushToast('error', title, errorMessage(err))
   }
 
   function dismissToast(id: number) {
@@ -742,7 +905,24 @@
     }
   })
 
+  async function initializeGateway() {
+    try {
+      const me = await gatewayMe()
+      gatewayAvailable.value = true
+      gatewayAuthenticated.value = me.authenticated
+      if (me.authenticated) {
+        gatewayDevices.value = await listGatewayDevices()
+      }
+    } catch {
+      gatewayAvailable.value = false
+      gatewayAuthenticated.value = false
+    }
+  }
+
   onMounted(async () => {
-    await refresh()
+    await initializeGateway()
+    if (!gatewayAvailable.value || gatewayAuthenticated.value) {
+      await refresh()
+    }
   })
 </script>

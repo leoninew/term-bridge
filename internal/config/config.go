@@ -44,7 +44,6 @@ type RuntimeConfig struct {
 
 type WebConfig struct {
 	AllowedOrigins []string
-	CwdAllowlist   []string
 	EnvDenylist    []string
 	Error          WebErrorConfig
 }
@@ -100,10 +99,6 @@ func Load(options Options) (Config, error) {
 		return Config{}, err
 	}
 
-	cwdAllowlist, err := resolvePathList(cwd, v.GetStringSlice("web.cwd_allowlist"))
-	if err != nil {
-		return Config{}, err
-	}
 	cfg := Config{
 		Cwd:                  cwd,
 		Command:              append([]string(nil), options.Command...),
@@ -120,7 +115,6 @@ func Load(options Options) (Config, error) {
 		Runtime: RuntimeConfig{StateDir: stateDir},
 		Web: WebConfig{
 			AllowedOrigins: cleanStringSlice(v.GetStringSlice("web.allowed_origins")),
-			CwdAllowlist:   cwdAllowlist,
 			EnvDenylist:    cleanStringSlice(v.GetStringSlice("web.env.denylist")),
 			Error:          WebErrorConfig{Debug: v.GetBool("web.error.debug")},
 		},
@@ -205,7 +199,6 @@ func rejectUnknownKeys(v *viper.Viper) error {
 		"history.max_line_bytes":  {},
 		"runtime.state_dir":       {},
 		"web.allowed_origins":     {},
-		"web.cwd_allowlist":       {},
 		"web.env.denylist":        {},
 		"web.error.debug":         {},
 	}
@@ -235,47 +228,6 @@ func resolveStateDir(cwd string, path string) (string, error) {
 		return filepath.Clean(path), nil
 	}
 	return filepath.Join(cwd, path), nil
-}
-
-func resolvePathList(cwd string, paths []string) ([]string, error) {
-	cleaned := cleanStringSlice(paths)
-	if len(cleaned) == 0 {
-		cleaned = []string{cwd}
-	}
-	out := make([]string, 0, len(cleaned))
-	for _, path := range cleaned {
-		var err error
-		path, err = expandHome(path)
-		if err != nil {
-			return nil, apperrors.Config("resolve web cwd allowlist", err)
-		}
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(cwd, path)
-		}
-		abs, err := filepath.Abs(path)
-		if err != nil {
-			return nil, apperrors.Config("resolve web cwd allowlist", err)
-		}
-		out = append(out, filepath.Clean(abs))
-	}
-	return out, nil
-}
-
-func expandHome(path string) (string, error) {
-	if path == "~" {
-		return os.UserHomeDir()
-	}
-	if strings.HasPrefix(path, "~/") || strings.HasPrefix(path, "~\\") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, path[2:]), nil
-	}
-	if strings.HasPrefix(path, "~") {
-		return "", fmt.Errorf("unsupported home path %q", path)
-	}
-	return path, nil
 }
 
 func cleanStringSlice(values []string) []string {

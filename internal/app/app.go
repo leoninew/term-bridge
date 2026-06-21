@@ -11,8 +11,10 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"termbridge-go/internal/agent"
 	"termbridge-go/internal/config"
 	apperrors "termbridge-go/internal/errors"
+	"termbridge-go/internal/gateway"
 	"termbridge-go/internal/history"
 	"termbridge-go/internal/identity"
 	"termbridge-go/internal/logging"
@@ -33,12 +35,16 @@ const (
 	CommandWorkspace CommandKind = "workspace"
 	CommandSession   CommandKind = "session"
 	CommandWeb       CommandKind = "web"
+	CommandGateway   CommandKind = "gateway"
+	CommandAgent     CommandKind = "agent"
 )
 
 type Command struct {
-	Kind CommandKind
-	Exec ExecCommand
-	Web  WebCommand
+	Kind    CommandKind
+	Exec    ExecCommand
+	Web     WebCommand
+	Gateway GatewayCommand
+	Agent   AgentCommand
 }
 
 type ExecCommand struct {
@@ -50,6 +56,19 @@ type WebCommand struct {
 	Port int
 	Open bool
 	Dev  bool
+}
+
+type GatewayCommand struct {
+	Host string
+	Port int
+	Open bool
+	Dev  bool
+}
+
+type AgentCommand struct {
+	GatewayURL         string
+	DeviceName         string
+	SeedSessionCommand string
 }
 
 type Options struct {
@@ -87,6 +106,21 @@ var runWebServer = func(ctx context.Context, server *webserver.Server, onListeni
 	return server.Serve(ctx, listener)
 }
 
+var runGatewayServer = func(ctx context.Context, server *gateway.Server, onListening func(gateway.Info)) error {
+	listener, info, err := server.Listen()
+	if err != nil {
+		return err
+	}
+	if onListening != nil {
+		onListening(info)
+	}
+	return server.Serve(ctx, listener)
+}
+
+var runAgentClient = func(ctx context.Context, client *agent.Client) error {
+	return client.Run(ctx)
+}
+
 func Run(ctx context.Context, options Options) (Result, error) {
 	select {
 	case <-ctx.Done():
@@ -104,7 +138,7 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	}
 
 	var logOutput io.Writer
-	if options.Command.Kind == CommandWeb {
+	if options.Command.Kind == CommandWeb || options.Command.Kind == CommandGateway || options.Command.Kind == CommandAgent {
 		logOutput = options.Stdout
 	}
 	logger, err := logging.New(logging.Config{Level: cfg.LogLevel, Format: cfg.LogFormat, Dir: cfg.LogDir, Output: logOutput})
@@ -124,6 +158,12 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	case CommandWeb:
 		logger.Info("termbridge web command parsed", "cwd", cfg.Cwd, "host", options.Command.Web.Host, "port", options.Command.Web.Port, "dev", options.Command.Web.Dev, "config", cfg.ConfigFile)
 		return runWeb(ctx, cfg, logger, options)
+	case CommandGateway:
+		logger.Info("termbridge gateway command parsed", "cwd", cfg.Cwd, "host", options.Command.Gateway.Host, "port", options.Command.Gateway.Port, "dev", options.Command.Gateway.Dev, "config", cfg.ConfigFile)
+		return runGateway(ctx, cfg, logger, options)
+	case CommandAgent:
+		logger.Info("termbridge agent command parsed", "cwd", cfg.Cwd, "gateway_url", options.Command.Agent.GatewayURL, "device_name", options.Command.Agent.DeviceName, "config", cfg.ConfigFile)
+		return runAgent(ctx, cfg, logger, options)
 	default:
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("missing command")
 	}
@@ -246,14 +286,13 @@ func runWeb(ctx context.Context, cfg config.Config, logger *logging.Logger, opti
 		stdout = io.Discard
 	}
 	registry := webterminal.NewRegistry(webterminal.Config{
-		Cwd:          cfg.Cwd,
-		Store:        state.NewStore(cfg.Runtime.StateDir),
-		LogDir:       cfg.LogDir,
-		History:      cfg.History,
-		Manager:      gopty.NewManager(),
-		Logger:       logger,
-		CwdAllowlist: cfg.Web.CwdAllowlist,
-		EnvDenylist:  cfg.Web.EnvDenylist,
+		Cwd:         cfg.Cwd,
+		Store:       state.NewStore(cfg.Runtime.StateDir),
+		LogDir:      cfg.LogDir,
+		History:     cfg.History,
+		Manager:     gopty.NewManager(),
+		Logger:      logger,
+		EnvDenylist: cfg.Web.EnvDenylist,
 	})
 	server := webserver.New(webserver.Config{Host: options.Command.Web.Host, Port: options.Command.Web.Port, Open: options.Command.Web.Open, Dev: options.Command.Web.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit, AllowedOrigins: cfg.Web.AllowedOrigins, DebugErrors: cfg.Web.Error.Debug}, registry)
 	err := runWebServer(ctx, server, func(info webserver.Info) {
@@ -262,6 +301,54 @@ func runWeb(ctx context.Context, cfg config.Config, logger *logging.Logger, opti
 			fmt.Fprintln(stdout, "Dev mode enabled: start the Vite dev server from web/ and proxy /api to this URL.")
 		}
 	})
+	if err != nil && err != context.Canceled {
+		return Result{Cwd: cfg.Cwd}, err
+	}
+	return Result{Cwd: cfg.Cwd}, nil
+}
+
+func runGateway(ctx context.Context, cfg config.Config, logger *logging.Logger, options Options) (Result, error) {
+	stdout := options.Stdout
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	server := gateway.New(gateway.Config{Host: options.Command.Gateway.Host, Port: options.Command.Gateway.Port, Open: options.Command.Gateway.Open, Dev: options.Command.Gateway.Dev, Logger: logger.Slog})
+	err := runGatewayServer(ctx, server, func(info gateway.Info) {
+		fmt.Fprintf(stdout, "TermBridge gateway listening on %s\n", info.URL)
+		if options.Command.Gateway.Dev {
+			fmt.Fprintln(stdout, "Dev mode enabled: M6 temporary auth is admin/admin; do not expose this server publicly.")
+		}
+	})
+	if err != nil && err != context.Canceled {
+		return Result{Cwd: cfg.Cwd}, err
+	}
+	return Result{Cwd: cfg.Cwd}, nil
+}
+
+func runAgent(ctx context.Context, cfg config.Config, logger *logging.Logger, options Options) (Result, error) {
+	stdout := options.Stdout
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	registry := webterminal.NewRegistry(webterminal.Config{
+		Cwd:         cfg.Cwd,
+		Store:       state.NewStore(cfg.Runtime.StateDir),
+		LogDir:      cfg.LogDir,
+		History:     cfg.History,
+		Manager:     gopty.NewManager(),
+		Logger:      logger,
+		EnvDenylist: cfg.Web.EnvDenylist,
+	})
+	if strings.TrimSpace(options.Command.Agent.SeedSessionCommand) != "" {
+		seed, err := registry.CreateSession(ctx, webterminal.CreateSessionRequest{Name: "M6 Pomelo running session", Cwd: cfg.Cwd, Command: []string{"/bin/sh", "-lc", options.Command.Agent.SeedSessionCommand}, Cols: 100, Rows: 30})
+		if err != nil {
+			return Result{Cwd: cfg.Cwd}, err
+		}
+		fmt.Fprintf(stdout, "Seeded agent session %s\n", seed.SessionId)
+	}
+	client := agent.New(agent.Config{GatewayURL: options.Command.Agent.GatewayURL, DeviceName: options.Command.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})
+	fmt.Fprintf(stdout, "TermBridge agent connecting to %s\n", options.Command.Agent.GatewayURL)
+	err := runAgentClient(ctx, client)
 	if err != nil && err != context.Canceled {
 		return Result{Cwd: cfg.Cwd}, err
 	}

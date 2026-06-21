@@ -1,0 +1,217 @@
+name: m6-gateway-web-terminal
+描述: Verify Gateway login, online device discovery, workspace/session relay, and optional terminal attach when an existing running session is available.
+
+variables:
+  base_url: "http://localhost:9011"
+  username: "admin"
+  password: "admin"
+
+steps:
+  - type: set-viewport
+    width: 1440
+    height: 960
+
+  - type: navigate
+    url: "{{base_url}}"
+
+  - type: wait
+    network_idle: true
+    timeout: 10000
+
+  - type: evaluate
+    script: |
+      localStorage.setItem('termbridge.locale', 'zh-CN');
+      return true;
+
+  - type: navigate
+    url: "{{base_url}}"
+
+  - type: wait
+    selector: "input[autocomplete='username']"
+    timeout: 10000
+
+  - type: screenshot
+    file: "01-gateway-login.png"
+    full_page: true
+
+  - type: fill
+    selector: "input[autocomplete='username']"
+    value: "{{username}}"
+
+  - type: fill
+    selector: "input[autocomplete='current-password']"
+    value: "{{password}}"
+
+  - type: click
+    selector: "button[type='submit']"
+
+  - type: wait
+    network_idle: true
+    timeout: 10000
+
+  - type: evaluate
+    script: |
+      return (async () => {
+        const deadline = Date.now() + 10000;
+        let last = '';
+        while (Date.now() < deadline) {
+          const me = await fetch('/api/gateway/me');
+          last = String(me.status) + ' ' + await me.clone().text().catch(() => '');
+          if (me.ok) {
+            const body = await me.json();
+            if (body.authenticated) {
+              return body;
+            }
+          }
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+        throw new Error('gateway auth did not become ready: ' + last);
+      })();
+
+  - type: wait
+    selector: "select"
+    timeout: 10000
+
+  - type: evaluate
+    script: |
+      return (async () => {
+        const res = await fetch('/api/gateway/devices');
+        if (!res.ok) {
+          throw new Error('devices failed: ' + res.status + ' ' + await res.text());
+        }
+        const devices = await res.json();
+        if (!Array.isArray(devices) || devices.length === 0) {
+          throw new Error('no gateway devices returned: ' + JSON.stringify(devices));
+        }
+        const online = devices.find((device) => device.online) ?? devices[0];
+        if (!online.online) {
+          throw new Error('no online gateway device: ' + JSON.stringify(devices));
+        }
+        window.__m6DeviceId = online.id;
+        window.__m6DeviceName = online.name;
+        return online;
+      })();
+
+  - type: screenshot
+    file: "02-device-selected.png"
+    full_page: true
+
+  - type: evaluate
+    script: |
+      return (async () => {
+        const deviceId = window.__m6DeviceId;
+        if (!deviceId) {
+          throw new Error('missing selected device id');
+        }
+        const treeRes = await fetch('/api/gateway/devices/' + encodeURIComponent(deviceId) + '/workspaces/tree');
+        if (!treeRes.ok) {
+          throw new Error('workspace tree failed: ' + treeRes.status + ' ' + await treeRes.text());
+        }
+        const tree = await treeRes.json();
+        if (!Array.isArray(tree)) {
+          throw new Error('workspace tree is not an array: ' + JSON.stringify(tree));
+        }
+        const sessionsRes = await fetch('/api/gateway/devices/' + encodeURIComponent(deviceId) + '/sessions');
+        if (!sessionsRes.ok) {
+          throw new Error('sessions failed: ' + sessionsRes.status + ' ' + await sessionsRes.text());
+        }
+        const sessions = await sessionsRes.json();
+        if (!Array.isArray(sessions)) {
+          throw new Error('sessions is not an array: ' + JSON.stringify(sessions));
+        }
+        window.__m6WorkspaceTree = tree;
+        window.__m6Sessions = sessions;
+        window.__m6RunningSession = sessions.find((session) => session.lifecycle_state === 'running') ?? null;
+        return { workspaceCount: tree.length, sessionCount: sessions.length, runningSessionId: window.__m6RunningSession?.id ?? null };
+      })();
+
+  - type: screenshot
+    file: "03-workspace-session-relay.png"
+    full_page: true
+
+  - type: if
+    condition: "window.__m6RunningSession !== null"
+    then:
+      - type: evaluate
+        script: |
+          return (async () => {
+            const session = window.__m6RunningSession;
+            const deviceId = window.__m6DeviceId;
+            if (!session || !deviceId) {
+              throw new Error('missing running session or device id');
+            }
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = protocol + '//' + window.location.host + '/api/gateway/devices/' + encodeURIComponent(deviceId) + '/sessions/' + encodeURIComponent(session.id) + '/ws';
+            const events = [];
+            const result = await new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                try { socket.close(); } catch (_) {}
+                reject(new Error('terminal attach probe timed out: ' + JSON.stringify(events)));
+              }, 10000);
+              const socket = new WebSocket(wsUrl, 'termbridge.terminal.v1');
+              socket.binaryType = 'arraybuffer';
+              socket.onopen = () => {
+                events.push('open');
+                socket.send(JSON.stringify({ type: 'hello' }));
+                socket.send(JSON.stringify({ type: 'resize', cols: 100, rows: 30 }));
+              };
+              socket.onmessage = (event) => {
+                if (typeof event.data === 'string') {
+                  events.push('text:' + event.data);
+                  try {
+                    const message = JSON.parse(event.data);
+                    if (message.type === 'error') {
+                      clearTimeout(timeout);
+                      reject(new Error('terminal attach error: ' + event.data));
+                    }
+                  } catch (_) {}
+                  return;
+                }
+                const text = new TextDecoder().decode(new Uint8Array(event.data));
+                events.push('binary:' + text);
+                if (text.includes('POMELO_M6_ATTACH_READY')) {
+                  socket.send(new TextEncoder().encode('echo POMELO_M6_ATTACH_INPUT\\n'));
+                }
+                if (text.includes('POMELO_M6_ATTACH_INPUT')) {
+                  clearTimeout(timeout);
+                  socket.send(JSON.stringify({ type: 'detach' }));
+                  socket.close();
+                  resolve({ attached: true, sessionId: session.id, events });
+                }
+              };
+              socket.onerror = () => {
+                clearTimeout(timeout);
+                reject(new Error('terminal websocket error: ' + JSON.stringify(events)));
+              };
+              socket.onclose = () => {
+                events.push('close');
+              };
+            });
+            window.__m6AttachProbe = result;
+            return result;
+          })();
+
+      - type: screenshot
+        file: "04-running-session-attach.png"
+        full_page: true
+
+      - type: evaluate
+        script: |
+          return (async () => {
+            const session = window.__m6RunningSession;
+            const deviceId = window.__m6DeviceId;
+            const history = await fetch('/api/gateway/devices/' + encodeURIComponent(deviceId) + '/sessions/' + encodeURIComponent(session.id) + '/history');
+            if (!history.ok) {
+              throw new Error('history failed: ' + history.status + ' ' + await history.text());
+            }
+            return { historyBytes: (await history.text()).length, attachProbe: window.__m6AttachProbe };
+          })();
+    else:
+      - type: evaluate
+        script: |
+          console.log('No running session is available; terminal attach screenshot is skipped. Relay endpoints were verified.');
+          return { skippedAttach: true, sessionCount: window.__m6Sessions?.length ?? 0 };
+
+      - type: screenshot
+        file: "04-no-running-session.png"
+        full_page: true

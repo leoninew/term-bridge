@@ -16,8 +16,6 @@ runtime:
 web:
   allowed_origins:
     - http://localhost:9011
-  cwd_allowlist:
-    - /Users/leon
   env:
     denylist: []
   error:

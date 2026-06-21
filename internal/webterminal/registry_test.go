@@ -26,7 +26,7 @@ func TestCreateSessionExpandsHomeCwd(t *testing.T) {
 	t.Setenv("HOME", home)
 	fake := newFakeSession()
 	manager := &fakeManager{session: fake}
-	registry := NewRegistry(Config{Cwd: home, CwdAllowlist: []string{home}, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
+	registry := NewRegistry(Config{Cwd: home, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
 
 	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Cwd: "~/Downloads", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
 	if err != nil {
@@ -41,13 +41,13 @@ func TestCreateSessionExpandsHomeCwd(t *testing.T) {
 	}
 }
 
-func TestCreateSessionAcceptsHomeCwdWhenHomeAllowed(t *testing.T) {
+func TestCreateSessionAcceptsHomeCwd(t *testing.T) {
 	root := t.TempDir()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	fake := newFakeSession()
 	manager := &fakeManager{session: fake}
-	registry := NewRegistry(Config{Cwd: home, CwdAllowlist: []string{home}, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
+	registry := NewRegistry(Config{Cwd: home, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
 
 	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Home shell", Cwd: "~", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
 	if err != nil {
