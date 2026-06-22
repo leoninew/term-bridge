@@ -74,15 +74,27 @@
             <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{
               workspace.workspace.name
             }}</span>
-            <button
+            <span
               v-if="props.allowMutations"
-              type="button"
-              class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 opacity-0 hover:bg-slate-800 hover:text-red-200 group-hover:opacity-100"
-              :aria-label="t('sidebar.removeWorkspaceAria', { name: workspace.workspace.name })"
-              @click.stop="emit('removeWorkspace', workspace.workspace)"
+              class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
             >
-              <Trash2 class="size-3.5" />
-            </button>
+              <button
+                type="button"
+                class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
+                :aria-label="t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })"
+                @click.stop="emit('newSession', workspace.workspace)"
+              >
+                <Plus class="size-3.5" />
+              </button>
+              <button
+                type="button"
+                class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
+                :aria-label="t('sidebar.removeWorkspaceAria', { name: workspace.workspace.name })"
+                @click.stop="emit('removeWorkspace', workspace.workspace)"
+              >
+                <Trash2 class="size-3.5" />
+              </button>
+            </span>
           </div>
 
           <template v-if="workspaceExpanded(workspace.value)">
@@ -253,7 +265,7 @@
   const emit = defineEmits<{
     select: [session: SessionSummary]
     refresh: []
-    newSession: []
+    newSession: [workspace?: WorkspaceSummary]
     renameSession: [session: SessionSummary]
     deleteSession: [session: SessionSummary]
     removeWorkspace: [workspace: WorkspaceSummary]
