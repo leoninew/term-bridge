@@ -12,21 +12,22 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"termbridge-go/internal/agent"
-	"termbridge-go/internal/config"
-	apperrors "termbridge-go/internal/errors"
-	"termbridge-go/internal/gateway"
-	"termbridge-go/internal/history"
-	"termbridge-go/internal/identity"
-	"termbridge-go/internal/logging"
-	"termbridge-go/internal/process"
-	"termbridge-go/internal/pty/gopty"
-	"termbridge-go/internal/runner"
-	"termbridge-go/internal/session"
-	"termbridge-go/internal/state"
-	"termbridge-go/internal/webserver"
-	"termbridge-go/internal/webterminal"
-	"termbridge-go/internal/workspace"
+	"termbridge-go/internal/application/agent"
+	"termbridge-go/internal/application/runner"
+	terminalapp "termbridge-go/internal/application/terminal"
+	"termbridge-go/internal/domain/identity"
+	"termbridge-go/internal/domain/process"
+	"termbridge-go/internal/domain/session"
+	"termbridge-go/internal/domain/workspace"
+	"termbridge-go/internal/infrastructure/config"
+	apperrors "termbridge-go/internal/infrastructure/errors"
+	"termbridge-go/internal/infrastructure/history"
+	"termbridge-go/internal/infrastructure/logging"
+	"termbridge-go/internal/infrastructure/pty/gopty"
+	"termbridge-go/internal/infrastructure/repository/state"
+	"termbridge-go/internal/transport/http/gatewayapi"
+	"termbridge-go/internal/transport/http/localapi"
+	httpserver "termbridge-go/internal/transport/http/server"
 )
 
 type CommandKind string
@@ -35,25 +36,16 @@ const (
 	CommandExec      CommandKind = "exec"
 	CommandWorkspace CommandKind = "workspace"
 	CommandSession   CommandKind = "session"
-	CommandWeb       CommandKind = "web"
 	CommandServe     CommandKind = "serve"
 )
 
 type Command struct {
 	Kind CommandKind
 	Exec ExecCommand
-	Web  WebCommand
 }
 
 type ExecCommand struct {
 	Command []string
-}
-
-type WebCommand struct {
-	Host string
-	Port int
-	Open bool
-	Dev  bool
 }
 
 type Options struct {
@@ -80,18 +72,7 @@ var runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.
 	return r.Run(ctx, spec, streams)
 }
 
-var runWebServer = func(ctx context.Context, server *webserver.Server, onListening func(webserver.Info)) error {
-	listener, info, err := server.Listen()
-	if err != nil {
-		return err
-	}
-	if onListening != nil {
-		onListening(info)
-	}
-	return server.Serve(ctx, listener)
-}
-
-var runGatewayServer = func(ctx context.Context, server *gateway.Server, onListening func(gateway.Info)) error {
+var runBackendServer = func(ctx context.Context, server *httpserver.Server, onListening func(httpserver.Info)) error {
 	listener, info, err := server.Listen()
 	if err != nil {
 		return err
@@ -123,7 +104,7 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	}
 
 	var logOutput io.Writer
-	if options.Command.Kind == CommandWeb || options.Command.Kind == CommandServe {
+	if options.Command.Kind == CommandServe {
 		logOutput = options.Stdout
 	}
 	logger, err := logging.New(logging.Config{Level: cfg.LogLevel, Format: cfg.LogFormat, Dir: cfg.LogDir, Output: logOutput})
@@ -140,11 +121,8 @@ func Run(ctx context.Context, options Options) (Result, error) {
 		return runWorkspaceList(cfg, options.Stdout)
 	case CommandSession:
 		return runSessionList(cfg, options.Stdout)
-	case CommandWeb:
-		logger.Info("termbridge web command parsed", "cwd", cfg.Cwd, "host", options.Command.Web.Host, "port", options.Command.Web.Port, "dev", options.Command.Web.Dev, "config", cfg.ConfigFile)
-		return runWeb(ctx, cfg, logger, options)
 	case CommandServe:
-		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "gateway_host", cfg.Gateway.Host, "gateway_port", cfg.Gateway.Port, "gateway_dev", cfg.Gateway.Dev, "agent_gateway_url", cfg.Agent.GatewayURL, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.ConfigFile)
+		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "serve_host", cfg.Serve.Host, "serve_port", cfg.Serve.Port, "serve_dev", cfg.Serve.Dev, "agent_server_url", cfg.Agent.ServerURL, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.ConfigFile)
 		return runServe(ctx, cfg, logger, options)
 	default:
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("missing command")
@@ -257,53 +235,35 @@ func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, opt
 	return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...), ExitCode: runtimeResult.ExitCode}, nil
 }
 
-func runWeb(ctx context.Context, cfg config.Config, logger *logging.Logger, options Options) (Result, error) {
-	stdout := options.Stdout
-	if stdout == nil {
-		stdout = io.Discard
-	}
-	registry := newWebTerminalRegistry(cfg, logger)
-	server := webserver.New(webserver.Config{Host: options.Command.Web.Host, Port: options.Command.Web.Port, Open: options.Command.Web.Open, Dev: options.Command.Web.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit, AllowedOrigins: cfg.Web.AllowedOrigins, DebugErrors: cfg.Web.Error.Debug}, registry)
-	err := runWebServer(ctx, server, func(info webserver.Info) {
-		fmt.Fprintf(stdout, "TermBridge web terminal listening on %s\n", info.URL)
-		if options.Command.Web.Dev {
-			fmt.Fprintln(stdout, "Dev mode enabled: start the Vite dev server from web/ and proxy /api to this URL.")
-		}
-	})
-	if err != nil && !errors.Is(err, context.Canceled) {
-		return Result{Cwd: cfg.Cwd}, err
-	}
-	return Result{Cwd: cfg.Cwd}, nil
-}
-
 func runServe(ctx context.Context, cfg config.Config, logger *logging.Logger, options Options) (Result, error) {
 	stdout := options.Stdout
 	if stdout == nil {
 		stdout = io.Discard
 	}
 	registry := newWebTerminalRegistry(cfg, logger)
-	localServer := webserver.New(webserver.Config{Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit, AllowedOrigins: cfg.Web.AllowedOrigins, DebugErrors: cfg.Web.Error.Debug}, registry)
-	server := gateway.New(gateway.Config{Host: cfg.Gateway.Host, Port: cfg.Gateway.Port, Open: cfg.Gateway.Open, Dev: cfg.Gateway.Dev, Logger: logger.Slog, LocalHandler: localServer})
-	client := agent.New(agent.Config{GatewayURL: cfg.Agent.GatewayURL, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})
+	localHandler := localapi.New(localapi.Config{AllowedOrigins: cfg.Web.AllowedOrigins, DebugErrors: cfg.Web.Error.Debug}, registry)
+	gatewayHandler := gatewayapi.New(gatewayapi.Config{})
+	server := httpserver.New(httpserver.Config{Host: cfg.Serve.Host, Port: cfg.Serve.Port, Open: cfg.Serve.Open, Dev: cfg.Serve.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit}, localHandler, gatewayHandler)
+	client := agent.New(agent.Config{ServerURL: cfg.Agent.ServerURL, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})
 
 	serveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	gatewayReady := make(chan struct{})
+	backendReady := make(chan struct{})
 	errCh := make(chan error, 2)
 
 	go func() {
-		err := runGatewayServer(serveCtx, server, func(info gateway.Info) {
+		err := runBackendServer(serveCtx, server, func(info httpserver.Info) {
 			fmt.Fprintf(stdout, "TermBridge serve listening on %s\n", info.URL)
-			if cfg.Gateway.Dev {
-				fmt.Fprintln(stdout, "Dev mode enabled for Gateway service.")
+			if cfg.Serve.Dev {
+				fmt.Fprintln(stdout, "Dev mode enabled for unified backend.")
 			}
-			close(gatewayReady)
+			close(backendReady)
 		})
 		errCh <- normalizeServeError(err)
 	}()
 
 	select {
-	case <-gatewayReady:
+	case <-backendReady:
 	case err := <-errCh:
 		cancel()
 		if err != nil {
@@ -315,7 +275,7 @@ func runServe(ctx context.Context, cfg config.Config, logger *logging.Logger, op
 		return Result{Cwd: cfg.Cwd}, nil
 	}
 
-	fmt.Fprintf(stdout, "TermBridge agent connector targeting %s\n", cfg.Agent.GatewayURL)
+	fmt.Fprintf(stdout, "TermBridge agent connector targeting %s\n", cfg.Agent.ServerURL)
 	go func() {
 		errCh <- normalizeServeError(runAgentClient(serveCtx, client))
 	}()
@@ -340,8 +300,8 @@ func normalizeServeError(err error) error {
 	return err
 }
 
-func newWebTerminalRegistry(cfg config.Config, logger *logging.Logger) *webterminal.Registry {
-	return webterminal.NewRegistry(webterminal.Config{
+func newWebTerminalRegistry(cfg config.Config, logger *logging.Logger) *terminalapp.Registry {
+	return terminalapp.NewRegistry(terminalapp.Config{
 		Cwd:         cfg.Cwd,
 		Store:       state.NewStore(cfg.Runtime.StateDir),
 		LogDir:      cfg.LogDir,

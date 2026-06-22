@@ -21,12 +21,12 @@ web:
   error:
     debug: false
 
-gateway:
+serve:
   host: 127.0.0.1
   port: 9010
   open: false
   dev: false
 
 agent:
-  gateway_url: http://127.0.0.1:9010
+  server_url: http://127.0.0.1:9010
   device_name: local-dev

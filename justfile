@@ -49,6 +49,6 @@ exec *args:
 web:
     cd web && yarn dev
 
-# Start unified backend: local Web API, Gateway service, and Agent connector
+# Start unified backend with Air hot reload
 serve:
-    go run cmd/termbridge/main.go serve
+    air -c .air.toml

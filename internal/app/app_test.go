@@ -11,13 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"termbridge-go/internal/agent"
-	apperrors "termbridge-go/internal/errors"
-	"termbridge-go/internal/gateway"
-	"termbridge-go/internal/logging"
-	"termbridge-go/internal/process"
-	"termbridge-go/internal/runner"
-	"termbridge-go/internal/webserver"
+	"termbridge-go/internal/application/agent"
+	"termbridge-go/internal/application/runner"
+	"termbridge-go/internal/domain/process"
+	apperrors "termbridge-go/internal/infrastructure/errors"
+	"termbridge-go/internal/infrastructure/logging"
+	httpserver "termbridge-go/internal/transport/http/server"
 )
 
 func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
@@ -94,57 +93,27 @@ func TestRunReturnsRuntimeErrorFromRunnerAndMarksFailed(t *testing.T) {
 	}
 }
 
-func TestRunWebStartsServerWithConfiguredRuntime(t *testing.T) {
+func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	oldRunWebServer := runWebServer
-	defer func() { runWebServer = oldRunWebServer }()
-	var gotServer *webserver.Server
-	runWebServer = func(ctx context.Context, server *webserver.Server, onListening func(webserver.Info)) error {
-		gotServer = server
-		onListening(webserver.Info{URL: "http://127.0.0.1:12345"})
-		return context.Canceled
-	}
-	stdout := &bytes.Buffer{}
-	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandWeb, Web: WebCommand{Host: "127.0.0.1", Port: 0, Dev: true}}, Stdout: stdout, Stderr: &bytes.Buffer{}})
-	if err != nil {
-		t.Fatalf("Run(web) error = %v", err)
-	}
-	if filepath.Clean(result.Cwd) != filepath.Clean(cwd) {
-		t.Fatalf("Result.Cwd = %q, want %q", result.Cwd, cwd)
-	}
-	if gotServer == nil {
-		t.Fatal("runWebServer was not called")
-	}
-	if !strings.Contains(stdout.String(), "http://127.0.0.1:12345") || !strings.Contains(stdout.String(), "Dev mode enabled") {
-		t.Fatalf("stdout = %s", stdout.String())
-	}
-}
-
-func TestRunServeStartsGatewayAndAgentFromConfig(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	cwd := t.TempDir()
-	writeDefaultConfig(t, cwd)
-	configContent := "gateway:\n  host: 127.0.0.1\n  port: 9090\n  dev: true\nagent:\n  gateway_url: http://127.0.0.1:9090\n  device_name: local-mac\n"
+	configContent := "serve:\n  host: 127.0.0.1\n  port: 9090\n  dev: true\nagent:\n  server_url: http://127.0.0.1:9090\n  device_name: local-mac\n"
 	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
 		t.Fatalf("WriteFile(config) error = %v", err)
 	}
-	oldRunGatewayServer := runGatewayServer
+	oldRunBackendServer := runBackendServer
 	oldRunAgentClient := runAgentClient
 	defer func() {
-		runGatewayServer = oldRunGatewayServer
+		runBackendServer = oldRunBackendServer
 		runAgentClient = oldRunAgentClient
 	}()
-	var gotServer *gateway.Server
+	var gotServer *httpserver.Server
 	var gotClient *agent.Client
-	runGatewayServer = func(ctx context.Context, server *gateway.Server, onListening func(gateway.Info)) error {
+	runBackendServer = func(ctx context.Context, server *httpserver.Server, onListening func(httpserver.Info)) error {
 		gotServer = server
-		onListening(gateway.Info{URL: "http://127.0.0.1:9090"})
+		onListening(httpserver.Info{URL: "http://127.0.0.1:9090"})
 		<-ctx.Done()
 		return ctx.Err()
 	}
@@ -161,18 +130,23 @@ func TestRunServeStartsGatewayAndAgentFromConfig(t *testing.T) {
 		t.Fatalf("Result.Cwd = %q, want %q", result.Cwd, cwd)
 	}
 	if gotServer == nil {
-		t.Fatal("runGatewayServer was not called")
+		t.Fatal("runBackendServer was not called")
 	}
 	localResponse := httptest.NewRecorder()
 	gotServer.ServeHTTP(localResponse, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if localResponse.Code != http.StatusOK || !strings.Contains(localResponse.Body.String(), `"status":"ok"`) {
-		t.Fatalf("local web API response = %d %s", localResponse.Code, localResponse.Body.String())
+		t.Fatalf("local API response = %d %s", localResponse.Code, localResponse.Body.String())
+	}
+	gatewayResponse := httptest.NewRecorder()
+	gotServer.ServeHTTP(gatewayResponse, httptest.NewRequest(http.MethodGet, "/api/gateway/health", nil))
+	if gatewayResponse.Code != http.StatusOK || !strings.Contains(gatewayResponse.Body.String(), `"status":"ok"`) {
+		t.Fatalf("gateway API response = %d %s", gatewayResponse.Code, gatewayResponse.Body.String())
 	}
 	if gotClient == nil {
 		t.Fatal("runAgentClient was not called")
 	}
 	gotConfig := gotClient.Config()
-	if gotConfig.GatewayURL != "http://127.0.0.1:9090" || gotConfig.DeviceName != "local-mac" {
+	if gotConfig.ServerURL != "http://127.0.0.1:9090" || gotConfig.DeviceName != "local-mac" {
 		t.Fatalf("agent config = %#v", gotConfig)
 	}
 	out := stdout.String()
