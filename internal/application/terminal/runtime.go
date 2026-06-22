@@ -26,9 +26,10 @@ type SessionRuntime struct {
 	closed     bool
 	stopMode   process.StopMode
 	current    process.TerminalSize
+	done       chan struct{}
 }
 
-func newSessionRuntime(registry *Registry, sess session.Session, ptySession termpty.Session, historyWriter *history.Writer) *SessionRuntime {
+func newSessionRuntime(registry *Registry, sess session.Session, ptySession termpty.Session, historyWriter *history.Writer, initialSize process.TerminalSize) *SessionRuntime {
 	return &SessionRuntime{
 		registry:   registry,
 		session:    sess,
@@ -36,7 +37,8 @@ func newSessionRuntime(registry *Registry, sess session.Session, ptySession term
 		history:    historyWriter,
 		clients:    map[string]*Client{},
 		attachment: AttachmentUnattached,
-		current:    process.DefaultTerminalSize(),
+		current:    initialSize.OrDefault(),
+		done:       make(chan struct{}),
 	}
 }
 
@@ -172,18 +174,25 @@ func (r *SessionRuntime) detachClient(id string, reason string) {
 func (r *SessionRuntime) closeSession(reason string) error {
 	r.mu.Lock()
 	if r.closed {
+		done := r.done
 		r.mu.Unlock()
+		<-done
 		return nil
 	}
 	r.closed = true
 	r.stopMode = process.StopClose
 	clients := r.snapshotClientsLocked()
+	done := r.done
 	r.mu.Unlock()
 	_ = r.registry.store.SaveState(r.session.WorkspaceKey, r.session.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopping, Reason: reason, UpdatedAt: time.Now().UTC()})
 	for _, client := range clients {
 		client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeState, LifecycleState: string(session.StateStopping), AttachmentState: string(AttachmentDetached), Reason: reason}})
 	}
-	return r.pty.Close()
+	if err := r.pty.Close(); err != nil {
+		return err
+	}
+	<-done
+	return nil
 }
 
 func (r *SessionRuntime) readLoop() {
@@ -241,6 +250,7 @@ func (r *SessionRuntime) waitLoop() {
 	r.broadcastText(terminalproto.ServerMessage{Type: terminalproto.TypeExited, ExitCode: &exit.Code, State: string(session.StateStopped), LifecycleState: string(session.StateStopped), AttachmentState: string(AttachmentDetached)})
 	r.closeClients()
 	r.registry.removeRuntime(r.session.ID)
+	close(r.done)
 }
 
 func (r *SessionRuntime) publishBinary(chunk []byte) {

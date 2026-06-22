@@ -102,6 +102,35 @@ func TestCreateSessionPersistsRuntimeRecords(t *testing.T) {
 	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
 }
 
+func TestRuntimeInitialSizeMatchesCreatedPTYSize(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	client, err := registry.Attach(response.SessionId)
+	if err != nil {
+		t.Fatalf("Attach() error = %v", err)
+	}
+	if err := client.Resize(120, 32); err != nil {
+		t.Fatalf("Resize() error = %v", err)
+	}
+	if len(fake.resizes) != 0 {
+		t.Fatalf("resizes = %#v, want none for initial size", fake.resizes)
+	}
+	if err := client.Resize(121, 32); err != nil {
+		t.Fatalf("Resize() error = %v", err)
+	}
+	if len(fake.resizes) != 1 || fake.resizes[0] != (process.TerminalSize{Cols: 121, Rows: 32}) {
+		t.Fatalf("resizes = %#v, want 121x32", fake.resizes)
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+}
+
 func TestAttachDetachAndInput(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()
@@ -311,6 +340,29 @@ func TestDeleteWorkspaceProtectsRunningSessions(t *testing.T) {
 	}
 }
 
+func TestCloseSessionReturnsStoppedSummary(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	go func() {
+		<-fake.closeSignal
+		fake.finish(termpty.Result{ExitCode: 0})
+	}()
+
+	summary, err := registry.CloseSession(response.SessionId, "test_close")
+	if err != nil {
+		t.Fatalf("CloseSession() error = %v", err)
+	}
+	if summary.ID != response.SessionId || summary.LifecycleState != session.StateStopped {
+		t.Fatalf("summary = %#v, want stopped session %s", summary, response.SessionId)
+	}
+}
+
 func waitExit(t *testing.T, store state.Store, workspaceKey string, sessionId string) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -391,14 +443,16 @@ func (m *fakeManager) Start(ctx context.Context, spec process.ProcessSpec) (term
 }
 
 type fakeSession struct {
-	output  chan []byte
-	done    chan termpty.Result
-	written []byte
-	closed  bool
+	output      chan []byte
+	done        chan termpty.Result
+	closeSignal chan struct{}
+	written     []byte
+	resizes     []process.TerminalSize
+	closed      bool
 }
 
 func newFakeSession() *fakeSession {
-	return &fakeSession{output: make(chan []byte, 8), done: make(chan termpty.Result, 1)}
+	return &fakeSession{output: make(chan []byte, 8), done: make(chan termpty.Result, 1), closeSignal: make(chan struct{}, 1)}
 }
 
 func (s *fakeSession) Read(p []byte) (int, error) {
@@ -414,11 +468,21 @@ func (s *fakeSession) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (s *fakeSession) Resize(size process.TerminalSize) error { return nil }
-func (s *fakeSession) Interrupt() error                       { return nil }
-func (s *fakeSession) Close() error                           { s.closed = true; return nil }
-func (s *fakeSession) KillTree() error                        { return nil }
-func (s *fakeSession) Wait() termpty.Result                   { return <-s.done }
+func (s *fakeSession) Resize(size process.TerminalSize) error {
+	s.resizes = append(s.resizes, size)
+	return nil
+}
+func (s *fakeSession) Interrupt() error { return nil }
+func (s *fakeSession) Close() error {
+	s.closed = true
+	select {
+	case s.closeSignal <- struct{}{}:
+	default:
+	}
+	return nil
+}
+func (s *fakeSession) KillTree() error      { return nil }
+func (s *fakeSession) Wait() termpty.Result { return <-s.done }
 func (s *fakeSession) ProcessInfo() process.Record {
 	return process.Record{SchemaVersion: 1, PID: 123, OwnerPID: os.Getpid(), Executable: "go", CommandLine: "go version", Cwd: ".", StartedAt: time.Now().UTC()}
 }

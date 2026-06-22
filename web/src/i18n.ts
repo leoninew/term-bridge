@@ -17,8 +17,8 @@ export const messages = {
   'zh-CN': {
     common: {
       cancel: '取消',
-      create: '创建',
-      creating: '创建中…',
+      create: '新建',
+      creating: '新建中…',
       delete: '删除',
       deleting: '删除中…',
       rename: '重命名',
@@ -34,11 +34,12 @@ export const messages = {
       searchPlaceholder: '搜索',
       newSession: '新建会话',
       newSessionInWorkspaceAria: '在 {name} 中新建会话',
-      emptyWorkspaces: '还没有工作区。创建会话后会自动初始化。',
+      emptyWorkspaces: '还没有工作区。新建会话后会自动初始化。',
       noSessionsMatch: '没有会话匹配“{query}”。',
       noActiveSessions: '没有活跃会话。',
       removeWorkspaceAria: '移除 {name} 工作区',
       renameSessionAria: '重命名 {name} 会话',
+      stopSessionAria: '停止 {name} 会话',
       deleteSessionAria: '删除 {name} 会话',
     },
     gateway: {
@@ -92,8 +93,8 @@ export const messages = {
     },
     toast: {
       refreshFailed: '刷新失败',
-      createSessionFailed: '创建会话失败',
-      sessionCreated: '会话已创建',
+      createSessionFailed: '新建会话失败',
+      sessionCreated: '会话已新建',
       renameSessionFailed: '重命名会话失败',
       sessionRenamed: '会话已重命名',
       deleteSessionFailed: '删除会话失败',
@@ -106,12 +107,13 @@ export const messages = {
       directoryDeleteUnsupported: '不支持删除目录',
       terminalError: '终端错误：{code}',
       terminalConnectionFailed: '终端连接失败',
+      stopSessionFailed: '停止会话失败',
     },
     message: {
       sessionNameRequired: '会话名称为必填项。',
       workingDirectoryRequired: '工作目录为必填项。',
       commandRequired: '命令为必填项。',
-      createdSessionMissing: '会话已创建，但刷新后的会话列表中没有返回该会话。',
+      createdSessionMissing: '会话已新建，但刷新后的会话列表中没有返回该会话。',
       nameRequired: '名称为必填项。',
       workspaceRemoved: '{name} 记录已移除。磁盘上的文件没有被删除。',
       closeSessionBeforeDelete: '请先关闭终端会话再删除。',
@@ -143,6 +145,7 @@ export const messages = {
       noActiveSessions: 'No active sessions.',
       removeWorkspaceAria: 'Remove {name} workspace',
       renameSessionAria: 'Rename {name} session',
+      stopSessionAria: 'Stop {name} session',
       deleteSessionAria: 'Delete {name} session',
     },
     gateway: {
@@ -214,6 +217,7 @@ export const messages = {
       directoryDeleteUnsupported: 'Directory delete is not supported',
       terminalError: 'Terminal error: {code}',
       terminalConnectionFailed: 'Terminal connection failed',
+      stopSessionFailed: 'Stop session failed',
     },
     message: {
       sessionNameRequired: 'Session name is required.',

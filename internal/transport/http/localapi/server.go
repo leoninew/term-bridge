@@ -248,11 +248,12 @@ func (s *Handler) handleSession(w http.ResponseWriter, r *http.Request) {
 			methodNotAllowed(w)
 			return
 		}
-		if err := s.registry.CloseSession(sessionId, "api_close"); err != nil {
+		summary, err := s.registry.CloseSession(sessionId, "api_close")
+		if err != nil {
 			s.writeError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"state": "closing"})
+		writeJSON(w, http.StatusOK, summary)
 	case "history":
 		if r.Method != http.MethodGet {
 			methodNotAllowed(w)

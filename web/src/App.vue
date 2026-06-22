@@ -79,6 +79,7 @@
           @refresh="refresh"
           @new-session="openCreateSessionForm"
           @rename-session="openRenameDialog"
+          @stop-session="stopSessionFromSidebar"
           @delete-session="openDeleteSessionDialog"
           @remove-workspace="openRemoveWorkspaceDialog"
           @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
@@ -134,6 +135,7 @@
                       :aria-label="
                         t('workbench.closeTabAria', { name: sessionTitle(tab.sessionId) })
                       "
+                      :title="t('workbench.closeTabAria', { name: sessionTitle(tab.sessionId) })"
                       @click.stop="closeTab(tab.sessionId)"
                     >
                       <X class="size-3.5" />
@@ -408,7 +410,7 @@
       <ToastDescription v-if="toast.description" class="toast-description">
         {{ toast.description }}
       </ToastDescription>
-      <ToastClose class="toast-close">×</ToastClose>
+      <ToastClose class="toast-close" :aria-label="t('common.close')" />
     </ToastRoot>
     <ToastViewport class="toast-viewport" />
   </ToastProvider>
@@ -461,6 +463,7 @@
   } from './protocol/terminal'
   import { commandFromText } from './protocol/terminal'
   import {
+    closeSession,
     createSession,
     deleteSession,
     getSession,
@@ -698,6 +701,7 @@
       if (!upsertSessionInState(session)) {
         await refresh()
       }
+      resetCreateSessionForm()
       createSessionFormOpen.value = false
       await openSessionTab(session)
       pushToast('success', t('toast.sessionCreated'), sessionDisplayName(session))
@@ -885,12 +889,7 @@
       workspacePath: workspace?.path,
       activeTabId: activeTabId.value,
     })
-    if (workspace) {
-      cwd.value = workspace.path
-    }
-    if (!sessionName.value.trim()) {
-      sessionName.value = commandText.value.trim()
-    }
+    resetCreateSessionForm(workspace)
     createSessionFormOpen.value = true
     void nextTick(() => {
       sessionNameInput.value?.focus()
@@ -901,6 +900,12 @@
   function cancelCreateSession() {
     logTerminalDiagnostic('session.form.cancel', { activeTabId: activeTabId.value })
     createSessionFormOpen.value = false
+  }
+
+  function resetCreateSessionForm(workspace?: WorkspaceSummary) {
+    commandText.value = 'zsh'
+    cwd.value = workspace?.path ?? ''
+    sessionName.value = commandText.value
   }
 
   function openRenameDialog(session: SessionSummary) {
@@ -914,6 +919,22 @@
       renameInput.value?.focus()
       renameInput.value?.select()
     })
+  }
+
+  async function stopSessionFromSidebar(session: SessionSummary) {
+    if (!ensureMutationAllowed()) {
+      return
+    }
+    if (!isStoppableLifecycle(session)) {
+      return
+    }
+    try {
+      const updated = await closeSession(session.id)
+      updateSessionInState(updated)
+      await ensureHistoryLoaded(session.id)
+    } catch (err) {
+      notifyError(t('toast.stopSessionFailed'), err)
+    }
   }
 
   function openDeleteSessionDialog(session: SessionSummary) {
@@ -1073,6 +1094,10 @@
     return ['running', 'starting', 'stopping'].includes(session.lifecycle_state)
   }
 
+  function isStoppableLifecycle(session: SessionSummary) {
+    return ['running', 'starting'].includes(session.lifecycle_state)
+  }
+
   function terminalWsUrl(sessionId: string) {
     return activeBackend.value.terminalWsUrl(sessionId)
   }
@@ -1094,8 +1119,7 @@
     }
   }
 
-  async function refreshActiveSession() {
-    const sessionId = activeTabId.value
+  async function refreshActiveSession(sessionId = activeTabId.value) {
     if (!sessionId || isGatewayBackend.value) {
       return
     }

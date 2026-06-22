@@ -312,7 +312,7 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 	if r.logger != nil {
 		r.logger.Info("terminal pty started", "session_id", sess.ID, "workspace_id", sess.WorkspaceId)
 	}
-	runtime := newSessionRuntime(r, sess, ptySession, historyWriter)
+	runtime := newSessionRuntime(r, sess, ptySession, historyWriter, size)
 	r.mu.Lock()
 	r.runtimes[sess.ID] = runtime
 	r.mu.Unlock()
@@ -331,14 +331,17 @@ func (r *Registry) Attach(sessionId string) (*Client, error) {
 	return runtime.attach()
 }
 
-func (r *Registry) CloseSession(sessionId string, reason string) error {
+func (r *Registry) CloseSession(sessionId string, reason string) (SessionSummary, error) {
 	r.mu.Lock()
 	runtime := r.runtimes[sessionId]
 	r.mu.Unlock()
 	if runtime == nil {
-		return apperrors.Runtime("session not closable", fmt.Errorf("live PTY handle not found for %s", sessionId))
+		return SessionSummary{}, apperrors.Runtime("session not closable", fmt.Errorf("live PTY handle not found for %s", sessionId))
 	}
-	return runtime.closeSession(reason)
+	if err := runtime.closeSession(reason); err != nil {
+		return SessionSummary{}, err
+	}
+	return r.GetSession(sessionId)
 }
 
 func (r *Registry) ListWorkspaces() ([]WorkspaceSummary, error) {

@@ -66,13 +66,14 @@ export async function readHistory(sessionId: string): Promise<string> {
   return response.text()
 }
 
-export async function closeSession(sessionId: string): Promise<void> {
+export async function closeSession(sessionId: string): Promise<SessionSummary> {
   const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/close`, {
     method: 'POST',
   })
   if (!response.ok) {
     throw new Error(await responseError('Close session failed', response))
   }
+  return (await response.json()) as SessionSummary
 }
 
 export async function responseError(prefix: string, response: Response): Promise<string> {

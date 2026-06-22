@@ -19,6 +19,7 @@
           type="button"
           class="flex size-8 shrink-0 items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
           :aria-label="t('sidebar.newSession')"
+          :title="t('sidebar.newSession')"
           @click="emit('newSession')"
         >
           <Plus class="size-4" />
@@ -82,6 +83,7 @@
                 type="button"
                 class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
                 :aria-label="t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })"
+                :title="t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })"
                 @click.stop="emit('newSession', workspace.workspace)"
               >
                 <Plus class="size-3.5" />
@@ -90,6 +92,7 @@
                 type="button"
                 class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
                 :aria-label="t('sidebar.removeWorkspaceAria', { name: workspace.workspace.name })"
+                :title="t('sidebar.removeWorkspaceAria', { name: workspace.workspace.name })"
                 @click.stop="emit('removeWorkspace', workspace.workspace)"
               >
                 <Trash2 class="size-3.5" />
@@ -130,24 +133,52 @@
                       name: session.session.name || session.session.command,
                     })
                   "
+                  :title="
+                    t('sidebar.renameSessionAria', {
+                      name: session.session.name || session.session.command,
+                    })
+                  "
                   @click.stop="emit('renameSession', session.session)"
                 >
                   <Pencil class="size-3.5" />
                 </button>
-                <button
-                  v-if="canDeleteSession(session.session)"
-                  type="button"
-                  class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
-                  :aria-label="
-                    t('sidebar.deleteSessionAria', {
-                      name: session.session.name || session.session.command,
-                    })
-                  "
-                  @click.stop="emit('deleteSession', session.session)"
-                >
-                  <Trash2 class="size-3.5" />
-                </button>
               </span>
+              <button
+                v-if="props.allowMutations && canStopSession(session.session)"
+                type="button"
+                class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
+                :aria-label="
+                  t('sidebar.stopSessionAria', {
+                    name: session.session.name || session.session.command,
+                  })
+                "
+                :title="
+                  t('sidebar.stopSessionAria', {
+                    name: session.session.name || session.session.command,
+                  })
+                "
+                @click.stop="emit('stopSession', session.session)"
+              >
+                <CircleStop class="size-3.5" />
+              </button>
+              <button
+                v-if="props.allowMutations && canDeleteSession(session.session)"
+                type="button"
+                class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
+                :aria-label="
+                  t('sidebar.deleteSessionAria', {
+                    name: session.session.name || session.session.command,
+                  })
+                "
+                :title="
+                  t('sidebar.deleteSessionAria', {
+                    name: session.session.name || session.session.command,
+                  })
+                "
+                @click.stop="emit('deleteSession', session.session)"
+              >
+                <Trash2 class="size-3.5" />
+              </button>
             </div>
           </template>
         </div>
@@ -215,6 +246,7 @@
   import {
     Check,
     ChevronRight,
+    CircleStop,
     Folder,
     FolderOpen,
     Pencil,
@@ -267,6 +299,7 @@
     refresh: []
     newSession: [workspace?: WorkspaceSummary]
     renameSession: [session: SessionSummary]
+    stopSession: [session: SessionSummary]
     deleteSession: [session: SessionSummary]
     removeWorkspace: [workspace: WorkspaceSummary]
     unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
@@ -362,6 +395,10 @@
 
   function isActiveSession(session: SessionSummary) {
     return ['starting', 'running', 'stopping'].includes(session.lifecycle_state)
+  }
+
+  function canStopSession(session: SessionSummary) {
+    return ['starting', 'running'].includes(session.lifecycle_state)
   }
 
   function canDeleteSession(session: SessionSummary) {
