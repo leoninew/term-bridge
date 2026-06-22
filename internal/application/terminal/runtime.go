@@ -127,6 +127,15 @@ func (r *SessionRuntime) attachmentState() AttachmentState {
 	return r.attachment
 }
 
+func (r *SessionRuntime) lifecycleState() session.State {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return session.StateStopping
+	}
+	return session.StateRunning
+}
+
 func (r *SessionRuntime) writeInput(data []byte) error {
 	if len(data) > terminalproto.MaxBinaryFrameBytes {
 		return fmt.Errorf("binary frame too large: %d bytes", len(data))

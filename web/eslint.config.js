@@ -24,6 +24,7 @@ export default tseslint.config(
       globals: {
         console: 'readonly',
         window: 'readonly',
+        document: 'readonly',
         WebSocket: 'readonly',
         TextEncoder: 'readonly',
         Uint8Array: 'readonly',

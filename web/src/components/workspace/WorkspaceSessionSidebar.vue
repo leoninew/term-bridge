@@ -91,8 +91,9 @@
               <button
                 type="button"
                 class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
-                :aria-label="t('sidebar.removeWorkspaceAria', { name: workspace.workspace.name })"
-                :title="t('sidebar.removeWorkspaceAria', { name: workspace.workspace.name })"
+                :aria-label="removeWorkspaceLabel(workspace)"
+                :title="removeWorkspaceLabel(workspace)"
+                :disabled="!canRemoveWorkspace(workspace)"
                 @click.stop="emit('removeWorkspace', workspace.workspace)"
               >
                 <Trash2 class="size-3.5" />
@@ -403,6 +404,17 @@
 
   function canDeleteSession(session: SessionSummary) {
     return ['stopped', 'failed'].includes(session.lifecycle_state)
+  }
+
+  function canRemoveWorkspace(workspace: WorkspaceTreeItem) {
+    return workspace.children.every((child) => !isActiveSession(child.session))
+  }
+
+  function removeWorkspaceLabel(workspace: WorkspaceTreeItem) {
+    if (canRemoveWorkspace(workspace)) {
+      return t('sidebar.removeWorkspaceAria', { name: workspace.workspace.name })
+    }
+    return t('sidebar.removeWorkspaceDisabledAria', { name: workspace.workspace.name })
   }
 
   function sessionsFor(workspace: WorkspaceTreeSummary): SessionSummary[] {

@@ -221,6 +221,34 @@ func TestSlowClientDetachDoesNotStopRuntimeOrHistory(t *testing.T) {
 	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
 }
 
+func TestRuntimeSummaryOverridesStaleFailedState(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	store := state.NewStore(root)
+	registry := NewRegistry(Config{Cwd: cwd, Store: store, LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	if err := store.SaveState(response.WorkspaceKey, response.SessionId, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "stale_process_unverified", UpdatedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("SaveState() error = %v", err)
+	}
+
+	tree, err := registry.WorkspaceTree()
+	if err != nil {
+		t.Fatalf("WorkspaceTree() error = %v", err)
+	}
+	if got := tree[0].Children[0].LifecycleState; got != session.StateRunning {
+		t.Fatalf("LifecycleState = %q, want running", got)
+	}
+	if err := registry.DeleteSession(response.SessionId); err == nil {
+		t.Fatal("DeleteSession() error = nil, want running session rejection")
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, store, response.WorkspaceKey, response.SessionId)
+}
+
 func TestCreateSessionRequiresName(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()

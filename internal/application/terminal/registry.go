@@ -606,9 +606,11 @@ func (r *Registry) summariesFromViews(views []session.View) []SessionSummary {
 	recoverer := session.Recoverer{Store: r.store}
 	out := make([]SessionSummary, 0, len(views))
 	for _, view := range views {
-		refreshed, err := recoverer.Refresh(view)
-		if err == nil {
-			view = refreshed
+		if !r.hasRuntime(view.Session.ID) {
+			refreshed, err := recoverer.Refresh(view)
+			if err == nil {
+				view = refreshed
+			}
 		}
 		out = append(out, r.summaryFromView(view))
 	}
@@ -641,9 +643,11 @@ func summaryFromWorkspace(ws workspace.Workspace) WorkspaceSummary {
 
 func (r *Registry) summaryFromView(view session.View) SessionSummary {
 	attachment := AttachmentUnattached
+	lifecycleState := view.State.State
 	r.mu.Lock()
 	if runtime := r.runtimes[view.Session.ID]; runtime != nil {
 		attachment = runtime.attachmentState()
+		lifecycleState = runtime.lifecycleState()
 	}
 	r.mu.Unlock()
 	return SessionSummary{
@@ -653,7 +657,7 @@ func (r *Registry) summaryFromView(view session.View) SessionSummary {
 		WorkspaceKey:    view.Session.WorkspaceKey,
 		Command:         view.CommandText,
 		Cwd:             view.Session.LaunchCwd,
-		LifecycleState:  view.State.State,
+		LifecycleState:  lifecycleState,
 		AttachmentState: attachment,
 		ExitCode:        view.ExitCode,
 		UpdatedAt:       view.Session.UpdatedAt,
