@@ -58,6 +58,9 @@ func (r *SessionRuntime) attach() (*Client, error) {
 	}
 	client := &Client{id: id, runtime: r, queue: make(chan Outbound, r.registry.clientQueueSize)}
 	attachment := AttachmentAttached
+	if r.registry.logger != nil {
+		r.registry.logger.Info("terminal attach start", "session_id", r.session.ID, "client_id", id, "current_cols", r.current.Cols, "current_rows", r.current.Rows)
+	}
 	r.mu.Unlock()
 
 	if err := r.enqueueReplay(client, attachment); err != nil {
@@ -73,11 +76,17 @@ func (r *SessionRuntime) attach() (*Client, error) {
 	}
 	r.clients[id] = client
 	r.attachment = attachment
+	if r.registry.logger != nil {
+		r.registry.logger.Info("terminal attach live", "session_id", r.session.ID, "client_id", id, "clients", len(r.clients))
+	}
 	r.mu.Unlock()
 	return client, nil
 }
 
 func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentState) error {
+	if r.registry.logger != nil {
+		r.registry.logger.Info("terminal replay enqueue start", "session_id", r.session.ID, "client_id", client.ID())
+	}
 	if !client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeStarted, SessionId: r.session.ID, WorkspaceId: r.session.WorkspaceId, WorkspaceKey: r.session.WorkspaceKey, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(attachment)}}) {
 		return fmt.Errorf("client queue full")
 	}
@@ -93,6 +102,9 @@ func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentStat
 		return err
 	}
 	if len(data) > 0 {
+		if r.registry.logger != nil {
+			r.registry.logger.Info("terminal replay enqueue history", "session_id", r.session.ID, "client_id", client.ID(), "bytes", len(data))
+		}
 		if !client.enqueue(Outbound{Kind: OutboundBinary, Binary: data}) {
 			return fmt.Errorf("client queue full")
 		}
@@ -100,6 +112,9 @@ func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentStat
 	truncated := false
 	if !client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeReplayFinished, Truncated: &truncated}}) {
 		return fmt.Errorf("client queue full")
+	}
+	if r.registry.logger != nil {
+		r.registry.logger.Info("terminal replay enqueue finish", "session_id", r.session.ID, "client_id", client.ID(), "queued_bytes", client.QueuedBytes())
 	}
 	return nil
 }
@@ -124,12 +139,16 @@ func (r *SessionRuntime) resize(cols int, rows int) error {
 	}
 	size := process.TerminalSize{Cols: cols, Rows: rows}
 	r.mu.Lock()
+	previous := r.current
 	if r.current == size {
 		r.mu.Unlock()
 		return nil
 	}
 	r.current = size
 	r.mu.Unlock()
+	if r.registry.logger != nil {
+		r.registry.logger.Info("terminal pty resize", "session_id", r.session.ID, "previous_cols", previous.Cols, "previous_rows", previous.Rows, "cols", size.Cols, "rows", size.Rows)
+	}
 	return r.pty.Resize(size)
 }
 

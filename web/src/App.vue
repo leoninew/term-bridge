@@ -451,6 +451,7 @@
   } from 'reka-ui'
   import HistoryTerminalView from './components/terminal/HistoryTerminalView.vue'
   import TerminalView from './components/terminal/TerminalView.vue'
+  import { logTerminalDiagnostic } from './components/terminal/diagnostics'
   import WorkspaceSessionSidebar from './components/workspace/WorkspaceSessionSidebar.vue'
   import type {
     ServerControlMessage,
@@ -667,6 +668,14 @@
     creatingSession.value = true
     try {
       const size = estimateTerminalSize()
+      logTerminalDiagnostic('session.create.request', {
+        name,
+        cwd: trimmedCwd,
+        command: command[0],
+        args: command.length - 1,
+        cols: size.cols,
+        rows: size.rows,
+      })
       const created = await createSession({
         name,
         cwd: trimmedCwd,
@@ -674,7 +683,18 @@
         cols: size.cols,
         rows: size.rows,
       })
+      logTerminalDiagnostic('session.create.response', {
+        sessionId: created.session_id,
+        workspaceId: created.workspace_id,
+        state: created.state,
+      })
       const session = await getSession(created.session_id)
+      logTerminalDiagnostic('session.create.summary', {
+        sessionId: session.id,
+        lifecycleState: session.lifecycle_state,
+        attachmentState: session.attachment_state,
+        exitCode: session.exit_code,
+      })
       if (!upsertSessionInState(session)) {
         await refresh()
       }
@@ -860,6 +880,11 @@
     if (!ensureMutationAllowed()) {
       return
     }
+    logTerminalDiagnostic('session.form.open', {
+      workspaceId: workspace?.id,
+      workspacePath: workspace?.path,
+      activeTabId: activeTabId.value,
+    })
     if (workspace) {
       cwd.value = workspace.path
     }
@@ -874,6 +899,7 @@
   }
 
   function cancelCreateSession() {
+    logTerminalDiagnostic('session.form.cancel', { activeTabId: activeTabId.value })
     createSessionFormOpen.value = false
   }
 

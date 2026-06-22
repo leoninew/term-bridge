@@ -71,6 +71,7 @@
       (data) => socket.sendInput(data),
       (data) => socket.sendBinary(data),
       (cols, rows) => socket.sendControl({ type: 'resize', cols, rows }),
+      { source: 'live', sessionId: props.sessionId },
     )
     if (terminalElement.value) {
       xterm.open(terminalElement.value)

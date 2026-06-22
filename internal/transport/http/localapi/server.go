@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -18,15 +20,18 @@ import (
 type Config struct {
 	AllowedOrigins []string
 	DebugErrors    bool
+	Logger         *slog.Logger
 }
 
 type Handler struct {
 	config   Config
 	registry *terminalapp.Registry
+	logger   *slog.Logger
 }
 
 func New(config Config, registry *terminalapp.Registry) *Handler {
-	return &Handler{config: normalizeConfig(config), registry: registry}
+	config = normalizeConfig(config)
+	return &Handler{config: config, registry: registry, logger: config.Logger}
 }
 
 func (h *Handler) Handler() http.Handler {
@@ -279,9 +284,11 @@ func (s *Handler) handleWebSocket(w http.ResponseWriter, r *http.Request, sessio
 	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{terminalproto.Subprotocol}, OriginPatterns: s.originPatterns(r)})
 	if err != nil {
+		s.logger.Info("terminal websocket accept failed", "session_id", sessionId, "client_id", client.ID(), "error", err)
 		client.Detach("websocket_accept_failed")
 		return
 	}
+	s.logger.Info("terminal websocket accepted", "session_id", sessionId, "client_id", client.ID(), "remote", r.RemoteAddr)
 	conn.SetReadLimit(terminalproto.MaxBinaryFrameBytes)
 	defer conn.Close(websocket.StatusNormalClosure, "closed")
 	s.serveWebSocket(r.Context(), conn, client)
@@ -299,6 +306,12 @@ func (s *Handler) serveWebSocket(ctx context.Context, conn *websocket.Conn, clie
 			switch outbound.Kind {
 			case terminalapp.OutboundBinary:
 				err = conn.Write(writeCtx, websocket.MessageBinary, outbound.Binary)
+				if err == nil {
+					chunks, totalBytes := client.MarkBinarySent(len(outbound.Binary))
+					if chunks <= 5 || chunks%50 == 0 {
+						s.logger.Info("terminal websocket binary sent", "session_id", client.SessionID(), "client_id", client.ID(), "chunk_bytes", len(outbound.Binary), "chunks", chunks, "total_bytes", totalBytes, "queued_bytes", client.QueuedBytes())
+					}
+				}
 			case terminalapp.OutboundText:
 				data, encodeErr := terminalproto.EncodeServer(outbound.Text)
 				if encodeErr != nil {
@@ -310,6 +323,7 @@ func (s *Handler) serveWebSocket(ctx context.Context, conn *websocket.Conn, clie
 			writeCancel()
 			client.MarkSent(outbound)
 			if err != nil {
+				s.logger.Info("terminal websocket write failed", "session_id", client.SessionID(), "client_id", client.ID(), "kind", outbound.Kind, "error", err)
 				client.Detach("websocket_write_failed")
 				return
 			}
@@ -318,6 +332,7 @@ func (s *Handler) serveWebSocket(ctx context.Context, conn *websocket.Conn, clie
 	for {
 		messageType, data, err := conn.Read(ctx)
 		if err != nil {
+			s.logger.Info("terminal websocket read closed", "session_id", client.SessionID(), "client_id", client.ID(), "error", err)
 			client.Detach("client_disconnected")
 			cancel()
 			<-writerDone
@@ -355,6 +370,7 @@ func (s *Handler) handleControl(client *terminalapp.Client, message terminalprot
 	case terminalproto.TypeHello:
 		return true
 	case terminalproto.TypeResize:
+		s.logger.Info("terminal resize received", "session_id", client.SessionID(), "client_id", client.ID(), "cols", message.Cols, "rows", message.Rows)
 		if err := client.Resize(message.Cols, message.Rows); err != nil {
 			client.SendControl(s.protocolError("resize_failed", "resize failed", err))
 		}
@@ -468,5 +484,8 @@ func methodNotAllowed(w http.ResponseWriter) {
 }
 
 func normalizeConfig(config Config) Config {
+	if config.Logger == nil {
+		config.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
 	return config
 }

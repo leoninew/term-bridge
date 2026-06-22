@@ -241,7 +241,7 @@ func runServe(ctx context.Context, cfg config.Config, logger *logging.Logger, op
 		stdout = io.Discard
 	}
 	registry := newWebTerminalRegistry(cfg, logger)
-	localHandler := localapi.New(localapi.Config{AllowedOrigins: cfg.Web.AllowedOrigins, DebugErrors: cfg.Web.Error.Debug}, registry)
+	localHandler := localapi.New(localapi.Config{AllowedOrigins: cfg.Web.AllowedOrigins, DebugErrors: cfg.Web.Error.Debug, Logger: logger.Slog}, registry)
 	gatewayHandler := gatewayapi.New(gatewayapi.Config{})
 	server := httpserver.New(httpserver.Config{Host: cfg.Serve.Host, Port: cfg.Serve.Port, Open: cfg.Serve.Open, Dev: cfg.Serve.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit}, localHandler, gatewayHandler)
 	client := agent.New(agent.Config{ServerURL: cfg.Agent.ServerURL, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})

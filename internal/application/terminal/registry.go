@@ -167,12 +167,14 @@ type Outbound struct {
 }
 
 type Client struct {
-	id          string
-	runtime     *SessionRuntime
-	queue       chan Outbound
-	once        sync.Once
-	mu          sync.Mutex
-	queuedBytes int
+	id               string
+	runtime          *SessionRuntime
+	queue            chan Outbound
+	once             sync.Once
+	mu               sync.Mutex
+	queuedBytes      int
+	sentBinaryChunks int
+	sentBinaryBytes  int64
 }
 
 func NewRegistry(config Config) *Registry {
@@ -223,6 +225,9 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 	size := process.TerminalSize{Cols: request.Cols, Rows: request.Rows}.OrDefault()
 	if err := terminalproto.ValidateSize(size.Cols, size.Rows); err != nil {
 		return CreateSessionResponse{}, apperrors.Usage(err.Error())
+	}
+	if r.logger != nil {
+		r.logger.Info("terminal session create request", "name", name, "cwd", absCwd, "command", strings.Join(request.Command, " "), "cols", size.Cols, "rows", size.Rows)
 	}
 
 	resolver := workspace.Resolver{Store: r.store, IDs: r.ids}
@@ -281,6 +286,9 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 	}
 	spec = spec.WithResolvedCommand(resolved)
 
+	if r.logger != nil {
+		r.logger.Info("terminal pty start", "session_id", sess.ID, "workspace_id", sess.WorkspaceId, "cols", spec.InitialSize.Cols, "rows", spec.InitialSize.Rows, "command", spec.EffectiveCommand())
+	}
 	ptySession, err := r.manager.Start(ctx, spec)
 	if err != nil {
 		_ = historyWriter.Close()
@@ -301,6 +309,9 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 		return CreateSessionResponse{}, apperrors.Runtime("save running state", err)
 	}
 
+	if r.logger != nil {
+		r.logger.Info("terminal pty started", "session_id", sess.ID, "workspace_id", sess.WorkspaceId)
+	}
 	runtime := newSessionRuntime(r, sess, ptySession, historyWriter)
 	r.mu.Lock()
 	r.runtimes[sess.ID] = runtime
@@ -691,6 +702,28 @@ func (c *Client) enqueue(outbound Outbound) bool {
 
 func (c *Client) MarkSent(outbound Outbound) {
 	c.markSent(outbound)
+}
+
+func (c *Client) ID() string {
+	return c.id
+}
+
+func (c *Client) SessionID() string {
+	return c.runtime.session.ID
+}
+
+func (c *Client) QueuedBytes() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.queuedBytes
+}
+
+func (c *Client) MarkBinarySent(bytes int) (chunks int, totalBytes int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sentBinaryChunks++
+	c.sentBinaryBytes += int64(bytes)
+	return c.sentBinaryChunks, c.sentBinaryBytes
 }
 
 func (c *Client) markSent(outbound Outbound) {

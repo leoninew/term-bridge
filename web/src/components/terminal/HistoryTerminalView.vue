@@ -27,6 +27,7 @@
       () => undefined,
       () => undefined,
       () => undefined,
+      { source: 'history' },
     )
     if (terminalElement.value) {
       xterm.open(terminalElement.value)
