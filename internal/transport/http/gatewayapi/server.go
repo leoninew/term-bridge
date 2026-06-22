@@ -295,6 +295,7 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+	conn.SetReadLimit(tunnel.MaxFrameBytes)
 	defer conn.Close(websocket.StatusNormalClosure, "")
 	_, data, err := conn.Read(r.Context())
 	if err != nil {

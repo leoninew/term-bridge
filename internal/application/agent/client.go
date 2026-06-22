@@ -45,6 +45,7 @@ func (c *Client) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	conn.SetReadLimit(tunnel.MaxFrameBytes)
 	defer conn.Close(websocket.StatusNormalClosure, "")
 	go func() {
 		<-ctx.Done()

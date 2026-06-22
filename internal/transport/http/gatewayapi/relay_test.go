@@ -34,7 +34,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 			case "sessions":
 				return rawResponse(`[{"id":"sess-1","name":"Session"}]`)
 			case "history":
-				return rawResponse(`"history text"`)
+				return rawResponse(`"` + strings.Repeat("h", 64*1024) + `"`)
 			default:
 				return tunnel.ResponsePayload{OK: false, Error: "unknown method"}
 			}
@@ -48,7 +48,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 	}{
 		{"/api/gateway/devices/dev-1/workspaces/tree", "Workspace"},
 		{"/api/gateway/devices/dev-1/sessions", "sess-1"},
-		{"/api/gateway/devices/dev-1/sessions/sess-1/history", "history text"},
+		{"/api/gateway/devices/dev-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
 	} {
 		request := httptest.NewRequest(http.MethodGet, tc.path, nil)
 		request.AddCookie(cookie)

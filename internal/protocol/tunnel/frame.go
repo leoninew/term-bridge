@@ -7,6 +7,8 @@ import (
 
 const ProtocolVersion = 2
 
+const MaxFrameBytes = 32 * 1024 * 1024
+
 const ControlStreamID StreamID = "control"
 
 type StreamID string

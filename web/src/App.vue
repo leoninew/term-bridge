@@ -147,6 +147,7 @@
 
             <section
               v-if="createSessionFormOpen"
+              ref="createSessionWorkbench"
               class="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-[#090d14] p-6"
             >
               <form
@@ -454,6 +455,7 @@
   import HistoryTerminalView from './components/terminal/HistoryTerminalView.vue'
   import TerminalView from './components/terminal/TerminalView.vue'
   import { logTerminalDiagnostic } from './components/terminal/diagnostics'
+  import { measureXtermSize } from './components/terminal/useXterm'
   import WorkspaceSessionSidebar from './components/workspace/WorkspaceSessionSidebar.vue'
   import type {
     ServerControlMessage,
@@ -528,6 +530,7 @@
   const selectedGatewayDeviceId = ref('')
   const sessionNameInput = ref<{ focus: () => void; select: () => void } | null>(null)
   const renameInput = ref<{ focus: () => void; select: () => void } | null>(null)
+  const createSessionWorkbench = ref<HTMLElement | null>(null)
   let toastId = 0
 
   const activeSession = computed(
@@ -670,7 +673,7 @@
     }
     creatingSession.value = true
     try {
-      const size = estimateTerminalSize()
+      const size = measureInitialTerminalSize()
       logTerminalDiagnostic('session.create.request', {
         name,
         cwd: trimmedCwd,
@@ -1152,10 +1155,50 @@
     return err instanceof Error ? err.message : String(err)
   }
 
-  function estimateTerminalSize(): { cols: number; rows: number } {
+  function measureInitialTerminalSize(): { cols: number; rows: number } {
+    const measured = measureCreateSessionWorkbench()
+    if (measured) {
+      return measured
+    }
     const cols = Math.max(80, Math.min(10000, Math.floor((window.innerWidth - 360) / 9)))
     const rows = Math.max(24, Math.min(10000, Math.floor((window.innerHeight - 180) / 18)))
+    logTerminalDiagnostic('xterm.measure.fallback', { cols, rows })
     return { cols, rows }
+  }
+
+  function measureCreateSessionWorkbench(): { cols: number; rows: number } | null {
+    const workbench = createSessionWorkbench.value
+    if (!workbench) {
+      logTerminalDiagnostic('xterm.measure.missing-workbench')
+      return null
+    }
+    const wrapper = document.createElement('section')
+    wrapper.style.position = 'fixed'
+    wrapper.style.left = '-10000px'
+    wrapper.style.top = '0'
+    wrapper.style.width = `${workbench.clientWidth}px`
+    wrapper.style.height = `${workbench.clientHeight}px`
+    wrapper.style.display = 'flex'
+    wrapper.style.flexDirection = 'column'
+    wrapper.style.padding = '8px'
+    wrapper.style.boxSizing = 'border-box'
+    wrapper.style.visibility = 'hidden'
+    wrapper.style.pointerEvents = 'none'
+
+    const shell = document.createElement('section')
+    shell.className = 'terminal-shell'
+    shell.style.flex = '1'
+
+    const container = document.createElement('div')
+    container.className = 'terminal-container'
+    shell.appendChild(container)
+    wrapper.appendChild(shell)
+    document.body.appendChild(wrapper)
+    try {
+      return measureXtermSize(container)
+    } finally {
+      wrapper.remove()
+    }
   }
 
   watch(commandText, (nextCommand) => {

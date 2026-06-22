@@ -310,7 +310,7 @@ func (s *Handler) serveWebSocket(ctx context.Context, conn *websocket.Conn, clie
 				if err == nil {
 					chunks, totalBytes := client.MarkBinarySent(len(outbound.Binary))
 					if chunks <= 5 || chunks%50 == 0 {
-						s.logger.Info("terminal websocket binary sent", "session_id", client.SessionID(), "client_id", client.ID(), "chunk_bytes", len(outbound.Binary), "chunks", chunks, "total_bytes", totalBytes, "queued_bytes", client.QueuedBytes())
+						s.logger.Debug("terminal websocket binary sent", "session_id", client.SessionID(), "client_id", client.ID(), "chunk_bytes", len(outbound.Binary), "chunks", chunks, "total_bytes", totalBytes, "queued_bytes", client.QueuedBytes())
 					}
 				}
 			case terminalapp.OutboundText:

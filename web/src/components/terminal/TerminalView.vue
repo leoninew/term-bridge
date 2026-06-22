@@ -30,6 +30,9 @@
     (data) => xterm?.write(data),
     (message) => {
       emit('state', message)
+      if (message.type === 'started') {
+        xterm?.fit()
+      }
       if (message.type === 'replay_started') {
         replaying.value = true
       }

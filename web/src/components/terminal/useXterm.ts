@@ -9,26 +9,21 @@ type ResizeCallback = (cols: number, rows: number) => void
 type XtermController = {
   terminal: Terminal
   open: (element: HTMLElement) => void
+  fit: () => void
   write: (data: Uint8Array) => void
   pendingBytes: () => number
   dispose: () => void
 }
 
 type XtermDiagnostics = {
-  source: 'live' | 'history'
+  source: 'live' | 'history' | 'measure'
   sessionId?: string | null
 }
 
 const maxPendingBytes = 4 * 1024 * 1024
 
-export function createXterm(
-  onData: (data: string) => void,
-  onBinary: (data: string) => void,
-  onResize: ResizeCallback,
-  diagnostics: XtermDiagnostics,
-): XtermController {
-  const terminal = new Terminal({
-    convertEol: true,
+function terminalOptions() {
+  return {
     cursorBlink: true,
     fontFamily: 'Cascadia Mono, Consolas, monospace',
     fontSize: 12,
@@ -39,7 +34,44 @@ export function createXterm(
       cursor: '#f8fafc',
       selectionBackground: '#1e3a5f',
     },
-  })
+  }
+}
+
+export function measureXtermSize(element: HTMLElement): { cols: number; rows: number } | null {
+  const terminal = new Terminal(terminalOptions())
+  const fitAddon = new FitAddon()
+  terminal.loadAddon(fitAddon)
+  try {
+    terminal.open(element)
+    fitAddon.fit()
+    if (terminal.cols < 1 || terminal.rows < 1) {
+      logTerminalDiagnostic('xterm.measure.invalid-size', {
+        source: 'measure',
+        clientWidth: element.clientWidth,
+        clientHeight: element.clientHeight,
+      })
+      return null
+    }
+    logTerminalDiagnostic('xterm.measure', {
+      source: 'measure',
+      clientWidth: element.clientWidth,
+      clientHeight: element.clientHeight,
+      cols: terminal.cols,
+      rows: terminal.rows,
+    })
+    return { cols: terminal.cols, rows: terminal.rows }
+  } finally {
+    terminal.dispose()
+  }
+}
+
+export function createXterm(
+  onData: (data: string) => void,
+  onBinary: (data: string) => void,
+  onResize: ResizeCallback,
+  diagnostics: XtermDiagnostics,
+): XtermController {
+  const terminal = new Terminal(terminalOptions())
   const fitAddon = new FitAddon()
   const webLinksAddon = new WebLinksAddon()
   const disposables = [terminal.onData(onData), terminal.onBinary(onBinary)]
@@ -130,6 +162,9 @@ export function createXterm(
       observer = new ResizeObserver(scheduleResize)
       observer.observe(element)
       terminal.focus()
+    },
+    fit() {
+      emitResize()
     },
     write(data: Uint8Array) {
       writeCount += 1

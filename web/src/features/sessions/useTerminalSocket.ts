@@ -22,6 +22,7 @@ export function useTerminalSocket(
   const error = ref<string | null>(null)
   let binaryMessageCount = 0
   let controlMessageCount = 0
+  let pendingResize: Extract<ClientControlMessage, { type: 'resize' }> | null = null
 
   function connect(url: string) {
     close()
@@ -37,6 +38,9 @@ export function useTerminalSocket(
       status.value = 'connected'
       logTerminalDiagnostic('socket.open', { path: diagnosticWebSocketPath(wsUrl) })
       sendControl({ type: 'hello' })
+      if (pendingResize) {
+        sendControl(pendingResize)
+      }
     }
     next.onmessage = (event: MessageEvent<string | ArrayBuffer | Blob>) => {
       if (typeof event.data === 'string') {
@@ -113,13 +117,26 @@ export function useTerminalSocket(
   }
 
   function sendControl(message: ClientControlMessage) {
-    if (socket.value?.readyState === WebSocket.OPEN) {
-      logTerminalDiagnostic('socket.control.send', {
+    if (message.type === 'resize') {
+      pendingResize = message
+    }
+    if (socket.value?.readyState !== WebSocket.OPEN) {
+      logTerminalDiagnostic('socket.control.deferred', {
         type: message.type,
         cols: 'cols' in message ? message.cols : undefined,
         rows: 'rows' in message ? message.rows : undefined,
+        readyState: socket.value?.readyState ?? null,
       })
-      socket.value.send(encodeControl(message))
+      return
+    }
+    logTerminalDiagnostic('socket.control.send', {
+      type: message.type,
+      cols: 'cols' in message ? message.cols : undefined,
+      rows: 'rows' in message ? message.rows : undefined,
+    })
+    socket.value.send(encodeControl(message))
+    if (message.type === 'resize' && pendingResize === message) {
+      pendingResize = null
     }
   }
 

@@ -2,14 +2,14 @@ type DiagnosticDetails = Record<string, unknown>
 
 const prefix = '[termbridge:terminal]'
 
-function diagnosticsEnabled(): boolean {
-  return window.localStorage.getItem('termbridge.terminalDebug') === '1'
-}
+// function diagnosticsEnabled(): boolean {
+//   return window.localStorage.getItem('termbridge.terminalDebug') === '1'
+// }
 
 export function logTerminalDiagnostic(event: string, details: DiagnosticDetails = {}) {
-  if (!diagnosticsEnabled()) {
-    return
-  }
+  // if (!diagnosticsEnabled()) {
+  //   return
+  // }
   console.info(prefix, event, details)
 }
 
