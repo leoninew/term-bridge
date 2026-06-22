@@ -1,37 +1,75 @@
 <template>
   <ToastProvider>
-    <section v-if="gatewayAvailable && !gatewayAuthenticated" class="flex h-screen min-h-screen items-center justify-center bg-[#05070d] p-6 text-sm text-slate-200">
-      <form class="w-full max-w-sm rounded-xl border border-slate-800 bg-[#0a0f18] p-5 shadow-xl" @submit.prevent="loginGateway">
+    <section
+      v-if="gatewayRoute && gatewayAvailable && !gatewayAuthenticated"
+      class="flex h-screen min-h-screen items-center justify-center bg-[#05070d] p-6 text-sm text-slate-200"
+    >
+      <form
+        class="w-full max-w-sm rounded-xl border border-slate-800 bg-[#0a0f18] p-5 shadow-xl"
+        @submit.prevent="loginGateway"
+      >
         <h1 class="text-lg font-semibold text-slate-100">{{ t('gateway.loginTitle') }}</h1>
         <p class="mt-1 text-slate-500">{{ t('gateway.loginDescription') }}</p>
         <label class="mt-4 block">
           <span class="text-slate-400">{{ t('gateway.username') }}</span>
-          <input v-model="gatewayUsernameInput" class="mt-1 h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-2 text-slate-100 outline-none" autocomplete="username" />
+          <input
+            v-model="gatewayUsernameInput"
+            class="mt-1 h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-2 text-slate-100 outline-none"
+            autocomplete="username"
+          />
         </label>
         <label class="mt-3 block">
           <span class="text-slate-400">{{ t('gateway.password') }}</span>
-          <input v-model="gatewayPasswordInput" type="password" class="mt-1 h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-2 text-slate-100 outline-none" autocomplete="current-password" />
+          <input
+            v-model="gatewayPasswordInput"
+            type="password"
+            class="mt-1 h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-2 text-slate-100 outline-none"
+            autocomplete="current-password"
+          />
         </label>
-        <button type="submit" class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50 hover:bg-blue-500 disabled:opacity-60" :disabled="gatewayLoggingIn">
+        <button
+          type="submit"
+          class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50 hover:bg-blue-500 disabled:opacity-60"
+          :disabled="gatewayLoggingIn"
+        >
           {{ gatewayLoggingIn ? t('gateway.signingIn') : t('gateway.signIn') }}
         </button>
       </form>
     </section>
 
-    <SplitterGroup v-else direction="horizontal" class="flex h-screen min-h-screen overflow-hidden bg-[#05070d] text-sm text-slate-200">
+    <SplitterGroup
+      v-else
+      direction="horizontal"
+      class="flex h-screen min-h-screen overflow-hidden bg-[#05070d] text-sm text-slate-200"
+    >
       <SplitterPanel id="workspace-sidebar" :default-size="22" :min-size="16" :max-size="35">
-        <div v-if="gatewayAvailable && gatewayAuthenticated" class="border-b border-slate-800/80 bg-[#0a0f18] p-2 text-sm">
+        <div
+          v-if="gatewayRoute && gatewayAvailable && gatewayAuthenticated"
+          class="border-b border-slate-800/80 bg-[#0a0f18] p-2 text-sm"
+        >
           <div class="flex items-center justify-between gap-2">
             <span class="font-medium text-slate-200">{{ t('gateway.devices') }}</span>
-            <button type="button" class="rounded px-1.5 py-0.5 text-slate-500 hover:bg-slate-900 hover:text-slate-200" @click="logoutGateway">{{ t('gateway.logout') }}</button>
+            <button
+              type="button"
+              class="rounded px-1.5 py-0.5 text-slate-500 hover:bg-slate-900 hover:text-slate-200"
+              @click="logoutGateway"
+            >
+              {{ t('gateway.logout') }}
+            </button>
           </div>
-          <select v-model="selectedGatewayDeviceId" class="mt-2 h-8 w-full rounded-md border border-slate-800 bg-slate-950 px-2 text-slate-100 outline-none" @change="selectGatewayDevice">
+          <select
+            v-model="selectedGatewayDeviceId"
+            class="mt-2 h-8 w-full rounded-md border border-slate-800 bg-slate-950 px-2 text-slate-100 outline-none"
+            @change="selectGatewayDevice"
+          >
             <option value="">{{ t('gateway.localWorkbench') }}</option>
             <option v-for="device in gatewayDevices" :key="device.id" :value="device.id">
               {{ device.name }} · {{ device.online ? t('gateway.online') : t('gateway.offline') }}
             </option>
           </select>
-          <p v-if="isGatewayBackend" class="mt-1.5 text-xs text-slate-500">{{ t('gateway.attachOnly') }}</p>
+          <p v-if="isGatewayBackend" class="mt-1.5 text-xs text-slate-500">
+            {{ t('gateway.attachOnly') }}
+          </p>
         </div>
         <WorkspaceSessionSidebar
           :workspace-tree="workspaceTree"
@@ -48,100 +86,137 @@
         />
       </SplitterPanel>
 
-      <SplitterResizeHandle class="group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[#05070d] outline-none">
+      <SplitterResizeHandle
+        class="group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[#05070d] outline-none"
+      >
         <span class="w-px bg-slate-800 transition group-hover:bg-slate-700" />
       </SplitterResizeHandle>
 
       <SplitterPanel id="terminal-workbench" :min-size="55">
         <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14]">
-        <TabsRoot
-          :model-value="activeTabId ?? undefined"
-          class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-          @update:model-value="activateOpenedTab"
-        >
-          <div class="flex h-11 shrink-0 items-center border-b border-slate-800/80 bg-[#0a0f18] px-2">
-            <TabsList as-child>
-              <VueDraggable
-                v-model="openedTabs"
-                tag="div"
-                class="flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
-                :animation="150"
-                handle=".tab-drag-handle"
-                item-key="sessionId"
-              >
-                <div
-                  v-for="tab in openedTabs"
-                  :key="tab.sessionId"
-                  class="group relative flex max-w-56 shrink-0 items-center rounded-md border px-0.5 text-sm transition"
-                  :class="activeTabId === tab.sessionId
-                    ? 'border-slate-700 bg-slate-900 text-slate-50'
-                    : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:border-slate-700 hover:bg-slate-900/80'"
-                >
-                  <TabsTrigger :value="tab.sessionId" class="tab-drag-handle flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 outline-none">
-                    <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                    <span class="truncate">{{ sessionTitle(tab.sessionId) }}</span>
-                  </TabsTrigger>
-                  <button
-                    type="button"
-                    class="rounded-md p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
-                    :aria-label="t('workbench.closeTabAria', { name: sessionTitle(tab.sessionId) })"
-                    @click.stop="closeTab(tab.sessionId)"
-                  >
-                    <X class="size-3.5" />
-                  </button>
-                </div>
-              </VueDraggable>
-            </TabsList>
-          </div>
-
-          <TabsContent
-            v-if="activeSession && activeTab"
-            :key="activeSession.id"
-            :value="activeSession.id"
-            class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14] p-2"
+          <TabsRoot
+            :model-value="activeTabId ?? undefined"
+            class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            @update:model-value="activateOpenedTab"
           >
-            <TerminalView
-              v-if="activeSession.lifecycle_state === 'running'"
+            <div
+              class="flex h-11 shrink-0 items-center border-b border-slate-800/80 bg-[#0a0f18] px-2"
+            >
+              <TabsList as-child>
+                <VueDraggable
+                  v-model="openedTabs"
+                  tag="div"
+                  class="flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
+                  :animation="150"
+                  handle=".tab-drag-handle"
+                  item-key="sessionId"
+                >
+                  <div
+                    v-for="tab in openedTabs"
+                    :key="tab.sessionId"
+                    class="group relative flex max-w-56 shrink-0 items-center rounded-md border px-0.5 text-sm transition"
+                    :class="
+                      activeTabId === tab.sessionId
+                        ? 'border-slate-700 bg-slate-900 text-slate-50'
+                        : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:border-slate-700 hover:bg-slate-900/80'
+                    "
+                  >
+                    <TabsTrigger
+                      :value="tab.sessionId"
+                      class="tab-drag-handle flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 outline-none"
+                    >
+                      <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                      <span class="truncate">{{ sessionTitle(tab.sessionId) }}</span>
+                    </TabsTrigger>
+                    <button
+                      type="button"
+                      class="rounded-md p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+                      :aria-label="
+                        t('workbench.closeTabAria', { name: sessionTitle(tab.sessionId) })
+                      "
+                      @click.stop="closeTab(tab.sessionId)"
+                    >
+                      <X class="size-3.5" />
+                    </button>
+                  </div>
+                </VueDraggable>
+              </TabsList>
+            </div>
+
+            <TabsContent
+              v-if="activeSession && activeTab"
               :key="activeSession.id"
-              :ws-url="terminalWsUrl(activeSession.id)"
-              :session-id="activeSession.id"
-              @state="handleTerminalState"
-              @terminal-error="handleTerminalError"
-            />
-
-            <section v-else class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-              <div v-if="activeTab.historyLoading" class="flex flex-1 items-center justify-center text-slate-500">{{ t('workbench.loadingHistory') }}</div>
-              <div v-else-if="activeTab.historyError" class="rounded-md border border-slate-800 bg-slate-950/80 px-2 py-1.5 text-red-100">
-                {{ activeTab.historyError }}
-              </div>
-              <HistoryTerminalView
-                v-else-if="activeTab.historyText"
-                :key="`${activeSession.id}-history`"
-                :history="activeTab.historyText"
+              :value="activeSession.id"
+              class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14] p-2"
+            >
+              <TerminalView
+                v-if="activeSession.lifecycle_state === 'running'"
+                :key="activeSession.id"
+                :ws-url="terminalWsUrl(activeSession.id)"
+                :session-id="activeSession.id"
+                @state="handleTerminalState"
+                @terminal-error="handleTerminalError"
               />
-              <div v-else class="flex flex-1 items-center justify-center text-slate-500">{{ t('workbench.noHistory') }}</div>
+
+              <section v-else class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                <div
+                  v-if="activeTab.historyLoading"
+                  class="flex flex-1 items-center justify-center text-slate-500"
+                >
+                  {{ t('workbench.loadingHistory') }}
+                </div>
+                <div
+                  v-else-if="activeTab.historyError"
+                  class="rounded-md border border-slate-800 bg-slate-950/80 px-2 py-1.5 text-red-100"
+                >
+                  {{ activeTab.historyError }}
+                </div>
+                <HistoryTerminalView
+                  v-else-if="activeTab.historyText"
+                  :key="`${activeSession.id}-history`"
+                  :history="activeTab.historyText"
+                />
+                <div v-else class="flex flex-1 items-center justify-center text-slate-500">
+                  {{ t('workbench.noHistory') }}
+                </div>
+              </section>
+            </TabsContent>
+
+            <section
+              v-if="openedTabs.length === 0"
+              class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-slate-500"
+            >
+              <h3 class="text-lg font-semibold text-slate-300">{{ t('workbench.noTabTitle') }}</h3>
+              <p>
+                {{
+                  isGatewayBackend
+                    ? t('gateway.selectExistingSession')
+                    : t('workbench.noTabDescription')
+                }}
+              </p>
+              <button
+                v-if="allowMutations"
+                type="button"
+                class="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-slate-100 hover:bg-slate-800"
+                @click="openCreateDialog"
+              >
+                {{ t('workbench.newSession') }}
+              </button>
             </section>
-          </TabsContent>
+          </TabsRoot>
 
-          <section v-if="openedTabs.length === 0" class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-slate-500">
-            <h3 class="text-lg font-semibold text-slate-300">{{ t('workbench.noTabTitle') }}</h3>
-            <p>{{ isGatewayBackend ? t('gateway.selectExistingSession') : t('workbench.noTabDescription') }}</p>
-            <button v-if="allowMutations" type="button" class="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-slate-100 hover:bg-slate-800" @click="openCreateDialog">
-              {{ t('workbench.newSession') }}
-            </button>
-          </section>
-        </TabsRoot>
-
-        <footer class="flex h-8 shrink-0 items-center gap-1.5 overflow-hidden border-t border-slate-800/80 bg-[#0a0f18] px-3 text-sm text-slate-500">
-          <template v-if="activeSession">
-            <span>{{ t('workbench.status') }}</span>
-            <span class="text-slate-200">{{ activeLifecycleLabel }}</span>
-            <span class="text-slate-700">·</span>
-            <span>{{ t('workbench.command') }}</span>
-            <span class="min-w-0 truncate text-slate-200">{{ activeSession.command }}</span>
-          </template>
-          <span v-else>{{ t('workbench.noActiveSession') }}</span>
-        </footer>
+          <footer
+            class="flex h-8 shrink-0 items-center gap-1.5 overflow-hidden border-t border-slate-800/80 bg-[#0a0f18] px-3 text-sm text-slate-500"
+          >
+            <template v-if="activeSession">
+              <span>{{ t('workbench.status') }}</span>
+              <span class="text-slate-200">{{ activeLifecycleLabel }}</span>
+              <span class="text-slate-700">·</span>
+              <span>{{ t('workbench.command') }}</span>
+              <span class="min-w-0 truncate text-slate-200">{{ activeSession.command }}</span>
+            </template>
+            <span v-else>{{ t('workbench.noActiveSession') }}</span>
+          </footer>
         </section>
       </SplitterPanel>
     </SplitterGroup>
@@ -157,7 +232,11 @@
           <form class="dialog-form" @submit.prevent="startSession">
             <label>
               <span>{{ t('dialog.name') }}</span>
-              <input ref="sessionNameInput" v-model="sessionName" :placeholder="t('dialog.sessionNamePlaceholder')" />
+              <input
+                ref="sessionNameInput"
+                v-model="sessionName"
+                :placeholder="t('dialog.sessionNamePlaceholder')"
+              />
             </label>
             <label>
               <span>{{ t('dialog.cwd') }}</span>
@@ -169,7 +248,9 @@
             </label>
             <div class="dialog-actions">
               <DialogClose as-child>
-                <button type="button" class="button button-secondary">{{ t('common.cancel') }}</button>
+                <button type="button" class="button button-secondary">
+                  {{ t('common.cancel') }}
+                </button>
               </DialogClose>
               <button type="submit" class="button button-primary" :disabled="creatingSession">
                 {{ creatingSession ? t('common.creating') : t('common.create') }}
@@ -191,11 +272,17 @@
           <form class="dialog-form" @submit.prevent="renameSelectedSession">
             <label>
               <span>{{ t('dialog.name') }}</span>
-              <input ref="renameInput" v-model="renameText" :placeholder="t('dialog.sessionNamePlaceholder')" />
+              <input
+                ref="renameInput"
+                v-model="renameText"
+                :placeholder="t('dialog.sessionNamePlaceholder')"
+              />
             </label>
             <div class="dialog-actions">
               <DialogClose as-child>
-                <button type="button" class="button button-secondary">{{ t('common.cancel') }}</button>
+                <button type="button" class="button button-secondary">
+                  {{ t('common.cancel') }}
+                </button>
               </DialogClose>
               <button type="submit" class="button button-primary" :disabled="renamingSession">
                 {{ renamingSession ? t('common.renaming') : t('common.rename') }}
@@ -210,24 +297,36 @@
       <AlertDialogPortal>
         <AlertDialogOverlay class="dialog-overlay" />
         <AlertDialogContent class="dialog-content">
-          <AlertDialogTitle class="dialog-title">{{ t('dialog.deleteSessionTitle') }}</AlertDialogTitle>
+          <AlertDialogTitle class="dialog-title">{{
+            t('dialog.deleteSessionTitle')
+          }}</AlertDialogTitle>
           <AlertDialogDescription class="dialog-description">
             <template v-if="selectedSession && isActiveLifecycle(selectedSession)">
               {{ t('dialog.deleteActiveSessionDescription') }}
             </template>
             <template v-else>
-              {{ t('dialog.deleteSessionDescription', { name: selectedSession ? sessionDisplayName(selectedSession) : t('dialog.fallbackSession') }) }}
+              {{
+                t('dialog.deleteSessionDescription', {
+                  name: selectedSession
+                    ? sessionDisplayName(selectedSession)
+                    : t('dialog.fallbackSession'),
+                })
+              }}
             </template>
           </AlertDialogDescription>
           <div class="dialog-actions">
             <AlertDialogCancel as-child>
-              <button type="button" class="button button-secondary">{{ t('common.cancel') }}</button>
+              <button type="button" class="button button-secondary">
+                {{ t('common.cancel') }}
+              </button>
             </AlertDialogCancel>
             <AlertDialogAction as-child>
               <button
                 type="button"
                 class="button button-danger"
-                :disabled="!selectedSession || isActiveLifecycle(selectedSession) || deletingSession"
+                :disabled="
+                  !selectedSession || isActiveLifecycle(selectedSession) || deletingSession
+                "
                 @click="deleteSelectedSession"
               >
                 {{ deletingSession ? t('common.deleting') : t('common.delete') }}
@@ -242,7 +341,9 @@
       <AlertDialogPortal>
         <AlertDialogOverlay class="dialog-overlay" />
         <AlertDialogContent class="dialog-content">
-          <AlertDialogTitle class="dialog-title">{{ t('dialog.removeWorkspaceTitle') }}</AlertDialogTitle>
+          <AlertDialogTitle class="dialog-title">{{
+            t('dialog.removeWorkspaceTitle')
+          }}</AlertDialogTitle>
           <AlertDialogDescription class="dialog-description">
             {{ t('dialog.removeWorkspaceDescription') }}
           </AlertDialogDescription>
@@ -251,7 +352,9 @@
           </div>
           <div class="dialog-actions">
             <AlertDialogCancel as-child>
-              <button type="button" class="button button-secondary">{{ t('common.cancel') }}</button>
+              <button type="button" class="button button-secondary">
+                {{ t('common.cancel') }}
+              </button>
             </AlertDialogCancel>
             <AlertDialogAction as-child>
               <button
@@ -334,6 +437,7 @@
   import {
     createSession,
     deleteSession,
+    getSession,
     readHistory,
     updateSession,
   } from './features/sessions/api'
@@ -346,7 +450,11 @@
     readGatewayHistory,
     type GatewayDeviceSummary,
   } from './features/gateway/api'
-  import { deleteWorkspace, listWorkspaceTree, updateWorkspaceOrder } from './features/workspaces/api'
+  import {
+    deleteWorkspace,
+    listWorkspaceTree,
+    updateWorkspaceOrder,
+  } from './features/workspaces/api'
 
   type OpenSessionTab = {
     sessionId: string
@@ -381,6 +489,7 @@
   const selectedWorkspace = ref<WorkspaceSummary | null>(null)
   const renameText = ref('')
   const toasts = ref<AppToast[]>([])
+  const gatewayRoute = window.location.pathname.startsWith('/gateway')
   const gatewayAvailable = ref(false)
   const gatewayAuthenticated = ref(false)
   const gatewayLoggingIn = ref(false)
@@ -392,12 +501,12 @@
   const renameInput = ref<{ focus: () => void; select: () => void } | null>(null)
   let toastId = 0
 
-  const activeSession = computed(() =>
-    sessions.value.find((session) => session.id === activeTabId.value) ?? null,
+  const activeSession = computed(
+    () => sessions.value.find((session) => session.id === activeTabId.value) ?? null,
   )
 
-  const activeTab = computed(() =>
-    openedTabs.value.find((tab) => tab.sessionId === activeTabId.value) ?? null,
+  const activeTab = computed(
+    () => openedTabs.value.find((tab) => tab.sessionId === activeTabId.value) ?? null,
   )
 
   const activeLifecycleLabel = computed(() => {
@@ -405,8 +514,9 @@
     return state ? state.charAt(0).toUpperCase() + state.slice(1) : ''
   })
 
-  const selectedGatewayDevice = computed(() =>
-    gatewayDevices.value.find((device) => device.id === selectedGatewayDeviceId.value) ?? null,
+  const selectedGatewayDevice = computed(
+    () =>
+      gatewayDevices.value.find((device) => device.id === selectedGatewayDeviceId.value) ?? null,
   )
 
   const activeBackend = computed(() => {
@@ -538,10 +648,9 @@
         cols: size.cols,
         rows: size.rows,
       })
-      await refresh()
-      const session = sessions.value.find((item) => item.id === created.session_id)
-      if (!session) {
-        throw new Error(t('message.createdSessionMissing'))
+      const session = await getSession(created.session_id)
+      if (!upsertSessionInState(session)) {
+        await refresh()
       }
       createDialogOpen.value = false
       await openSessionTab(session)
@@ -583,7 +692,11 @@
     if (!ensureMutationAllowed()) {
       return
     }
-    if (!selectedSession.value || deletingSession.value || isActiveLifecycle(selectedSession.value)) {
+    if (
+      !selectedSession.value ||
+      deletingSession.value ||
+      isActiveLifecycle(selectedSession.value)
+    ) {
       return
     }
     const session = selectedSession.value
@@ -616,7 +729,11 @@
       removeWorkspaceFromState(workspace.id)
       selectedWorkspace.value = null
       removeWorkspaceDialogOpen.value = false
-      pushToast('success', t('toast.workspaceRemoved'), t('message.workspaceRemoved', { name: workspace.name }))
+      pushToast(
+        'success',
+        t('toast.workspaceRemoved'),
+        t('message.workspaceRemoved', { name: workspace.name }),
+      )
     } catch (err) {
       notifyError(t('toast.removeWorkspaceFailed'), err)
     } finally {
@@ -632,7 +749,10 @@
     workspaceTree.value = orderWorkspaceTree(previousTree, workspaceIds)
     try {
       const orderedWorkspaces = await updateWorkspaceOrder(workspaceIds)
-      workspaceTree.value = orderWorkspaceTree(workspaceTree.value, orderedWorkspaces.map((workspace) => workspace.id))
+      workspaceTree.value = orderWorkspaceTree(
+        workspaceTree.value,
+        orderedWorkspaces.map((workspace) => workspace.id),
+      )
       workspaces.value = orderedWorkspaces
     } catch (err) {
       notifyError(t('toast.updateWorkspaceOrderFailed'), err)
@@ -685,7 +805,13 @@
   async function ensureHistoryLoaded(sessionId: string) {
     const session = sessionFor(sessionId)
     const tab = openedTabs.value.find((item) => item.sessionId === sessionId)
-    if (!session || !tab || session.lifecycle_state === 'running' || tab.historyLoaded || tab.historyLoading) {
+    if (
+      !session ||
+      !tab ||
+      session.lifecycle_state === 'running' ||
+      tab.historyLoaded ||
+      tab.historyLoading
+    ) {
       return
     }
     tab.historyLoading = true
@@ -769,27 +895,44 @@
     )
   }
 
+  function upsertSessionInState(updated: SessionSummary): boolean {
+    if (!workspaceTree.value.some((workspace) => workspace.id === updated.workspace_id)) {
+      return false
+    }
+
+    const existingIndex = sessions.value.findIndex((session) => session.id === updated.id)
+    if (existingIndex === -1) {
+      sessions.value = [...sessions.value, updated]
+    } else {
+      sessions.value = sessions.value.map((session) =>
+        session.id === updated.id ? updated : session,
+      )
+    }
+
+    workspaceTree.value = workspaceTree.value.map((workspace) => {
+      if (workspace.id !== updated.workspace_id) {
+        return workspace
+      }
+      const nextSession = sessionSummaryForWorkspaceTree(updated)
+      const childIndex = workspace.children.findIndex((session) => session.id === updated.id)
+      if (childIndex === -1) {
+        return { ...workspace, children: [...workspace.children, nextSession] }
+      }
+      return {
+        ...workspace,
+        children: workspace.children.map((session) =>
+          session.id === updated.id ? nextSession : session,
+        ),
+      }
+    })
+    return true
+  }
+
   function updateSessionInState(updated: SessionSummary) {
-    sessions.value = sessions.value.map((session) => (session.id === updated.id ? updated : session))
-    workspaceTree.value = workspaceTree.value.map((workspace) => ({
-      ...workspace,
-      children: workspace.children.map((session) => {
-        if (session.id !== updated.id) {
-          return session
-        }
-        return {
-          id: updated.id,
-          name: updated.name,
-          command: updated.command,
-          cwd: updated.cwd,
-          lifecycle_state: updated.lifecycle_state,
-          attachment_state: updated.attachment_state,
-          exit_code: updated.exit_code,
-          updated_at: updated.updated_at,
-          log_path: updated.log_path,
-        }
-      }),
-    }))
+    if (!sessions.value.some((session) => session.id === updated.id)) {
+      return
+    }
+    upsertSessionInState(updated)
   }
 
   function removeSessionFromState(sessionId: string) {
@@ -810,8 +953,25 @@
     workspaces.value = workspaces.value.filter((workspace) => workspace.id !== workspaceId)
     sessions.value = sessions.value.filter((session) => session.workspace_id !== workspaceId)
     openedTabs.value = openedTabs.value.filter((tab) => !removedSessionIds.has(tab.sessionId))
-    if (activeSession.value?.workspace_id === workspaceId || (activeTabId.value && removedSessionIds.has(activeTabId.value))) {
+    if (
+      activeSession.value?.workspace_id === workspaceId ||
+      (activeTabId.value && removedSessionIds.has(activeTabId.value))
+    ) {
       activeTabId.value = openedTabs.value[0]?.sessionId ?? null
+    }
+  }
+
+  function sessionSummaryForWorkspaceTree(session: SessionSummary) {
+    return {
+      id: session.id,
+      name: session.name,
+      command: session.command,
+      cwd: session.cwd,
+      lifecycle_state: session.lifecycle_state,
+      attachment_state: session.attachment_state,
+      exit_code: session.exit_code,
+      updated_at: session.updated_at,
+      log_path: session.log_path,
     }
   }
 
@@ -869,7 +1029,21 @@
       pushToast('error', t('toast.terminalError', { code: message.code }), message.message)
     }
     if (message.type === 'state' || message.type === 'exited') {
-      void refresh()
+      void refreshActiveSession()
+    }
+  }
+
+  async function refreshActiveSession() {
+    const sessionId = activeTabId.value
+    if (!sessionId || isGatewayBackend.value) {
+      return
+    }
+    try {
+      const updated = await getSession(sessionId)
+      updateSessionInState(updated)
+      await ensureHistoryLoaded(sessionId)
+    } catch (err) {
+      notifyError(t('toast.refreshFailed'), err)
     }
   }
 
@@ -906,6 +1080,11 @@
   })
 
   async function initializeGateway() {
+    if (!gatewayRoute) {
+      gatewayAvailable.value = false
+      gatewayAuthenticated.value = false
+      return
+    }
     try {
       const me = await gatewayMe()
       gatewayAvailable.value = true

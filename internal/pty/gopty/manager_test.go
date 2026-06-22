@@ -156,6 +156,7 @@ func TestManagerContextCancelDoesNotKillProcess(t *testing.T) {
 	if !strings.Contains(output.String(), "TERM_BRIDGE_AFTER_CANCEL") {
 		t.Fatalf("output missing marker:\n%s", output.String())
 	}
+	_ = session.Close()
 	waitForReader(t, readDone, output)
 }
 
@@ -172,14 +173,24 @@ func TestManagerRunsCmdExe(t *testing.T) {
 		Env:         os.Environ(),
 		InitialSize: process.TerminalSize{Cols: 80, Rows: 25},
 	}
-	output, result := runSpec(t, spec)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	session, output, readDone, err := startSession(ctx, spec)
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer func() {
+		_ = session.Close()
+		_ = session.KillTree()
+	}()
 
+	waitForOutput(t, output, "TERM_BRIDGE_CMD_OK", 5*time.Second)
+	result := waitForResult(t, session, 5*time.Second)
 	if result.ExitCode != 0 || result.Err != nil {
-		t.Fatalf("Wait() = %#v; output=%s", result, output)
+		t.Fatalf("Wait() = %#v; output=%s", result, output.String())
 	}
-	if !strings.Contains(output, "TERM_BRIDGE_CMD_OK") {
-		t.Fatalf("output missing marker:\n%s", output)
-	}
+	_ = session.Close()
+	waitForReader(t, readDone, output)
 }
 
 func TestManagerReturnsCorrectExitCode(t *testing.T) {

@@ -54,6 +54,10 @@ func New(config Config, registry *webterminal.Registry) *Server {
 	return s
 }
 
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.server.Handler.ServeHTTP(w, r)
+}
+
 func (s *Server) Listen() (net.Listener, Info, error) {
 	addr := net.JoinHostPort(s.config.Host, strconv.Itoa(s.config.Port))
 	listener, err := net.Listen("tcp", addr)

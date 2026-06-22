@@ -24,6 +24,7 @@ func TestCreateSessionExpandsHomeCwd(t *testing.T) {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	fake := newFakeSession()
 	manager := &fakeManager{session: fake}
 	registry := NewRegistry(Config{Cwd: home, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
@@ -45,6 +46,7 @@ func TestCreateSessionAcceptsHomeCwd(t *testing.T) {
 	root := t.TempDir()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	fake := newFakeSession()
 	manager := &fakeManager{session: fake}
 	registry := NewRegistry(Config{Cwd: home, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
@@ -120,13 +122,7 @@ func TestAttachDetachAndInput(t *testing.T) {
 		t.Fatalf("written = %q", fake.written)
 	}
 	client.Detach("test_detach")
-	summaries, err := registry.ListSessions()
-	if err != nil {
-		t.Fatalf("ListSessions() error = %v", err)
-	}
-	if len(summaries) != 1 || summaries[0].AttachmentState != AttachmentDetached {
-		t.Fatalf("summaries = %#v", summaries)
-	}
+	waitRuntimeAttachment(t, registry, response.SessionId, AttachmentDetached)
 	fake.finish(termpty.Result{ExitCode: 0})
 	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
 }
@@ -317,7 +313,7 @@ func TestDeleteWorkspaceProtectsRunningSessions(t *testing.T) {
 
 func waitExit(t *testing.T, store state.Store, workspaceKey string, sessionId string) {
 	t.Helper()
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for {
 		exitReady := false
 		if _, err := store.LoadExit(workspaceKey, sessionId); err == nil {
@@ -328,7 +324,7 @@ func waitExit(t *testing.T, store state.Store, workspaceKey string, sessionId st
 			return
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("session did not stop for %s", sessionId)
+			t.Fatalf("session did not stop for %s; exitReady=%v state=%#v stateErr=%v", sessionId, exitReady, stateRecord, stateErr)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

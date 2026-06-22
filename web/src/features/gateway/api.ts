@@ -47,7 +47,9 @@ export async function listGatewayDevices(): Promise<GatewayDeviceSummary[]> {
 }
 
 export async function listGatewayWorkspaceTree(deviceId: string): Promise<WorkspaceTreeSummary[]> {
-  const response = await fetch(`/api/gateway/devices/${encodeURIComponent(deviceId)}/workspaces/tree`)
+  const response = await fetch(
+    `/api/gateway/devices/${encodeURIComponent(deviceId)}/workspaces/tree`,
+  )
   if (!response.ok) {
     throw new Error(await responseError('List gateway workspace tree failed', response))
   }
@@ -63,7 +65,9 @@ export async function listGatewaySessions(deviceId: string): Promise<SessionSumm
 }
 
 export async function readGatewayHistory(deviceId: string, sessionId: string): Promise<string> {
-  const response = await fetch(`/api/gateway/devices/${encodeURIComponent(deviceId)}/sessions/${encodeURIComponent(sessionId)}/history`)
+  const response = await fetch(
+    `/api/gateway/devices/${encodeURIComponent(deviceId)}/sessions/${encodeURIComponent(sessionId)}/history`,
+  )
   if (!response.ok) {
     throw new Error(await responseError('Read gateway history failed', response))
   }

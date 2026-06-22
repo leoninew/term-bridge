@@ -88,7 +88,7 @@ termbridge codex
 本地阶段不应要求用户先启动：
 
 ```text
-termbridge agent start
+termbridge serve
 termbridge workspace create
 termbridge attach <id>
 ```

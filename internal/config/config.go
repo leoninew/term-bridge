@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	EnvPrefix       = "TERMBRIDGE"
 	DefaultFileName = ".termbridge.default.yaml"
 	FileName        = ".termbridge.yaml"
 )
@@ -29,6 +28,8 @@ type Config struct {
 	History              HistoryConfig
 	Runtime              RuntimeConfig
 	Web                  WebConfig
+	Gateway              GatewayConfig
+	Agent                AgentConfig
 	ConfigFile           string
 }
 
@@ -52,6 +53,18 @@ type WebErrorConfig struct {
 	Debug bool
 }
 
+type GatewayConfig struct {
+	Host string
+	Port int
+	Open bool
+	Dev  bool
+}
+
+type AgentConfig struct {
+	GatewayURL string
+	DeviceName string
+}
+
 type Options struct {
 	Cwd     string
 	Command []string
@@ -71,9 +84,6 @@ func Load(options Options) (Config, error) {
 
 	v := viper.New()
 	v.SetConfigType("yaml")
-	v.SetEnvPrefix(EnvPrefix)
-	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
-	v.AutomaticEnv()
 
 	v.SetConfigFile(defaultConfigFile)
 	if err := v.ReadInConfig(); err != nil {
@@ -118,6 +128,16 @@ func Load(options Options) (Config, error) {
 			EnvDenylist:    cleanStringSlice(v.GetStringSlice("web.env.denylist")),
 			Error:          WebErrorConfig{Debug: v.GetBool("web.error.debug")},
 		},
+		Gateway: GatewayConfig{
+			Host: strings.TrimSpace(v.GetString("gateway.host")),
+			Port: v.GetInt("gateway.port"),
+			Open: v.GetBool("gateway.open"),
+			Dev:  v.GetBool("gateway.dev"),
+		},
+		Agent: AgentConfig{
+			GatewayURL: strings.TrimSpace(v.GetString("agent.gateway_url")),
+			DeviceName: strings.TrimSpace(v.GetString("agent.device_name")),
+		},
 		ConfigFile: configFile,
 	}
 
@@ -131,6 +151,12 @@ func Load(options Options) (Config, error) {
 		return Config{}, err
 	}
 	if err := validateHistory(cfg.History); err != nil {
+		return Config{}, err
+	}
+	if err := validateGateway(cfg.Gateway); err != nil {
+		return Config{}, err
+	}
+	if err := validateAgent(cfg.Agent); err != nil {
 		return Config{}, err
 	}
 	if err := ensureLogDir(cfg.LogDir); err != nil {
@@ -201,6 +227,12 @@ func rejectUnknownKeys(v *viper.Viper) error {
 		"web.allowed_origins":     {},
 		"web.env.denylist":        {},
 		"web.error.debug":         {},
+		"gateway.host":            {},
+		"gateway.port":            {},
+		"gateway.open":            {},
+		"gateway.dev":             {},
+		"agent.gateway_url":       {},
+		"agent.device_name":       {},
 	}
 	for _, key := range v.AllKeys() {
 		if _, ok := allowed[key]; !ok {
@@ -260,24 +292,38 @@ func validateLogFormat(format string) error {
 }
 
 func validateLogBodyLimits(requestLimit int, responseLimit int) error {
-	if requestLimit <= 0 {
+	if requestLimit < 1 {
 		return apperrors.Config("invalid log.request_body_limit", fmt.Errorf("must be positive"))
 	}
-	if responseLimit <= 0 {
+	if responseLimit < 1 {
 		return apperrors.Config("invalid log.response_body_limit", fmt.Errorf("must be positive"))
 	}
 	return nil
 }
 
-func validateHistory(config HistoryConfig) error {
-	if config.MaxLines <= 0 {
-		return apperrors.Config("invalid history max_lines", fmt.Errorf("must be positive"))
+func validateHistory(cfg HistoryConfig) error {
+	if cfg.MaxLines < 1 {
+		return apperrors.Config("invalid history.max_lines", fmt.Errorf("must be positive"))
 	}
-	if config.MaxBytes <= 0 {
-		return apperrors.Config("invalid history max_bytes", fmt.Errorf("must be positive"))
+	if cfg.MaxBytes < 1 {
+		return apperrors.Config("invalid history.max_bytes", fmt.Errorf("must be positive"))
 	}
-	if config.MaxLineBytes <= 0 {
-		return apperrors.Config("invalid history max_line_bytes", fmt.Errorf("must be positive"))
+	if cfg.MaxLineBytes < 1 {
+		return apperrors.Config("invalid history.max_line_bytes", fmt.Errorf("must be positive"))
+	}
+	return nil
+}
+
+func validateGateway(cfg GatewayConfig) error {
+	if cfg.Port < 0 || cfg.Port > 65535 {
+		return apperrors.Config("invalid gateway.port", fmt.Errorf("must be between 0 and 65535"))
+	}
+	return nil
+}
+
+func validateAgent(cfg AgentConfig) error {
+	if strings.TrimSpace(cfg.GatewayURL) == "" {
+		return apperrors.Config("invalid agent.gateway_url", fmt.Errorf("empty URL"))
 	}
 	return nil
 }
@@ -285,25 +331,6 @@ func validateHistory(config HistoryConfig) error {
 func ensureLogDir(path string) error {
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		return apperrors.Config("create log dir", err)
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return apperrors.Config("stat log dir", err)
-	}
-	if !info.IsDir() {
-		return apperrors.Config("invalid log dir", fmt.Errorf("not a directory: %s", path))
-	}
-
-	probe, err := os.CreateTemp(path, ".termbridge-log-probe-*")
-	if err != nil {
-		return apperrors.Config("check log dir writable", err)
-	}
-	name := probe.Name()
-	if err := probe.Close(); err != nil {
-		return apperrors.Config("close log dir probe", err)
-	}
-	if err := os.Remove(name); err != nil {
-		return apperrors.Config("remove log dir probe", err)
 	}
 	return nil
 }

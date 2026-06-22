@@ -3,6 +3,8 @@ package app
 import (
 	"bytes"
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -122,24 +124,38 @@ func TestRunWebStartsServerWithConfiguredRuntime(t *testing.T) {
 	}
 }
 
-func TestRunGatewayStartsServer(t *testing.T) {
+func TestRunServeStartsGatewayAndAgentFromConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
+	configContent := "gateway:\n  host: 127.0.0.1\n  port: 9090\n  dev: true\nagent:\n  gateway_url: http://127.0.0.1:9090\n  device_name: local-mac\n"
+	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(config) error = %v", err)
+	}
 	oldRunGatewayServer := runGatewayServer
-	defer func() { runGatewayServer = oldRunGatewayServer }()
+	oldRunAgentClient := runAgentClient
+	defer func() {
+		runGatewayServer = oldRunGatewayServer
+		runAgentClient = oldRunAgentClient
+	}()
 	var gotServer *gateway.Server
+	var gotClient *agent.Client
 	runGatewayServer = func(ctx context.Context, server *gateway.Server, onListening func(gateway.Info)) error {
 		gotServer = server
-		onListening(gateway.Info{URL: "http://127.0.0.1:8080"})
+		onListening(gateway.Info{URL: "http://127.0.0.1:9090"})
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	runAgentClient = func(ctx context.Context, client *agent.Client) error {
+		gotClient = client
 		return context.Canceled
 	}
 	stdout := &bytes.Buffer{}
-	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandGateway, Gateway: GatewayCommand{Host: "127.0.0.1", Port: 8080, Dev: true}}, Stdout: stdout, Stderr: &bytes.Buffer{}})
+	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandServe}, Stdout: stdout, Stderr: &bytes.Buffer{}})
 	if err != nil {
-		t.Fatalf("Run(gateway) error = %v", err)
+		t.Fatalf("Run(serve) error = %v", err)
 	}
 	if filepath.Clean(result.Cwd) != filepath.Clean(cwd) {
 		t.Fatalf("Result.Cwd = %q, want %q", result.Cwd, cwd)
@@ -147,41 +163,24 @@ func TestRunGatewayStartsServer(t *testing.T) {
 	if gotServer == nil {
 		t.Fatal("runGatewayServer was not called")
 	}
-	if !strings.Contains(stdout.String(), "http://127.0.0.1:8080") || !strings.Contains(stdout.String(), "admin/admin") {
-		t.Fatalf("stdout = %s", stdout.String())
-	}
-}
-
-func TestRunAgentStartsClient(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	cwd := t.TempDir()
-	writeDefaultConfig(t, cwd)
-	oldRunAgentClient := runAgentClient
-	defer func() { runAgentClient = oldRunAgentClient }()
-	var gotClient *agent.Client
-	runAgentClient = func(ctx context.Context, client *agent.Client) error {
-		gotClient = client
-		return context.Canceled
-	}
-	stdout := &bytes.Buffer{}
-	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandAgent, Agent: AgentCommand{GatewayURL: "http://127.0.0.1:8080", DeviceName: "local-mac"}}, Stdout: stdout, Stderr: &bytes.Buffer{}})
-	if err != nil {
-		t.Fatalf("Run(agent) error = %v", err)
-	}
-	if filepath.Clean(result.Cwd) != filepath.Clean(cwd) {
-		t.Fatalf("Result.Cwd = %q, want %q", result.Cwd, cwd)
+	localResponse := httptest.NewRecorder()
+	gotServer.ServeHTTP(localResponse, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+	if localResponse.Code != http.StatusOK || !strings.Contains(localResponse.Body.String(), `"status":"ok"`) {
+		t.Fatalf("local web API response = %d %s", localResponse.Code, localResponse.Body.String())
 	}
 	if gotClient == nil {
 		t.Fatal("runAgentClient was not called")
 	}
 	gotConfig := gotClient.Config()
-	if gotConfig.GatewayURL != "http://127.0.0.1:8080" || gotConfig.DeviceName != "local-mac" {
+	if gotConfig.GatewayURL != "http://127.0.0.1:9090" || gotConfig.DeviceName != "local-mac" {
 		t.Fatalf("agent config = %#v", gotConfig)
 	}
-	if !strings.Contains(stdout.String(), "http://127.0.0.1:8080") {
-		t.Fatalf("stdout = %s", stdout.String())
+	out := stdout.String()
+	if !strings.Contains(out, "http://127.0.0.1:9090") || !strings.Contains(out, "TermBridge agent connector targeting http://127.0.0.1:9090") {
+		t.Fatalf("stdout = %s", out)
+	}
+	if strings.Contains(out, "admin/admin") {
+		t.Fatalf("stdout exposes temporary auth: %s", out)
 	}
 }
 

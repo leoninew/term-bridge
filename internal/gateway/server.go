@@ -21,11 +21,12 @@ import (
 )
 
 type Config struct {
-	Host   string
-	Port   int
-	Open   bool
-	Dev    bool
-	Logger *slog.Logger
+	Host         string
+	Port         int
+	Open         bool
+	Dev          bool
+	Logger       *slog.Logger
+	LocalHandler http.Handler
 }
 
 type Server struct {
@@ -101,8 +102,16 @@ func New(config Config) *Server {
 	mux.HandleFunc("/api/gateway/devices", s.auth.Middleware(http.HandlerFunc(s.handleDevices)).ServeHTTP)
 	mux.HandleFunc("/api/gateway/devices/", s.auth.Middleware(http.HandlerFunc(s.handleDevice)).ServeHTTP)
 	mux.HandleFunc("/api/gateway/agent/tunnel", s.handleAgentTunnel)
+	if config.LocalHandler != nil {
+		mux.Handle("/api", config.LocalHandler)
+		mux.Handle("/api/", config.LocalHandler)
+	}
 	s.server = &http.Server{Handler: mux}
 	return s
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.server.Handler.ServeHTTP(w, r)
 }
 
 func (s *Server) Listen() (net.Listener, Info, error) {
@@ -429,7 +438,7 @@ func normalizeConfig(config Config) Config {
 		config.Host = "127.0.0.1"
 	}
 	if config.Port == 0 {
-		config.Port = 8080
+		config.Port = 9010
 	}
 	return config
 }

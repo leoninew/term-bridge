@@ -351,11 +351,35 @@ func writeJSON(path string, value any) error {
 		_ = os.Remove(tmpName)
 		return err
 	}
-	if err := os.Rename(tmpName, path); err != nil {
+	if err := replaceFile(tmpName, path); err != nil {
 		_ = os.Remove(tmpName)
 		return err
 	}
 	return nil
+}
+
+func replaceFile(tmpName string, path string) error {
+	if err := os.Rename(tmpName, path); err == nil {
+		return nil
+	}
+	deadline := time.Now().Add(time.Second)
+	for {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			if time.Now().After(deadline) {
+				return err
+			}
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		if err := os.Rename(tmpName, path); err != nil {
+			if time.Now().After(deadline) {
+				return err
+			}
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		return nil
+	}
 }
 
 func sortWorkspaces(values []workspace.Workspace) {

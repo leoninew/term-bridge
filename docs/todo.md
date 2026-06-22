@@ -14,29 +14,34 @@
 
 ---
 
-## 待处理
+## 已由 M5/M6 处理或缓解
 
-### webterminal: 大量输出时 client 被 detach
-- **现象**: 进程持续快速输出时，前端终端突然断开，不再接收后续输出
-- **根因**: `Client.queue` 容量仅 64，`publishBinary` 用非阻塞 `enqueue`，queue 满时直接 detach client
-- **影响**: 一旦 detach，用户需重新 attach 才能看到后续输出，中间丢失的内容不可恢复
-- **位置**: `internal/webterminal/registry.go:358-365`, `internal/webterminal/runtime.go:179-186`
+以下事项曾作为 M2.5/M5 风险记录，当前不再作为未处理 TODO 保留；事实来源见 `docs/verification/20260620-m5-runtime-hardening.md` 和 `docs/verification/20260620-m6-gateway-web-terminal-mvp.md`。
 
-### webterminal: history 全量刷盘性能问题
-- **现象**: 大量输出时磁盘 I/O 频繁
-- **根因**: `history.Writer.Write` 每次调用都 `os.WriteFile` 将全部行刷新到磁盘
-- **配置**: 默认上限 10000 行 / 5MB / 64KB 每行 (`configs/termbridge.default.yaml`)
-- **位置**: `internal/history/writer.go:104-111`
+### webterminal: 大量输出时 client 被 detach / readLoop 背压
+- **原风险**: 进程持续快速输出时，前端终端可能因 client queue 满而 detach，或 readLoop 不感知 WebSocket 消费能力。
+- **当前处理**: M5 引入 bounded queue / queued bytes backpressure，slow client 超限 detach，但 runtime/history 继续工作。
+- **剩余边界**: 仍需更大规模端到端压力验证，尤其是 Gateway tunnel 场景。
 
-### webterminal: readLoop 无背压控制
-- **现象**: 进程输出速率超过 WebSocket 消费速率时，内存中积累大量未发送数据
-- **根因**: `readLoop` 只读不阻塞，不感知 client 的消费能力
-- **位置**: `internal/webterminal/runtime.go:126-144`
+### webterminal: history 全量刷盘性能与并发安全
+- **原风险**: 高频输出时 history flush 导致磁盘 I/O 频繁，并可能与 attach replay / history read 发生并发 race。
+- **当前处理**: M5 加固 `history.Writer`，增加 mutex、pending flush、interval flush 和 race-sensitive 测试。
+- **剩余边界**: 仍需真实长时间运行和大输出场景观察。
 
 ### webterminal: copyBytes 高频内存分配
-- **现象**: 高频输出时 GC 压力大
-- **根因**: `readLoop` 每个 chunk 都调用 `copyBytes` 分配新内存
-- **位置**: `internal/webterminal/runtime.go:131`, `internal/webterminal/registry.go:371-375`
+- **原风险**: 高频输出时每个 client 重复 copy 带来 GC 压力。
+- **当前处理**: M5 减少 per-client copy，避免 `publishBinary` 为每个 client 重复复制。
+- **剩余边界**: Gateway tunnel terminal output 仍需继续压测。
+
+---
+
+## 仍需人工验证
+
+1. Agent disconnect / reconnect 行为和 stale route cleanup。
+2. 20+ sessions 或同等级压力场景。
+3. 真实 Claude Code / Codex TUI 通过 local Web 和 Gateway attach 的交互行为。
+4. Windows 真机上的 Agent/Gateway 连接、ConPTY 和 process tree cleanup。
+5. 存在 running session 时的 Pomelo PW terminal attach 分支。
 
 ---
 
@@ -49,3 +54,6 @@
 - [x] Unicode/ANSI 输出支持
 - [x] 用户退出码传递
 - [x] 大终端 resize 支持 (最大 500x500)
+- [x] M5 Runtime Hardening: process cleanup、backpressure、history 并发安全
+- [x] M6 Gateway Web Terminal MVP: Gateway relay、Agent tunnel、device/session/history relay
+- [x] M6.1 Serve 统一入口: `termbridge serve` / `just serve` 和配置驱动 Gateway/Agent 参数

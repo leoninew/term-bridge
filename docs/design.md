@@ -1,6 +1,6 @@
 # TermBridge-go 设计文档
 
-最后修改时间: 2026-06-20
+最后修改时间: 2026-06-22
 
 ## 背景
 
@@ -290,6 +290,37 @@ ttyd + tmux 的封装工具
 5. **Go + go-pty 必须被 abstraction 隔离**：业务层不直接依赖 go-pty.Pty
 6. **Ctrl+C 是停止当前命令，不是 detach**：必须区分 interrupt foreground process / close session / kill process tree
 7. **先 CLI Runtime，后本地产品面，再 Gateway**：不在 CLI runtime 稳定前提前建设复杂 Gateway
+8. **Serve 是远程能力统一入口**：Gateway service 和 Agent connector 对外不再作为两个模式暴露，统一通过 `termbridge serve` 启动
+
+### 当前 serve / Gateway 边界
+
+M6.1 后远程访问入口收口为：
+
+```text
+termbridge serve
+  ├─ Gateway service
+  │   ├─ Browser API / terminal WebSocket
+  │   ├─ Auth
+  │   ├─ Device registry
+  │   ├─ Routing
+  │   └─ Relay
+  └─ Agent connector
+      ├─ outbound tunnel
+      ├─ device identity
+      └─ local runtime adapter
+          ↓
+        Workspace / Session / History / Terminal attach
+          ↓
+        PTY / Process
+```
+
+边界：
+
+1. `termbridge serve` 启动后同时具备 Gateway service 和 Agent connector 能力。
+2. Agent connector 连接哪个 Gateway 由配置决定，不通过 CLI 参数或环境变量作为正式入口传递。
+3. Gateway service 不拥有 PTY / Process lifecycle，不直接运行用户命令。
+4. Agent connector 通过本地 runtime adapter 访问 workspace、session、history 和 terminal stream。
+5. 前端只有一套，通过不同路由或访问面区分 local / Gateway 能力。
 
 ### 后续仍需决策
 

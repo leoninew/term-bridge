@@ -9,7 +9,9 @@ export const localeLabels: Record<AppLocale, string> = {
 }
 
 const savedLocale = window.localStorage.getItem('termbridge.locale')
-const initialLocale: AppLocale = locales.includes(savedLocale as AppLocale) ? (savedLocale as AppLocale) : 'zh-CN'
+const initialLocale: AppLocale = locales.includes(savedLocale as AppLocale)
+  ? (savedLocale as AppLocale)
+  : 'zh-CN'
 
 export const messages = {
   'zh-CN': {
@@ -84,7 +86,8 @@ export const messages = {
       deleteSessionDescription: '删除“{name}”？这会对已停止或终态会话调用后端 DELETE 会话接口。',
       fallbackSession: '此会话',
       removeWorkspaceTitle: '移除工作区记录',
-      removeWorkspaceDescription: '这会移除 TermBridge 工作区记录以及后端允许移除的相关记录，不会删除磁盘上的目录或文件。当前后端没有文件系统目录删除 API。',
+      removeWorkspaceDescription:
+        '这会移除 TermBridge 工作区记录以及后端允许移除的相关记录，不会删除磁盘上的目录或文件。当前后端没有文件系统目录删除 API。',
     },
     toast: {
       refreshFailed: '刷新失败',
@@ -142,7 +145,8 @@ export const messages = {
     },
     gateway: {
       loginTitle: 'Gateway sign in',
-      loginDescription: 'Connect to the remote Gateway to select a device and attach existing sessions.',
+      loginDescription:
+        'Connect to the remote Gateway to select a device and attach existing sessions.',
       username: 'Username',
       password: 'Password',
       signIn: 'Sign in',
@@ -152,7 +156,8 @@ export const messages = {
       localWorkbench: 'Local workbench',
       online: 'online',
       offline: 'offline',
-      attachOnly: 'Gateway currently supports listing and attaching existing sessions only. Create, rename, delete, and reorder actions are unavailable.',
+      attachOnly:
+        'Gateway currently supports listing and attaching existing sessions only. Create, rename, delete, and reorder actions are unavailable.',
       attachOnlyTitle: 'Gateway session list is read-only',
       selectExistingSession: 'Select an existing session from the Gateway device workspace tree.',
       routeUnavailable: 'The selected device is offline or its route is unavailable.',
@@ -182,11 +187,14 @@ export const messages = {
       renameSessionTitle: 'Rename session',
       renameSessionDescription: 'Only the session name can be changed by the current backend API.',
       deleteSessionTitle: 'Delete session',
-      deleteActiveSessionDescription: 'Running, starting, and stopping sessions cannot be deleted. Close the terminal session first.',
-      deleteSessionDescription: 'Delete “{name}”? This uses the backend DELETE session endpoint for stopped or terminal sessions.',
+      deleteActiveSessionDescription:
+        'Running, starting, and stopping sessions cannot be deleted. Close the terminal session first.',
+      deleteSessionDescription:
+        'Delete “{name}”? This uses the backend DELETE session endpoint for stopped or terminal sessions.',
       fallbackSession: 'this session',
       removeWorkspaceTitle: 'Remove workspace record',
-      removeWorkspaceDescription: 'This removes the TermBridge workspace record and related records allowed by the backend. It does not delete directories or files from disk. The current backend has no filesystem directory delete API.',
+      removeWorkspaceDescription:
+        'This removes the TermBridge workspace record and related records allowed by the backend. It does not delete directories or files from disk. The current backend has no filesystem directory delete API.',
     },
     toast: {
       refreshFailed: 'Refresh failed',
@@ -209,11 +217,13 @@ export const messages = {
       sessionNameRequired: 'Session name is required.',
       workingDirectoryRequired: 'Working directory is required.',
       commandRequired: 'Command is required.',
-      createdSessionMissing: 'Session was created, but it was not returned by the refreshed session list.',
+      createdSessionMissing:
+        'Session was created, but it was not returned by the refreshed session list.',
       nameRequired: 'Name is required.',
       workspaceRemoved: '{name} record was removed. Files on disk were not deleted.',
       closeSessionBeforeDelete: 'Close the terminal session before deleting it.',
-      directoryDeleteUnsupported: 'TermBridge can remove workspace records, but the backend has no filesystem directory delete API.',
+      directoryDeleteUnsupported:
+        'TermBridge can remove workspace records, but the backend has no filesystem directory delete API.',
     },
   },
 } as const

@@ -26,6 +26,14 @@ export async function createSession(request: CreateSessionRequest): Promise<Crea
   return (await response.json()) as CreateSessionResponse
 }
 
+export async function getSession(sessionId: string): Promise<SessionSummary> {
+  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`)
+  if (!response.ok) {
+    throw new Error(await responseError('Get session failed', response))
+  }
+  return (await response.json()) as SessionSummary
+}
+
 export async function updateSession(
   sessionId: string,
   request: UpdateSessionRequest,

@@ -1,5 +1,5 @@
 # Roadmap 里程碑计划
-最后修改时间: 2026-06-20 17:23:23
+最后修改时间: 2026-06-22 13:54:03
 
 Review status: Accepted
 
@@ -215,7 +215,7 @@ M2.5: Web Terminal Technical Spike（已实现，风险进入 M5）
 M3: Session / Workspace Runtime Model（主体已完成）
 M4: Local Product Surface: CLI first, GUI optional container（收口中）
 M5: Runtime Hardening
-M6: Gateway Web Terminal MVP
+M6: Gateway Web Terminal MVP（工程链路已实现，M6.1 收口为 serve 统一入口）
 M7: Multi-device Beta
 M8: Security / Packaging / Release
 ```
@@ -973,6 +973,24 @@ session / workspace listing relay
 single-user token auth
 connection status
 ```
+
+### M6.1 Serve entry consolidation
+
+M6 工程链路完成后，入口和文档由 M6.1 收口：
+
+```text
+termbridge serve
+  ├─ Gateway service
+  └─ Agent connector
+```
+
+M6.1 决策：
+
+1. 对外正式入口收口为 `termbridge serve`。
+2. 开发入口收口为 `just serve`。
+3. Gateway/Agent 运行参数进入 `.termbridge.default.yaml` / `.termbridge.yaml` 配置和配置覆盖机制。
+4. 删除独立 `termbridge gateway` / `termbridge agent` 入口、`just gateway` / `just agent` 平级入口和 M6 专用 `m6-*` just target。
+5. 前端保持单体，通过不同路由或访问面区分 local/Gateway 能力。
 
 ### Minimal model
 

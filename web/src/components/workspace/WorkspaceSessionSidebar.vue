@@ -4,7 +4,9 @@
       <div class="flex w-full items-center gap-1.5">
         <label class="relative min-w-0 flex-1">
           <span class="sr-only">{{ t('sidebar.searchSessions') }}</span>
-          <Search class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+          <Search
+            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-500"
+          />
           <input
             v-model="searchQuery"
             type="search"
@@ -25,11 +27,21 @@
     </header>
 
     <div class="min-h-0 flex-1 overflow-y-auto p-1.5">
-      <div v-if="workspaceTree.length === 0" class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500">
+      <div
+        v-if="workspaceTree.length === 0"
+        class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500"
+      >
         {{ t('sidebar.emptyWorkspaces') }}
       </div>
-      <div v-else-if="treeItems.length === 0" class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500">
-        {{ normalizedSearchQuery ? t('sidebar.noSessionsMatch', { query: searchQuery }) : t('sidebar.noActiveSessions') }}
+      <div
+        v-else-if="treeItems.length === 0"
+        class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500"
+      >
+        {{
+          normalizedSearchQuery
+            ? t('sidebar.noSessionsMatch', { query: searchQuery })
+            : t('sidebar.noActiveSessions')
+        }}
       </div>
 
       <VueDraggable
@@ -53,9 +65,15 @@
             @keydown.enter.prevent="toggleWorkspace(workspace.value)"
             @keydown.space.prevent="toggleWorkspace(workspace.value)"
           >
-            <FolderOpen v-if="workspaceExpanded(workspace.value)" class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+            <FolderOpen
+              v-if="workspaceExpanded(workspace.value)"
+              class="size-4 shrink-0 text-slate-500"
+              aria-hidden="true"
+            />
             <Folder v-else class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
-            <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{ workspace.workspace.name }}</span>
+            <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{
+              workspace.workspace.name
+            }}</span>
             <button
               v-if="props.allowMutations"
               type="button"
@@ -74,21 +92,32 @@
               role="button"
               tabindex="0"
               class="group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-left transition"
-              :class="activeSessionId === session.session.id
-                ? 'border-slate-700 bg-slate-900 text-slate-100'
-                : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900/50 hover:text-slate-200'"
+              :class="
+                activeSessionId === session.session.id
+                  ? 'border-slate-700 bg-slate-900 text-slate-100'
+                  : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900/50 hover:text-slate-200'
+              "
               :style="{ paddingLeft: '38px' }"
               @click="selectSession(session.session)"
               @keydown.enter.prevent="selectSession(session.session)"
               @keydown.space.prevent="selectSession(session.session)"
             >
               <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
-              <span class="min-w-0 flex-1 truncate text-sm">{{ session.session.name || session.session.command }}</span>
-              <span v-if="props.allowMutations" class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+              <span class="min-w-0 flex-1 truncate text-sm">{{
+                session.session.name || session.session.command
+              }}</span>
+              <span
+                v-if="props.allowMutations"
+                class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100"
+              >
                 <button
                   type="button"
                   class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
-                  :aria-label="t('sidebar.renameSessionAria', { name: session.session.name || session.session.command })"
+                  :aria-label="
+                    t('sidebar.renameSessionAria', {
+                      name: session.session.name || session.session.command,
+                    })
+                  "
                   @click.stop="emit('renameSession', session.session)"
                 >
                   <Pencil class="size-3.5" />
@@ -97,7 +126,11 @@
                   v-if="canDeleteSession(session.session)"
                   type="button"
                   class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
-                  :aria-label="t('sidebar.deleteSessionAria', { name: session.session.name || session.session.command })"
+                  :aria-label="
+                    t('sidebar.deleteSessionAria', {
+                      name: session.session.name || session.session.command,
+                    })
+                  "
                   @click.stop="emit('deleteSession', session.session)"
                 >
                   <Trash2 class="size-3.5" />
@@ -109,7 +142,9 @@
       </VueDraggable>
     </div>
 
-    <footer class="flex h-8 shrink-0 items-center border-t border-slate-800/80 bg-[#0a0f18] px-2 text-sm text-slate-500">
+    <footer
+      class="flex h-8 shrink-0 items-center border-t border-slate-800/80 bg-[#0a0f18] px-2 text-sm text-slate-500"
+    >
       <DropdownMenuRoot>
         <DropdownMenuTrigger
           class="flex h-6 items-center gap-1.5 rounded px-1.5 text-slate-500 outline-none hover:bg-slate-900 hover:text-slate-200 focus:bg-slate-900 focus:text-slate-200"
@@ -127,7 +162,9 @@
             class="z-50 min-w-44 rounded-md border border-slate-800 bg-slate-950 p-1 text-sm text-slate-200 shadow-xl"
           >
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 outline-none hover:bg-slate-800 focus:bg-slate-800">
+              <DropdownMenuSubTrigger
+                class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 outline-none hover:bg-slate-800 focus:bg-slate-800"
+              >
                 <span class="inline-flex items-center gap-2">{{ t('common.language') }}</span>
                 <ChevronRight class="size-4 text-slate-500" />
               </DropdownMenuSubTrigger>
@@ -143,7 +180,10 @@
                       :value="item.value"
                       class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-slate-800 focus:bg-slate-800"
                     >
-                      <Check :class="locale === item.value ? 'opacity-100' : 'opacity-0'" class="size-4 text-blue-500" />
+                      <Check
+                        :class="locale === item.value ? 'opacity-100' : 'opacity-0'"
+                        class="size-4 text-blue-500"
+                      />
                       {{ item.label }}
                     </DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
@@ -160,7 +200,18 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { Check, ChevronRight, Folder, FolderOpen, Pencil, Plus, Search, Settings, SquareTerminal, Trash2 } from '@lucide/vue'
+  import {
+    Check,
+    ChevronRight,
+    Folder,
+    FolderOpen,
+    Pencil,
+    Plus,
+    Search,
+    Settings,
+    SquareTerminal,
+    Trash2,
+  } from '@lucide/vue'
   import {
     DropdownMenuContent,
     DropdownMenuPortal,
@@ -174,7 +225,11 @@
   } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
   import { localeLabels, locales, setLocale, type AppLocale } from '../../i18n'
-  import type { SessionSummary, WorkspaceSummary, WorkspaceTreeSummary } from '../../protocol/terminal'
+  import type {
+    SessionSummary,
+    WorkspaceSummary,
+    WorkspaceTreeSummary,
+  } from '../../protocol/terminal'
 
   type WorkspaceTreeItem = {
     kind: 'workspace'
@@ -213,7 +268,9 @@
   const draggableTreeItems = ref<WorkspaceTreeItem[]>([])
 
   const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
-  const localeOptions = computed(() => locales.map((value) => ({ value, label: localeLabels[value] })))
+  const localeOptions = computed(() =>
+    locales.map((value) => ({ value, label: localeLabels[value] })),
+  )
 
   function changeLocale(value: unknown) {
     if (typeof value === 'string' && locales.includes(value as AppLocale)) {
@@ -236,7 +293,12 @@
           children,
         }
       })
-      .filter((item) => !normalizedSearchQuery.value || item.children.length > 0 || workspaceMatchesSearch(item.workspace))
+      .filter(
+        (item) =>
+          !normalizedSearchQuery.value ||
+          item.children.length > 0 ||
+          workspaceMatchesSearch(item.workspace),
+      )
   })
 
   watch(
@@ -245,7 +307,10 @@
       draggableTreeItems.value = items
       const nextExpanded = new Set(expandedKeys.value)
       for (const item of items) {
-        if (!initializedExpandedKeys.has(item.value) && item.children.some((child) => isActiveSession(child.session))) {
+        if (
+          !initializedExpandedKeys.has(item.value) &&
+          item.children.some((child) => isActiveSession(child.session))
+        ) {
           initializedExpandedKeys.add(item.value)
           nextExpanded.add(item.value)
         }
@@ -259,7 +324,10 @@
     if (normalizedSearchQuery.value || !props.allowMutations) {
       return
     }
-    emit('reorderWorkspaces', draggableTreeItems.value.map((item) => item.workspace.id))
+    emit(
+      'reorderWorkspaces',
+      draggableTreeItems.value.map((item) => item.workspace.id),
+    )
   }
 
   function toggleWorkspace(workspaceValue: string) {

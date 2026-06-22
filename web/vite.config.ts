@@ -1,20 +1,27 @@
 import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 
-const backend = process.env.TERMBRIDGE_WEB_BACKEND ?? 'http://localhost:9010'
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const backend = env.VITE_TERMBRIDGE_BACKEND
 
-export default defineConfig({
-  plugins: [vue(), tailwindcss()],
-  server: {
-    host: 'localhost',
-    port: 9011,
-    proxy: {
-      '/api': {
-        target: backend,
-        changeOrigin: true,
-        ws: true,
+  if (!backend) {
+    throw new Error('VITE_TERMBRIDGE_BACKEND must be set in web/.env')
+  }
+
+  return {
+    plugins: [vue(), tailwindcss()],
+    server: {
+      host: 'localhost',
+      port: 9011,
+      proxy: {
+        '/api': {
+          target: backend,
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
-  },
+  }
 })

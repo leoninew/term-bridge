@@ -1,5 +1,5 @@
 # M6 Gateway Web Terminal MVP 规格
-最后修改时间: 2026-06-20 22:24:59
+最后修改时间: 2026-06-22 14:25:00
 
 Review status: Accepted
 
@@ -12,7 +12,7 @@ Review status: Accepted
 用户已确认的关键决策：
 
 1. M6 支持 attach/list 已存在 session，不通过 Gateway 创建新 session。
-2. Gateway 与 Agent 使用同一个 `termbridge` binary 的不同 subcommand。
+2. Gateway service 与 Agent connector 使用同一个 `termbridge serve` 统一入口启动；历史独立 Gateway/Agent subcommand 不再保留。
 3. Agent tunnel 采用单 WebSocket 多路复用。
 4. 正式用户系统稍后实现，M6 使用临时 `admin/admin` 用户。
 5. M6 支持多个会话。
@@ -33,13 +33,12 @@ M6 不支持通过 Gateway 创建新 session。用户可通过本地 CLI/local W
 
 ## Design decisions
 
-### 1. Same binary, multiple subcommands
+### 1. Same binary, unified serve entry
 
-M6 在现有 `termbridge` binary 中增加 subcommand，而不是新建 binary：
+M6.1 后 Gateway service 与 Agent connector 不再作为独立用户模式暴露，统一由现有 `termbridge` binary 的 `serve` command 启动：
 
 ```text
-termbridge gateway [options]
-termbridge agent [options]
+termbridge serve
 ```
 
 现有命令继续保持：
@@ -51,7 +50,7 @@ termbridge session
 termbridge workspace
 ```
 
-CLI parser 需要增加 `gateway` 和 `agent` command kind。`app.Run` 继续作为命令分发入口，但 Gateway/Agent 应拆成独立 internal packages，避免把 relay 状态混入 local webterminal runtime。
+CLI parser 只需要暴露 `serve` command kind。Gateway/Agent 运行参数不通过 CLI flag 传递，统一从 `.termbridge.default.yaml` 和 `.termbridge.yaml` 读取。Gateway/Agent 仍应拆成独立 internal packages，避免把 relay 状态混入 local webterminal runtime。
 
 ### 2. Gateway and Agent packages are separate from runtime ownership
 
@@ -203,27 +202,24 @@ Agent reconnect 后：
 - `internal/app/app.go`
 - `internal/app/app_test.go`
 
-增加：
+暴露：
 
 ```text
-termbridge gateway [options]
-termbridge agent [options]
+termbridge serve
 ```
 
-Gateway options 预计包括：
+Gateway/Agent 参数通过配置表达：
 
-```text
---host
---port
---dev
---open
-```
+```yaml
+gateway:
+  host: 127.0.0.1
+  port: 8080
+  open: false
+  dev: false
 
-Agent options 预计包括：
-
-```text
---gateway-url
---device-name
+agent:
+  gateway_url: http://127.0.0.1:8080
+  device_name: local-dev
 ```
 
 Auth 暂不暴露复杂配置，M6 默认 `admin/admin`。
@@ -295,9 +291,10 @@ M6 需要复用 local session list / attach 能力，但 Gateway 不能直接拥
 ### CLI shape
 
 ```text
-termbridge gateway --host 127.0.0.1 --port 8080 --dev
-termbridge agent --gateway-url http://127.0.0.1:8080 --device-name local-mac
+termbridge serve
 ```
+
+Gateway listen address、Agent upstream URL 和 device name 由配置控制，不通过 CLI 参数传递。
 
 ### Browser Gateway API
 
@@ -396,9 +393,9 @@ Browser ↔ Gateway 的 terminal WebSocket 输出语义保持现有 xterm termin
 
 不采用。用户已确认 M6 支持 attach/list 已存在 session。远程创建 session 涉及 cwd/env/command authorization 和安全边界，留到后续阶段。
 
-### Alternative B: 拆分 gateway/agent binary
+### Alternative B: 拆分 gateway/agent binary 或保留独立 gateway/agent subcommand
 
-不采用。用户已确认 Gateway 与 Agent 使用同一个 `termbridge` binary 的不同 subcommand。
+不采用。用户已确认 Gateway/Agent 对外收口为统一 `termbridge serve` 启动入口；启动后同时具备 Gateway service 和 Agent connector 能力。
 
 ### Alternative C: REST + WebSocket 多连接 tunnel
 
@@ -417,7 +414,7 @@ Browser ↔ Gateway 的 terminal WebSocket 输出语义保持现有 xterm termin
 本 Spec 已根据用户确认决策设计：
 
 1. attach/list only，不做 Gateway session creation。
-2. same binary, different subcommands。
+2. same binary, unified `serve` entry。
 3. single WebSocket multiplexed tunnel。
 4. temporary `admin/admin` auth。
 5. 支持多个 session。

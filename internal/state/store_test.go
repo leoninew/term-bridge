@@ -58,6 +58,29 @@ func TestStoreSavesAndListsRecords(t *testing.T) {
 	}
 }
 
+func TestStoreOverwritesExistingState(t *testing.T) {
+	store := NewStore(filepath.Join(t.TempDir(), ".termbridge"))
+	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	workspaceKey := "workspacekey"
+	sessionId := "session"
+	first := session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: now}
+	second := session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "user_process_exited", UpdatedAt: now.Add(time.Second)}
+
+	if err := store.SaveState(workspaceKey, sessionId, first); err != nil {
+		t.Fatalf("SaveState(first) error = %v", err)
+	}
+	if err := store.SaveState(workspaceKey, sessionId, second); err != nil {
+		t.Fatalf("SaveState(second) error = %v", err)
+	}
+	stored, err := store.LoadState(workspaceKey, sessionId)
+	if err != nil {
+		t.Fatalf("LoadState() error = %v", err)
+	}
+	if stored.State != session.StateStopped || stored.Reason != "user_process_exited" {
+		t.Fatalf("state = %#v, want stopped user_process_exited", stored)
+	}
+}
+
 func TestStoreOrdersAndDeletesWorkspaceSessions(t *testing.T) {
 	store := NewStore(filepath.Join(t.TempDir(), ".termbridge"))
 	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)

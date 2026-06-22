@@ -55,6 +55,12 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Web.Error.Debug {
 		t.Fatal("Web.Error.Debug = true, want false")
 	}
+	if cfg.Gateway.Host != "127.0.0.1" || cfg.Gateway.Port != 9010 || cfg.Gateway.Open || cfg.Gateway.Dev {
+		t.Fatalf("Gateway = %#v", cfg.Gateway)
+	}
+	if cfg.Agent.GatewayURL != "http://127.0.0.1:9010" || cfg.Agent.DeviceName != "local-dev" {
+		t.Fatalf("Agent = %#v", cfg.Agent)
+	}
 	if !reflect.DeepEqual(cfg.Command, []string{"pwsh"}) {
 		t.Fatalf("Command = %#v", cfg.Command)
 	}
@@ -78,6 +84,34 @@ func TestLoadRejectsInvalidHistoryLimit(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeConfig(t, cwd, "history:\n  max_lines: 0\n")
+
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !apperrors.IsConfig(err) {
+		t.Fatalf("Load() error = %T, want config error", err)
+	}
+}
+
+func TestLoadRejectsInvalidGatewayPort(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeConfig(t, cwd, "gateway:\n  port: 70000\n")
+
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !apperrors.IsConfig(err) {
+		t.Fatalf("Load() error = %T, want config error", err)
+	}
+}
+
+func TestLoadRejectsEmptyAgentGatewayURL(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeConfig(t, cwd, "agent:\n  gateway_url: \"\"\n")
 
 	_, err := Load(Options{Cwd: cwd})
 	if err == nil {
@@ -133,7 +167,7 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	configPath := filepath.Join(cwd, FileName)
 	logDir := filepath.Join(cwd, "configured-logs")
 	stateDir := filepath.Join(cwd, "configured-state")
-	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\n  request_body_limit: 128\n  response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: " + filepath.ToSlash(stateDir) + "\n"
+	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\n  request_body_limit: 128\n  response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: " + filepath.ToSlash(stateDir) + "\ngateway:\n  host: 0.0.0.0\n  port: 9090\n  open: true\n  dev: true\nagent:\n  gateway_url: http://gateway.example.test:8080\n  device_name: office-pc\n"
 	writeConfig(t, cwd, content)
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -163,6 +197,12 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	}
 	if cfg.History.MaxLines != 42 || cfg.History.MaxBytes != 2048 || cfg.History.MaxLineBytes != 128 {
 		t.Fatalf("History = %#v", cfg.History)
+	}
+	if cfg.Gateway.Host != "0.0.0.0" || cfg.Gateway.Port != 9090 || !cfg.Gateway.Open || !cfg.Gateway.Dev {
+		t.Fatalf("Gateway = %#v", cfg.Gateway)
+	}
+	if cfg.Agent.GatewayURL != "http://gateway.example.test:8080" || cfg.Agent.DeviceName != "office-pc" {
+		t.Fatalf("Agent = %#v", cfg.Agent)
 	}
 }
 

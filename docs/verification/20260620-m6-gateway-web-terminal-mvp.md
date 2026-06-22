@@ -1,13 +1,13 @@
 # M6 Gateway Web Terminal MVP 验证
-最后修改时间: 2026-06-20 22:40:00
+最后修改时间: 2026-06-22 14:20:00
 
-Review status: Draft
+Review status: Accepted
 
 ## Requirement alignment
 
 对照 `docs/requirement/20260620-m6-gateway-web-terminal-mvp.md`：
 
-- 已实现 Gateway / Agent 使用同一 `termbridge` binary 的不同 subcommand。
+- 已实现 Gateway service / Agent connector 使用同一 `termbridge` binary，并在 M6.1 后统一为 `termbridge serve` 启动入口。
 - 已实现 Agent outbound tunnel，Gateway 作为 Browser API 和 terminal relay 入口。
 - 已实现临时 `admin/admin` 登录、logout、me 和 cookie auth。
 - 已实现 Gateway device registry、online/offline route state。
@@ -17,6 +17,7 @@ Review status: Draft
 - 已在当前前端中接入 Gateway 能力，没有创建第二套 frontend，也没有引入 Gateway mode 产品概念。
 - Gateway 下不支持 session creation/mutation；前端通过 current backend abstraction 禁用 mutation 入口。
 - 已移除 `web.cwd_allowlist` 配置和 Web terminal cwd allowlist 业务校验；session cwd 仍保留 `~` 展开、绝对路径和 symlink 规范化。
+- M6.1 已将 Gateway/Agent 对外入口收口为 `termbridge serve` / `just serve`，并将 Gateway/Agent 运行参数收口到配置。
 
 ## Spec alignment
 
@@ -26,14 +27,14 @@ Review status: Draft
 - Agent 通过 `RuntimeAccess` / `webterminal.Registry` adapter 访问本地 runtime。
 - Browser ↔ Gateway terminal WebSocket 继续使用现有 `termbridge.terminal.v1` 协议；Gateway ↔ Agent tunnel 使用内部 JSON frame。
 - 当前前端复用 `WorkspaceSessionSidebar`、`TerminalView`、`HistoryTerminalView`，local/Gateway 差异集中在 `activeBackend` 的 API path、history reader、terminal WS URL 和 mutation capability。
-- `justfile` 增加了 M6 相关启动与验证入口，便于重复执行验证。
+- `justfile` 的 M6 初始启动与验证入口已由 M6.1 收口为 `just serve` 和通用检查命令；历史命令结果在本文档中保留为 M6 当时的验证记录。
 
 ## Plan alignment
 
 对照 `docs/plan/20260620-m6-gateway-web-terminal-mvp.md`：
 
 - Step 1-10 已进入实现范围并通过自动化检查覆盖核心路径。
-- Step 11 Pomelo PW flow 尚未创建，`just m6-pw-validate` 已提供入口并在 flow 缺失时明确 skip。
+- Step 11 Pomelo PW flow 已在 M6 验证期创建并运行通过；M6.1 后 milestone 入口已删除，flow 文件本身作为验证资产保留。
 - Step 12 本文档记录验证结果、架构图、流程图、命令结果和未完成项。
 
 ## Architecture and flow diagrams
@@ -43,7 +44,7 @@ Review status: Draft
 ```mermaid
 flowchart LR
     Browser[Browser\nCurrent web frontend] -->|HTTP + terminal WS| Gateway[Gateway service\nAuth / registry / relay]
-    Gateway <-->|single WS multiplexed tunnel| Agent[Agent subcommand\nRuntimeAccess adapter]
+    Gateway <-->|single WS multiplexed tunnel| Agent[Agent connector\nRuntimeAccess adapter]
     Agent --> Registry[webterminal.Registry]
     Registry --> Runtime[TermBridge runtime]
     Runtime --> PTY[PTY / Process]
@@ -144,7 +145,8 @@ flowchart TD
 - `web/src/i18n.ts`
   - 增加 Gateway 相关中英文文案。
 - `justfile`
-  - 增加日常开发入口 `just web-backend`、`just web-frontend`、`just gateway`、`just agent`，以及 M6 验证入口 `just m6-frontend`、`just m6-agent`、`just m6-agent-with-session`、`just m6-test`、`just m6-race`、`just m6-check`、`just m6-pw-*`。
+  - 当前开发入口已收口为 `just serve`，M6 专用 target 不再保留。
+  - 通用验证入口保留为 `just test`、`just check`、`just build`；组合命令按“前端在前、后端在后”组织，`check` 直接覆盖前端 typecheck/lint/format/test 与后端 Go fmt/vet/test。
 - `internal/config/config.go`、`internal/webterminal/registry.go`、`.termbridge.default.yaml`
   - 移除 `web.cwd_allowlist` 配置、`CwdAllowlist` wiring 和 cwd containment 业务校验。
   - 保留 session cwd 的 `~` 展开、绝对路径、symlink eval 和目录有效性检查。
@@ -176,7 +178,7 @@ flowchart TD
 
 ## Acceptance checklist
 
-- [x] Gateway 和 Agent 使用同一个 binary 的不同 subcommand。
+- [x] Gateway 和 Agent 能力使用同一个 binary；M6.1 后对外统一为 `termbridge serve`。
 - [x] Agent tunnel 使用单 WebSocket 多路复用 frame。
 - [x] Gateway Browser API relay 覆盖 workspace tree、sessions、history。
 - [x] Agent 侧 RuntimeAccess 调用 workspace/session/history。
@@ -195,24 +197,21 @@ flowchart TD
 
 ### `just --list`
 
-结果：通过。
+M6 初始验证结果：通过。
 
-关键入口已列出：
+当前关键入口包括：
 
 ```text
-just gateway
-just m6-agent
-just m6-agent-with-session
-just m6-frontend
-just m6-test
-just m6-race
-just m6-check
-just m6-pw-validate
-just m6-pw-run
-just web-build
+just serve
+just web
+just test
+just check
+just build
 ```
 
-### `just m6-test`
+M6.1 后 milestone 专用入口不再作为当前入口保留；当前长期入口以 `just serve`、`just web`、`just test`、`just check` 和 `just build` 为准。
+
+### Gateway 相关 Go 测试
 
 结果：通过。
 
@@ -225,7 +224,7 @@ ok termbridge-go/internal/cli
 ok termbridge-go/internal/app
 ```
 
-### `just web-build`
+### `just build`
 
 结果：通过。
 
@@ -242,14 +241,15 @@ vue-tsc --noEmit && vite build
 
 这些警告未导致构建失败，且来自依赖/打包体积提示，不是本次 M6 Gateway 实现的功能失败。
 
-### `just m6-check`
+### 通用检查组合
 
 结果：通过。
 
 覆盖：
 
-- `just m6-test`
-- `just web-build`
+- 前端 typecheck / lint / format check / Vitest
+- 后端 Go fmt / vet / test
+- `just build`
 
 ### `go test ./...`
 
@@ -332,6 +332,8 @@ Validation passed
 
 ## Conclusion
 
-M6 Gateway Web Terminal MVP 的核心后端 relay、Agent RuntimeAccess、前端 Gateway capability、single-writer 约束、just 入口、架构/流程图文档、cwd allowlist cleanup 和 Pomelo PW login/device/list relay flow 已完成并通过当前自动化检查。
+M6 Gateway Web Terminal MVP 的核心后端 relay、Agent RuntimeAccess、前端 Gateway capability、single-writer 约束、架构/流程图文档、cwd allowlist cleanup 和 Pomelo PW login/device/list relay flow 已完成并通过当前自动化检查。
 
-本阶段尚不能标记为完全验收完成；terminal attach 自动化分支、Agent reconnect、真实 Claude/Codex TUI 和 Windows 环境验证仍是 open items。
+M6.1 已进一步将入口收口为 `termbridge serve` / `just serve`，并将 Gateway/Agent 运行参数收口到配置。M6 verification 因此标记为 Accepted。
+
+仍需继续跟踪：terminal attach 自动化分支、Agent reconnect、真实 Claude/Codex TUI、20+ sessions 和 Windows 环境验证。

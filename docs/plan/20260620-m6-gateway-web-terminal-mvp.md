@@ -1,5 +1,5 @@
 # M6 Gateway Web Terminal MVP 计划
-最后修改时间: 2026-06-20 22:24:59
+最后修改时间: 2026-06-22 14:25:00
 
 Review status: Accepted
 
@@ -15,7 +15,7 @@ M6 采用严格模式 / strict。本计划覆盖 Gateway Web Terminal MVP，不�
 用户已确认的 M6 关键边界：
 
 1. 只支持 attach/list 已存在 session，不通过 Gateway 创建新 session。
-2. Gateway 与 Agent 使用同一个 `termbridge` binary 的不同 subcommand。
+2. Gateway service 与 Agent connector 使用同一个 `termbridge serve` 统一入口启动；历史独立 Gateway/Agent subcommand 不再保留。
 3. Agent tunnel 采用单 WebSocket 多路复用。
 4. 服务端正式用户系统稍后实现，M6 使用临时 `admin/admin`。
 5. 继续在当前前端上实现 Gateway 能力；项目只有一个前端，不引入 Gateway mode 或第二套 frontend。
@@ -29,17 +29,16 @@ M6 采用严格模式 / strict。本计划覆盖 Gateway Web Terminal MVP，不�
 
 ### Step 1. 扩展 CLI command shape
 
-目标：在同一个 `termbridge` binary 中增加 Gateway 和 Agent subcommand。
+目标：在同一个 `termbridge` binary 中增加统一 `serve` command，同时启动 Gateway service 和 Agent connector。
 
 计划：
 
-1. 在 `internal/cli/cli.go` 增加 command kind：`gateway`、`agent`。
-2. 增加 `GatewayOptions` 和 `AgentOptions`：
-   - Gateway: `--host`、`--port`、`--dev`、`--open`。
-   - Agent: `--gateway-url`、`--device-name`。
-3. 更新 usage/help：展示 `termbridge gateway` 和 `termbridge agent`。
-4. 在 `internal/app/app.go` 增加 command dispatch，但只委托到独立 packages。
-5. 补 CLI parsing tests，覆盖合法命令、help、非法参数。
+1. 在 `internal/cli/cli.go` 增加 command kind：`serve`。
+2. 不保留独立 `gateway` / `agent` command。
+3. Gateway/Agent 运行参数不通过 CLI flag 暴露；`gateway.host`、`gateway.port`、`gateway.open`、`gateway.dev`、`agent.gateway_url`、`agent.device_name` 由配置读取。
+4. 更新 usage/help：展示 `termbridge serve`，不展示历史 Gateway/Agent command 或运行参数 flag。
+5. 在 `internal/app/app.go` 增加 `serve` command dispatch，但只委托到独立 packages。
+6. 补 CLI parsing tests，覆盖 `serve`、help、非法参数、历史入口拒绝。
 
 ### Step 2. 建立 tunnel protocol package
 
@@ -89,8 +88,8 @@ M6 采用严格模式 / strict。本计划覆盖 Gateway Web Terminal MVP，不�
 1. 新增 `internal/agent/device.go` 或 `internal/device`。
 2. 使用 runtime state dir 生成/读取：`.termbridge/device.json`。
 3. 字段：`id`、`name`、`created_at`。
-4. `--device-name` 覆盖显示名；如果未指定，使用 hostname 或已有记录。
-5. 增加 tests：首次生成、再次读取稳定、device-name 覆盖 name、坏文件处理。
+4. `agent.device_name` 通过配置覆盖显示名；如果未配置，使用 hostname 或已有记录。
+5. 增加 tests：首次生成、再次读取稳定、配置覆盖 device name、坏文件处理。
 
 ### Step 5. 实现 Gateway service skeleton 和 device registry
 
@@ -237,7 +236,7 @@ type RuntimeAccess interface {
 11. `web/src/i18n.ts`
 12. `.pomelo-pw/m6-gateway-web-terminal.yaml`
 13. `docs/verification/20260620-m6-gateway-web-terminal-mvp.md`
-14. `justfile`（M6 Gateway/Agent 开发入口与验证入口）
+14. `justfile`（统一 `serve` 开发入口与通用验证入口）
 15. `docs/spec/20260620-m6-gateway-web-terminal-mvp.md`（架构图与流程图）
 
 预计新增：
@@ -251,31 +250,25 @@ type RuntimeAccess interface {
 
 ## Developer just entries
 
-M6 开发和验证使用现有 `justfile` 作为统一入口，避免在说明中散落长命令。
+M6.1 后开发入口不再保留历史 `gateway` / `agent` / `m6-*` target，避免历史验证命令成为长期使用路径。
+
+当前入口：
 
 ```text
-just gateway [host] [port]
-just m6-agent [gateway_url] [device_name]
-just m6-agent-with-session [gateway_url] [device_name]
-just m6-frontend [gateway_url]
-just m6-test
-just m6-race
-just m6-check
-just web-build
-just m6-pw-validate
-just m6-pw-run
+just serve
+just web
+just test
+just check
+just build
 ```
 
 入口用途：
 
-1. `just gateway`：启动 Gateway service，默认 `127.0.0.1:8080`，带 `--dev`。
-2. `just m6-agent`：启动 M6 验证用 Agent 并连接默认 Gateway，默认 device name 为 `local-dev`。
-3. `just m6-agent-with-session`：启动 M6 验证用 Agent，并在 Agent 自己的 runtime 中 seed 一个 running shell session，用于 terminal attach 自动化验证。
-4. `just m6-frontend`：启动 Vite frontend，监听 `http://localhost:9011`，并把 `/api` / WebSocket proxy 到 Gateway `http://127.0.0.1:8080`。
-5. `just m6-test`：运行 tunnel/auth/gateway/agent/cli/app 相关 Go 测试。
-6. `just m6-race`：运行 M6 多路复用关键包 race tests。
-7. `just m6-check`：运行 M6 自动化验证组合，目前包含 `m6-test` 和 `web-build`。
-8. `just m6-pw-validate` / `just m6-pw-run`：在 Pomelo PW flow 存在时执行验证或运行；flow 缺失时明确 skip。
+1. `just serve`：调用 `termbridge serve`，按配置同时启动 Gateway service 和 Agent connector。
+2. `just web`：启动唯一前端项目的开发服务。
+3. `just test`：前后端单元测试统一入口，先运行前端 Vitest，再运行后端 Go tests。
+4. `just check`：作为单一检查入口，按“前端在前、后端在后”直接运行前端 typecheck/lint/format/test 与后端 Go fmt/vet/test。
+5. `just build`：先构建前端生产产物，再构建 termbridge binary。
 
 ## Verification plan
 
@@ -322,8 +315,8 @@ pomelo-pw run .pomelo-pw/m6-gateway-web-terminal.yaml -o .pomelo-pw/output-m6 --
 
 进入 Verification 阶段时补齐结果：
 
-1. 启动 Gateway：`termbridge gateway ...`。
-2. 启动 Agent：`termbridge agent --gateway-url ...`。
+1. 在配置中设置 `gateway.*` 和 `agent.*`。
+2. 启动统一服务：`termbridge serve` 或 `just serve`。
 3. Browser 使用 `admin/admin` 登录。
 4. Browser 能看到 online device。
 5. Browser 能看到已有 workspace/session。
@@ -343,7 +336,7 @@ pomelo-pw run .pomelo-pw/m6-gateway-web-terminal.yaml -o .pomelo-pw/output-m6 --
 当前无阻塞 Plan 的用户决策项。已确认：
 
 1. attach/list only。
-2. same binary different subcommands。
+2. same binary unified `serve` entry。
 3. single WebSocket multiplexed tunnel。
 4. temporary `admin/admin`。
 5. current frontend only。
@@ -372,8 +365,8 @@ pomelo-pw run .pomelo-pw/m6-gateway-web-terminal.yaml -o .pomelo-pw/output-m6 --
 
 ## Rollback
 
-1. CLI subcommand 增加应独立，不影响 `exec`、`web`、`session`、`workspace`。
-2. Gateway/Agent/tunnel 包新增应与 local runtime 隔离；若 Gateway 实现不稳定，可不接入默认命令帮助之外的路径。
+1. `serve` command 增加应独立，不影响 `exec`、`web`、`session`、`workspace`。
+2. Gateway/Agent/tunnel 包新增应与 local runtime 隔离；若 Gateway 实现不稳定，可暂停 `serve` 入口但不恢复历史独立 Gateway/Agent command。
 3. 前端 Gateway 能力应通过 API client/component 分层实现；如出现问题，可回退相关组件，不影响 local Web terminal 核心组件。
 4. Auth 临时实现应可替换；后续正式用户系统上线时删除或替换 `admin/admin`。
 5. Gateway ↔ Agent tunnel 内部 JSON/base64 实现可替换为 binary framing，Browser terminal WebSocket 语义保持稳定。

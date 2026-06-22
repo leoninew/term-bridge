@@ -1,5 +1,5 @@
 # M6 Gateway Web Terminal MVP 需求
-最后修改时间: 2026-06-20 20:50:45
+最后修改时间: 2026-06-22 14:28:00
 
 Review status: Accepted
 
@@ -87,7 +87,7 @@ M6 Gateway Web Terminal MVP 完成需要满足：
 5. M6 使用临时 `admin/admin` auth；正式用户系统稍后实现。
 6. M6 复用 M2.5/M5 的 Web terminal/runtime 基础，不重写另一套 terminal runtime。
 7. M6 支持 attach/list 已存在 session，不通过 Gateway 创建新 session。
-8. Gateway 与 Agent 使用同一个 `termbridge` binary 的不同 subcommand。
+8. Gateway service 与 Agent connector 使用同一个 `termbridge serve` 统一入口；历史独立 subcommand 不再保留。
 9. Agent tunnel 采用单 WebSocket 多路复用。
 10. M6 支持多个会话。
 11. 可单元测试和 Pomelo PW 测试的自行组合验证，剩余项列入人工测试列表。
@@ -107,7 +107,7 @@ M6 Gateway Web Terminal MVP 完成需要满足：
 用户已确认进入 Spec，并补充以下决策：
 
 1. M6 支持 attach/list 已存在 session，不通过 Gateway 创建新 session。
-2. Gateway 与 Agent 使用同一个 `termbridge` binary 的不同 subcommand。
+2. Gateway service 与 Agent connector 使用同一个 `termbridge serve` 统一入口；历史独立 subcommand 不再保留。
 3. Agent tunnel 采用单 WebSocket 多路复用。
 4. 服务端稍后实现正式用户系统，M6 使用临时 `admin/admin` 作为用户。
 5. M6 支持多个会话。
