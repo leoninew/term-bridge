@@ -68,7 +68,7 @@ export async function updateSession(
     body: JSON.stringify(request),
   })
   if (!response.ok) {
-    throw new Error(await responseError('Rename session failed', response))
+    throw new Error(await responseError('Edit session failed', response))
   }
   return (await response.json()) as SessionSummary
 }

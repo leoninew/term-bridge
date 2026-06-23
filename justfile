@@ -22,7 +22,7 @@ clean:
 check:
     cd web && yarn typecheck
     cd web && yarn lint
-    cd web && yarn format:check
+    cd web && yarn format:check --write
     cd web && yarn test
     go fmt ./cmd/... ./internal/...
     go vet ./cmd/... ./internal/...

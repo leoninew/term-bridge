@@ -55,7 +55,6 @@
           </label>
         </div>
         <button
-          v-if="props.allowMutations"
           type="button"
           class="flex size-8 shrink-0 items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
           :aria-label="t('sidebar.newSession')"
@@ -99,7 +98,7 @@
         item-key="value"
         handle=".workspace-drag-handle"
         :animation="150"
-        :disabled="Boolean(normalizedSearchQuery) || !props.allowMutations"
+        :disabled="Boolean(normalizedSearchQuery)"
         @end="reorderDraggedWorkspaces"
       >
         <div v-for="workspace in draggableTreeItems" :key="workspace.value" class="min-w-0">
@@ -122,7 +121,6 @@
               workspace.workspace.name
             }}</span>
             <span
-              v-if="props.allowMutations"
               class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
             >
               <button
@@ -138,13 +136,20 @@
               </button>
               <button
                 type="button"
+                :disabled="
+                  !canRemoveWorkspace(workspace) ||
+                  props.removingWorkspaceId === workspace.workspace.id
+                "
                 class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
                 :aria-label="removeWorkspaceLabel(workspace)"
                 :title="removeWorkspaceLabel(workspace)"
-                :disabled="!canRemoveWorkspace(workspace)"
                 @click.stop="emit('removeWorkspace', workspace.workspace)"
               >
-                <Trash2 class="size-3.5" />
+                <Loader2
+                  v-if="props.removingWorkspaceId === workspace.workspace.id"
+                  class="size-3.5 animate-spin"
+                />
+                <Trash2 v-else class="size-3.5" />
               </button>
             </span>
           </div>
@@ -170,31 +175,29 @@
               <span class="min-w-0 flex-1 truncate text-sm">{{
                 session.session.name || session.session.command
               }}</span>
-              <span
-                v-if="props.allowMutations"
-                class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100"
-              >
+              <span class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
                 <button
                   type="button"
                   class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
                   :aria-label="
-                    t('sidebar.renameSessionAria', {
+                    t('sidebar.editSessionAria', {
                       name: session.session.name || session.session.command,
                     })
                   "
                   :title="
-                    t('sidebar.renameSessionAria', {
+                    t('sidebar.editSessionAria', {
                       name: session.session.name || session.session.command,
                     })
                   "
-                  @click.stop="emit('renameSession', session.session)"
+                  @click.stop="emit('editSession', session.session)"
                 >
                   <Pencil class="size-3.5" />
                 </button>
               </span>
               <button
-                v-if="props.allowMutations && canStopSession(session.session)"
+                v-if="session.session.lifecycle_state === 'running'"
                 type="button"
+                :disabled="props.stoppingSessionId === session.session.id"
                 class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
                 :aria-label="
                   t('sidebar.stopSessionAria', {
@@ -208,11 +211,16 @@
                 "
                 @click.stop="emit('stopSession', session.session)"
               >
-                <CircleStop class="size-3.5" />
+                <Loader2
+                  v-if="props.stoppingSessionId === session.session.id"
+                  class="size-3.5 animate-spin"
+                />
+                <CircleStop v-else class="size-3.5" />
               </button>
               <button
-                v-if="props.allowMutations && canRerunSession(session.session)"
+                v-if="['stopped', 'failed'].includes(session.session.lifecycle_state)"
                 type="button"
+                :disabled="props.rerunningSessionId === session.session.id"
                 class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
                 :aria-label="
                   t('sidebar.rerunSessionAria', {
@@ -226,11 +234,16 @@
                 "
                 @click.stop="emit('rerunSession', session.session)"
               >
-                <RotateCcw class="size-3.5" />
+                <Loader2
+                  v-if="props.rerunningSessionId === session.session.id"
+                  class="size-3.5 animate-spin"
+                />
+                <RotateCcw v-else class="size-3.5" />
               </button>
               <button
-                v-if="props.allowMutations && canDeleteSession(session.session)"
+                v-if="['stopped', 'failed'].includes(session.session.lifecycle_state)"
                 type="button"
+                :disabled="props.deletingSessionId === session.session.id"
                 class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
                 :aria-label="
                   t('sidebar.deleteSessionAria', {
@@ -244,7 +257,11 @@
                 "
                 @click.stop="emit('deleteSession', session.session)"
               >
-                <Trash2 class="size-3.5" />
+                <Loader2
+                  v-if="props.deletingSessionId === session.session.id"
+                  class="size-3.5 animate-spin"
+                />
+                <Trash2 v-else class="size-3.5" />
               </button>
             </div>
           </template>
@@ -316,10 +333,11 @@
     ChevronRight,
     CircleStop,
     Folder,
-    RotateCcw,
     FolderOpen,
+    Loader2,
     Pencil,
     Plus,
+    RotateCcw,
     Search,
     Settings,
     SquareTerminal,
@@ -370,16 +388,19 @@
   const props = defineProps<{
     workspaceTree: WorkspaceTreeSummary[]
     activeSessionId: string | null
-    allowMutations?: boolean
     devices: DeviceSummary[]
     selectedDeviceId: string
+    stoppingSessionId: string | null
+    rerunningSessionId: string | null
+    deletingSessionId: string | null
+    removingWorkspaceId: string | null
   }>()
 
   const emit = defineEmits<{
     select: [session: SessionSummary]
     refresh: []
     newSession: [workspace?: WorkspaceSummary]
-    renameSession: [session: SessionSummary]
+    editSession: [session: SessionSummary]
     stopSession: [session: SessionSummary]
     rerunSession: [session: SessionSummary]
     deleteSession: [session: SessionSummary]
@@ -465,7 +486,7 @@
   )
 
   function reorderDraggedWorkspaces() {
-    if (normalizedSearchQuery.value || !props.allowMutations) {
+    if (normalizedSearchQuery.value) {
       return
     }
     emit(
@@ -494,18 +515,6 @@
 
   function isActiveSession(session: SessionSummary) {
     return session.lifecycle_state === 'running'
-  }
-
-  function canStopSession(session: SessionSummary) {
-    return session.lifecycle_state === 'running'
-  }
-
-  function canRerunSession(session: SessionSummary) {
-    return ['stopped', 'failed'].includes(session.lifecycle_state)
-  }
-
-  function canDeleteSession(session: SessionSummary) {
-    return ['stopped', 'failed'].includes(session.lifecycle_state)
   }
 
   function canRemoveWorkspace(workspace: WorkspaceTreeItem) {

@@ -53,14 +53,17 @@
         <WorkspaceSessionSidebar
           :workspace-tree="workspaceTree"
           :active-session-id="activeTabId"
-          :allow-mutations="allowMutations"
           :devices="devices"
           :selected-device-id="selectedDeviceId"
+          :stopping-session-id="stoppingSessionId"
+          :rerunning-session-id="rerunningSessionId"
+          :deleting-session-id="deletingSessionId"
+          :removing-workspace-id="removingWorkspaceId"
           @select-device="selectDeviceId"
           @select="openSessionTab"
           @refresh="refresh"
           @new-session="openCreateSessionForm"
-          @rename-session="openRenameDialog"
+          @edit-session="openEditDialog"
           @stop-session="stopSessionFromSidebar"
           @rerun-session="rerunSessionFromSidebar"
           @delete-session="openDeleteSessionDialog"
@@ -164,7 +167,6 @@
                 <label class="flex flex-col gap-1.5 text-sm text-slate-300">
                   <span>{{ t('dialog.name') }}</span>
                   <input
-                    ref="sessionNameInput"
                     v-model="sessionName"
                     class="h-9 rounded-md border border-slate-800 bg-[#05070d] px-2 text-slate-100 outline-none placeholder:text-slate-600 focus:border-slate-600"
                     :placeholder="t('dialog.sessionNamePlaceholder')"
@@ -201,11 +203,7 @@
               class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14] p-2"
             >
               <TerminalView
-                v-if="
-                  activeSession.lifecycle_state === 'running' &&
-                  selectedDeviceOnline &&
-                  !offlineReadonly
-                "
+                v-if="activeSession.lifecycle_state === 'running'"
                 :key="activeSession.id"
                 :ws-url="terminalWsUrl(activeSession.id)"
                 :session-id="activeSession.id"
@@ -246,13 +244,10 @@
                 {{
                   !selectedDeviceId
                     ? t('gateway.selectDevicePlaceholder')
-                    : allowMutations
-                      ? t('workbench.noTabDescription')
-                      : t('gateway.selectExistingSession')
+                    : t('workbench.noTabDescription')
                 }}
               </p>
               <button
-                v-if="allowMutations"
                 type="button"
                 class="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-slate-100 hover:bg-slate-800"
                 @click="() => openCreateSessionForm()"
@@ -278,20 +273,17 @@
       </SplitterPanel>
     </SplitterGroup>
 
-    <DialogRoot v-model:open="renameDialogOpen">
+    <DialogRoot v-model:open="editDialogOpen">
       <DialogPortal>
         <DialogOverlay class="dialog-overlay" />
         <DialogContent class="dialog-content">
-          <DialogTitle class="dialog-title">{{ t('dialog.renameSessionTitle') }}</DialogTitle>
-          <DialogDescription class="dialog-description">
-            {{ t('dialog.renameSessionDescription') }}
-          </DialogDescription>
-          <form class="dialog-form" @submit.prevent="renameSelectedSession">
+          <DialogTitle class="dialog-title">{{ t('dialog.editSessionTitle') }}</DialogTitle>
+          <form class="dialog-form" @submit.prevent="editSelectedSession">
             <label>
               <span>{{ t('dialog.name') }}</span>
               <input
-                ref="renameInput"
-                v-model="renameText"
+                ref="editInput"
+                v-model="editText"
                 :placeholder="t('dialog.sessionNamePlaceholder')"
               />
             </label>
@@ -301,8 +293,8 @@
                   {{ t('common.cancel') }}
                 </button>
               </DialogClose>
-              <button type="submit" class="button button-primary" :disabled="renamingSession">
-                {{ renamingSession ? t('common.renaming') : t('common.rename') }}
+              <button type="submit" class="button button-primary" :disabled="editingSession">
+                {{ editingSession ? t('common.editing') : t('common.edit') }}
               </button>
             </div>
           </form>
@@ -340,11 +332,11 @@
                 type="button"
                 class="button button-danger"
                 :disabled="
-                  !selectedSession || isActiveLifecycle(selectedSession) || deletingSession
+                  !selectedSession || isActiveLifecycle(selectedSession) || !!deletingSessionId
                 "
                 @click="deleteSelectedSession"
               >
-                {{ deletingSession ? t('common.deleting') : t('common.delete') }}
+                {{ deletingSessionId ? t('common.deleting') : t('common.delete') }}
               </button>
             </AlertDialogAction>
           </div>
@@ -360,11 +352,13 @@
             t('dialog.removeWorkspaceTitle')
           }}</AlertDialogTitle>
           <AlertDialogDescription class="dialog-description">
-            {{ t('dialog.removeWorkspaceDescription') }}
+            <template v-if="selectedWorkspace">
+              {{ t('dialog.removeWorkspaceDescription', { name: selectedWorkspace.name }) }}
+            </template>
+            <template v-else>
+              {{ t('dialog.removeWorkspaceDescription', { name: t('dialog.fallbackSession') }) }}
+            </template>
           </AlertDialogDescription>
-          <div v-if="selectedWorkspace" class="dialog-note">
-            {{ selectedWorkspace.name }} — {{ selectedWorkspace.path }}
-          </div>
           <div class="dialog-actions">
             <AlertDialogCancel as-child>
               <button type="button" class="button button-secondary">
@@ -375,10 +369,10 @@
               <button
                 type="button"
                 class="button button-danger"
-                :disabled="!selectedWorkspace || removingWorkspace"
+                :disabled="!selectedWorkspace || !!removingWorkspaceId"
                 @click="removeSelectedWorkspace"
               >
-                {{ removingWorkspace ? t('common.removing') : t('common.removeWorkspace') }}
+                {{ removingWorkspaceId ? t('common.removing') : t('common.removeWorkspace') }}
               </button>
             </AlertDialogAction>
           </div>
@@ -413,14 +407,12 @@
     AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
-    AlertDialogDescription,
     AlertDialogOverlay,
     AlertDialogPortal,
     AlertDialogRoot,
     AlertDialogTitle,
     DialogClose,
     DialogContent,
-    DialogDescription,
     DialogOverlay,
     DialogPortal,
     DialogRoot,
@@ -490,18 +482,19 @@
   const cwd = ref('')
   const loading = ref(false)
   const creatingSession = ref(false)
-  const renamingSession = ref(false)
-  const deletingSession = ref(false)
-  const rerunningSession = ref(false)
-  const removingWorkspace = ref(false)
+  const editingSession = ref(false)
+  const stoppingSessionId = ref<string | null>(null)
+  const rerunningSessionId = ref<string | null>(null)
+  const deletingSessionId = ref<string | null>(null)
+  const removingWorkspaceId = ref<string | null>(null)
   const createSessionFormOpen = ref(false)
   const createSessionWorkspace = ref<WorkspaceSummary | null>(null)
-  const renameDialogOpen = ref(false)
+  const editDialogOpen = ref(false)
   const deleteSessionDialogOpen = ref(false)
   const removeWorkspaceDialogOpen = ref(false)
   const selectedSession = ref<SessionSummary | null>(null)
   const selectedWorkspace = ref<WorkspaceSummary | null>(null)
-  const renameText = ref('')
+  const editText = ref('')
   const toasts = ref<AppToast[]>([])
   const authInitialized = ref(false)
   const authenticated = ref(false)
@@ -510,9 +503,7 @@
   const passwordInput = ref('')
   const devices = ref<DeviceSummary[]>([])
   const selectedDeviceId = ref('')
-  const offlineReadonly = ref(false)
-  const sessionNameInput = ref<{ focus: () => void; select: () => void } | null>(null)
-  const renameInput = ref<{ focus: () => void; select: () => void } | null>(null)
+  const editInput = ref<{ focus: () => void; select: () => void } | null>(null)
   const createSessionWorkbench = ref<HTMLElement | null>(null)
   let toastId = 0
 
@@ -529,16 +520,6 @@
     return state ? state.charAt(0).toUpperCase() + state.slice(1) : ''
   })
 
-  const selectedDevice = computed(
-    () => devices.value.find((device) => device.id === selectedDeviceId.value) ?? null,
-  )
-
-  const selectedDeviceOnline = computed(() => selectedDevice.value?.online ?? false)
-
-  const allowMutations = computed(
-    () => Boolean(selectedDeviceId.value) && selectedDeviceOnline.value && !offlineReadonly.value,
-  )
-
   async function refresh() {
     if (!selectedDeviceId.value) {
       return
@@ -546,7 +527,6 @@
     loading.value = true
     try {
       const response = await listWorkspaceTree(selectedDeviceId.value)
-      offlineReadonly.value = response.offline || !selectedDeviceOnline.value
       applyWorkspaceTree(response.data)
       if (activeTabId.value) {
         await ensureHistoryLoaded(activeTabId.value)
@@ -597,7 +577,6 @@
   }
 
   async function selectDevice() {
-    offlineReadonly.value = selectedDeviceId.value !== '' && !selectedDeviceOnline.value
     await resetWorkbenchForSourceChange()
     await refresh()
   }
@@ -610,9 +589,6 @@
   }
 
   async function startSession() {
-    if (!ensureMutationAllowed()) {
-      return
-    }
     if (creatingSession.value) {
       return
     }
@@ -682,19 +658,16 @@
     }
   }
 
-  async function renameSelectedSession() {
-    if (!ensureMutationAllowed()) {
+  async function editSelectedSession() {
+    if (!selectedSession.value || editingSession.value) {
       return
     }
-    if (!selectedSession.value || renamingSession.value) {
-      return
-    }
-    const name = renameText.value.trim()
+    const name = editText.value.trim()
     if (!name) {
-      pushToast('error', t('toast.renameSessionFailed'), t('message.nameRequired'))
+      pushToast('error', t('toast.editSessionFailed'), t('message.nameRequired'))
       return
     }
-    renamingSession.value = true
+    editingSession.value = true
     try {
       const updated = await updateSession(
         selectedDeviceId.value,
@@ -704,28 +677,25 @@
       )
       updateSessionInState(updated)
       selectedSession.value = updated
-      renameDialogOpen.value = false
-      pushToast('success', t('toast.sessionRenamed'), name)
+      editDialogOpen.value = false
+      pushToast('success', t('toast.sessionEdited'), name)
     } catch (err) {
-      notifyError(t('toast.renameSessionFailed'), err)
+      notifyError(t('toast.editSessionFailed'), err)
     } finally {
-      renamingSession.value = false
+      editingSession.value = false
     }
   }
 
   async function deleteSelectedSession() {
-    if (!ensureMutationAllowed()) {
-      return
-    }
     if (
       !selectedSession.value ||
-      deletingSession.value ||
+      deletingSessionId.value ||
       isActiveLifecycle(selectedSession.value)
     ) {
       return
     }
     const session = selectedSession.value
-    deletingSession.value = true
+    deletingSessionId.value = session.id
     try {
       await deleteSession(selectedDeviceId.value, session.workspace_id, session.id)
       removeSessionFromState(session.id)
@@ -736,19 +706,16 @@
     } catch (err) {
       notifyError(t('toast.deleteSessionFailed'), err)
     } finally {
-      deletingSession.value = false
+      deletingSessionId.value = null
     }
   }
 
   async function removeSelectedWorkspace() {
-    if (!ensureMutationAllowed()) {
-      return
-    }
-    if (!selectedWorkspace.value || removingWorkspace.value) {
+    if (!selectedWorkspace.value || removingWorkspaceId.value) {
       return
     }
     const workspace = selectedWorkspace.value
-    removingWorkspace.value = true
+    removingWorkspaceId.value = workspace.id
     try {
       await deleteWorkspace(selectedDeviceId.value, workspace.id)
       removeWorkspaceFromState(workspace.id)
@@ -762,14 +729,11 @@
     } catch (err) {
       notifyError(t('toast.removeWorkspaceFailed'), err)
     } finally {
-      removingWorkspace.value = false
+      removingWorkspaceId.value = null
     }
   }
 
   async function reorderWorkspaces(workspaceIds: string[]) {
-    if (!ensureMutationAllowed()) {
-      return
-    }
     const previousTree = workspaceTree.value
     workspaceTree.value = orderWorkspaceTree(previousTree, workspaceIds)
     try {
@@ -835,9 +799,7 @@
     if (
       !session ||
       !tab ||
-      (session.lifecycle_state === 'running' &&
-        selectedDeviceOnline.value &&
-        !offlineReadonly.value) ||
+      session.lifecycle_state === 'running' ||
       tab.historyLoaded ||
       tab.historyLoading
     ) {
@@ -847,7 +809,6 @@
     tab.historyError = null
     try {
       const response = await readHistory(selectedDeviceId.value, session.workspace_id, sessionId)
-      offlineReadonly.value = offlineReadonly.value || response.offline
       tab.historyText = response.data
       tab.historyLoaded = true
     } catch (err) {
@@ -860,9 +821,6 @@
   }
 
   function openCreateSessionForm(workspace?: WorkspaceSummary) {
-    if (!ensureMutationAllowed()) {
-      return
-    }
     logTerminalDiagnostic('session.form.open', {
       workspaceId: workspace?.id,
       workspacePath: workspace?.path,
@@ -870,10 +828,6 @@
     })
     resetCreateSessionForm(workspace)
     createSessionFormOpen.value = true
-    void nextTick(() => {
-      sessionNameInput.value?.focus()
-      sessionNameInput.value?.select()
-    })
   }
 
   function cancelCreateSession() {
@@ -902,43 +856,40 @@
     return 'bash'
   }
 
-  function openRenameDialog(session: SessionSummary) {
-    if (!ensureMutationAllowed()) {
-      return
-    }
+  function openEditDialog(session: SessionSummary) {
     selectedSession.value = session
-    renameText.value = session.name || session.command || ''
-    renameDialogOpen.value = true
+    editText.value = session.name || session.command || ''
+    editDialogOpen.value = true
     void nextTick(() => {
-      renameInput.value?.focus()
-      renameInput.value?.select()
+      editInput.value?.focus()
+      editInput.value?.select()
     })
   }
 
   async function stopSessionFromSidebar(session: SessionSummary) {
-    if (!ensureMutationAllowed()) {
-      return
-    }
     if (!isStoppableLifecycle(session)) {
       return
     }
+    if (stoppingSessionId.value) {
+      return
+    }
+    stoppingSessionId.value = session.id
     try {
       const updated = await closeSession(selectedDeviceId.value, session.workspace_id, session.id)
       updateSessionInState(updated)
       await ensureHistoryLoaded(session.id)
     } catch (err) {
       notifyError(t('toast.stopSessionFailed'), err)
+    } finally {
+      stoppingSessionId.value = null
     }
   }
 
   async function rerunSessionFromSidebar(session: SessionSummary) {
-    if (!ensureMutationAllowed()) {
+    if (!canRerunLifecycle(session) || rerunningSessionId.value) {
       return
     }
-    if (!canRerunLifecycle(session) || rerunningSession.value) {
-      return
-    }
-    rerunningSession.value = true
+    rerunningSessionId.value = session.id
     try {
       const size = measureInitialTerminalSize()
       const response = await rerunSession(
@@ -960,7 +911,7 @@
       notifyError(t('toast.rerunSessionFailed'), err)
       await refreshSessionAfterRerunFailure(session)
     } finally {
-      rerunningSession.value = false
+      rerunningSessionId.value = null
     }
   }
 
@@ -987,9 +938,6 @@
   }
 
   function openDeleteSessionDialog(session: SessionSummary) {
-    if (!ensureMutationAllowed()) {
-      return
-    }
     selectedSession.value = session
     deleteSessionDialogOpen.value = true
     if (isActiveLifecycle(session)) {
@@ -998,9 +946,6 @@
   }
 
   function openRemoveWorkspaceDialog(workspace: WorkspaceSummary) {
-    if (!ensureMutationAllowed()) {
-      return
-    }
     selectedWorkspace.value = workspace
     removeWorkspaceDialogOpen.value = true
   }
@@ -1151,18 +1096,10 @@
   }
 
   function terminalWsUrl(sessionId: string) {
-    const session = sessionFor(sessionId)
-    return selectedDeviceId.value && selectedDeviceOnline.value && session
+    const session = sessions.value.find((s) => s.id === sessionId)
+    return session
       ? sessionTerminalWsUrl(selectedDeviceId.value, session.workspace_id, sessionId)
       : null
-  }
-
-  function ensureMutationAllowed() {
-    if (allowMutations.value) {
-      return true
-    }
-    pushToast('info', t('gateway.offlineReadonlyTitle'), t('gateway.offlineReadonly'))
-    return false
   }
 
   function handleTerminalState(message: ServerControlMessage) {

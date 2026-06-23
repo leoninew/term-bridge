@@ -95,11 +95,11 @@ p {
   background: #0f172a;
   color: #e2e8f0;
   font-size: 14px;
-  padding: 14px;
+  padding: 24px;
 }
 
 .dialog-title {
-  margin-bottom: 4px;
+  margin-bottom: 12px;
   font-size: 18px;
   font-weight: 600;
 }
@@ -146,8 +146,8 @@ p {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 .terminal-shell {
