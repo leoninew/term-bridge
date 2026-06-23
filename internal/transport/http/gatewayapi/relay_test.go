@@ -31,7 +31,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 			switch request.Method {
 			case "workspace_tree":
 				return rawResponse(`[{"id":"ws-1","name":"Workspace"}]`)
-			case "sessions":
+			case "workspace_sessions":
 				return rawResponse(`[{"id":"sess-1","name":"Session"}]`)
 			case "history":
 				return rawResponse(`"` + strings.Repeat("h", 64*1024) + `"`)
@@ -47,8 +47,8 @@ func TestBrowserAPIRelay(t *testing.T) {
 		want string
 	}{
 		{"/api/devices/dev-1/workspaces/tree", "Workspace"},
-		{"/api/devices/dev-1/sessions", "sess-1"},
-		{"/api/devices/dev-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
+		{"/api/devices/dev-1/workspaces/ws-1/sessions", "sess-1"},
+		{"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
 	} {
 		request := httptest.NewRequest(http.MethodGet, tc.path, nil)
 		request.AddCookie(cookie)

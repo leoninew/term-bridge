@@ -40,7 +40,7 @@ func TestGatewayAgentTerminalAttachE2E(t *testing.T) {
 	cookie := loginCookie(t, gateway)
 	header := http.Header{}
 	header.Set("Cookie", cookie.Name+"="+cookie.Value)
-	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/"+device.Id+"/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/"+device.Id+"/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		t.Fatalf("browser Dial() error = %v", err)
 	}
@@ -125,11 +125,11 @@ func newFakeRuntimeAccess() *fakeRuntimeAccess {
 }
 
 func (r *fakeRuntimeAccess) ListWorkspaces(context.Context) ([]terminalapp.WorkspaceSummary, error) {
-	return []terminalapp.WorkspaceSummary{{Id: "ws-1", Key: "ws-1", Name: "Workspace", Path: "."}}, nil
+	return []terminalapp.WorkspaceSummary{{Id: "ws-1", Name: "Workspace", Path: "."}}, nil
 }
 
 func (r *fakeRuntimeAccess) WorkspaceTree(context.Context) ([]terminalapp.WorkspaceTreeNode, error) {
-	return []terminalapp.WorkspaceTreeNode{{Id: "ws-1", Key: "ws-1", Name: "Workspace", Path: ".", Children: []terminalapp.WorkspaceSessionSummary{{Id: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}}}}, nil
+	return []terminalapp.WorkspaceTreeNode{{Id: "ws-1", Name: "Workspace", Path: ".", Children: []terminalapp.WorkspaceSessionSummary{{Id: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}}}}, nil
 }
 
 func (r *fakeRuntimeAccess) UpdateWorkspaceOrder(context.Context, []string) ([]terminalapp.WorkspaceSummary, error) {
@@ -144,35 +144,31 @@ func (r *fakeRuntimeAccess) ListSessionsByWorkspaceId(context.Context, string) (
 	return []terminalapp.WorkspaceSessionSummary{{Id: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}}, nil
 }
 
-func (r *fakeRuntimeAccess) ListSessions(context.Context) ([]terminalapp.SessionSummary, error) {
-	return []terminalapp.SessionSummary{{Id: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}}, nil
-}
-
 func (r *fakeRuntimeAccess) CreateSession(context.Context, terminalapp.CreateSessionRequest) (terminalapp.CreateSessionResponse, error) {
-	return terminalapp.CreateSessionResponse{SessionId: "sess-1", WorkspaceId: "ws-1", WorkspaceKey: "ws-1", State: string(session.StateRunning), WsUrl: "/api/devices/gateway-e2e-device/sessions/sess-1/ws"}, nil
+	return terminalapp.CreateSessionResponse{SessionId: "sess-1", WorkspaceId: "ws-1", State: string(session.StateRunning)}, nil
 }
 
-func (r *fakeRuntimeAccess) GetSession(context.Context, string) (terminalapp.SessionSummary, error) {
-	return terminalapp.SessionSummary{Id: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}, nil
+func (r *fakeRuntimeAccess) GetSession(context.Context, string, string) (terminalapp.SessionSummary, error) {
+	return terminalapp.SessionSummary{Id: "sess-1", WorkspaceId: "ws-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}, nil
 }
 
-func (r *fakeRuntimeAccess) UpdateSession(context.Context, string, terminalapp.UpdateSessionRequest) (terminalapp.SessionSummary, error) {
-	return r.GetSession(context.Background(), "sess-1")
+func (r *fakeRuntimeAccess) UpdateSession(context.Context, string, string, terminalapp.UpdateSessionRequest) (terminalapp.SessionSummary, error) {
+	return r.GetSession(context.Background(), "ws-1", "sess-1")
 }
 
-func (r *fakeRuntimeAccess) DeleteSession(context.Context, string) error {
+func (r *fakeRuntimeAccess) DeleteSession(context.Context, string, string) error {
 	return nil
 }
 
-func (r *fakeRuntimeAccess) CloseSession(context.Context, string) (terminalapp.SessionSummary, error) {
-	return r.GetSession(context.Background(), "sess-1")
+func (r *fakeRuntimeAccess) CloseSession(context.Context, string, string) (terminalapp.SessionSummary, error) {
+	return r.GetSession(context.Background(), "ws-1", "sess-1")
 }
 
-func (r *fakeRuntimeAccess) ReadHistory(context.Context, string) ([]byte, error) {
+func (r *fakeRuntimeAccess) ReadHistory(context.Context, string, string) ([]byte, error) {
 	return []byte("POMELO_M6_ATTACH_READY\n"), nil
 }
 
-func (r *fakeRuntimeAccess) Attach(_ context.Context, sessionId string) (agentapp.TerminalStream, error) {
+func (r *fakeRuntimeAccess) Attach(_ context.Context, workspaceId string, sessionId string) (agentapp.TerminalStream, error) {
 	stream := newFakeTerminalStream()
 	r.mu.Lock()
 	r.streams[sessionId] = stream

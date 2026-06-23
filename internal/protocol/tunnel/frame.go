@@ -63,9 +63,10 @@ type ResponsePayload struct {
 }
 
 type TerminalAttachPayload struct {
-	SessionId string `json:"session_id"`
-	Cols      int    `json:"cols,omitempty"`
-	Rows      int    `json:"rows,omitempty"`
+	WorkspaceId string `json:"workspace_id"`
+	SessionId   string `json:"session_id"`
+	Cols        int    `json:"cols,omitempty"`
+	Rows        int    `json:"rows,omitempty"`
 }
 
 type TerminalDataPayload struct {

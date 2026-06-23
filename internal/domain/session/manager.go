@@ -9,7 +9,7 @@ import (
 
 type Store interface {
 	SaveSession(Session) error
-	SaveState(workspaceKey string, sessionId string, value StateRecord) error
+	SaveState(workspaceId string, sessionId string, value StateRecord) error
 }
 
 type Manager struct {
@@ -24,7 +24,6 @@ type CreateOptions struct {
 	LaunchCwd string
 	Command   CommandRecord
 	History   HistoryRecord
-	LogPath   string
 }
 
 func (m Manager) Create(options CreateOptions) (Session, error) {
@@ -38,18 +37,16 @@ func (m Manager) Create(options CreateOptions) (Session, error) {
 		Id:            id,
 		Name:          options.Name,
 		WorkspaceId:   options.Workspace.Id,
-		WorkspaceKey:  options.Workspace.Key,
 		LaunchCwd:     options.LaunchCwd,
 		Command:       options.Command,
 		History:       options.History,
-		LogPath:       options.LogPath,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
 	if err := m.Store.SaveSession(session); err != nil {
 		return Session{}, err
 	}
-	if err := m.Store.SaveState(session.WorkspaceKey, session.Id, StateRecord{SchemaVersion: SchemaVersion, State: StateStarting, Reason: "session_created", UpdatedAt: now}); err != nil {
+	if err := m.Store.SaveState(session.WorkspaceId, session.Id, StateRecord{SchemaVersion: SchemaVersion, State: StateStarting, Reason: "session_created", UpdatedAt: now}); err != nil {
 		return Session{}, err
 	}
 	return session, nil

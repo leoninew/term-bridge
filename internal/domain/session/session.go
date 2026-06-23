@@ -23,11 +23,9 @@ type Session struct {
 	Id            string        `json:"session_id"`
 	Name          string        `json:"name"`
 	WorkspaceId   string        `json:"workspace_id"`
-	WorkspaceKey  string        `json:"workspace_key"`
 	LaunchCwd     string        `json:"launch_cwd"`
 	Command       CommandRecord `json:"command"`
 	History       HistoryRecord `json:"history"`
-	LogPath       string        `json:"log_path"`
 	CreatedAt     time.Time     `json:"created_at"`
 	UpdatedAt     time.Time     `json:"updated_at"`
 }

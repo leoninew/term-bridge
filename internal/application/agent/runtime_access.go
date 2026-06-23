@@ -12,14 +12,13 @@ type RuntimeAccess interface {
 	UpdateWorkspaceOrder(ctx context.Context, workspaceIds []string) ([]terminalapp.WorkspaceSummary, error)
 	DeleteWorkspace(ctx context.Context, workspaceId string) error
 	ListSessionsByWorkspaceId(ctx context.Context, workspaceId string) ([]terminalapp.WorkspaceSessionSummary, error)
-	ListSessions(ctx context.Context) ([]terminalapp.SessionSummary, error)
 	CreateSession(ctx context.Context, request terminalapp.CreateSessionRequest) (terminalapp.CreateSessionResponse, error)
-	GetSession(ctx context.Context, sessionId string) (terminalapp.SessionSummary, error)
-	UpdateSession(ctx context.Context, sessionId string, request terminalapp.UpdateSessionRequest) (terminalapp.SessionSummary, error)
-	DeleteSession(ctx context.Context, sessionId string) error
-	CloseSession(ctx context.Context, sessionId string) (terminalapp.SessionSummary, error)
-	ReadHistory(ctx context.Context, sessionId string) ([]byte, error)
-	Attach(ctx context.Context, sessionId string) (TerminalStream, error)
+	GetSession(ctx context.Context, workspaceId string, sessionId string) (terminalapp.SessionSummary, error)
+	UpdateSession(ctx context.Context, workspaceId string, sessionId string, request terminalapp.UpdateSessionRequest) (terminalapp.SessionSummary, error)
+	DeleteSession(ctx context.Context, workspaceId string, sessionId string) error
+	CloseSession(ctx context.Context, workspaceId string, sessionId string) (terminalapp.SessionSummary, error)
+	ReadHistory(ctx context.Context, workspaceId string, sessionId string) ([]byte, error)
+	Attach(ctx context.Context, workspaceId string, sessionId string) (TerminalStream, error)
 }
 
 type TerminalStream interface {
@@ -68,13 +67,6 @@ func (a WebTerminalAccess) ListSessionsByWorkspaceId(ctx context.Context, worksp
 	return a.Registry.ListSessionsByWorkspaceId(workspaceId)
 }
 
-func (a WebTerminalAccess) ListSessions(ctx context.Context) ([]terminalapp.SessionSummary, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	return a.Registry.ListSessions()
-}
-
 func (a WebTerminalAccess) CreateSession(ctx context.Context, request terminalapp.CreateSessionRequest) (terminalapp.CreateSessionResponse, error) {
 	if err := ctx.Err(); err != nil {
 		return terminalapp.CreateSessionResponse{}, err
@@ -82,44 +74,44 @@ func (a WebTerminalAccess) CreateSession(ctx context.Context, request terminalap
 	return a.Registry.CreateSession(ctx, request)
 }
 
-func (a WebTerminalAccess) GetSession(ctx context.Context, sessionId string) (terminalapp.SessionSummary, error) {
+func (a WebTerminalAccess) GetSession(ctx context.Context, workspaceId string, sessionId string) (terminalapp.SessionSummary, error) {
 	if err := ctx.Err(); err != nil {
 		return terminalapp.SessionSummary{}, err
 	}
-	return a.Registry.GetSession(sessionId)
+	return a.Registry.GetSession(workspaceId, sessionId)
 }
 
-func (a WebTerminalAccess) UpdateSession(ctx context.Context, sessionId string, request terminalapp.UpdateSessionRequest) (terminalapp.SessionSummary, error) {
+func (a WebTerminalAccess) UpdateSession(ctx context.Context, workspaceId string, sessionId string, request terminalapp.UpdateSessionRequest) (terminalapp.SessionSummary, error) {
 	if err := ctx.Err(); err != nil {
 		return terminalapp.SessionSummary{}, err
 	}
-	return a.Registry.UpdateSession(sessionId, request)
+	return a.Registry.UpdateSession(workspaceId, sessionId, request)
 }
 
-func (a WebTerminalAccess) DeleteSession(ctx context.Context, sessionId string) error {
+func (a WebTerminalAccess) DeleteSession(ctx context.Context, workspaceId string, sessionId string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return a.Registry.DeleteSession(sessionId)
+	return a.Registry.DeleteSession(workspaceId, sessionId)
 }
 
-func (a WebTerminalAccess) CloseSession(ctx context.Context, sessionId string) (terminalapp.SessionSummary, error) {
+func (a WebTerminalAccess) CloseSession(ctx context.Context, workspaceId string, sessionId string) (terminalapp.SessionSummary, error) {
 	if err := ctx.Err(); err != nil {
 		return terminalapp.SessionSummary{}, err
 	}
-	return a.Registry.CloseSession(sessionId, "api_close")
+	return a.Registry.CloseSession(workspaceId, sessionId, "api_close")
 }
 
-func (a WebTerminalAccess) ReadHistory(ctx context.Context, sessionId string) ([]byte, error) {
+func (a WebTerminalAccess) ReadHistory(ctx context.Context, workspaceId string, sessionId string) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return a.Registry.History(sessionId)
+	return a.Registry.History(workspaceId, sessionId)
 }
 
-func (a WebTerminalAccess) Attach(ctx context.Context, sessionId string) (TerminalStream, error) {
+func (a WebTerminalAccess) Attach(ctx context.Context, workspaceId string, sessionId string) (TerminalStream, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return a.Registry.Attach(sessionId)
+	return a.Registry.Attach(workspaceId, sessionId)
 }

@@ -200,7 +200,11 @@
               class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14] p-2"
             >
               <TerminalView
-                v-if="activeSession.lifecycle_state === 'running' && selectedDeviceOnline && !offlineReadonly"
+                v-if="
+                  activeSession.lifecycle_state === 'running' &&
+                  selectedDeviceOnline &&
+                  !offlineReadonly
+                "
                 :key="activeSession.id"
                 :ws-url="terminalWsUrl(activeSession.id)"
                 :session-id="activeSession.id"
@@ -319,9 +323,7 @@
             <template v-else>
               {{
                 t('dialog.deleteSessionDescription', {
-                  name: selectedSession
-                    ? sessionDisplayName(selectedSession)
-                    : t('dialog.fallbackSession'),
+                  name: selectedSession ? selectedSession.name : t('dialog.fallbackSession'),
                 })
               }}
             </template>
@@ -457,12 +459,7 @@
     terminalWsUrl as sessionTerminalWsUrl,
     updateSession,
   } from '../features/sessions/api'
-  import {
-    authLogin,
-    authMe,
-    listDevices,
-    type DeviceSummary,
-  } from '../features/gateway/api'
+  import { authLogin, authMe, listDevices, type DeviceSummary } from '../features/gateway/api'
   import {
     deleteWorkspace,
     listWorkspaceTree,
@@ -495,6 +492,7 @@
   const deletingSession = ref(false)
   const removingWorkspace = ref(false)
   const createSessionFormOpen = ref(false)
+  const createSessionWorkspace = ref<WorkspaceSummary | null>(null)
   const renameDialogOpen = ref(false)
   const deleteSessionDialogOpen = ref(false)
   const removeWorkspaceDialogOpen = ref(false)
@@ -641,7 +639,9 @@
         cols: size.cols,
         rows: size.rows,
       })
-      const created = await createSession(selectedDeviceId.value, {
+      const workspaceId = createSessionWorkspace.value?.id ?? null
+      const created = await createSession(selectedDeviceId.value, workspaceId, {
+        ...(workspaceId ? { workspace_id: workspaceId } : {}),
         name,
         cwd: trimmedCwd,
         command,
@@ -653,7 +653,7 @@
         workspaceId: created.workspace_id,
         state: created.state,
       })
-      const session = await getSession(selectedDeviceId.value, created.session_id)
+      const session = await getSession(selectedDeviceId.value, created.workspace_id, created.session_id)
       logTerminalDiagnostic('session.create.summary', {
         sessionId: session.id,
         lifecycleState: session.lifecycle_state,
@@ -666,7 +666,7 @@
       resetCreateSessionForm()
       createSessionFormOpen.value = false
       await openSessionTab(session)
-      pushToast('success', t('toast.sessionCreated'), sessionDisplayName(session))
+      pushToast('success', t('toast.sessionCreated'), session.name)
     } catch (err) {
       notifyError(t('toast.createSessionFailed'), err)
     } finally {
@@ -688,7 +688,12 @@
     }
     renamingSession.value = true
     try {
-      const updated = await updateSession(selectedDeviceId.value, selectedSession.value.id, { name })
+      const updated = await updateSession(
+        selectedDeviceId.value,
+        selectedSession.value.workspace_id,
+        selectedSession.value.id,
+        { name },
+      )
       updateSessionInState(updated)
       selectedSession.value = updated
       renameDialogOpen.value = false
@@ -714,12 +719,12 @@
     const session = selectedSession.value
     deletingSession.value = true
     try {
-      await deleteSession(selectedDeviceId.value, session.id)
+      await deleteSession(selectedDeviceId.value, session.workspace_id, session.id)
       removeSessionFromState(session.id)
       closeTab(session.id)
       selectedSession.value = null
       deleteSessionDialogOpen.value = false
-      pushToast('success', t('toast.sessionDeleted'), sessionDisplayName(session))
+      pushToast('success', t('toast.sessionDeleted'), session.name)
     } catch (err) {
       notifyError(t('toast.deleteSessionFailed'), err)
     } finally {
@@ -822,7 +827,9 @@
     if (
       !session ||
       !tab ||
-      (session.lifecycle_state === 'running' && selectedDeviceOnline.value && !offlineReadonly.value) ||
+      (session.lifecycle_state === 'running' &&
+        selectedDeviceOnline.value &&
+        !offlineReadonly.value) ||
       tab.historyLoaded ||
       tab.historyLoading
     ) {
@@ -831,7 +838,7 @@
     tab.historyLoading = true
     tab.historyError = null
     try {
-      const response = await readHistory(selectedDeviceId.value, sessionId)
+      const response = await readHistory(selectedDeviceId.value, session.workspace_id, sessionId)
       offlineReadonly.value = offlineReadonly.value || response.offline
       tab.historyText = response.data
       tab.historyLoaded = true
@@ -868,6 +875,7 @@
 
   function resetCreateSessionForm(workspace?: WorkspaceSummary) {
     commandText.value = defaultCommand()
+    createSessionWorkspace.value = workspace ?? null
     cwd.value = workspace?.path ?? '~'
     sessionName.value = t('dialog.defaultSessionName')
   }
@@ -907,7 +915,7 @@
       return
     }
     try {
-      const updated = await closeSession(selectedDeviceId.value, session.id)
+      const updated = await closeSession(selectedDeviceId.value, session.workspace_id, session.id)
       updateSessionInState(updated)
       await ensureHistoryLoaded(session.id)
     } catch (err) {
@@ -950,7 +958,6 @@
       workspace.children.map((session) => ({
         ...session,
         workspace_id: session.workspace_id ?? workspace.id,
-        workspace_key: session.workspace_key ?? workspace.key,
       })),
     )
   }
@@ -1031,14 +1038,12 @@
       attachment_state: session.attachment_state,
       exit_code: session.exit_code,
       updated_at: session.updated_at,
-      log_path: session.log_path,
     }
   }
 
   function workspaceSummaryFromTree(workspace: WorkspaceTreeSummary): WorkspaceSummary {
     return {
       id: workspace.id,
-      key: workspace.key,
       name: workspace.name,
       path: workspace.path,
       sort_order: workspace.sort_order,
@@ -1061,12 +1066,13 @@
 
   function sessionTitle(sessionId: string) {
     const session = sessionFor(sessionId)
-    return session ? sessionDisplayName(session) : sessionId.slice(0, 8)
+    if (!session) {
+      return sessionId.slice(0, 8)
+    }
+    const workspaceName = workspaces.value.find((workspace) => workspace.id === session.workspace_id)?.name
+    return workspaceName ? `${session.name} · ${workspaceName}` : session.name
   }
 
-  function sessionDisplayName(session: SessionSummary) {
-    return session.name || session.command || session.id.slice(0, 8)
-  }
 
   function isActiveLifecycle(session: SessionSummary) {
     return ['running', 'starting', 'stopping'].includes(session.lifecycle_state)
@@ -1077,8 +1083,9 @@
   }
 
   function terminalWsUrl(sessionId: string) {
-    return selectedDeviceId.value && selectedDeviceOnline.value
-      ? sessionTerminalWsUrl(selectedDeviceId.value, sessionId)
+    const session = sessionFor(sessionId)
+    return selectedDeviceId.value && selectedDeviceOnline.value && session
+      ? sessionTerminalWsUrl(selectedDeviceId.value, session.workspace_id, sessionId)
       : null
   }
 
@@ -1104,7 +1111,11 @@
       return
     }
     try {
-      const updated = await getSession(selectedDeviceId.value, sessionId)
+      const session = sessionFor(sessionId)
+      if (!session) {
+        return
+      }
+      const updated = await getSession(selectedDeviceId.value, session.workspace_id, sessionId)
       updateSessionInState(updated)
       await ensureHistoryLoaded(sessionId)
     } catch (err) {

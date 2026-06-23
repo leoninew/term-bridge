@@ -30,7 +30,7 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 	cookie := loginCookie(t, gateway)
 	header := http.Header{}
 	header.Set("Cookie", cookie.Name+"="+cookie.Value)
-	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		t.Fatalf("browser Dial() error = %v", err)
 	}
@@ -43,7 +43,7 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 	if !bytes.Equal(output, wantOutput) {
 		t.Fatalf("terminal output = %q, want %q", output, wantOutput)
 	}
-	_, response, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	_, response, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err == nil {
 		t.Fatal("second writer Dial() error = nil, want conflict")
 	}
@@ -116,7 +116,7 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, input
 func TestRouteUnavailable(t *testing.T) {
 	gateway := New(testGatewayConfig())
 	cookie := loginCookie(t, gateway)
-	request := httptest.NewRequest(http.MethodGet, "/api/devices/missing/sessions", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/devices/missing/workspaces/ws-1/sessions", nil)
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, request)

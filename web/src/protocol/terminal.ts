@@ -14,7 +14,6 @@ export type ServerControlMessage =
       type: 'started'
       session_id: string
       workspace_id: string
-      workspace_key?: string
       state: LifecycleState
       lifecycle_state?: LifecycleState
       attachment_state?: AttachmentState
@@ -40,7 +39,6 @@ export type ApiErrorResponse = {
 
 export type WorkspaceSummary = {
   id: string
-  key: string
   name: string
   path: string
   sort_order: number
@@ -51,19 +49,16 @@ export type SessionSummary = {
   id: string
   name: string
   workspace_id: string
-  workspace_key: string
   command: string
   cwd: string
   lifecycle_state: LifecycleState
   attachment_state?: AttachmentState
   exit_code?: number
   updated_at: string
-  log_path: string
 }
 
-export type WorkspaceTreeSession = Omit<SessionSummary, 'workspace_id' | 'workspace_key'> & {
+export type WorkspaceTreeSession = Omit<SessionSummary, 'workspace_id'> & {
   workspace_id?: string
-  workspace_key?: string
 }
 
 export type WorkspaceTreeSummary = WorkspaceSummary & {
@@ -71,6 +66,7 @@ export type WorkspaceTreeSummary = WorkspaceSummary & {
 }
 
 export type CreateSessionRequest = {
+  workspace_id?: string
   name: string
   cwd: string
   command: string[]
@@ -85,9 +81,7 @@ export type UpdateSessionRequest = {
 export type CreateSessionResponse = {
   session_id: string
   workspace_id: string
-  workspace_key: string
   state: LifecycleState
-  ws_url: string
 }
 
 export function encodeControl(message: ClientControlMessage): string {

@@ -221,7 +221,7 @@ func TestRunWorkspaceAndSessionList(t *testing.T) {
 		t.Fatalf("Run(session) error = %v", err)
 	}
 	sessionOutput := sessionOut.String()
-	for _, want := range []string{"SESSION ID", "COMMAND", "CWD", "LOG", "stopped", "pwsh", cwd, "termbridge.log"} {
+	for _, want := range []string{"SESSION ID", "COMMAND", "CWD", "stopped", "pwsh", cwd} {
 		if !strings.Contains(sessionOutput, want) {
 			t.Fatalf("session output missing %q: %s", want, sessionOutput)
 		}

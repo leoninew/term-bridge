@@ -41,7 +41,6 @@ type ServerMessage struct {
 	Type            string `json:"type"`
 	SessionId       string `json:"session_id,omitempty"`
 	WorkspaceId     string `json:"workspace_id,omitempty"`
-	WorkspaceKey    string `json:"workspace_key,omitempty"`
 	State           string `json:"state,omitempty"`
 	LifecycleState  string `json:"lifecycle_state,omitempty"`
 	AttachmentState string `json:"attachment_state,omitempty"`

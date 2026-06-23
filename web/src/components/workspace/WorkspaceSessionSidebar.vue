@@ -501,13 +501,12 @@
       .map((session) => ({
         ...session,
         workspace_id: session.workspace_id ?? workspace.id,
-        workspace_key: session.workspace_key ?? workspace.key,
       }))
       .filter((session) => !normalizedSearchQuery.value || sessionMatchesSearch(session, workspace))
   }
 
   function workspaceMatchesSearch(workspace: WorkspaceSummary) {
-    const haystack = [workspace.id, workspace.key, workspace.name, workspace.path]
+    const haystack = [workspace.id, workspace.name, workspace.path]
       .join(' ')
       .toLowerCase()
     return haystack.includes(normalizedSearchQuery.value)

@@ -149,8 +149,6 @@ func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.Reques
 			return nil, err
 		}
 		return c.config.Runtime.ListSessionsByWorkspaceId(ctx, params.WorkspaceId)
-	case "sessions":
-		return c.config.Runtime.ListSessions(ctx)
 	case "create_session":
 		var params terminalapp.CreateSessionRequest
 		if err := decodeRequestParams(request.Params, &params); err != nil {
@@ -159,45 +157,50 @@ func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.Reques
 		return c.config.Runtime.CreateSession(ctx, params)
 	case "get_session":
 		var params struct {
-			SessionId string `json:"session_id"`
+			WorkspaceId string `json:"workspace_id"`
+			SessionId   string `json:"session_id"`
 		}
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return c.config.Runtime.GetSession(ctx, params.SessionId)
+		return c.config.Runtime.GetSession(ctx, params.WorkspaceId, params.SessionId)
 	case "update_session":
 		var params struct {
-			SessionId string                           `json:"session_id"`
-			Request   terminalapp.UpdateSessionRequest `json:"request"`
+			WorkspaceId string                           `json:"workspace_id"`
+			SessionId   string                           `json:"session_id"`
+			Request     terminalapp.UpdateSessionRequest `json:"request"`
 		}
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return c.config.Runtime.UpdateSession(ctx, params.SessionId, params.Request)
+		return c.config.Runtime.UpdateSession(ctx, params.WorkspaceId, params.SessionId, params.Request)
 	case "delete_session":
 		var params struct {
-			SessionId string `json:"session_id"`
+			WorkspaceId string `json:"workspace_id"`
+			SessionId   string `json:"session_id"`
 		}
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return nil, c.config.Runtime.DeleteSession(ctx, params.SessionId)
+		return nil, c.config.Runtime.DeleteSession(ctx, params.WorkspaceId, params.SessionId)
 	case "close_session":
 		var params struct {
-			SessionId string `json:"session_id"`
+			WorkspaceId string `json:"workspace_id"`
+			SessionId   string `json:"session_id"`
 		}
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return c.config.Runtime.CloseSession(ctx, params.SessionId)
+		return c.config.Runtime.CloseSession(ctx, params.WorkspaceId, params.SessionId)
 	case "history":
 		var params struct {
-			SessionId string `json:"session_id"`
+			WorkspaceId string `json:"workspace_id"`
+			SessionId   string `json:"session_id"`
 		}
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		data, err := c.config.Runtime.ReadHistory(ctx, params.SessionId)
+		data, err := c.config.Runtime.ReadHistory(ctx, params.WorkspaceId, params.SessionId)
 		return string(data), err
 	default:
 		return nil, fmt.Errorf("unknown request method: %s", request.Method)
@@ -241,7 +244,7 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamId, err.Error())
 		return
 	}
-	stream, err := c.config.Runtime.Attach(ctx, payload.SessionId)
+	stream, err := c.config.Runtime.Attach(ctx, payload.WorkspaceId, payload.SessionId)
 	if err != nil {
 		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamId, err.Error())
 		return

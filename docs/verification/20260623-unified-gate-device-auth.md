@@ -1,5 +1,5 @@
 # 统一 Gate / Device / Auth 工作台验证
-最后修改时间: 2026-06-23 15:26:20
+最后修改时间: 2026-06-23 18:42:25
 
 Review status: Accepted
 
@@ -104,7 +104,7 @@ Review status: Accepted
 | Bootstrap writes missing credentials and viper reads them | 通过 | `auth.username/password` 与 `agent.device_id/name` 被读取和生成。 |
 | Browser auth and Agent auth share credentials | 通过 | config-driven credentials 替代 hardcoded auth。 |
 | Gate registry remains routing state, not runtime owner | 通过 | Gateway relay 到 Agent/Runtime，未接管 PTY/process lifecycle。 |
-| Offline readonly history | 部分通过 | Gateway 内存 cache 支持在线读过后的离线只读 history/workspace/session snapshot；不是持久化 Gate cache，Gate 重启后 snapshot 丢失。 |
+| Offline readonly history | 按当前决策通过 | Gateway 内存 cache 支持在线读过后的离线只读 history/workspace tree snapshot；持久化 Gate snapshot 已明确不做，Gate 重启后 cache 丢失。 |
 | Structured error shape | 未完全完成 | 当前多处仍用 `http.Error` 返回文本，尚未统一为 Spec 建议的 `{ error: { code, message } }`。 |
 
 ## Plan alignment
@@ -119,7 +119,7 @@ Review status: Accepted
 | Step 6. canonical device-scoped Gateway routes | 通过 | `/api/login/logout/me/devices/devices/:id/...` 已接入。 |
 | Step 7. RuntimeAccess 完整控制面 | 通过 | Agent runtime access 和 WebTerminalAccess adapter 已扩展。 |
 | Step 8. tunnel request/response method 和错误映射 | 部分通过 | mutation methods 已补齐；method 名称按实现采用 `create_session`、`workspace_order` 等；structured error/status mapping 尚未完全稳定化。 |
-| Step 9. Gate offline readonly history snapshot/cache | 部分通过 | 已实现进程内 cache；未实现 Plan 示例中的持久化 `gateway-cache` 目录。 |
+| Step 9. Gate offline readonly history snapshot/cache | 按当前决策通过 | 已实现进程内 cache；持久化 `gateway-cache` 已明确不做。 |
 | Step 10. 前端 canonical Gate/Device API client 和 Pinia 状态边界 | 部分通过 | API client 已切到 canonical path；Pinia/router 基础已接入；auth/device/workbench 状态仍在 `SessionsView.vue` 局部 refs 中。 |
 | Step 11. 移除 `/gateway` 产品路由并改造 `/sessions` | 通过 | `/gateway` redirect；`SessionsView` 使用 selected device；设备选择已整合到 sidebar。 |
 | Step 12. 文档更新 | 通过 | README 和设计/需求/规格/计划/验证文档记录新边界；本次更新补充后续 UI 与默认值调整验证。 |
@@ -209,7 +209,8 @@ Review status: Accepted
   - canonical auth/device API client。
 
 - `web/src/features/sessions/api.ts`
-  - session API 改为 `/api/devices/:deviceId/sessions...`。
+  - session read/update/delete/close/history/ws API 改为 `/api/devices/:deviceId/workspaces/:workspaceId/sessions...`。
+  - workspace-scoped create 由路径 workspace id 注入 `workspace_id`；普通 create-by-cwd 入口保留 `POST /api/devices/:deviceId/sessions`。
   - history 返回 offline marker。
 
 - `web/src/features/workspaces/api.ts`
@@ -254,7 +255,8 @@ Review status: Accepted
 - 删除 localapi 比 Requirement 初稿更激进，但符合 Plan 阶段用户明确覆盖决策。
 - 前端 device selector 从独立 post-login 页面移动到 `/sessions` sidebar：来自后续 UX 决策，避免登录后仍被设备选择页阻断。
 - 默认 device name 从 `<hostname>-<short-device-id>` 改为 hostname-only：来自后续 UX 决策，避免 name 与 id 重复表达。
-- `internal/application/terminal/registry.go` 中 `CreateSessionResponse.WsUrl` 字段名已按要求改为 `WsUrl`，但字段值仍生成旧 `/api/sessions/:id/ws`。当前前端不使用这个字段，而是基于 selected device 生成 canonical terminal URL；仍记录为风险。
+- 后续 session contract 清理已删除 `CreateSessionResponse.ws_url`、session response `log_path` 和 workspace `workspace_key` 输出；当前前端基于 selected device、workspace id、session id 生成 canonical terminal URL。
+- session read/update/delete/close/history/ws 已收敛为 workspace-scoped path；仅普通 create-by-cwd fallback 保留 `POST /api/devices/:deviceId/sessions`。
 - `go test ./...` 会经过 `web/node_modules/flatted/golang/pkg/flatted` 并显示 `[no test files]`，不是失败，但说明当前 Go package discovery 会扫到 node_modules 下的 Go package。
 
 ### 未纳入本轮的内容
@@ -298,9 +300,10 @@ Review status: Accepted
 - [x] 新建会话表单顺序为“目录 / 名称 / 命令”。
 - [x] 新建会话默认名称为“默认 / Default”。
 - [x] 默认命令按 UA 简单推断：Windows `cmd`、macOS `zsh`、Linux `bash`、fallback `bash`。
-- [ ] Gateway offline history cache 未持久化，重启后 snapshot 不保留。
+- [x] Gate snapshot 明确不做持久化；offline history cache 仅为进程内缓存，重启后不保留。
+- [x] `CreateSessionResponse.ws_url`、session response `log_path`、workspace `workspace_key` 已从当前代码 contract 删除。
+- [x] session read/update/delete/close/history/ws 已改为 workspace-scoped device API。
 - [ ] HTTP/API 错误响应未统一为 structured error shape。
-- [ ] `CreateSessionResponse.ws_url` 字段值仍是旧 direct path 字符串。
 - [ ] 未进行浏览器人工端到端验收。
 
 ## Command results
@@ -317,7 +320,7 @@ go test ./...
 
 ```text
 ?   	termbridge-go/cmd/termbridge	[no test files]
-ok  	termbridge-go/internal/app	(cached)
+ok  	termbridge-go/internal/app	1.446s
 ok  	termbridge-go/internal/application/agent	(cached)
 ok  	termbridge-go/internal/application/runner	(cached)
 ok  	termbridge-go/internal/application/terminal	(cached)
@@ -335,7 +338,7 @@ ok  	termbridge-go/internal/infrastructure/repository/state	(cached)
 ?   	termbridge-go/internal/infrastructure/version	[no test files]
 ok  	termbridge-go/internal/protocol/terminal	(cached)
 ok  	termbridge-go/internal/protocol/tunnel	(cached)
-ok  	termbridge-go/internal/transport/cli	(cached)
+ok  	termbridge-go/internal/transport/cli	1.517s
 ok  	termbridge-go/internal/transport/http/gatewayapi	(cached)
 ok  	termbridge-go/internal/transport/http/gatewayapi/auth	(cached)
 ok  	termbridge-go/internal/transport/http/middleware/requestlog	(cached)
@@ -381,18 +384,34 @@ ok  	termbridge-go/internal/transport/http/server	0.845s
 ?   	termbridge-go/web/node_modules/flatted/golang/pkg/flatted	[no test files]
 ```
 
+### Focused workspace/session contract regression
+
+```text
+go test ./internal/application/terminal ./internal/application/agent ./internal/transport/http/gatewayapi ./internal/protocol/tunnel ./internal/infrastructure/repository/state
+```
+
+结果：通过。
+
+```text
+ok  	termbridge-go/internal/application/terminal	(cached)
+ok  	termbridge-go/internal/application/agent	(cached)
+ok  	termbridge-go/internal/transport/http/gatewayapi	(cached)
+ok  	termbridge-go/internal/protocol/tunnel	(cached)
+ok  	termbridge-go/internal/infrastructure/repository/state	(cached)
+```
+
 ### Frontend typecheck
 
 ```text
 yarn --cwd web typecheck
 ```
 
-结果：通过。
+结果：通过。最新补充执行结果：
 
 ```text
 yarn run v1.22.22
 $ vue-tsc --noEmit
-Done in 1.81s.
+Done in 2.01s.
 ```
 
 ### Frontend lint
@@ -406,7 +425,7 @@ yarn --cwd web lint
 ```text
 yarn run v1.22.22
 $ eslint .
-Done in 1.36s.
+Done in 1.42s.
 ```
 
 ### Frontend tests
@@ -425,10 +444,10 @@ $ vitest run --passWithNoTests
 
  Test Files  1 passed (1)
       Tests  4 passed (4)
-   Start at  15:03:11
-   Duration  292ms (transform 35ms, setup 0ms, import 158ms, tests 18ms, environment 0ms)
+   Start at  18:41:47
+   Duration  339ms (transform 35ms, setup 0ms, import 199ms, tests 18ms, environment 0ms)
 
-Done in 0.83s.
+Done in 0.90s.
 ```
 
 ### Frontend build
@@ -450,12 +469,12 @@ dist/index.html                                      0.40 kB │ gzip:   0.27 kB
 dist/assets/SessionsView-BrP-ENHg.css                3.93 kB │ gzip:   1.01 kB
 dist/assets/index-Ch8OWeSY.css                      19.44 kB │ gzip:   4.99 kB
 dist/assets/_plugin-vue_export-helper-BDNMzG2s.js    0.08 kB │ gzip:   0.09 kB
-dist/assets/SettingsView-XUWXp1NG.js                 0.25 kB │ gzip:   0.22 kB
-dist/assets/HelpView-BYsh0tUE.js                     0.55 kB │ gzip:   0.38 kB
-dist/assets/index-CQsX8kkM.js                      205.69 kB │ gzip:  74.90 kB
-dist/assets/SessionsView-DrtRab90.js               593.29 kB │ gzip: 159.98 kB
-✓ built in 362ms
-Done in 2.49s.
+dist/assets/SettingsView-B6f87vXU.js                 0.25 kB │ gzip:   0.22 kB
+dist/assets/HelpView-DMoYd1VD.js                     0.55 kB │ gzip:   0.38 kB
+dist/assets/index-BYr7mM_V.js                      205.69 kB │ gzip:  74.90 kB
+dist/assets/SessionsView-CeVcewOG.js               593.15 kB │ gzip: 159.97 kB
+✓ built in 446ms
+Done in 3.39s.
 ```
 
 Warnings：
@@ -506,29 +525,24 @@ Warnings：
 
 - 按用户实现阶段要求，将代码标识符中的 `ID` / `URL` 大范围统一为 `Id` / `Url`，包括 Go 类型、字段、方法和部分 TS 命名。
 - 删除 localapi 比 Requirement 初稿更激进，但符合 Plan 阶段用户明确覆盖决策。
-- offline readonly history 从 Spec 的可选/后续能力被 Plan 阶段提升为必做；实现提供了进程内 cache 支持。
+- offline readonly history 从 Spec 的可选/后续能力被 Plan 阶段提升为必做；当前决策明确只做进程内 cache，不做持久化 Gate snapshot。
 - 后续 UX 决策进一步调整了设备选择位置、设备名策略、新建会话默认值和 i18n 文案策略。
 
 ### Missed / incomplete scope
 
-1. **Offline cache 未持久化**
-   - Plan 描述了 Gateway-side snapshot/cache store，可落盘到 `gateway-cache`。
-   - 当前实现是内存 cache；设备离线但 Gate 不重启时可读，Gate 重启后不可读。
+1. **Persistent offline snapshot 不做**
+   - Plan 曾描述 Gateway-side snapshot/cache store，可落盘到 `gateway-cache`。
+   - 当前决策明确不做持久化 Gate snapshot；实现保留进程内 cache，设备离线但 Gate 不重启时可读，Gate 重启后不可读。
 
 2. **Structured error 未完整实现**
    - Spec/Plan 建议稳定 `{ error: { code, message } }`。
    - 当前多处仍是 `http.Error` 文本响应和 `502 Bad Gateway` 映射。
 
-3. **`CreateSessionResponse.ws_url` 值仍是旧 direct path**
-   - `internal/application/terminal/registry.go` 中创建会话响应仍返回 `/api/sessions/:id/ws`。
-   - 当前前端使用 `terminalWsUrl(deviceId, sessionId)`，不依赖该字段。
-   - 若外部调用者读取 `ws_url`，会看到非 canonical path。
-
-4. **Pinia 状态边界未继续深化**
+3. **Pinia 状态边界未继续深化**
    - Pinia 已作为基础设施引入，但本功能未新增 auth/devices/workbench store。
    - 当前 auth/device/workbench 状态仍集中在 `SessionsView.vue`。
 
-5. **Manual / integration 验证未执行**
+4. **Manual / integration 验证未执行**
    - 未启动真实 `termbridge serve` 做浏览器登录、设备选择、创建 session、terminal attach 人工回归。
    - 未模拟远程云端 Gate。
    - 未实际断开 Agent 后手工验证 UI 离线历史状态。
@@ -541,19 +555,16 @@ Warnings：
 2. **API error contract 风险**
    - 前端当前可显示错误文本，但 API contract 还不是稳定 structured error；未来客户端/云端 API 需要补齐。
 
-3. **`ws_url` 旧路径风险**
-   - 虽然当前前端不使用 `CreateSessionResponse.ws_url`，但 API 响应里仍存在旧 direct path 字符串，可能误导调用方。
-
-4. **非 serve CLI state 路径风险**
+3. **非 serve CLI state 路径风险**
    - `serve` runtime 使用 device-scoped store；部分非 serve CLI 命令仍使用 base store layout。若长期模型要求所有 workspace/session 都强制归属 Device，后续需要继续收口。
 
-5. **chunk size 风险**
+4. **chunk size 风险**
    - `SessionsView` 继续超过 500 kB warning，短期不影响功能，长期应拆分 view/store/dialog/terminal 逻辑。
 
-6. **明文凭据风险**
+5. **明文凭据风险**
    - `.termbridge.yaml` 保存明文 password。本阶段按计划接受，但后续需要文件权限、secret 管理或 pairing flow。
 
-7. **人工端到端缺口**
+6. **人工端到端缺口**
    - 自动化检查通过，但真实 terminal attach、浏览器交互、Agent 断连后的 UX 仍建议人工验收。
 
 ## Conclusion
@@ -563,7 +574,9 @@ Warnings：
 - `/sessions` 成为统一工作台。
 - Browser 和 Agent 都通过 Gate/device 模型访问 runtime。
 - localapi runtime path 已移除。
-- 设备身份、配置凭据、canonical device-scoped API、Gate mutation relay 和离线只读 cache 已落地。
+- 设备身份、配置凭据、canonical device/workspace-scoped API、Gate mutation relay 和离线只读 cache 已落地。
+- `workspace_key`、session `log_path`、`CreateSessionResponse.ws_url` 已从当前 API contract 删除。
+- session read/update/delete/close/history/ws 已通过 `/api/devices/:deviceId/workspaces/:workspaceId/sessions...` 定位。
 - 登录后不再进入独立设备选择页；设备选择已整合到 `/sessions` sidebar。
 - 单设备自动选中，多设备未选中时保持工作台壳但禁止 device-scoped 数据刷新和 mutation。
 - 默认 device name 已改为 hostname-only。
@@ -572,9 +585,8 @@ Warnings：
 
 但交付前仍需明确以下未完成/风险事项：
 
-1. offline readonly history 当前是进程内 cache，不是持久化 Gate snapshot。
+1. offline readonly history 当前明确为进程内 cache，不做持久化 Gate snapshot。
 2. API structured error contract 尚未完成。
-3. `CreateSessionResponse.ws_url` 仍是旧 direct path 字符串。
-4. 尚未做真实浏览器人工端到端验收。
+3. 尚未做真实浏览器人工端到端验收。
 
 总体结论：验证通过，但带上述已知风险和后续修正项。

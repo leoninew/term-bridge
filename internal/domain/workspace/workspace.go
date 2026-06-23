@@ -17,20 +17,17 @@ type SessionNode struct {
 	Name      string        `json:"name"`
 	LaunchCwd string        `json:"launch_cwd"`
 	Command   CommandRecord `json:"command"`
-	LogPath   string        `json:"log_path"`
 	CreatedAt time.Time     `json:"created_at"`
 	UpdatedAt time.Time     `json:"updated_at"`
 }
 
 type Workspace struct {
-	SchemaVersion        int           `json:"schema_version"`
-	Id                   string        `json:"workspace_id"`
-	Key                  string        `json:"workspace_key"`
-	Name                 string        `json:"name"`
-	Path                 string        `json:"path"`
-	SortOrder            int           `json:"sort_order"`
-	Children             []SessionNode `json:"children"`
-	PathHashInputVersion int           `json:"path_hash_input_version"`
-	CreatedAt            time.Time     `json:"created_at"`
-	UpdatedAt            time.Time     `json:"updated_at"`
+	SchemaVersion int           `json:"schema_version"`
+	Id            string        `json:"workspace_id"`
+	Name          string        `json:"name"`
+	Path          string        `json:"path"`
+	SortOrder     int           `json:"sort_order"`
+	Children      []SessionNode `json:"children"`
+	CreatedAt     time.Time     `json:"created_at"`
+	UpdatedAt     time.Time     `json:"updated_at"`
 }

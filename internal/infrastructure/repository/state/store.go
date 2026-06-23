@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unicode"
 
 	"termbridge-go/internal/domain/process"
 	"termbridge-go/internal/domain/session"
@@ -32,7 +31,7 @@ func NewStore(root string) Store {
 }
 
 func NewDeviceStore(root string, deviceId string) Store {
-	return Store{Root: filepath.Join(root, "devices", safeSegment(deviceId))}
+	return Store{Root: filepath.Join(root, "devices", deviceId)}
 }
 
 func RootForCwd(cwd string, stateDir string) string {
@@ -49,40 +48,44 @@ func (s Store) WorkspaceRoot() string {
 	return filepath.Join(s.Root, "workspaces")
 }
 
-func (s Store) WorkspaceDir(key string) string {
-	return filepath.Join(s.WorkspaceRoot(), safeSegment(key))
+func (s Store) WorkspaceDir(workspaceId string) string {
+	return filepath.Join(s.WorkspaceRoot(), workspaceId)
 }
 
-func (s Store) SessionDir(workspaceKey string, sessionId string) string {
-	return filepath.Join(s.WorkspaceDir(workspaceKey), "sessions", safeSegment(sessionId))
+func (s Store) SessionDir(workspaceId string, sessionId string) string {
+	return filepath.Join(s.WorkspaceDir(workspaceId), "sessions", sessionId)
 }
 
 func (s Store) SaveWorkspace(value workspace.Workspace) error {
-	path := filepath.Join(s.WorkspaceDir(value.Key), "workspace.json")
+	path := filepath.Join(s.WorkspaceDir(value.Id), "workspace.json")
 	return writeJSON(path, value)
 }
 
-func (s Store) LoadWorkspace(key string) (workspace.Workspace, error) {
+func (s Store) LoadWorkspace(workspaceId string) (workspace.Workspace, error) {
 	var value workspace.Workspace
-	err := readJSON(filepath.Join(s.WorkspaceDir(key), "workspace.json"), &value)
+	err := readJSON(filepath.Join(s.WorkspaceDir(workspaceId), "workspace.json"), &value)
 	return value, err
 }
 
-func (s Store) FindWorkspaceById(workspaceId string) (workspace.Workspace, error) {
+func (s Store) FindWorkspaceByPath(path string) (workspace.Workspace, error) {
 	workspaces, _, err := s.ListWorkspaces()
 	if err != nil {
 		return workspace.Workspace{}, err
 	}
 	for _, value := range workspaces {
-		if value.Id == workspaceId {
+		if value.Path == path {
 			return value, nil
 		}
 	}
 	return workspace.Workspace{}, os.ErrNotExist
 }
 
+func (s Store) FindWorkspaceById(workspaceId string) (workspace.Workspace, error) {
+	return s.LoadWorkspace(workspaceId)
+}
+
 func (s Store) SaveSession(value session.Session) error {
-	ws, err := s.LoadWorkspace(value.WorkspaceKey)
+	ws, err := s.LoadWorkspace(value.WorkspaceId)
 	if err != nil {
 		return err
 	}
@@ -91,12 +94,12 @@ func (s Store) SaveSession(value session.Session) error {
 	if err := s.SaveWorkspace(ws); err != nil {
 		return err
 	}
-	path := filepath.Join(s.SessionDir(value.WorkspaceKey, value.Id), "session.json")
+	path := filepath.Join(s.SessionDir(value.WorkspaceId, value.Id), "session.json")
 	return writeJSON(path, value)
 }
 
-func (s Store) LoadSession(workspaceKey string, sessionId string) (session.Session, error) {
-	ws, err := s.LoadWorkspace(workspaceKey)
+func (s Store) LoadSession(workspaceId string, sessionId string) (session.Session, error) {
+	ws, err := s.LoadWorkspace(workspaceId)
 	if err != nil {
 		return session.Session{}, err
 	}
@@ -108,8 +111,8 @@ func (s Store) LoadSession(workspaceKey string, sessionId string) (session.Sessi
 	return session.Session{}, os.ErrNotExist
 }
 
-func (s Store) UpdateSession(workspaceKey string, sessionId string, update func(*session.Session) error) (session.Session, error) {
-	value, err := s.LoadSession(workspaceKey, sessionId)
+func (s Store) UpdateSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error) {
+	value, err := s.LoadSession(workspaceId, sessionId)
 	if err != nil {
 		return session.Session{}, err
 	}
@@ -122,8 +125,8 @@ func (s Store) UpdateSession(workspaceKey string, sessionId string, update func(
 	return value, nil
 }
 
-func (s Store) DeleteSession(workspaceKey string, sessionId string) error {
-	ws, err := s.LoadWorkspace(workspaceKey)
+func (s Store) DeleteSession(workspaceId string, sessionId string) error {
+	ws, err := s.LoadWorkspace(workspaceId)
 	if err != nil {
 		return err
 	}
@@ -132,48 +135,48 @@ func (s Store) DeleteSession(workspaceKey string, sessionId string) error {
 	if err := s.SaveWorkspace(ws); err != nil {
 		return err
 	}
-	return os.RemoveAll(s.SessionDir(workspaceKey, sessionId))
+	return os.RemoveAll(s.SessionDir(workspaceId, sessionId))
 }
 
-func (s Store) DeleteWorkspace(workspaceKey string) error {
-	return os.RemoveAll(s.WorkspaceDir(workspaceKey))
+func (s Store) DeleteWorkspace(workspaceId string) error {
+	return os.RemoveAll(s.WorkspaceDir(workspaceId))
 }
 
-func (s Store) SaveState(workspaceKey string, sessionId string, value session.StateRecord) error {
-	path := filepath.Join(s.SessionDir(workspaceKey, sessionId), "state.json")
+func (s Store) SaveState(workspaceId string, sessionId string, value session.StateRecord) error {
+	path := filepath.Join(s.SessionDir(workspaceId, sessionId), "state.json")
 	return writeJSON(path, value)
 }
 
-func (s Store) LoadState(workspaceKey string, sessionId string) (session.StateRecord, error) {
+func (s Store) LoadState(workspaceId string, sessionId string) (session.StateRecord, error) {
 	var value session.StateRecord
-	err := readJSON(filepath.Join(s.SessionDir(workspaceKey, sessionId), "state.json"), &value)
+	err := readJSON(filepath.Join(s.SessionDir(workspaceId, sessionId), "state.json"), &value)
 	return value, err
 }
 
-func (s Store) SaveProcess(workspaceKey string, sessionId string, value process.Record) error {
-	path := filepath.Join(s.SessionDir(workspaceKey, sessionId), "process.json")
+func (s Store) SaveProcess(workspaceId string, sessionId string, value process.Record) error {
+	path := filepath.Join(s.SessionDir(workspaceId, sessionId), "process.json")
 	return writeJSON(path, value)
 }
 
-func (s Store) LoadProcess(workspaceKey string, sessionId string) (process.Record, error) {
+func (s Store) LoadProcess(workspaceId string, sessionId string) (process.Record, error) {
 	var value process.Record
-	err := readJSON(filepath.Join(s.SessionDir(workspaceKey, sessionId), "process.json"), &value)
+	err := readJSON(filepath.Join(s.SessionDir(workspaceId, sessionId), "process.json"), &value)
 	return value, err
 }
 
-func (s Store) SaveExit(workspaceKey string, sessionId string, value process.ExitRecord) error {
-	path := filepath.Join(s.SessionDir(workspaceKey, sessionId), "exit.json")
+func (s Store) SaveExit(workspaceId string, sessionId string, value process.ExitRecord) error {
+	path := filepath.Join(s.SessionDir(workspaceId, sessionId), "exit.json")
 	return writeJSON(path, value)
 }
 
-func (s Store) LoadExit(workspaceKey string, sessionId string) (process.ExitRecord, error) {
+func (s Store) LoadExit(workspaceId string, sessionId string) (process.ExitRecord, error) {
 	var value process.ExitRecord
-	err := readJSON(filepath.Join(s.SessionDir(workspaceKey, sessionId), "exit.json"), &value)
+	err := readJSON(filepath.Join(s.SessionDir(workspaceId, sessionId), "exit.json"), &value)
 	return value, err
 }
 
-func (s Store) HistoryPath(workspaceKey string, sessionId string) string {
-	return filepath.Join(s.SessionDir(workspaceKey, sessionId), "history.log")
+func (s Store) HistoryPath(workspaceId string, sessionId string) string {
+	return filepath.Join(s.SessionDir(workspaceId, sessionId), "history.log")
 }
 
 func (s Store) ListWorkspaces() ([]workspace.Workspace, []Warning, error) {
@@ -220,7 +223,7 @@ func (s Store) ListSessions() ([]session.View, []Warning, error) {
 		workspaceViews, workspaceWarnings, err := s.listSessionsInWorkspace(ws)
 		warnings = append(warnings, workspaceWarnings...)
 		if err != nil {
-			warnings = append(warnings, Warning{Path: s.WorkspaceDir(ws.Key), Err: err})
+			warnings = append(warnings, Warning{Path: s.WorkspaceDir(ws.Id), Err: err})
 			continue
 		}
 		views = append(views, workspaceViews...)
@@ -263,17 +266,17 @@ func (s Store) listSessionsInWorkspace(ws workspace.Workspace) ([]session.View, 
 	var warnings []Warning
 	for _, child := range ws.Children {
 		sess := sessionFromWorkspaceNode(ws, child)
-		stateRecord, err := s.LoadState(ws.Key, child.Id)
+		stateRecord, err := s.LoadState(ws.Id, child.Id)
 		if err != nil {
-			warnings = append(warnings, Warning{Path: filepath.Join(s.SessionDir(ws.Key, child.Id), "state.json"), Err: err})
+			warnings = append(warnings, Warning{Path: filepath.Join(s.SessionDir(ws.Id, child.Id), "state.json"), Err: err})
 		}
 		view := session.View{Session: sess, State: stateRecord, CommandText: formatCommand(sess.Command)}
-		if exit, err := s.LoadExit(ws.Key, child.Id); err == nil {
+		if exit, err := s.LoadExit(ws.Id, child.Id); err == nil {
 			code := exit.ExitCode
 			view.ExitCode = &code
 			view.ExitReason = exit.Reason
 		} else if !errors.Is(err, os.ErrNotExist) {
-			warnings = append(warnings, Warning{Path: filepath.Join(s.SessionDir(ws.Key, child.Id), "exit.json"), Err: err})
+			warnings = append(warnings, Warning{Path: filepath.Join(s.SessionDir(ws.Id, child.Id), "exit.json"), Err: err})
 		}
 		views = append(views, view)
 	}
@@ -292,7 +295,6 @@ func sessionNodeFromSession(value session.Session) workspace.SessionNode {
 			EnvStrategy: value.Command.EnvStrategy,
 			EnvCount:    value.Command.EnvCount,
 		},
-		LogPath:   value.LogPath,
 		CreatedAt: value.CreatedAt,
 		UpdatedAt: value.UpdatedAt,
 	}
@@ -304,7 +306,6 @@ func sessionFromWorkspaceNode(ws workspace.Workspace, child workspace.SessionNod
 		Id:            child.Id,
 		Name:          child.Name,
 		WorkspaceId:   ws.Id,
-		WorkspaceKey:  ws.Key,
 		LaunchCwd:     child.LaunchCwd,
 		Command: session.CommandRecord{
 			Executable:  child.Command.Executable,
@@ -313,7 +314,6 @@ func sessionFromWorkspaceNode(ws workspace.Workspace, child workspace.SessionNod
 			EnvStrategy: child.Command.EnvStrategy,
 			EnvCount:    child.Command.EnvCount,
 		},
-		LogPath:   child.LogPath,
 		CreatedAt: child.CreatedAt,
 		UpdatedAt: child.UpdatedAt,
 	}
@@ -431,24 +431,4 @@ func formatCommand(command session.CommandRecord) string {
 		return command.Command
 	}
 	return command.Command + " " + strings.Join(command.Args, " ")
-}
-
-func safeSegment(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return "unknown"
-	}
-	var builder strings.Builder
-	for _, r := range value {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' || r == '.' {
-			builder.WriteRune(r)
-			continue
-		}
-		builder.WriteByte('_')
-	}
-	out := strings.Trim(builder.String(), ".")
-	if out == "" || out == ".." {
-		return "unknown"
-	}
-	return out
 }

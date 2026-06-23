@@ -67,11 +67,12 @@ type Registry struct {
 }
 
 type CreateSessionRequest struct {
-	Name    string   `json:"name"`
-	Cwd     string   `json:"cwd"`
-	Command []string `json:"command"`
-	Cols    int      `json:"cols"`
-	Rows    int      `json:"rows"`
+	WorkspaceId string   `json:"workspace_id,omitempty"`
+	Name        string   `json:"name"`
+	Cwd         string   `json:"cwd"`
+	Command     []string `json:"command"`
+	Cols        int      `json:"cols"`
+	Rows        int      `json:"rows"`
 }
 
 type UpdateSessionRequest struct {
@@ -102,7 +103,6 @@ type UpdateWorkspaceOrderRequest struct {
 
 type WorkspaceTreeNode struct {
 	Id        string                    `json:"id"`
-	Key       string                    `json:"key"`
 	Name      string                    `json:"name"`
 	Path      string                    `json:"path"`
 	SortOrder int                       `json:"sort_order"`
@@ -111,16 +111,13 @@ type WorkspaceTreeNode struct {
 }
 
 type CreateSessionResponse struct {
-	SessionId    string `json:"session_id"`
-	WorkspaceId  string `json:"workspace_id"`
-	WorkspaceKey string `json:"workspace_key"`
-	State        string `json:"state"`
-	WsUrl        string `json:"ws_url"`
+	SessionId   string `json:"session_id"`
+	WorkspaceId string `json:"workspace_id"`
+	State       string `json:"state"`
 }
 
 type WorkspaceSummary struct {
 	Id        string    `json:"id"`
-	Key       string    `json:"key"`
 	Name      string    `json:"name"`
 	Path      string    `json:"path"`
 	SortOrder int       `json:"sort_order"`
@@ -131,14 +128,12 @@ type SessionSummary struct {
 	Id              string          `json:"id"`
 	Name            string          `json:"name"`
 	WorkspaceId     string          `json:"workspace_id"`
-	WorkspaceKey    string          `json:"workspace_key"`
 	Command         string          `json:"command"`
 	Cwd             string          `json:"cwd"`
 	LifecycleState  session.State   `json:"lifecycle_state"`
 	AttachmentState AttachmentState `json:"attachment_state,omitempty"`
 	ExitCode        *int            `json:"exit_code,omitempty"`
 	UpdatedAt       time.Time       `json:"updated_at"`
-	LogPath         string          `json:"log_path"`
 }
 
 type WorkspaceSessionSummary struct {
@@ -150,7 +145,6 @@ type WorkspaceSessionSummary struct {
 	AttachmentState AttachmentState `json:"attachment_state,omitempty"`
 	ExitCode        *int            `json:"exit_code,omitempty"`
 	UpdatedAt       time.Time       `json:"updated_at"`
-	LogPath         string          `json:"log_path"`
 }
 
 type OutboundKind int
@@ -201,6 +195,25 @@ func NewRegistry(config Config) *Registry {
 	}
 }
 
+func (r *Registry) workspaceForCreateSession(workspaceId string, cwd string) (workspace.Workspace, error) {
+	if strings.TrimSpace(workspaceId) != "" {
+		ws, err := r.store.LoadWorkspace(workspaceId)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return workspace.Workspace{}, apperrors.NotFound("workspace not found", err)
+			}
+			return workspace.Workspace{}, apperrors.Runtime("load workspace", err)
+		}
+		return ws, nil
+	}
+	resolver := workspace.Resolver{Store: r.store, Ids: r.ids}
+	ws, err := resolver.Resolve(cwd)
+	if err != nil {
+		return workspace.Workspace{}, apperrors.Runtime("resolve workspace", err)
+	}
+	return ws, nil
+}
+
 func (r *Registry) CreateSession(ctx context.Context, request CreateSessionRequest) (CreateSessionResponse, error) {
 	name := strings.TrimSpace(request.Name)
 	if name == "" {
@@ -230,10 +243,9 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 		r.logger.Info("terminal session create request", "name", name, "cwd", absCwd, "command", strings.Join(request.Command, " "), "cols", size.Cols, "rows", size.Rows)
 	}
 
-	resolver := workspace.Resolver{Store: r.store, Ids: r.ids}
-	ws, err := resolver.Resolve(absCwd)
+	ws, err := r.workspaceForCreateSession(request.WorkspaceId, absCwd)
 	if err != nil {
-		return CreateSessionResponse{}, apperrors.Runtime("resolve workspace", err)
+		return CreateSessionResponse{}, err
 	}
 
 	env := filterEnv(os.Environ(), r.envDenylist)
@@ -259,29 +271,28 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 			MaxBytes:     r.historyConfig.MaxBytes,
 			MaxLineBytes: r.historyConfig.MaxLineBytes,
 		},
-		LogPath: filepath.Join(r.logDir, "termbridge.log"),
 	})
 	if err != nil {
 		return CreateSessionResponse{}, apperrors.Runtime("create session", err)
 	}
 
-	historyWriter, err := history.NewWriter(r.store.HistoryPath(sess.WorkspaceKey, sess.Id), history.Config{MaxLines: r.historyConfig.MaxLines, MaxBytes: r.historyConfig.MaxBytes, MaxLineBytes: r.historyConfig.MaxLineBytes})
+	historyWriter, err := history.NewWriter(r.store.HistoryPath(sess.WorkspaceId, sess.Id), history.Config{MaxLines: r.historyConfig.MaxLines, MaxBytes: r.historyConfig.MaxBytes, MaxLineBytes: r.historyConfig.MaxLineBytes})
 	if err != nil {
-		_ = r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "history_create_failed", UpdatedAt: time.Now().UTC()})
+		_ = r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "history_create_failed", UpdatedAt: time.Now().UTC()})
 		return CreateSessionResponse{}, apperrors.Runtime("create history writer", err)
 	}
 
 	spec, err := process.NewSpec(absCwd, request.Command, size)
 	if err != nil {
 		_ = historyWriter.Close()
-		_ = r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "build_process_spec_failed", UpdatedAt: time.Now().UTC()})
+		_ = r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "build_process_spec_failed", UpdatedAt: time.Now().UTC()})
 		return CreateSessionResponse{}, apperrors.Runtime("build process spec", err)
 	}
 	spec.Env = env
 	resolved, err := process.ResolveExecutable(spec.Command)
 	if err != nil {
 		_ = historyWriter.Close()
-		_ = r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "resolve_executable_failed", UpdatedAt: time.Now().UTC()})
+		_ = r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "resolve_executable_failed", UpdatedAt: time.Now().UTC()})
 		return CreateSessionResponse{}, apperrors.Runtime("resolve executable", err)
 	}
 	spec = spec.WithResolvedCommand(resolved)
@@ -292,18 +303,18 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 	ptySession, err := r.manager.Start(ctx, spec)
 	if err != nil {
 		_ = historyWriter.Close()
-		_ = r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "pty_start_failed", UpdatedAt: time.Now().UTC()})
+		_ = r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "pty_start_failed", UpdatedAt: time.Now().UTC()})
 		return CreateSessionResponse{}, apperrors.Runtime("start pty", err)
 	}
 	if reporter, ok := ptySession.(termpty.ProcessReporter); ok {
-		if err := r.store.SaveProcess(sess.WorkspaceKey, sess.Id, reporter.ProcessInfo()); err != nil {
+		if err := r.store.SaveProcess(sess.WorkspaceId, sess.Id, reporter.ProcessInfo()); err != nil {
 			_ = ptySession.Close()
 			_ = historyWriter.Close()
-			_ = r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_process_failed", UpdatedAt: time.Now().UTC()})
+			_ = r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_process_failed", UpdatedAt: time.Now().UTC()})
 			return CreateSessionResponse{}, apperrors.Runtime("save process", err)
 		}
 	}
-	if err := r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: time.Now().UTC()}); err != nil {
+	if err := r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: time.Now().UTC()}); err != nil {
 		_ = ptySession.Close()
 		_ = historyWriter.Close()
 		return CreateSessionResponse{}, apperrors.Runtime("save running state", err)
@@ -318,30 +329,30 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 	r.mu.Unlock()
 	runtime.start()
 
-	return CreateSessionResponse{SessionId: sess.Id, WorkspaceId: sess.WorkspaceId, WorkspaceKey: sess.WorkspaceKey, State: string(session.StateRunning), WsUrl: "/api/sessions/" + sess.Id + "/ws"}, nil
+	return CreateSessionResponse{SessionId: sess.Id, WorkspaceId: sess.WorkspaceId, State: string(session.StateRunning)}, nil
 }
 
-func (r *Registry) Attach(sessionId string) (*Client, error) {
+func (r *Registry) Attach(workspaceId string, sessionId string) (*Client, error) {
 	r.mu.Lock()
 	runtime := r.runtimes[sessionId]
 	r.mu.Unlock()
-	if runtime == nil {
-		return nil, apperrors.Runtime("session not attachable", fmt.Errorf("live PTY handle not found for %s", sessionId))
+	if runtime == nil || runtime.session.WorkspaceId != workspaceId {
+		return nil, apperrors.Runtime("session not attachable", fmt.Errorf("live PTY handle not found for %s/%s", workspaceId, sessionId))
 	}
 	return runtime.attach()
 }
 
-func (r *Registry) CloseSession(sessionId string, reason string) (SessionSummary, error) {
+func (r *Registry) CloseSession(workspaceId string, sessionId string, reason string) (SessionSummary, error) {
 	r.mu.Lock()
 	runtime := r.runtimes[sessionId]
 	r.mu.Unlock()
-	if runtime == nil {
-		return SessionSummary{}, apperrors.Runtime("session not closable", fmt.Errorf("live PTY handle not found for %s", sessionId))
+	if runtime == nil || runtime.session.WorkspaceId != workspaceId {
+		return SessionSummary{}, apperrors.Runtime("session not closable", fmt.Errorf("live PTY handle not found for %s/%s", workspaceId, sessionId))
 	}
 	if err := runtime.closeSession(reason); err != nil {
 		return SessionSummary{}, err
 	}
-	return r.GetSession(sessionId)
+	return r.GetSession(workspaceId, sessionId)
 }
 
 func (r *Registry) ListWorkspaces() ([]WorkspaceSummary, error) {
@@ -369,7 +380,6 @@ func (r *Registry) WorkspaceTree() ([]WorkspaceTreeNode, error) {
 		}
 		nodes = append(nodes, WorkspaceTreeNode{
 			Id:        ws.Id,
-			Key:       ws.Key,
 			Name:      ws.Name,
 			Path:      ws.Path,
 			SortOrder: ws.SortOrder,
@@ -399,16 +409,16 @@ func (r *Registry) ListSessionsByWorkspaceId(workspaceId string) ([]WorkspaceSes
 	return r.workspaceSessionSummariesFromViews(views), nil
 }
 
-func (r *Registry) UpdateSession(sessionId string, request UpdateSessionRequest) (SessionSummary, error) {
+func (r *Registry) UpdateSession(workspaceId string, sessionId string, request UpdateSessionRequest) (SessionSummary, error) {
 	name := strings.TrimSpace(request.Name)
 	if name == "" {
 		return SessionSummary{}, apperrors.Usage("missing session name")
 	}
-	view, err := r.findSessionView(sessionId)
+	view, err := r.sessionView(workspaceId, sessionId)
 	if err != nil {
 		return SessionSummary{}, err
 	}
-	updated, err := r.store.UpdateSession(view.Session.WorkspaceKey, sessionId, func(value *session.Session) error {
+	updated, err := r.store.UpdateSession(workspaceId, sessionId, func(value *session.Session) error {
 		value.Name = name
 		value.UpdatedAt = time.Now().UTC()
 		return nil
@@ -420,15 +430,15 @@ func (r *Registry) UpdateSession(sessionId string, request UpdateSessionRequest)
 	return r.summaryFromView(view), nil
 }
 
-func (r *Registry) DeleteSession(sessionId string) error {
-	view, err := r.findSessionView(sessionId)
+func (r *Registry) DeleteSession(workspaceId string, sessionId string) error {
+	view, err := r.sessionView(workspaceId, sessionId)
 	if err != nil {
 		return err
 	}
 	if r.hasRuntime(sessionId) || !session.Terminal(view.State.State) {
 		return apperrors.Usage("cannot delete running session")
 	}
-	if err := r.store.DeleteSession(view.Session.WorkspaceKey, sessionId); err != nil {
+	if err := r.store.DeleteSession(workspaceId, sessionId); err != nil {
 		return apperrors.Runtime("delete session", err)
 	}
 	return nil
@@ -472,46 +482,43 @@ func (r *Registry) DeleteWorkspace(workspaceId string) error {
 			return apperrors.Usage("cannot delete workspace with running sessions")
 		}
 	}
-	if err := r.store.DeleteWorkspace(ws.Key); err != nil {
+	if err := r.store.DeleteWorkspace(ws.Id); err != nil {
 		return apperrors.Runtime("delete workspace", err)
 	}
 	return nil
 }
 
-func (r *Registry) GetSession(sessionId string) (SessionSummary, error) {
-	view, err := r.findSessionView(sessionId)
+func (r *Registry) GetSession(workspaceId string, sessionId string) (SessionSummary, error) {
+	view, err := r.sessionView(workspaceId, sessionId)
 	if err != nil {
 		return SessionSummary{}, err
 	}
 	return r.summaryFromView(view), nil
 }
 
-func (r *Registry) History(sessionId string) ([]byte, error) {
+func (r *Registry) History(workspaceId string, sessionId string) ([]byte, error) {
 	r.mu.Lock()
 	runtime := r.runtimes[sessionId]
 	r.mu.Unlock()
 	if runtime != nil {
+		if runtime.session.WorkspaceId != workspaceId {
+			return nil, apperrors.NotFound("session not found", os.ErrNotExist)
+		}
 		if err := runtime.history.Flush(); err != nil {
 			return nil, apperrors.Runtime("flush history", err)
 		}
 	}
-	views, _, err := r.store.ListSessions()
+	if _, err := r.sessionView(workspaceId, sessionId); err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(r.store.HistoryPath(workspaceId, sessionId))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
 	if err != nil {
-		return nil, apperrors.Runtime("list sessions", err)
+		return nil, apperrors.Runtime("read history", err)
 	}
-	for _, view := range views {
-		if view.Session.Id == sessionId {
-			data, err := os.ReadFile(r.store.HistoryPath(view.Session.WorkspaceKey, view.Session.Id))
-			if errors.Is(err, os.ErrNotExist) {
-				return nil, nil
-			}
-			if err != nil {
-				return nil, apperrors.Runtime("read history", err)
-			}
-			return data, nil
-		}
-	}
-	return nil, apperrors.NotFound("session not found", os.ErrNotExist)
+	return data, nil
 }
 
 func resolveSessionCwd(path string) (string, error) {
@@ -589,10 +596,13 @@ func (r *Registry) hasRuntime(sessionId string) bool {
 	return r.runtimes[sessionId] != nil
 }
 
-func (r *Registry) findSessionView(sessionId string) (session.View, error) {
-	views, _, err := r.store.ListSessions()
+func (r *Registry) sessionView(workspaceId string, sessionId string) (session.View, error) {
+	views, _, err := r.store.ListSessionsByWorkspaceId(workspaceId)
 	if err != nil {
-		return session.View{}, apperrors.Runtime("list sessions", err)
+		if errors.Is(err, os.ErrNotExist) {
+			return session.View{}, apperrors.NotFound("workspace not found", err)
+		}
+		return session.View{}, apperrors.Runtime("list workspace sessions", err)
 	}
 	for _, view := range views {
 		if view.Session.Id == sessionId {
@@ -631,14 +641,13 @@ func (r *Registry) workspaceSessionSummariesFromViews(views []session.View) []Wo
 			AttachmentState: summary.AttachmentState,
 			ExitCode:        summary.ExitCode,
 			UpdatedAt:       summary.UpdatedAt,
-			LogPath:         summary.LogPath,
 		})
 	}
 	return out
 }
 
 func summaryFromWorkspace(ws workspace.Workspace) WorkspaceSummary {
-	return WorkspaceSummary{Id: ws.Id, Key: ws.Key, Name: ws.Name, Path: ws.Path, SortOrder: ws.SortOrder, UpdatedAt: ws.UpdatedAt}
+	return WorkspaceSummary{Id: ws.Id, Name: ws.Name, Path: ws.Path, SortOrder: ws.SortOrder, UpdatedAt: ws.UpdatedAt}
 }
 
 func (r *Registry) summaryFromView(view session.View) SessionSummary {
@@ -654,14 +663,12 @@ func (r *Registry) summaryFromView(view session.View) SessionSummary {
 		Id:              view.Session.Id,
 		Name:            view.Session.Name,
 		WorkspaceId:     view.Session.WorkspaceId,
-		WorkspaceKey:    view.Session.WorkspaceKey,
 		Command:         view.CommandText,
 		Cwd:             view.Session.LaunchCwd,
 		LifecycleState:  lifecycleState,
 		AttachmentState: attachment,
 		ExitCode:        view.ExitCode,
 		UpdatedAt:       view.Session.UpdatedAt,
-		LogPath:         view.Session.LogPath,
 	}
 }
 

@@ -75,7 +75,7 @@ func TestCreateSessionPersistsRuntimeRecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
-	if response.SessionId == "" || response.WorkspaceId == "" || response.WsUrl == "" {
+	if response.SessionId == "" || response.WorkspaceId == "" {
 		t.Fatalf("response = %#v", response)
 	}
 	if len(manager.specs) != 1 {
@@ -85,21 +85,21 @@ func TestCreateSessionPersistsRuntimeRecords(t *testing.T) {
 		t.Fatalf("InitialSize = %#v", manager.specs[0].InitialSize)
 	}
 	store := state.NewStore(root)
-	if _, err := store.LoadSession(response.WorkspaceKey, response.SessionId); err != nil {
+	if _, err := store.LoadSession(response.WorkspaceId, response.SessionId); err != nil {
 		t.Fatalf("LoadSession() error = %v", err)
 	}
-	stateRecord, err := store.LoadState(response.WorkspaceKey, response.SessionId)
+	stateRecord, err := store.LoadState(response.WorkspaceId, response.SessionId)
 	if err != nil {
 		t.Fatalf("LoadState() error = %v", err)
 	}
 	if stateRecord.State != session.StateRunning {
 		t.Fatalf("state = %q, want running", stateRecord.State)
 	}
-	if _, err := store.LoadProcess(response.WorkspaceKey, response.SessionId); err != nil {
+	if _, err := store.LoadProcess(response.WorkspaceId, response.SessionId); err != nil {
 		t.Fatalf("LoadProcess() error = %v", err)
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 }
 
 func TestRuntimeInitialSizeMatchesCreatedPTYSize(t *testing.T) {
@@ -111,7 +111,7 @@ func TestRuntimeInitialSizeMatchesCreatedPTYSize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
-	client, err := registry.Attach(response.SessionId)
+	client, err := registry.Attach(response.WorkspaceId, response.SessionId)
 	if err != nil {
 		t.Fatalf("Attach() error = %v", err)
 	}
@@ -128,7 +128,7 @@ func TestRuntimeInitialSizeMatchesCreatedPTYSize(t *testing.T) {
 		t.Fatalf("resizes = %#v, want 121x32", fake.resizes)
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 }
 
 func TestAttachDetachAndInput(t *testing.T) {
@@ -140,7 +140,7 @@ func TestAttachDetachAndInput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
-	client, err := registry.Attach(response.SessionId)
+	client, err := registry.Attach(response.WorkspaceId, response.SessionId)
 	if err != nil {
 		t.Fatalf("Attach() error = %v", err)
 	}
@@ -153,7 +153,7 @@ func TestAttachDetachAndInput(t *testing.T) {
 	client.Detach("test_detach")
 	waitRuntimeAttachment(t, registry, response.SessionId, AttachmentDetached)
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 }
 
 func TestHistoryReturnsWrittenOutput(t *testing.T) {
@@ -170,7 +170,7 @@ func TestHistoryReturnsWrittenOutput(t *testing.T) {
 	deadline := time.Now().Add(time.Second)
 	for {
 		var err error
-		data, err = registry.History(response.SessionId)
+		data, err = registry.History(response.WorkspaceId, response.SessionId)
 		if err != nil {
 			t.Fatalf("History() error = %v", err)
 		}
@@ -186,7 +186,7 @@ func TestHistoryReturnsWrittenOutput(t *testing.T) {
 		t.Fatalf("History() = %q", data)
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 }
 
 func TestSlowClientDetachDoesNotStopRuntimeOrHistory(t *testing.T) {
@@ -198,7 +198,7 @@ func TestSlowClientDetachDoesNotStopRuntimeOrHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
-	client, err := registry.Attach(response.SessionId)
+	client, err := registry.Attach(response.WorkspaceId, response.SessionId)
 	if err != nil {
 		t.Fatalf("Attach() error = %v", err)
 	}
@@ -207,7 +207,7 @@ func TestSlowClientDetachDoesNotStopRuntimeOrHistory(t *testing.T) {
 		fake.output <- []byte("TERM_BRIDGE_LARGE_OUTPUT_" + strings.Repeat("x", 128) + "\n")
 	}
 	waitRuntimeAttachment(t, registry, response.SessionId, AttachmentDetached)
-	data, err := registry.History(response.SessionId)
+	data, err := registry.History(response.WorkspaceId, response.SessionId)
 	if err != nil {
 		t.Fatalf("History() error = %v", err)
 	}
@@ -218,7 +218,7 @@ func TestSlowClientDetachDoesNotStopRuntimeOrHistory(t *testing.T) {
 		t.Fatal("runtime stopped after slow client detach")
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 }
 
 func TestRuntimeSummaryOverridesStaleFailedState(t *testing.T) {
@@ -231,7 +231,7 @@ func TestRuntimeSummaryOverridesStaleFailedState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
-	if err := store.SaveState(response.WorkspaceKey, response.SessionId, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "stale_process_unverified", UpdatedAt: time.Now().UTC()}); err != nil {
+	if err := store.SaveState(response.WorkspaceId, response.SessionId, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "stale_process_unverified", UpdatedAt: time.Now().UTC()}); err != nil {
 		t.Fatalf("SaveState() error = %v", err)
 	}
 
@@ -242,11 +242,11 @@ func TestRuntimeSummaryOverridesStaleFailedState(t *testing.T) {
 	if got := tree[0].Children[0].LifecycleState; got != session.StateRunning {
 		t.Fatalf("LifecycleState = %q, want running", got)
 	}
-	if err := registry.DeleteSession(response.SessionId); err == nil {
+	if err := registry.DeleteSession(response.WorkspaceId, response.SessionId); err == nil {
 		t.Fatal("DeleteSession() error = nil, want running session rejection")
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, store, response.WorkspaceKey, response.SessionId)
+	waitExit(t, store, response.WorkspaceId, response.SessionId)
 }
 
 func TestCreateSessionRequiresName(t *testing.T) {
@@ -270,14 +270,14 @@ func TestUpdateSessionChangesName(t *testing.T) {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 
-	summary, err := registry.UpdateSession(response.SessionId, UpdateSessionRequest{Name: "New name"})
+	summary, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, UpdateSessionRequest{Name: "New name"})
 	if err != nil {
 		t.Fatalf("UpdateSession() error = %v", err)
 	}
 	if summary.Name != "New name" {
 		t.Fatalf("Name = %q, want New name", summary.Name)
 	}
-	stored, err := state.NewStore(root).LoadSession(response.WorkspaceKey, response.SessionId)
+	stored, err := state.NewStore(root).LoadSession(response.WorkspaceId, response.SessionId)
 	if err != nil {
 		t.Fatalf("LoadSession() error = %v", err)
 	}
@@ -285,7 +285,7 @@ func TestUpdateSessionChangesName(t *testing.T) {
 		t.Fatalf("stored name = %q", stored.Name)
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 }
 
 func TestUpdateSessionRejectsUnsupportedFields(t *testing.T) {
@@ -304,16 +304,16 @@ func TestDeleteSessionRejectsRunningAndAllowsStopped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
-	if err := registry.DeleteSession(response.SessionId); err == nil {
+	if err := registry.DeleteSession(response.WorkspaceId, response.SessionId); err == nil {
 		t.Fatal("DeleteSession() error = nil, want running session rejection")
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 	waitRuntimeRemoved(t, registry, response.SessionId)
-	if err := registry.DeleteSession(response.SessionId); err != nil {
+	if err := registry.DeleteSession(response.WorkspaceId, response.SessionId); err != nil {
 		t.Fatalf("DeleteSession() stopped error = %v", err)
 	}
-	if _, err := state.NewStore(root).LoadSession(response.WorkspaceKey, response.SessionId); err == nil {
+	if _, err := state.NewStore(root).LoadSession(response.WorkspaceId, response.SessionId); err == nil {
 		t.Fatal("LoadSession() error = nil, want deleted session")
 	}
 }
@@ -342,7 +342,7 @@ func TestWorkspaceTreeAndOrder(t *testing.T) {
 		t.Fatalf("workspaces = %#v", workspaces)
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 }
 
 func TestDeleteWorkspaceProtectsRunningSessions(t *testing.T) {
@@ -358,12 +358,12 @@ func TestDeleteWorkspaceProtectsRunningSessions(t *testing.T) {
 		t.Fatal("DeleteWorkspace() error = nil, want running session rejection")
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceKey, response.SessionId)
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 	waitRuntimeRemoved(t, registry, response.SessionId)
 	if err := registry.DeleteWorkspace(response.WorkspaceId); err != nil {
 		t.Fatalf("DeleteWorkspace() stopped error = %v", err)
 	}
-	if _, err := state.NewStore(root).LoadWorkspace(response.WorkspaceKey); err == nil {
+	if _, err := state.NewStore(root).LoadWorkspace(response.WorkspaceId); err == nil {
 		t.Fatal("LoadWorkspace() error = nil, want deleted workspace")
 	}
 }
@@ -382,7 +382,7 @@ func TestCloseSessionReturnsStoppedSummary(t *testing.T) {
 		fake.finish(termpty.Result{ExitCode: 0})
 	}()
 
-	summary, err := registry.CloseSession(response.SessionId, "test_close")
+	summary, err := registry.CloseSession(response.WorkspaceId, response.SessionId, "test_close")
 	if err != nil {
 		t.Fatalf("CloseSession() error = %v", err)
 	}

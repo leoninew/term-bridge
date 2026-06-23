@@ -9,7 +9,7 @@ import (
 )
 
 type Store interface {
-	LoadWorkspace(key string) (Workspace, error)
+	FindWorkspaceByPath(path string) (Workspace, error)
 	SaveWorkspace(Workspace) error
 }
 
@@ -20,11 +20,11 @@ type Resolver struct {
 }
 
 func (r Resolver) Resolve(path string) (Workspace, error) {
-	key, normalized, err := KeyForPath(path)
+	normalized, err := NormalizePath(path)
 	if err != nil {
 		return Workspace{}, err
 	}
-	if existing, err := r.Store.LoadWorkspace(key); err == nil {
+	if existing, err := r.Store.FindWorkspaceByPath(normalized); err == nil {
 		existing.UpdatedAt = r.now()
 		if err := r.Store.SaveWorkspace(existing); err != nil {
 			return Workspace{}, err
@@ -40,14 +40,12 @@ func (r Resolver) Resolve(path string) (Workspace, error) {
 	}
 	now := r.now()
 	workspace := Workspace{
-		SchemaVersion:        SchemaVersion,
-		Id:                   id,
-		Key:                  key,
-		Name:                 NameForPath(normalized, key),
-		Path:                 normalized,
-		PathHashInputVersion: PathHashInputVersion,
-		CreatedAt:            now,
-		UpdatedAt:            now,
+		SchemaVersion: SchemaVersion,
+		Id:            id,
+		Name:          NameForPath(normalized),
+		Path:          normalized,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	if err := r.Store.SaveWorkspace(workspace); err != nil {
 		return Workspace{}, err
