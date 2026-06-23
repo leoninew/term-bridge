@@ -1,6 +1,6 @@
 export const terminalSubprotocol = 'termbridge.terminal.v1'
 
-export type LifecycleState = 'starting' | 'running' | 'stopping' | 'stopped' | 'failed'
+export type LifecycleState = 'running' | 'stopped' | 'failed'
 export type AttachmentState = 'unattached' | 'attached' | 'detached' | 'reattaching'
 
 export type ClientControlMessage =
@@ -76,6 +76,11 @@ export type CreateSessionRequest = {
 
 export type UpdateSessionRequest = {
   name: string
+}
+
+export type RerunSessionRequest = {
+  cols: number
+  rows: number
 }
 
 export type CreateSessionResponse = {

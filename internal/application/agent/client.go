@@ -155,6 +155,16 @@ func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.Reques
 			return nil, err
 		}
 		return c.config.Runtime.CreateSession(ctx, params)
+	case "rerun_session":
+		var params struct {
+			WorkspaceId string                          `json:"workspace_id"`
+			SessionId   string                          `json:"session_id"`
+			Request     terminalapp.RerunSessionRequest `json:"request"`
+		}
+		if err := decodeRequestParams(request.Params, &params); err != nil {
+			return nil, err
+		}
+		return c.config.Runtime.RerunSession(ctx, params.WorkspaceId, params.SessionId, params.Request)
 	case "get_session":
 		var params struct {
 			WorkspaceId string `json:"workspace_id"`

@@ -41,6 +41,7 @@ export const messages = {
       removeWorkspaceDisabledAria: '{name} 工作区内有运行中的会话，暂时不能移除',
       renameSessionAria: '重命名 {name} 会话',
       stopSessionAria: '停止 {name} 会话',
+      rerunSessionAria: '重新运行 {name} 会话',
       deleteSessionAria: '删除 {name} 会话',
     },
     gateway: {
@@ -92,7 +93,7 @@ export const messages = {
       renameSessionTitle: '重命名会话',
       renameSessionDescription: '当前后端 API 仅支持修改会话名称。',
       deleteSessionTitle: '删除会话',
-      deleteActiveSessionDescription: '运行中、启动中和停止中的会话不能删除。请先关闭终端会话。',
+      deleteActiveSessionDescription: '运行中的会话不能删除。请先关闭终端会话。',
       deleteSessionDescription: '删除“{name}”？这会对已停止或终态会话调用后端 DELETE 会话接口。',
       fallbackSession: '此会话',
       removeWorkspaceTitle: '移除工作区记录',
@@ -116,6 +117,8 @@ export const messages = {
       terminalError: '终端错误：{code}',
       terminalConnectionFailed: '终端连接失败',
       stopSessionFailed: '停止会话失败',
+      rerunSessionFailed: '重新运行会话失败',
+      sessionRerun: '会话已重新运行',
     },
     message: {
       sessionNameRequired: '会话名称为必填项。',
@@ -156,6 +159,7 @@ export const messages = {
         '{name} workspace has running sessions and cannot be removed yet',
       renameSessionAria: 'Rename {name} session',
       stopSessionAria: 'Stop {name} session',
+      rerunSessionAria: 'Rerun {name} session',
       deleteSessionAria: 'Delete {name} session',
     },
     gateway: {
@@ -181,7 +185,8 @@ export const messages = {
       attachOnly:
         'Device offline: cached history is read-only; writes and terminal attach are unavailable.',
       attachOnlyTitle: 'Device offline read-only',
-      selectExistingSession: 'Select an existing session to read history; offline devices only expose cached history.',
+      selectExistingSession:
+        'Select an existing session to read history; offline devices only expose cached history.',
       routeUnavailable: 'The selected device is offline or its route is unavailable.',
       loginFailed: 'Sign in failed',
       logoutFailed: 'Logout failed',
@@ -211,7 +216,7 @@ export const messages = {
       renameSessionDescription: 'Only the session name can be changed by the current backend API.',
       deleteSessionTitle: 'Delete session',
       deleteActiveSessionDescription:
-        'Running, starting, and stopping sessions cannot be deleted. Close the terminal session first.',
+        'Running sessions cannot be deleted. Close the terminal session first.',
       deleteSessionDescription:
         'Delete “{name}”? This uses the backend DELETE session endpoint for stopped or terminal sessions.',
       fallbackSession: 'this session',
@@ -236,6 +241,8 @@ export const messages = {
       terminalError: 'Terminal error: {code}',
       terminalConnectionFailed: 'Terminal connection failed',
       stopSessionFailed: 'Stop session failed',
+      rerunSessionFailed: 'Rerun session failed',
+      sessionRerun: 'Session rerun',
     },
     message: {
       sessionNameRequired: 'Session name is required.',

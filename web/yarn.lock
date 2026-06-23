@@ -1519,7 +1519,7 @@ picomatch@^4.0.3, picomatch@^4.0.4:
   resolved "https://registry.npmmirror.com/picomatch/-/picomatch-4.0.4.tgz"
   integrity sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==
 
-pinia@^3.0.4:
+pinia@3.0.4:
   version "3.0.4"
   resolved "https://registry.npmmirror.com/pinia/-/pinia-3.0.4.tgz#75dde12784a61e34c1fa6abcd13c1a1061c360c0"
   integrity sha512-l7pqLUFTI/+ESXn6k3nu30ZIzW5E2WZF/LaHJEpoq6ElcLD+wduZoB2kBN19du6K/4FDpPMazY2wJr+IndBtQw==
@@ -1807,7 +1807,7 @@ vue-i18n@^11.4.6:
     "@intlify/shared" "11.4.6"
     "@vue/devtools-api" "^6.5.0"
 
-vue-router@4:
+vue-router@4.6.4:
   version "4.6.4"
   resolved "https://registry.npmmirror.com/vue-router/-/vue-router-4.6.4.tgz#a0a9cb9ef811a106d249e4bb9313d286718020d8"
   integrity sha512-Hz9q5sa33Yhduglwz6g9skT8OBPii+4bFn88w6J+J4MfEo4KRRpmiNG/hHHkdbRFlLBOqxN8y8gf2Fb0MTUgVg==

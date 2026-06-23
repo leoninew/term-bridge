@@ -308,8 +308,15 @@ func TestRunCommandCreatesLogStateAndReturnsCommandExitCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Glob() error = %v", err)
 	}
-	if len(matches) != 1 {
-		t.Fatalf("exit.json matches = %#v", matches)
+	if len(matches) != 0 {
+		t.Fatalf("exit.json matches = %#v, want none", matches)
+	}
+	workspaceMatches, err := filepath.Glob(filepath.Join(cwd, ".termbridge", "workspaces", "*", "workspace.json"))
+	if err != nil {
+		t.Fatalf("Glob() error = %v", err)
+	}
+	if len(workspaceMatches) != 1 {
+		t.Fatalf("workspace.json matches = %#v", workspaceMatches)
 	}
 }
 

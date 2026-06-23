@@ -128,11 +128,6 @@ func (r *SessionRuntime) attachmentState() AttachmentState {
 }
 
 func (r *SessionRuntime) lifecycleState() session.State {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.closed {
-		return session.StateStopping
-	}
 	return session.StateRunning
 }
 
@@ -193,9 +188,8 @@ func (r *SessionRuntime) closeSession(reason string) error {
 	clients := r.snapshotClientsLocked()
 	done := r.done
 	r.mu.Unlock()
-	_ = r.registry.store.SaveState(r.session.WorkspaceId, r.session.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopping, Reason: reason, UpdatedAt: time.Now().UTC()})
 	for _, client := range clients {
-		client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeState, LifecycleState: string(session.StateStopping), AttachmentState: string(AttachmentDetached), Reason: reason}})
+		client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeState, LifecycleState: string(session.StateRunning), AttachmentState: string(AttachmentDetached), Reason: reason}})
 	}
 	if err := r.pty.Close(); err != nil {
 		return err
@@ -253,10 +247,14 @@ func (r *SessionRuntime) waitLoop() {
 	if err := r.registry.store.SaveExit(r.session.WorkspaceId, r.session.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: exit.Code, Reason: "user_process_exited", Forced: exit.Forced, Closed: exit.Closed, StartedAt: startedAt, EndedAt: endedAt, WaitError: waitErr}); err != nil && r.registry.logger != nil {
 		r.registry.logger.Warn("save web terminal exit", "session_id", r.session.Id, "error", err)
 	}
-	if err := r.registry.store.SaveState(r.session.WorkspaceId, r.session.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "user_process_exited", UpdatedAt: endedAt}); err != nil && r.registry.logger != nil {
-		r.registry.logger.Warn("save web terminal stopped state", "session_id", r.session.Id, "error", err)
+	finalState := session.StateStopped
+	if result.Err != nil && !exit.Stopped && !exit.Closed && exit.Code == 0 {
+		finalState = session.StateFailed
 	}
-	r.broadcastText(terminalproto.ServerMessage{Type: terminalproto.TypeExited, ExitCode: &exit.Code, State: string(session.StateStopped), LifecycleState: string(session.StateStopped), AttachmentState: string(AttachmentDetached)})
+	if err := r.registry.store.SaveState(r.session.WorkspaceId, r.session.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: finalState, Reason: "user_process_exited", UpdatedAt: endedAt}); err != nil && r.registry.logger != nil {
+		r.registry.logger.Warn("save web terminal final state", "session_id", r.session.Id, "state", finalState, "error", err)
+	}
+	r.broadcastText(terminalproto.ServerMessage{Type: terminalproto.TypeExited, ExitCode: &exit.Code, State: string(finalState), LifecycleState: string(finalState), AttachmentState: string(AttachmentDetached)})
 	r.closeClients()
 	r.registry.removeRuntime(r.session.Id)
 	close(r.done)

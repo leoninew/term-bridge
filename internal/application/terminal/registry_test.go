@@ -391,6 +391,140 @@ func TestCloseSessionReturnsStoppedSummary(t *testing.T) {
 	}
 }
 
+func TestRerunSessionArchivesHistoryAndReusesSessionId(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	first := newFakeSession()
+	second := newFakeSession()
+	manager := &fakeManager{sessions: []*fakeSession{first, second}}
+	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	first.output <- []byte("OLD_OUTPUT\n")
+	waitHistoryContains(t, registry, response.WorkspaceId, response.SessionId, "OLD_OUTPUT")
+	first.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
+	waitRuntimeRemoved(t, registry, response.SessionId)
+
+	rerun, err := registry.RerunSession(context.Background(), response.WorkspaceId, response.SessionId, RerunSessionRequest{Cols: 100, Rows: 30})
+	if err != nil {
+		t.Fatalf("RerunSession() error = %v", err)
+	}
+	if rerun.SessionId != response.SessionId || rerun.WorkspaceId != response.WorkspaceId || rerun.State != string(session.StateRunning) {
+		t.Fatalf("rerun response = %#v", rerun)
+	}
+	if len(manager.specs) != 2 {
+		t.Fatalf("manager specs = %d, want 2", len(manager.specs))
+	}
+	if manager.specs[1].Command != "go" || len(manager.specs[1].Args) != 1 || manager.specs[1].Args[0] != "version" {
+		t.Fatalf("rerun spec = %#v", manager.specs[1])
+	}
+	if manager.specs[1].InitialSize != (process.TerminalSize{Cols: 100, Rows: 30}) {
+		t.Fatalf("rerun size = %#v", manager.specs[1].InitialSize)
+	}
+	if data, err := registry.History(response.WorkspaceId, response.SessionId); err != nil || string(data) != "" {
+		t.Fatalf("new history = %q, err=%v; want empty", data, err)
+	}
+	storedWorkspace, err := state.NewStore(root).LoadWorkspace(response.WorkspaceId)
+	if err != nil {
+		t.Fatalf("LoadWorkspace() error = %v", err)
+	}
+	child := storedWorkspace.Children[0]
+	if len(child.ArchivedRuns) != 1 || child.ArchivedRuns[0].HistoryPath == "" || child.ArchivedRuns[0].Process == nil || child.ArchivedRuns[0].Exit == nil {
+		t.Fatalf("archived runs = %#v", child.ArchivedRuns)
+	}
+	archivePath := filepath.Join(state.NewStore(root).SessionDir(response.WorkspaceId, response.SessionId), child.ArchivedRuns[0].HistoryPath)
+	archived, err := os.ReadFile(archivePath)
+	if err != nil {
+		t.Fatalf("ReadFile(archive) error = %v", err)
+	}
+	if string(archived) != "OLD_OUTPUT\n" {
+		t.Fatalf("archive history = %q", archived)
+	}
+	assertNoArchiveFragments(t, state.NewStore(root).SessionDir(response.WorkspaceId, response.SessionId))
+	second.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
+}
+
+func TestRerunSessionRejectsRunningSession(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	if _, err := registry.RerunSession(context.Background(), response.WorkspaceId, response.SessionId, RerunSessionRequest{}); err == nil {
+		t.Fatal("RerunSession() error = nil, want running session rejection")
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
+}
+
+func TestRerunSessionFailureMarksFailed(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	first := newFakeSession()
+	manager := &fakeManager{sessions: []*fakeSession{first}}
+	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
+	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	first.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
+	waitRuntimeRemoved(t, registry, response.SessionId)
+	if err := os.RemoveAll(cwd); err != nil {
+		t.Fatalf("RemoveAll(cwd) error = %v", err)
+	}
+
+	if _, err := registry.RerunSession(context.Background(), response.WorkspaceId, response.SessionId, RerunSessionRequest{}); err == nil {
+		t.Fatal("RerunSession() error = nil, want invalid cwd")
+	}
+	stateRecord, err := state.NewStore(root).LoadState(response.WorkspaceId, response.SessionId)
+	if err != nil {
+		t.Fatalf("LoadState() error = %v", err)
+	}
+	if stateRecord.State != session.StateFailed {
+		t.Fatalf("state = %#v, want failed", stateRecord)
+	}
+}
+
+func waitHistoryContains(t *testing.T, registry *Registry, workspaceId string, sessionId string, want string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for {
+		data, err := registry.History(workspaceId, sessionId)
+		if err != nil {
+			t.Fatalf("History() error = %v", err)
+		}
+		if strings.Contains(string(data), want) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("history = %q, want substring %q", data, want)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func assertNoArchiveFragments(t *testing.T, sessionDir string) {
+	t.Helper()
+	entries, err := os.ReadDir(sessionDir)
+	if err != nil {
+		t.Fatalf("ReadDir() error = %v", err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, "process.") || strings.HasPrefix(name, "exit.") || strings.HasPrefix(name, "state.") {
+			t.Fatalf("unexpected archive fragment %s", name)
+		}
+	}
+}
+
 func waitExit(t *testing.T, store state.Store, workspaceKey string, sessionId string) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -461,12 +595,18 @@ func drainClient(t *testing.T, client *Client) {
 }
 
 type fakeManager struct {
-	session *fakeSession
-	specs   []process.ProcessSpec
+	session  *fakeSession
+	sessions []*fakeSession
+	specs    []process.ProcessSpec
 }
 
 func (m *fakeManager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.Session, error) {
 	m.specs = append(m.specs, spec)
+	if len(m.sessions) > 0 {
+		session := m.sessions[0]
+		m.sessions = m.sessions[1:]
+		return session, nil
+	}
 	return m.session, nil
 }
 

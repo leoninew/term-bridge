@@ -59,8 +59,19 @@ func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
 	if got := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "history.log")); got == "" {
 		t.Fatal("history.log was not created")
 	}
-	if got := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "exit.json")); got == "" {
-		t.Fatal("exit.json was not created")
+	if got := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "exit.json")); got != "" {
+		t.Fatalf("exit.json was created: %s", got)
+	}
+	workspaceJSON := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "workspace.json"))
+	if workspaceJSON == "" {
+		t.Fatal("workspace.json was not created")
+	}
+	workspaceData, err := os.ReadFile(workspaceJSON)
+	if err != nil {
+		t.Fatalf("ReadFile(workspace.json) error = %v", err)
+	}
+	if !strings.Contains(string(workspaceData), `"exit"`) || !strings.Contains(string(workspaceData), `"exit_code": 7`) {
+		t.Fatalf("workspace.json missing exit aggregate: %s", workspaceData)
 	}
 }
 
@@ -88,8 +99,19 @@ func TestRunReturnsRuntimeErrorFromRunnerAndMarksFailed(t *testing.T) {
 		t.Fatalf("Result.Command = %#v", result.Command)
 	}
 	stateFile := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "state.json"))
-	if stateFile == "" {
-		t.Fatal("state.json was not created")
+	if stateFile != "" {
+		t.Fatalf("state.json was created: %s", stateFile)
+	}
+	workspaceJSON := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "workspace.json"))
+	if workspaceJSON == "" {
+		t.Fatal("workspace.json was not created")
+	}
+	workspaceData, err := os.ReadFile(workspaceJSON)
+	if err != nil {
+		t.Fatalf("ReadFile(workspace.json) error = %v", err)
+	}
+	if !strings.Contains(string(workspaceData), `"state": "failed"`) {
+		t.Fatalf("workspace.json missing failed state: %s", workspaceData)
 	}
 }
 

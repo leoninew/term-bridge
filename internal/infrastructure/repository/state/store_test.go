@@ -1,6 +1,7 @@
 package state
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,24 +12,24 @@ import (
 	"termbridge-go/internal/domain/workspace"
 )
 
-func TestStoreSavesAndListsRecords(t *testing.T) {
+func TestStoreSavesAndListsRecordsFromWorkspaceAggregate(t *testing.T) {
 	store := NewStore(filepath.Join(t.TempDir(), ".termbridge"))
 	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
 	ws := workspace.Workspace{SchemaVersion: workspace.SchemaVersion, Id: "01", Name: "project", Path: t.TempDir(), CreatedAt: now, UpdatedAt: now}
 	if err := store.SaveWorkspace(ws); err != nil {
 		t.Fatalf("SaveWorkspace() error = %v", err)
 	}
-	sess := session.Session{SchemaVersion: session.SchemaVersion, Id: "02", WorkspaceId: ws.Id, LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "pwsh", Args: []string{"-NoLogo"}}, CreatedAt: now, UpdatedAt: now}
+	sess := session.Session{SchemaVersion: session.SchemaVersion, Id: "02", WorkspaceId: ws.Id, Name: "shell", LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "pwsh", Args: []string{"-NoLogo"}}, History: session.HistoryRecord{Path: "history.log", MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, CreatedAt: now, UpdatedAt: now}
 	if err := store.SaveSession(sess); err != nil {
 		t.Fatalf("SaveSession() error = %v", err)
 	}
 	if err := store.SaveState(ws.Id, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "done", UpdatedAt: now}); err != nil {
 		t.Fatalf("SaveState() error = %v", err)
 	}
-	if err := store.SaveProcess(ws.Id, sess.Id, process.Record{SchemaVersion: 1, Pid: 123}); err != nil {
+	if err := store.SaveProcess(ws.Id, sess.Id, process.Record{SchemaVersion: 1, Pid: 123, StartedAt: now}); err != nil {
 		t.Fatalf("SaveProcess() error = %v", err)
 	}
-	if err := store.SaveExit(ws.Id, sess.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: 7, Reason: "user_process_exited"}); err != nil {
+	if err := store.SaveExit(ws.Id, sess.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: 7, Reason: "user_process_exited", EndedAt: now}); err != nil {
 		t.Fatalf("SaveExit() error = %v", err)
 	}
 
@@ -56,28 +57,126 @@ func TestStoreSavesAndListsRecords(t *testing.T) {
 	if sessions[0].ExitCode == nil || *sessions[0].ExitCode != 7 {
 		t.Fatalf("ExitCode = %#v", sessions[0].ExitCode)
 	}
+	storedWorkspace, err := store.LoadWorkspace(ws.Id)
+	if err != nil {
+		t.Fatalf("LoadWorkspace() error = %v", err)
+	}
+	child := storedWorkspace.Children[0]
+	if child.State.State != string(session.StateStopped) || child.CurrentRun.Process == nil || child.CurrentRun.Exit == nil {
+		t.Fatalf("workspace child aggregate = %#v", child)
+	}
+	assertNotExists(t, filepath.Join(store.SessionDir(ws.Id, sess.Id), "session.json"))
+	assertNotExists(t, filepath.Join(store.SessionDir(ws.Id, sess.Id), "state.json"))
+	assertNotExists(t, filepath.Join(store.SessionDir(ws.Id, sess.Id), "process.json"))
+	assertNotExists(t, filepath.Join(store.SessionDir(ws.Id, sess.Id), "exit.json"))
 }
 
 func TestStoreOverwritesExistingState(t *testing.T) {
 	store := NewStore(filepath.Join(t.TempDir(), ".termbridge"))
 	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
-	workspaceId := "workspace"
-	sessionId := "session"
+	ws, sess := saveWorkspaceSession(t, store, now)
 	first := session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: now}
 	second := session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "user_process_exited", UpdatedAt: now.Add(time.Second)}
 
-	if err := store.SaveState(workspaceId, sessionId, first); err != nil {
+	if err := store.SaveState(ws.Id, sess.Id, first); err != nil {
 		t.Fatalf("SaveState(first) error = %v", err)
 	}
-	if err := store.SaveState(workspaceId, sessionId, second); err != nil {
+	if err := store.SaveState(ws.Id, sess.Id, second); err != nil {
 		t.Fatalf("SaveState(second) error = %v", err)
 	}
-	stored, err := store.LoadState(workspaceId, sessionId)
+	stored, err := store.LoadState(ws.Id, sess.Id)
 	if err != nil {
 		t.Fatalf("LoadState() error = %v", err)
 	}
 	if stored.State != session.StateStopped || stored.Reason != "user_process_exited" {
 		t.Fatalf("state = %#v, want stopped user_process_exited", stored)
+	}
+}
+
+func TestStoreIgnoresLegacySessionFragments(t *testing.T) {
+	store := NewStore(filepath.Join(t.TempDir(), ".termbridge"))
+	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	ws, sess := saveWorkspaceSession(t, store, now)
+	if err := store.SaveState(ws.Id, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "workspace_state", UpdatedAt: now}); err != nil {
+		t.Fatalf("SaveState() error = %v", err)
+	}
+	if err := store.SaveProcess(ws.Id, sess.Id, process.Record{SchemaVersion: 1, Pid: 123}); err != nil {
+		t.Fatalf("SaveProcess() error = %v", err)
+	}
+	if err := store.SaveExit(ws.Id, sess.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: 7, Reason: "workspace_exit"}); err != nil {
+		t.Fatalf("SaveExit() error = %v", err)
+	}
+	legacyDir := store.SessionDir(ws.Id, sess.Id)
+	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	legacyFiles := map[string]string{
+		"session.json": `{"session_id":"legacy","name":"legacy"}`,
+		"state.json":   `{"state":"running","reason":"legacy_state"}`,
+		"process.json": `{"pid":999}`,
+		"exit.json":    `{"exit_code":99,"reason":"legacy_exit"}`,
+	}
+	for name, body := range legacyFiles {
+		if err := os.WriteFile(filepath.Join(legacyDir, name), []byte(body), 0o644); err != nil {
+			t.Fatalf("WriteFile(%s) error = %v", name, err)
+		}
+	}
+
+	stateRecord, err := store.LoadState(ws.Id, sess.Id)
+	if err != nil {
+		t.Fatalf("LoadState() error = %v", err)
+	}
+	if stateRecord.State != session.StateStopped || stateRecord.Reason != "workspace_state" {
+		t.Fatalf("state = %#v, want workspace aggregate", stateRecord)
+	}
+	processRecord, err := store.LoadProcess(ws.Id, sess.Id)
+	if err != nil {
+		t.Fatalf("LoadProcess() error = %v", err)
+	}
+	if processRecord.Pid != 123 {
+		t.Fatalf("process = %#v, want workspace aggregate", processRecord)
+	}
+	exitRecord, err := store.LoadExit(ws.Id, sess.Id)
+	if err != nil {
+		t.Fatalf("LoadExit() error = %v", err)
+	}
+	if exitRecord.ExitCode != 7 || exitRecord.Reason != "workspace_exit" {
+		t.Fatalf("exit = %#v, want workspace aggregate", exitRecord)
+	}
+}
+
+func TestArchiveCurrentRunMovesCurrentMetadataIntoWorkspaceArchive(t *testing.T) {
+	store := NewStore(filepath.Join(t.TempDir(), ".termbridge"))
+	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	ws, sess := saveWorkspaceSession(t, store, now)
+	if err := store.SaveState(ws.Id, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "done", UpdatedAt: now}); err != nil {
+		t.Fatalf("SaveState() error = %v", err)
+	}
+	if err := store.SaveProcess(ws.Id, sess.Id, process.Record{SchemaVersion: 1, Pid: 123}); err != nil {
+		t.Fatalf("SaveProcess() error = %v", err)
+	}
+	if err := store.SaveExit(ws.Id, sess.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: 7}); err != nil {
+		t.Fatalf("SaveExit() error = %v", err)
+	}
+
+	archivedAt := now.Add(time.Minute)
+	if err := store.ArchiveCurrentRun(ws.Id, sess.Id, "20260618T100100Z", "history.20260618T100100Z.log", archivedAt); err != nil {
+		t.Fatalf("ArchiveCurrentRun() error = %v", err)
+	}
+	storedWorkspace, err := store.LoadWorkspace(ws.Id)
+	if err != nil {
+		t.Fatalf("LoadWorkspace() error = %v", err)
+	}
+	child := storedWorkspace.Children[0]
+	if child.CurrentRun.Process != nil || child.CurrentRun.Exit != nil {
+		t.Fatalf("current run = %#v, want cleared", child.CurrentRun)
+	}
+	if len(child.ArchivedRuns) != 1 {
+		t.Fatalf("archived runs = %#v", child.ArchivedRuns)
+	}
+	archived := child.ArchivedRuns[0]
+	if archived.State.State != string(session.StateStopped) || archived.Process == nil || archived.Process.Pid != 123 || archived.Exit == nil || archived.Exit.ExitCode != 7 {
+		t.Fatalf("archived run = %#v", archived)
 	}
 }
 
@@ -193,5 +292,25 @@ func TestFindWorkspaceByIdUsesWorkspaceIdDirectory(t *testing.T) {
 	}
 	if got.Id != workspaceId {
 		t.Fatalf("FindWorkspaceById() = %#v, want workspace id %q", got, workspaceId)
+	}
+}
+
+func saveWorkspaceSession(t *testing.T, store Store, now time.Time) (workspace.Workspace, session.Session) {
+	t.Helper()
+	ws := workspace.Workspace{SchemaVersion: workspace.SchemaVersion, Id: "workspace", Name: "workspace", Path: t.TempDir(), CreatedAt: now, UpdatedAt: now}
+	if err := store.SaveWorkspace(ws); err != nil {
+		t.Fatalf("SaveWorkspace() error = %v", err)
+	}
+	sess := session.Session{SchemaVersion: session.SchemaVersion, Id: "session", Name: "session", WorkspaceId: ws.Id, LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "pwsh"}, History: session.HistoryRecord{Path: "history.log"}, CreatedAt: now, UpdatedAt: now}
+	if err := store.SaveSession(sess); err != nil {
+		t.Fatalf("SaveSession() error = %v", err)
+	}
+	return ws, sess
+}
+
+func assertNotExists(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); err == nil || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("%s exists or stat failed with unexpected error: %v", path, err)
 	}
 }

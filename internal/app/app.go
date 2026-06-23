@@ -187,12 +187,6 @@ func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, opt
 				logger.Error("save running state", "error", err)
 			}
 		},
-		OnStopping: func(_ process.StopMode, reason string) {
-			if err := store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopping, Reason: reason, UpdatedAt: time.Now().UTC()}); err != nil {
-				hookErr = err
-				logger.Error("save stopping state", "error", err)
-			}
-		},
 	}
 
 	stdout := options.Stdout
@@ -231,8 +225,12 @@ func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, opt
 		_ = store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_exit_failed", UpdatedAt: endedAt})
 		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("save exit record", err)
 	}
-	if err := store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "user_process_exited", UpdatedAt: endedAt}); err != nil {
-		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("save stopped state", err)
+	finalState := session.StateStopped
+	if runtimeResult.Exit.WaitErr != nil && !runtimeResult.Exit.Stopped && !runtimeResult.Exit.Closed && runtimeResult.Exit.Code == 0 {
+		finalState = session.StateFailed
+	}
+	if err := store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: finalState, Reason: "user_process_exited", UpdatedAt: endedAt}); err != nil {
+		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("save final state", err)
 	}
 
 	return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...), ExitCode: runtimeResult.ExitCode}, nil

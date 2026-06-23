@@ -148,6 +148,10 @@ func (r *fakeRuntimeAccess) CreateSession(context.Context, terminalapp.CreateSes
 	return terminalapp.CreateSessionResponse{SessionId: "sess-1", WorkspaceId: "ws-1", State: string(session.StateRunning)}, nil
 }
 
+func (r *fakeRuntimeAccess) RerunSession(context.Context, string, string, terminalapp.RerunSessionRequest) (terminalapp.CreateSessionResponse, error) {
+	return terminalapp.CreateSessionResponse{SessionId: "sess-1", WorkspaceId: "ws-1", State: string(session.StateRunning)}, nil
+}
+
 func (r *fakeRuntimeAccess) GetSession(context.Context, string, string) (terminalapp.SessionSummary, error) {
 	return terminalapp.SessionSummary{Id: "sess-1", WorkspaceId: "ws-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}, nil
 }

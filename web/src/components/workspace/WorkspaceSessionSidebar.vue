@@ -13,10 +13,7 @@
               :aria-label="t('gateway.devices')"
               :title="selectedDeviceLabel"
             >
-              <SelectValue
-                class="min-w-0 truncate"
-                :placeholder="deviceSelectPlaceholder"
-              />
+              <SelectValue class="min-w-0 truncate" :placeholder="deviceSelectPlaceholder" />
               <ChevronDown class="size-3.5 shrink-0 text-slate-500" aria-hidden="true" />
             </SelectTrigger>
             <SelectPortal>
@@ -214,6 +211,24 @@
                 <CircleStop class="size-3.5" />
               </button>
               <button
+                v-if="props.allowMutations && canRerunSession(session.session)"
+                type="button"
+                class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
+                :aria-label="
+                  t('sidebar.rerunSessionAria', {
+                    name: session.session.name || session.session.command,
+                  })
+                "
+                :title="
+                  t('sidebar.rerunSessionAria', {
+                    name: session.session.name || session.session.command,
+                  })
+                "
+                @click.stop="emit('rerunSession', session.session)"
+              >
+                <RotateCcw class="size-3.5" />
+              </button>
+              <button
                 v-if="props.allowMutations && canDeleteSession(session.session)"
                 type="button"
                 class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
@@ -301,6 +316,7 @@
     ChevronRight,
     CircleStop,
     Folder,
+    RotateCcw,
     FolderOpen,
     Pencil,
     Plus,
@@ -365,6 +381,7 @@
     newSession: [workspace?: WorkspaceSummary]
     renameSession: [session: SessionSummary]
     stopSession: [session: SessionSummary]
+    rerunSession: [session: SessionSummary]
     deleteSession: [session: SessionSummary]
     removeWorkspace: [workspace: WorkspaceSummary]
     unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
@@ -385,7 +402,9 @@
   const deviceSelectPlaceholder = computed(() =>
     props.devices.length === 0 ? t('gateway.noDevices') : t('gateway.selectDevicePlaceholder'),
   )
-  const selectedDeviceLabel = computed(() => selectedDevice.value?.name ?? deviceSelectPlaceholder.value)
+  const selectedDeviceLabel = computed(
+    () => selectedDevice.value?.name ?? deviceSelectPlaceholder.value,
+  )
   const deviceSelectDisabled = computed(() => props.devices.length === 0)
   const localeOptions = computed(() =>
     locales.map((value) => ({ value, label: localeLabels[value] })),
@@ -474,11 +493,15 @@
   }
 
   function isActiveSession(session: SessionSummary) {
-    return ['starting', 'running', 'stopping'].includes(session.lifecycle_state)
+    return session.lifecycle_state === 'running'
   }
 
   function canStopSession(session: SessionSummary) {
-    return ['starting', 'running'].includes(session.lifecycle_state)
+    return session.lifecycle_state === 'running'
+  }
+
+  function canRerunSession(session: SessionSummary) {
+    return ['stopped', 'failed'].includes(session.lifecycle_state)
   }
 
   function canDeleteSession(session: SessionSummary) {
@@ -506,9 +529,7 @@
   }
 
   function workspaceMatchesSearch(workspace: WorkspaceSummary) {
-    const haystack = [workspace.id, workspace.name, workspace.path]
-      .join(' ')
-      .toLowerCase()
+    const haystack = [workspace.id, workspace.name, workspace.path].join(' ').toLowerCase()
     return haystack.includes(normalizedSearchQuery.value)
   }
 

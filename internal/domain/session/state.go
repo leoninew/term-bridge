@@ -10,11 +10,9 @@ const SchemaVersion = 1
 type State string
 
 const (
-	StateStarting State = "starting"
-	StateRunning  State = "running"
-	StateStopping State = "stopping"
-	StateStopped  State = "stopped"
-	StateFailed   State = "failed"
+	StateRunning State = "running"
+	StateStopped State = "stopped"
+	StateFailed  State = "failed"
 )
 
 type StateRecord struct {
@@ -26,7 +24,7 @@ type StateRecord struct {
 
 func (s State) Valid() bool {
 	switch s {
-	case StateStarting, StateRunning, StateStopping, StateStopped, StateFailed:
+	case StateRunning, StateStopped, StateFailed:
 		return true
 	default:
 		return false
@@ -38,14 +36,12 @@ func CanTransition(from State, to State) bool {
 		return false
 	}
 	switch from {
-	case StateStarting:
-		return to == StateRunning || to == StateFailed
 	case StateRunning:
-		return to == StateStopping || to == StateStopped || to == StateFailed
-	case StateStopping:
 		return to == StateStopped || to == StateFailed
+	case StateStopped:
+		return to == StateRunning || to == StateFailed
 	case StateFailed:
-		return to == StateStopped
+		return to == StateRunning || to == StateStopped
 	default:
 		return false
 	}

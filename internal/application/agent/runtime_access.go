@@ -13,6 +13,7 @@ type RuntimeAccess interface {
 	DeleteWorkspace(ctx context.Context, workspaceId string) error
 	ListSessionsByWorkspaceId(ctx context.Context, workspaceId string) ([]terminalapp.WorkspaceSessionSummary, error)
 	CreateSession(ctx context.Context, request terminalapp.CreateSessionRequest) (terminalapp.CreateSessionResponse, error)
+	RerunSession(ctx context.Context, workspaceId string, sessionId string, request terminalapp.RerunSessionRequest) (terminalapp.CreateSessionResponse, error)
 	GetSession(ctx context.Context, workspaceId string, sessionId string) (terminalapp.SessionSummary, error)
 	UpdateSession(ctx context.Context, workspaceId string, sessionId string, request terminalapp.UpdateSessionRequest) (terminalapp.SessionSummary, error)
 	DeleteSession(ctx context.Context, workspaceId string, sessionId string) error
@@ -72,6 +73,13 @@ func (a WebTerminalAccess) CreateSession(ctx context.Context, request terminalap
 		return terminalapp.CreateSessionResponse{}, err
 	}
 	return a.Registry.CreateSession(ctx, request)
+}
+
+func (a WebTerminalAccess) RerunSession(ctx context.Context, workspaceId string, sessionId string, request terminalapp.RerunSessionRequest) (terminalapp.CreateSessionResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return terminalapp.CreateSessionResponse{}, err
+	}
+	return a.Registry.RerunSession(ctx, workspaceId, sessionId, request)
 }
 
 func (a WebTerminalAccess) GetSession(ctx context.Context, workspaceId string, sessionId string) (terminalapp.SessionSummary, error) {

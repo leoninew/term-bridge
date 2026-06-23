@@ -9,7 +9,6 @@ import (
 
 type Store interface {
 	SaveSession(Session) error
-	SaveState(workspaceId string, sessionId string, value StateRecord) error
 }
 
 type Manager struct {
@@ -44,9 +43,6 @@ func (m Manager) Create(options CreateOptions) (Session, error) {
 		UpdatedAt:     now,
 	}
 	if err := m.Store.SaveSession(session); err != nil {
-		return Session{}, err
-	}
-	if err := m.Store.SaveState(session.WorkspaceId, session.Id, StateRecord{SchemaVersion: SchemaVersion, State: StateStarting, Reason: "session_created", UpdatedAt: now}); err != nil {
 		return Session{}, err
 	}
 	return session, nil

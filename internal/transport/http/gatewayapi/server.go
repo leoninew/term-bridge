@@ -284,6 +284,16 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 			return
 		}
 		s.handleJSONRelay(w, r, route, deviceId, "close_session", params, "")
+	case "rerun":
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w, http.MethodPost)
+			return
+		}
+		var request json.RawMessage
+		if !decodeJSONRequest(w, r, &request) {
+			return
+		}
+		s.handleJSONRelay(w, r, route, deviceId, "rerun_session", map[string]any{"workspace_id": workspaceId, "session_id": sessionId, "request": request}, "")
 	case "history":
 		if r.Method != http.MethodGet {
 			methodNotAllowed(w, http.MethodGet)

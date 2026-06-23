@@ -91,11 +91,7 @@ func (s Store) SaveSession(value session.Session) error {
 	}
 	ws.UpdatedAt = value.UpdatedAt
 	upsertSessionNode(&ws, sessionNodeFromSession(value))
-	if err := s.SaveWorkspace(ws); err != nil {
-		return err
-	}
-	path := filepath.Join(s.SessionDir(value.WorkspaceId, value.Id), "session.json")
-	return writeJSON(path, value)
+	return s.SaveWorkspace(ws)
 }
 
 func (s Store) LoadSession(workspaceId string, sessionId string) (session.Session, error) {
@@ -143,36 +139,87 @@ func (s Store) DeleteWorkspace(workspaceId string) error {
 }
 
 func (s Store) SaveState(workspaceId string, sessionId string, value session.StateRecord) error {
-	path := filepath.Join(s.SessionDir(workspaceId, sessionId), "state.json")
-	return writeJSON(path, value)
+	return s.updateSessionNode(workspaceId, sessionId, func(node *workspace.SessionNode) error {
+		node.State = workspaceStateFromSession(value)
+		node.UpdatedAt = value.UpdatedAt
+		return nil
+	})
 }
 
 func (s Store) LoadState(workspaceId string, sessionId string) (session.StateRecord, error) {
-	var value session.StateRecord
-	err := readJSON(filepath.Join(s.SessionDir(workspaceId, sessionId), "state.json"), &value)
-	return value, err
+	node, err := s.loadSessionNode(workspaceId, sessionId)
+	if err != nil {
+		return session.StateRecord{}, err
+	}
+	return sessionStateFromWorkspace(node.State)
 }
 
 func (s Store) SaveProcess(workspaceId string, sessionId string, value process.Record) error {
-	path := filepath.Join(s.SessionDir(workspaceId, sessionId), "process.json")
-	return writeJSON(path, value)
+	return s.updateSessionNode(workspaceId, sessionId, func(node *workspace.SessionNode) error {
+		record := workspaceProcessFromProcess(value)
+		node.CurrentRun.Process = &record
+		if !value.StartedAt.IsZero() {
+			node.UpdatedAt = value.StartedAt
+		} else {
+			node.UpdatedAt = time.Now().UTC()
+		}
+		return nil
+	})
 }
 
 func (s Store) LoadProcess(workspaceId string, sessionId string) (process.Record, error) {
-	var value process.Record
-	err := readJSON(filepath.Join(s.SessionDir(workspaceId, sessionId), "process.json"), &value)
-	return value, err
+	node, err := s.loadSessionNode(workspaceId, sessionId)
+	if err != nil {
+		return process.Record{}, err
+	}
+	if node.CurrentRun.Process == nil {
+		return process.Record{}, os.ErrNotExist
+	}
+	return processFromWorkspaceProcess(*node.CurrentRun.Process), nil
 }
 
 func (s Store) SaveExit(workspaceId string, sessionId string, value process.ExitRecord) error {
-	path := filepath.Join(s.SessionDir(workspaceId, sessionId), "exit.json")
-	return writeJSON(path, value)
+	return s.updateSessionNode(workspaceId, sessionId, func(node *workspace.SessionNode) error {
+		record := workspaceExitFromProcess(value)
+		node.CurrentRun.Exit = &record
+		if !value.EndedAt.IsZero() {
+			node.UpdatedAt = value.EndedAt
+		} else {
+			node.UpdatedAt = time.Now().UTC()
+		}
+		return nil
+	})
 }
 
 func (s Store) LoadExit(workspaceId string, sessionId string) (process.ExitRecord, error) {
-	var value process.ExitRecord
-	err := readJSON(filepath.Join(s.SessionDir(workspaceId, sessionId), "exit.json"), &value)
-	return value, err
+	node, err := s.loadSessionNode(workspaceId, sessionId)
+	if err != nil {
+		return process.ExitRecord{}, err
+	}
+	if node.CurrentRun.Exit == nil {
+		return process.ExitRecord{}, os.ErrNotExist
+	}
+	return processExitFromWorkspaceExit(*node.CurrentRun.Exit), nil
+}
+
+func (s Store) ArchiveCurrentRun(workspaceId string, sessionId string, archiveId string, historyPath string, archivedAt time.Time) error {
+	if strings.TrimSpace(archiveId) == "" {
+		return fmt.Errorf("archive_id is required")
+	}
+	return s.updateSessionNode(workspaceId, sessionId, func(node *workspace.SessionNode) error {
+		node.ArchivedRuns = append(node.ArchivedRuns, workspace.ArchivedRun{
+			ArchiveId:   archiveId,
+			HistoryPath: historyPath,
+			State:       node.State,
+			Process:     cloneWorkspaceProcess(node.CurrentRun.Process),
+			Exit:        cloneWorkspaceExit(node.CurrentRun.Exit),
+			ArchivedAt:  archivedAt,
+		})
+		node.CurrentRun = workspace.RunRecord{}
+		node.History.Truncated = false
+		node.UpdatedAt = archivedAt
+		return nil
+	})
 }
 
 func (s Store) HistoryPath(workspaceId string, sessionId string) string {
@@ -266,21 +313,51 @@ func (s Store) listSessionsInWorkspace(ws workspace.Workspace) ([]session.View, 
 	var warnings []Warning
 	for _, child := range ws.Children {
 		sess := sessionFromWorkspaceNode(ws, child)
-		stateRecord, err := s.LoadState(ws.Id, child.Id)
+		stateRecord, err := sessionStateFromWorkspace(child.State)
 		if err != nil {
-			warnings = append(warnings, Warning{Path: filepath.Join(s.SessionDir(ws.Id, child.Id), "state.json"), Err: err})
+			warnings = append(warnings, Warning{Path: filepath.Join(s.WorkspaceDir(ws.Id), "workspace.json"), Err: fmt.Errorf("session %s state: %w", child.Id, err)})
+			continue
 		}
 		view := session.View{Session: sess, State: stateRecord, CommandText: formatCommand(sess.Command)}
-		if exit, err := s.LoadExit(ws.Id, child.Id); err == nil {
+		if child.CurrentRun.Exit != nil {
+			exit := processExitFromWorkspaceExit(*child.CurrentRun.Exit)
 			code := exit.ExitCode
 			view.ExitCode = &code
 			view.ExitReason = exit.Reason
-		} else if !errors.Is(err, os.ErrNotExist) {
-			warnings = append(warnings, Warning{Path: filepath.Join(s.SessionDir(ws.Id, child.Id), "exit.json"), Err: err})
 		}
 		views = append(views, view)
 	}
 	return views, warnings, nil
+}
+
+func (s Store) loadSessionNode(workspaceId string, sessionId string) (workspace.SessionNode, error) {
+	ws, err := s.LoadWorkspace(workspaceId)
+	if err != nil {
+		return workspace.SessionNode{}, err
+	}
+	for _, child := range ws.Children {
+		if child.Id == sessionId {
+			return child, nil
+		}
+	}
+	return workspace.SessionNode{}, os.ErrNotExist
+}
+
+func (s Store) updateSessionNode(workspaceId string, sessionId string, update func(*workspace.SessionNode) error) error {
+	ws, err := s.LoadWorkspace(workspaceId)
+	if err != nil {
+		return err
+	}
+	for i := range ws.Children {
+		if ws.Children[i].Id == sessionId {
+			if err := update(&ws.Children[i]); err != nil {
+				return err
+			}
+			ws.UpdatedAt = ws.Children[i].UpdatedAt
+			return s.SaveWorkspace(ws)
+		}
+	}
+	return os.ErrNotExist
 }
 
 func sessionNodeFromSession(value session.Session) workspace.SessionNode {
@@ -294,6 +371,13 @@ func sessionNodeFromSession(value session.Session) workspace.SessionNode {
 			Args:        append([]string(nil), value.Command.Args...),
 			EnvStrategy: value.Command.EnvStrategy,
 			EnvCount:    value.Command.EnvCount,
+		},
+		History: workspace.HistoryRecord{
+			Path:         value.History.Path,
+			MaxLines:     value.History.MaxLines,
+			MaxBytes:     value.History.MaxBytes,
+			MaxLineBytes: value.History.MaxLineBytes,
+			Truncated:    value.History.Truncated,
 		},
 		CreatedAt: value.CreatedAt,
 		UpdatedAt: value.UpdatedAt,
@@ -314,14 +398,68 @@ func sessionFromWorkspaceNode(ws workspace.Workspace, child workspace.SessionNod
 			EnvStrategy: child.Command.EnvStrategy,
 			EnvCount:    child.Command.EnvCount,
 		},
+		History: session.HistoryRecord{
+			Path:         child.History.Path,
+			MaxLines:     child.History.MaxLines,
+			MaxBytes:     child.History.MaxBytes,
+			MaxLineBytes: child.History.MaxLineBytes,
+			Truncated:    child.History.Truncated,
+		},
 		CreatedAt: child.CreatedAt,
 		UpdatedAt: child.UpdatedAt,
 	}
 }
 
+func workspaceStateFromSession(value session.StateRecord) workspace.StateRecord {
+	return workspace.StateRecord{SchemaVersion: value.SchemaVersion, State: string(value.State), Reason: value.Reason, UpdatedAt: value.UpdatedAt}
+}
+
+func sessionStateFromWorkspace(value workspace.StateRecord) (session.StateRecord, error) {
+	state := session.State(value.State)
+	if !state.Valid() {
+		return session.StateRecord{}, fmt.Errorf("invalid lifecycle state %q", value.State)
+	}
+	return session.StateRecord{SchemaVersion: value.SchemaVersion, State: state, Reason: value.Reason, UpdatedAt: value.UpdatedAt}, nil
+}
+
+func workspaceProcessFromProcess(value process.Record) workspace.ProcessRecord {
+	return workspace.ProcessRecord{SchemaVersion: value.SchemaVersion, Pid: value.Pid, OwnerPid: value.OwnerPid, Executable: value.Executable, CommandLine: value.CommandLine, Cwd: value.Cwd, StartedAt: value.StartedAt}
+}
+
+func processFromWorkspaceProcess(value workspace.ProcessRecord) process.Record {
+	return process.Record{SchemaVersion: value.SchemaVersion, Pid: value.Pid, OwnerPid: value.OwnerPid, Executable: value.Executable, CommandLine: value.CommandLine, Cwd: value.Cwd, StartedAt: value.StartedAt}
+}
+
+func workspaceExitFromProcess(value process.ExitRecord) workspace.ExitRecord {
+	return workspace.ExitRecord{SchemaVersion: value.SchemaVersion, ExitCode: value.ExitCode, Reason: value.Reason, Forced: value.Forced, Closed: value.Closed, StartedAt: value.StartedAt, EndedAt: value.EndedAt, WaitError: value.WaitError}
+}
+
+func processExitFromWorkspaceExit(value workspace.ExitRecord) process.ExitRecord {
+	return process.ExitRecord{SchemaVersion: value.SchemaVersion, ExitCode: value.ExitCode, Reason: value.Reason, Forced: value.Forced, Closed: value.Closed, StartedAt: value.StartedAt, EndedAt: value.EndedAt, WaitError: value.WaitError}
+}
+
+func cloneWorkspaceProcess(value *workspace.ProcessRecord) *workspace.ProcessRecord {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneWorkspaceExit(value *workspace.ExitRecord) *workspace.ExitRecord {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
 func upsertSessionNode(ws *workspace.Workspace, child workspace.SessionNode) {
 	for i := range ws.Children {
 		if ws.Children[i].Id == child.Id {
+			child.State = ws.Children[i].State
+			child.CurrentRun = ws.Children[i].CurrentRun
+			child.ArchivedRuns = append([]workspace.ArchivedRun(nil), ws.Children[i].ArchivedRuns...)
 			ws.Children[i] = child
 			return
 		}

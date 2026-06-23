@@ -62,8 +62,9 @@ type Registry struct {
 	clientQueueBytes int
 	envDenylist      []string
 
-	mu       sync.Mutex
-	runtimes map[string]*SessionRuntime
+	mu        sync.Mutex
+	runtimes  map[string]*SessionRuntime
+	launching map[string]bool
 }
 
 type CreateSessionRequest struct {
@@ -73,6 +74,11 @@ type CreateSessionRequest struct {
 	Command     []string `json:"command"`
 	Cols        int      `json:"cols"`
 	Rows        int      `json:"rows"`
+}
+
+type RerunSessionRequest struct {
+	Cols int `json:"cols"`
+	Rows int `json:"rows"`
 }
 
 type UpdateSessionRequest struct {
@@ -192,6 +198,7 @@ func NewRegistry(config Config) *Registry {
 		clientQueueBytes: queueBytes,
 		envDenylist:      append([]string(nil), config.EnvDenylist...),
 		runtimes:         map[string]*SessionRuntime{},
+		launching:        map[string]bool{},
 	}
 }
 
@@ -276,24 +283,80 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 		return CreateSessionResponse{}, apperrors.Runtime("create session", err)
 	}
 
+	if err := r.startSessionRuntime(ctx, sess, request.Command, size); err != nil {
+		r.saveSessionFailed(sess, startFailureReason(err))
+		return CreateSessionResponse{}, err
+	}
+	return CreateSessionResponse{SessionId: sess.Id, WorkspaceId: sess.WorkspaceId, State: string(session.StateRunning)}, nil
+}
+
+func (r *Registry) RerunSession(ctx context.Context, workspaceId string, sessionId string, request RerunSessionRequest) (CreateSessionResponse, error) {
+	view, err := r.sessionView(workspaceId, sessionId)
+	if err != nil {
+		return CreateSessionResponse{}, err
+	}
+	if !session.Terminal(view.State.State) {
+		return CreateSessionResponse{}, apperrors.Usage("cannot rerun running session")
+	}
+	command := commandFromSession(view.Session)
+	if len(command) == 0 {
+		r.saveSessionFailed(view.Session, "missing_rerun_command")
+		return CreateSessionResponse{}, apperrors.Usage("missing session command")
+	}
+	if err := validateSessionCwd(view.Session.LaunchCwd); err != nil {
+		r.saveSessionFailed(view.Session, "invalid_rerun_cwd")
+		return CreateSessionResponse{}, err
+	}
+	size := process.TerminalSize{Cols: request.Cols, Rows: request.Rows}.OrDefault()
+	if err := terminalproto.ValidateSize(size.Cols, size.Rows); err != nil {
+		return CreateSessionResponse{}, apperrors.Usage(err.Error())
+	}
+	if err := r.claimSessionStart(sessionId); err != nil {
+		return CreateSessionResponse{}, err
+	}
+	defer r.releaseSessionStart(sessionId)
+
+	archivedAt := time.Now().UTC()
+	archiveId := archiveIdForTime(archivedAt)
+	historyPath, err := r.archiveCurrentHistory(workspaceId, sessionId, archiveId)
+	if err != nil {
+		r.saveSessionFailed(view.Session, "archive_history_failed")
+		return CreateSessionResponse{}, apperrors.Runtime("archive history", err)
+	}
+	if err := r.store.ArchiveCurrentRun(workspaceId, sessionId, archiveId, historyPath, archivedAt); err != nil {
+		r.saveSessionFailed(view.Session, "archive_run_failed")
+		return CreateSessionResponse{}, apperrors.Runtime("archive current run", err)
+	}
+	if err := r.startClaimedSessionRuntime(ctx, view.Session, command, size); err != nil {
+		r.saveSessionFailed(view.Session, startFailureReason(err))
+		return CreateSessionResponse{}, err
+	}
+	return CreateSessionResponse{SessionId: view.Session.Id, WorkspaceId: view.Session.WorkspaceId, State: string(session.StateRunning)}, nil
+}
+
+func (r *Registry) startSessionRuntime(ctx context.Context, sess session.Session, command []string, size process.TerminalSize) error {
+	if err := r.claimSessionStart(sess.Id); err != nil {
+		return err
+	}
+	defer r.releaseSessionStart(sess.Id)
+	return r.startClaimedSessionRuntime(ctx, sess, command, size)
+}
+
+func (r *Registry) startClaimedSessionRuntime(ctx context.Context, sess session.Session, command []string, size process.TerminalSize) error {
 	historyWriter, err := history.NewWriter(r.store.HistoryPath(sess.WorkspaceId, sess.Id), history.Config{MaxLines: r.historyConfig.MaxLines, MaxBytes: r.historyConfig.MaxBytes, MaxLineBytes: r.historyConfig.MaxLineBytes})
 	if err != nil {
-		_ = r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "history_create_failed", UpdatedAt: time.Now().UTC()})
-		return CreateSessionResponse{}, apperrors.Runtime("create history writer", err)
+		return apperrors.Runtime("create history writer", err)
 	}
-
-	spec, err := process.NewSpec(absCwd, request.Command, size)
+	spec, err := process.NewSpec(sess.LaunchCwd, command, size)
 	if err != nil {
 		_ = historyWriter.Close()
-		_ = r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "build_process_spec_failed", UpdatedAt: time.Now().UTC()})
-		return CreateSessionResponse{}, apperrors.Runtime("build process spec", err)
+		return apperrors.Runtime("build process spec", err)
 	}
-	spec.Env = env
+	spec.Env = filterEnv(os.Environ(), r.envDenylist)
 	resolved, err := process.ResolveExecutable(spec.Command)
 	if err != nil {
 		_ = historyWriter.Close()
-		_ = r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "resolve_executable_failed", UpdatedAt: time.Now().UTC()})
-		return CreateSessionResponse{}, apperrors.Runtime("resolve executable", err)
+		return apperrors.Runtime("resolve executable", err)
 	}
 	spec = spec.WithResolvedCommand(resolved)
 
@@ -303,21 +366,32 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 	ptySession, err := r.manager.Start(ctx, spec)
 	if err != nil {
 		_ = historyWriter.Close()
-		_ = r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "pty_start_failed", UpdatedAt: time.Now().UTC()})
-		return CreateSessionResponse{}, apperrors.Runtime("start pty", err)
+		return apperrors.Runtime("start pty", err)
 	}
 	if reporter, ok := ptySession.(termpty.ProcessReporter); ok {
-		if err := r.store.SaveProcess(sess.WorkspaceId, sess.Id, reporter.ProcessInfo()); err != nil {
+		record := reporter.ProcessInfo()
+		if record.Executable == "" {
+			record.Executable = spec.EffectiveCommand()
+		}
+		if record.CommandLine == "" {
+			record.CommandLine = formatProcessCommand(spec.Command, spec.Args)
+		}
+		if record.Cwd == "" {
+			record.Cwd = spec.Cwd
+		}
+		if record.StartedAt.IsZero() {
+			record.StartedAt = time.Now().UTC()
+		}
+		if err := r.store.SaveProcess(sess.WorkspaceId, sess.Id, record); err != nil {
 			_ = ptySession.Close()
 			_ = historyWriter.Close()
-			_ = r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_process_failed", UpdatedAt: time.Now().UTC()})
-			return CreateSessionResponse{}, apperrors.Runtime("save process", err)
+			return apperrors.Runtime("save process", err)
 		}
 	}
 	if err := r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: time.Now().UTC()}); err != nil {
 		_ = ptySession.Close()
 		_ = historyWriter.Close()
-		return CreateSessionResponse{}, apperrors.Runtime("save running state", err)
+		return apperrors.Runtime("save running state", err)
 	}
 
 	if r.logger != nil {
@@ -328,8 +402,114 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 	r.runtimes[sess.Id] = runtime
 	r.mu.Unlock()
 	runtime.start()
+	return nil
+}
 
-	return CreateSessionResponse{SessionId: sess.Id, WorkspaceId: sess.WorkspaceId, State: string(session.StateRunning)}, nil
+func (r *Registry) claimSessionStart(sessionId string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.runtimes[sessionId] != nil || r.launching[sessionId] {
+		return apperrors.Usage("session already running")
+	}
+	r.launching[sessionId] = true
+	return nil
+}
+
+func (r *Registry) releaseSessionStart(sessionId string) {
+	r.mu.Lock()
+	delete(r.launching, sessionId)
+	r.mu.Unlock()
+}
+
+func (r *Registry) saveSessionFailed(sess session.Session, reason string) {
+	if err := r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: reason, UpdatedAt: time.Now().UTC()}); err != nil && r.logger != nil {
+		r.logger.Warn("save failed session state", "session_id", sess.Id, "reason", reason, "error", err)
+	}
+}
+
+func startFailureReason(err error) string {
+	message := err.Error()
+	switch {
+	case strings.Contains(message, "create history writer"):
+		return "history_create_failed"
+	case strings.Contains(message, "build process spec"):
+		return "build_process_spec_failed"
+	case strings.Contains(message, "resolve executable"):
+		return "resolve_executable_failed"
+	case strings.Contains(message, "start pty"):
+		return "pty_start_failed"
+	case strings.Contains(message, "save process"):
+		return "save_process_failed"
+	case strings.Contains(message, "save running state"):
+		return "save_running_state_failed"
+	default:
+		return "runtime_start_failed"
+	}
+}
+
+func formatProcessCommand(command string, args []string) string {
+	if len(args) == 0 {
+		return command
+	}
+	return command + " " + strings.Join(args, " ")
+}
+
+func commandFromSession(sess session.Session) []string {
+	command := strings.TrimSpace(sess.Command.Command)
+	if command == "" {
+		command = strings.TrimSpace(sess.Command.Executable)
+	}
+	if command == "" {
+		return nil
+	}
+	return append([]string{command}, sess.Command.Args...)
+}
+
+func validateSessionCwd(cwd string) error {
+	if strings.TrimSpace(cwd) == "" {
+		return apperrors.Config("invalid session cwd", fmt.Errorf("missing cwd"))
+	}
+	if info, err := os.Stat(cwd); err != nil {
+		return apperrors.Config("invalid session cwd", err)
+	} else if !info.IsDir() {
+		return apperrors.Config("invalid session cwd", fmt.Errorf("not a directory"))
+	}
+	return nil
+}
+
+func (r *Registry) archiveCurrentHistory(workspaceId string, sessionId string, archiveId string) (string, error) {
+	historyPath := r.store.HistoryPath(workspaceId, sessionId)
+	if _, err := os.Stat(historyPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+		return "", err
+	}
+	for i := 0; i < 1000; i++ {
+		archiveName := "history." + archiveId + archiveSuffix(i) + ".log"
+		archivePath := filepath.Join(filepath.Dir(historyPath), archiveName)
+		if _, err := os.Stat(archivePath); err == nil {
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+		if err := os.Rename(historyPath, archivePath); err != nil {
+			return "", err
+		}
+		return archiveName, nil
+	}
+	return "", fmt.Errorf("history archive name exhausted for %s", archiveId)
+}
+
+func archiveSuffix(index int) string {
+	if index == 0 {
+		return ""
+	}
+	return fmt.Sprintf(".%d", index)
+}
+
+func archiveIdForTime(value time.Time) string {
+	return value.UTC().Format("20060102T150405.000000000Z")
 }
 
 func (r *Registry) Attach(workspaceId string, sessionId string) (*Client, error) {

@@ -62,6 +62,7 @@
           @new-session="openCreateSessionForm"
           @rename-session="openRenameDialog"
           @stop-session="stopSessionFromSidebar"
+          @rerun-session="rerunSessionFromSidebar"
           @delete-session="openDeleteSessionDialog"
           @remove-workspace="openRemoveWorkspaceDialog"
           @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
@@ -456,6 +457,7 @@
     deleteSession,
     getSession,
     readHistory,
+    rerunSession,
     terminalWsUrl as sessionTerminalWsUrl,
     updateSession,
   } from '../features/sessions/api'
@@ -490,6 +492,7 @@
   const creatingSession = ref(false)
   const renamingSession = ref(false)
   const deletingSession = ref(false)
+  const rerunningSession = ref(false)
   const removingWorkspace = ref(false)
   const createSessionFormOpen = ref(false)
   const createSessionWorkspace = ref<WorkspaceSummary | null>(null)
@@ -653,7 +656,11 @@
         workspaceId: created.workspace_id,
         state: created.state,
       })
-      const session = await getSession(selectedDeviceId.value, created.workspace_id, created.session_id)
+      const session = await getSession(
+        selectedDeviceId.value,
+        created.workspace_id,
+        created.session_id,
+      )
       logTerminalDiagnostic('session.create.summary', {
         sessionId: session.id,
         lifecycleState: session.lifecycle_state,
@@ -669,6 +676,7 @@
       pushToast('success', t('toast.sessionCreated'), session.name)
     } catch (err) {
       notifyError(t('toast.createSessionFailed'), err)
+      await refresh()
     } finally {
       creatingSession.value = false
     }
@@ -923,6 +931,61 @@
     }
   }
 
+  async function rerunSessionFromSidebar(session: SessionSummary) {
+    if (!ensureMutationAllowed()) {
+      return
+    }
+    if (!canRerunLifecycle(session) || rerunningSession.value) {
+      return
+    }
+    rerunningSession.value = true
+    try {
+      const size = measureInitialTerminalSize()
+      const response = await rerunSession(
+        selectedDeviceId.value,
+        session.workspace_id,
+        session.id,
+        size,
+      )
+      const updated = await getSession(
+        selectedDeviceId.value,
+        response.workspace_id,
+        response.session_id,
+      )
+      updateSessionInState(updated)
+      resetTabHistory(updated.id)
+      await openSessionTab(updated)
+      pushToast('success', t('toast.sessionRerun'), updated.name)
+    } catch (err) {
+      notifyError(t('toast.rerunSessionFailed'), err)
+      await refreshSessionAfterRerunFailure(session)
+    } finally {
+      rerunningSession.value = false
+    }
+  }
+
+  async function refreshSessionAfterRerunFailure(session: SessionSummary) {
+    resetTabHistory(session.id)
+    try {
+      const updated = await getSession(selectedDeviceId.value, session.workspace_id, session.id)
+      updateSessionInState(updated)
+      await ensureHistoryLoaded(session.id)
+    } catch {
+      await refresh()
+    }
+  }
+
+  function resetTabHistory(sessionId: string) {
+    const tab = openedTabs.value.find((item) => item.sessionId === sessionId)
+    if (!tab) {
+      return
+    }
+    tab.historyText = ''
+    tab.historyLoaded = false
+    tab.historyLoading = false
+    tab.historyError = null
+  }
+
   function openDeleteSessionDialog(session: SessionSummary) {
     if (!ensureMutationAllowed()) {
       return
@@ -1069,17 +1132,22 @@
     if (!session) {
       return sessionId.slice(0, 8)
     }
-    const workspaceName = workspaces.value.find((workspace) => workspace.id === session.workspace_id)?.name
+    const workspaceName = workspaces.value.find(
+      (workspace) => workspace.id === session.workspace_id,
+    )?.name
     return workspaceName ? `${session.name} · ${workspaceName}` : session.name
   }
 
-
   function isActiveLifecycle(session: SessionSummary) {
-    return ['running', 'starting', 'stopping'].includes(session.lifecycle_state)
+    return session.lifecycle_state === 'running'
   }
 
   function isStoppableLifecycle(session: SessionSummary) {
-    return ['running', 'starting'].includes(session.lifecycle_state)
+    return session.lifecycle_state === 'running'
+  }
+
+  function canRerunLifecycle(session: SessionSummary) {
+    return ['stopped', 'failed'].includes(session.lifecycle_state)
   }
 
   function terminalWsUrl(sessionId: string) {

@@ -14,10 +14,15 @@ export async function listWorkspaces(deviceId: string): Promise<ApiResult<Worksp
   if (!response.ok) {
     throw new Error(await responseError('List workspaces failed', response))
   }
-  return { data: ((await response.json()) as WorkspaceSummary[] | null) ?? [], offline: offline(response) }
+  return {
+    data: ((await response.json()) as WorkspaceSummary[] | null) ?? [],
+    offline: offline(response),
+  }
 }
 
-export async function listWorkspaceTree(deviceId: string): Promise<ApiResult<WorkspaceTreeSummary[]>> {
+export async function listWorkspaceTree(
+  deviceId: string,
+): Promise<ApiResult<WorkspaceTreeSummary[]>> {
   const response = await fetch(devicePath(deviceId, '/workspaces/tree'))
   if (!response.ok) {
     throw new Error(await responseError('List workspace tree failed', response))
@@ -44,9 +49,12 @@ export async function updateWorkspaceOrder(
 }
 
 export async function deleteWorkspace(deviceId: string, workspaceId: string): Promise<void> {
-  const response = await fetch(devicePath(deviceId, `/workspaces/${encodeURIComponent(workspaceId)}`), {
-    method: 'DELETE',
-  })
+  const response = await fetch(
+    devicePath(deviceId, `/workspaces/${encodeURIComponent(workspaceId)}`),
+    {
+      method: 'DELETE',
+    },
+  )
   if (!response.ok) {
     throw new Error(await responseError('Remove workspace failed', response))
   }

@@ -4,13 +4,11 @@ import "testing"
 
 func TestCanTransitionAllowsExpectedTransitions(t *testing.T) {
 	allowed := [][2]State{
-		{StateStarting, StateRunning},
-		{StateStarting, StateFailed},
-		{StateRunning, StateStopping},
 		{StateRunning, StateStopped},
 		{StateRunning, StateFailed},
-		{StateStopping, StateStopped},
-		{StateStopping, StateFailed},
+		{StateStopped, StateRunning},
+		{StateStopped, StateFailed},
+		{StateFailed, StateRunning},
 		{StateFailed, StateStopped},
 	}
 	for _, pair := range allowed {
@@ -22,9 +20,11 @@ func TestCanTransitionAllowsExpectedTransitions(t *testing.T) {
 
 func TestCanTransitionRejectsInvalidTransitions(t *testing.T) {
 	invalid := [][2]State{
-		{StateStopped, StateRunning},
-		{StateFailed, StateRunning},
-		{StateStarting, StateStopped},
+		{StateRunning, StateRunning},
+		{StateStopped, StateStopped},
+		{StateFailed, StateFailed},
+		{State("starting"), StateRunning},
+		{StateRunning, State("stopping")},
 		{State("bogus"), StateRunning},
 		{StateRunning, State("bogus")},
 	}
@@ -36,10 +36,14 @@ func TestCanTransitionRejectsInvalidTransitions(t *testing.T) {
 }
 
 func TestStateValid(t *testing.T) {
-	if !StateRunning.Valid() {
-		t.Fatal("StateRunning.Valid() = false")
+	for _, state := range []State{StateRunning, StateStopped, StateFailed} {
+		if !state.Valid() {
+			t.Fatalf("%q.Valid() = false", state)
+		}
 	}
-	if State("wat").Valid() {
-		t.Fatal("unknown state is valid")
+	for _, state := range []State{State("starting"), State("stopping"), State("wat")} {
+		if state.Valid() {
+			t.Fatalf("%q.Valid() = true, want false", state)
+		}
 	}
 }

@@ -2,6 +2,7 @@ import type {
   ApiErrorResponse,
   CreateSessionRequest,
   CreateSessionResponse,
+  RerunSessionRequest,
   SessionSummary,
   UpdateSessionRequest,
 } from '../../protocol/terminal'
@@ -90,7 +91,9 @@ export async function readHistory(
   workspaceId: string,
   sessionId: string,
 ): Promise<ApiResult<string>> {
-  const response = await fetch(devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/history`))
+  const response = await fetch(
+    devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/history`),
+  )
   if (!response.ok) {
     throw new Error(await responseError('Read history failed', response))
   }
@@ -102,13 +105,36 @@ export async function closeSession(
   workspaceId: string,
   sessionId: string,
 ): Promise<SessionSummary> {
-  const response = await fetch(devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/close`), {
-    method: 'POST',
-  })
+  const response = await fetch(
+    devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/close`),
+    {
+      method: 'POST',
+    },
+  )
   if (!response.ok) {
     throw new Error(await responseError('Close session failed', response))
   }
   return (await response.json()) as SessionSummary
+}
+
+export async function rerunSession(
+  deviceId: string,
+  workspaceId: string,
+  sessionId: string,
+  request: RerunSessionRequest,
+): Promise<CreateSessionResponse> {
+  const response = await fetch(
+    devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/rerun`),
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  )
+  if (!response.ok) {
+    throw new Error(await responseError('Rerun session failed', response))
+  }
+  return (await response.json()) as CreateSessionResponse
 }
 
 export function terminalWsUrl(deviceId: string, workspaceId: string, sessionId: string): string {
