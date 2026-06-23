@@ -316,16 +316,11 @@ func (r *Registry) RerunSession(ctx context.Context, workspaceId string, session
 	}
 	defer r.releaseSessionStart(sessionId)
 
-	archivedAt := time.Now().UTC()
-	archiveId := archiveIdForTime(archivedAt)
-	historyPath, err := r.archiveCurrentHistory(workspaceId, sessionId, archiveId)
+	archiveId := archiveIdForTime(time.Now().UTC())
+	_, err = r.archiveCurrentHistory(workspaceId, sessionId, archiveId)
 	if err != nil {
 		r.saveSessionFailed(view.Session, "archive_history_failed")
 		return CreateSessionResponse{}, apperrors.Runtime("archive history", err)
-	}
-	if err := r.store.ArchiveCurrentRun(workspaceId, sessionId, archiveId, historyPath, archivedAt); err != nil {
-		r.saveSessionFailed(view.Session, "archive_run_failed")
-		return CreateSessionResponse{}, apperrors.Runtime("archive current run", err)
 	}
 	if err := r.startClaimedSessionRuntime(ctx, view.Session, command, size); err != nil {
 		r.saveSessionFailed(view.Session, startFailureReason(err))

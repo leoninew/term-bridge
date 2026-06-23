@@ -145,41 +145,6 @@ func TestStoreIgnoresLegacySessionFragments(t *testing.T) {
 	}
 }
 
-func TestArchiveCurrentRunMovesCurrentMetadataIntoWorkspaceArchive(t *testing.T) {
-	store := NewStore(filepath.Join(t.TempDir(), ".termbridge"))
-	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
-	ws, sess := saveWorkspaceSession(t, store, now)
-	if err := store.SaveState(ws.Id, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "done", UpdatedAt: now}); err != nil {
-		t.Fatalf("SaveState() error = %v", err)
-	}
-	if err := store.SaveProcess(ws.Id, sess.Id, process.Record{SchemaVersion: 1, Pid: 123}); err != nil {
-		t.Fatalf("SaveProcess() error = %v", err)
-	}
-	if err := store.SaveExit(ws.Id, sess.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: 7}); err != nil {
-		t.Fatalf("SaveExit() error = %v", err)
-	}
-
-	archivedAt := now.Add(time.Minute)
-	if err := store.ArchiveCurrentRun(ws.Id, sess.Id, "20260618T100100Z", "history.20260618T100100Z.log", archivedAt); err != nil {
-		t.Fatalf("ArchiveCurrentRun() error = %v", err)
-	}
-	storedWorkspace, err := store.LoadWorkspace(ws.Id)
-	if err != nil {
-		t.Fatalf("LoadWorkspace() error = %v", err)
-	}
-	child := storedWorkspace.Children[0]
-	if child.CurrentRun.Process != nil || child.CurrentRun.Exit != nil {
-		t.Fatalf("current run = %#v, want cleared", child.CurrentRun)
-	}
-	if len(child.ArchivedRuns) != 1 {
-		t.Fatalf("archived runs = %#v", child.ArchivedRuns)
-	}
-	archived := child.ArchivedRuns[0]
-	if archived.State.State != string(session.StateStopped) || archived.Process == nil || archived.Process.Pid != 123 || archived.Exit == nil || archived.Exit.ExitCode != 7 {
-		t.Fatalf("archived run = %#v", archived)
-	}
-}
-
 func TestStoreOrdersAndDeletesWorkspaceSessions(t *testing.T) {
 	store := NewStore(filepath.Join(t.TempDir(), ".termbridge"))
 	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)

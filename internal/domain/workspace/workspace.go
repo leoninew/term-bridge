@@ -53,26 +53,16 @@ type RunRecord struct {
 	Exit    *ExitRecord    `json:"exit,omitempty"`
 }
 
-type ArchivedRun struct {
-	ArchiveId   string         `json:"archive_id"`
-	HistoryPath string         `json:"history_path"`
-	State       StateRecord    `json:"state"`
-	Process     *ProcessRecord `json:"process,omitempty"`
-	Exit        *ExitRecord    `json:"exit,omitempty"`
-	ArchivedAt  time.Time      `json:"archived_at"`
-}
-
 type SessionNode struct {
-	Id           string        `json:"session_id"`
-	Name         string        `json:"name"`
-	LaunchCwd    string        `json:"launch_cwd"`
-	Command      CommandRecord `json:"command"`
-	History      HistoryRecord `json:"history"`
-	State        StateRecord   `json:"state"`
-	CurrentRun   RunRecord     `json:"current_run"`
-	ArchivedRuns []ArchivedRun `json:"archived_runs,omitempty"`
-	CreatedAt    time.Time     `json:"created_at"`
-	UpdatedAt    time.Time     `json:"updated_at"`
+	Id         string        `json:"session_id"`
+	Name       string        `json:"name"`
+	LaunchCwd  string        `json:"launch_cwd"`
+	Command    CommandRecord `json:"command"`
+	History    HistoryRecord `json:"history"`
+	State      StateRecord   `json:"state"`
+	CurrentRun RunRecord     `json:"current_run"`
+	CreatedAt  time.Time     `json:"created_at"`
+	UpdatedAt  time.Time     `json:"updated_at"`
 }
 
 type Workspace struct {

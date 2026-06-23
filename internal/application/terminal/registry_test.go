@@ -432,17 +432,22 @@ func TestRerunSessionArchivesHistoryAndReusesSessionId(t *testing.T) {
 		t.Fatalf("LoadWorkspace() error = %v", err)
 	}
 	child := storedWorkspace.Children[0]
-	if len(child.ArchivedRuns) != 1 || child.ArchivedRuns[0].HistoryPath == "" || child.ArchivedRuns[0].Process == nil || child.ArchivedRuns[0].Exit == nil {
-		t.Fatalf("archived runs = %#v", child.ArchivedRuns)
+	archiveDir := state.NewStore(root).SessionDir(response.WorkspaceId, response.SessionId)
+	matches, err := filepath.Glob(filepath.Join(archiveDir, "history.*.log"))
+	if err != nil {
+		t.Fatalf("Glob(archive) error = %v", err)
 	}
-	archivePath := filepath.Join(state.NewStore(root).SessionDir(response.WorkspaceId, response.SessionId), child.ArchivedRuns[0].HistoryPath)
-	archived, err := os.ReadFile(archivePath)
+	if len(matches) != 1 {
+		t.Fatalf("archive count = %d, want 1; files = %v", len(matches), matches)
+	}
+	archived, err := os.ReadFile(matches[0])
 	if err != nil {
 		t.Fatalf("ReadFile(archive) error = %v", err)
 	}
 	if string(archived) != "OLD_OUTPUT\n" {
 		t.Fatalf("archive history = %q", archived)
 	}
+	_ = child
 	assertNoArchiveFragments(t, state.NewStore(root).SessionDir(response.WorkspaceId, response.SessionId))
 	second.finish(termpty.Result{ExitCode: 0})
 	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)

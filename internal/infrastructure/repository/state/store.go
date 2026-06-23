@@ -202,26 +202,6 @@ func (s Store) LoadExit(workspaceId string, sessionId string) (process.ExitRecor
 	return processExitFromWorkspaceExit(*node.CurrentRun.Exit), nil
 }
 
-func (s Store) ArchiveCurrentRun(workspaceId string, sessionId string, archiveId string, historyPath string, archivedAt time.Time) error {
-	if strings.TrimSpace(archiveId) == "" {
-		return fmt.Errorf("archive_id is required")
-	}
-	return s.updateSessionNode(workspaceId, sessionId, func(node *workspace.SessionNode) error {
-		node.ArchivedRuns = append(node.ArchivedRuns, workspace.ArchivedRun{
-			ArchiveId:   archiveId,
-			HistoryPath: historyPath,
-			State:       node.State,
-			Process:     cloneWorkspaceProcess(node.CurrentRun.Process),
-			Exit:        cloneWorkspaceExit(node.CurrentRun.Exit),
-			ArchivedAt:  archivedAt,
-		})
-		node.CurrentRun = workspace.RunRecord{}
-		node.History.Truncated = false
-		node.UpdatedAt = archivedAt
-		return nil
-	})
-}
-
 func (s Store) HistoryPath(workspaceId string, sessionId string) string {
 	return filepath.Join(s.SessionDir(workspaceId, sessionId), "history.log")
 }
@@ -459,7 +439,6 @@ func upsertSessionNode(ws *workspace.Workspace, child workspace.SessionNode) {
 		if ws.Children[i].Id == child.Id {
 			child.State = ws.Children[i].State
 			child.CurrentRun = ws.Children[i].CurrentRun
-			child.ArchivedRuns = append([]workspace.ArchivedRun(nil), ws.Children[i].ArchivedRuns...)
 			ws.Children[i] = child
 			return
 		}
