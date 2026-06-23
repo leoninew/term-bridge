@@ -145,7 +145,8 @@ export const messages = {
       noSessionsMatch: 'No sessions match “{query}”.',
       noActiveSessions: 'No active sessions.',
       removeWorkspaceAria: 'Remove {name} workspace',
-      removeWorkspaceDisabledAria: '{name} workspace has running sessions and cannot be removed yet',
+      removeWorkspaceDisabledAria:
+        '{name} workspace has running sessions and cannot be removed yet',
       renameSessionAria: 'Rename {name} session',
       stopSessionAria: 'Stop {name} session',
       deleteSessionAria: 'Delete {name} session',

@@ -82,7 +82,9 @@
               <button
                 type="button"
                 class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
-                :aria-label="t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })"
+                :aria-label="
+                  t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })
+                "
                 :title="t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })"
                 @click.stop="emit('newSession', workspace.workspace)"
               >

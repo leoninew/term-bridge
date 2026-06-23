@@ -99,7 +99,9 @@ export function useTerminalSocket(
 
   function sendInput(data: string) {
     if (socket.value?.readyState === WebSocket.OPEN) {
-      logTerminalDiagnostic('socket.input.send', { bytes: new TextEncoder().encode(data).byteLength })
+      logTerminalDiagnostic('socket.input.send', {
+        bytes: new TextEncoder().encode(data).byteLength,
+      })
       socket.value.send(new TextEncoder().encode(data))
     }
   }
