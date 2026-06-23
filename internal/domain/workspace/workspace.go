@@ -13,7 +13,7 @@ type CommandRecord struct {
 }
 
 type SessionNode struct {
-	ID        string        `json:"session_id"`
+	Id        string        `json:"session_id"`
 	Name      string        `json:"name"`
 	LaunchCwd string        `json:"launch_cwd"`
 	Command   CommandRecord `json:"command"`
@@ -24,7 +24,7 @@ type SessionNode struct {
 
 type Workspace struct {
 	SchemaVersion        int           `json:"schema_version"`
-	ID                   string        `json:"workspace_id"`
+	Id                   string        `json:"workspace_id"`
 	Key                  string        `json:"workspace_key"`
 	Name                 string        `json:"name"`
 	Path                 string        `json:"path"`

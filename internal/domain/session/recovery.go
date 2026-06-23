@@ -36,7 +36,7 @@ func (r Recoverer) Refresh(view View) (View, error) {
 	if Terminal(view.State.State) {
 		return view, nil
 	}
-	record, err := r.Store.LoadProcess(view.Session.WorkspaceKey, view.Session.ID)
+	record, err := r.Store.LoadProcess(view.Session.WorkspaceKey, view.Session.Id)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return r.markFailed(view, "stale_process_missing")
@@ -51,7 +51,7 @@ func (r Recoverer) Refresh(view View) (View, error) {
 	case AliveMatched:
 		return view, nil
 	case AliveMissing:
-		if _, err := r.Store.LoadExit(view.Session.WorkspaceKey, view.Session.ID); err == nil {
+		if _, err := r.Store.LoadExit(view.Session.WorkspaceKey, view.Session.Id); err == nil {
 			return r.markState(view, StateStopped, "recovered_exit_record")
 		}
 		return r.markFailed(view, "stale_process_missing")
@@ -66,7 +66,7 @@ func (r Recoverer) markFailed(view View, reason string) (View, error) {
 
 func (r Recoverer) markState(view View, state State, reason string) (View, error) {
 	view.State = StateRecord{SchemaVersion: SchemaVersion, State: state, Reason: reason, UpdatedAt: r.now()}
-	if err := r.Store.SaveState(view.Session.WorkspaceKey, view.Session.ID, view.State); err != nil {
+	if err := r.Store.SaveState(view.Session.WorkspaceKey, view.Session.Id, view.State); err != nil {
 		return view, err
 	}
 	return view, nil

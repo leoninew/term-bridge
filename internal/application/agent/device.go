@@ -7,53 +7,54 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"termbridge-go/internal/domain/identity"
 )
 
 const DeviceFileName = "device.json"
 
 type Device struct {
-	ID        string    `json:"id"`
+	Id        string    `json:"id"`
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type DeviceOptions struct {
 	StateDir   string
+	DeviceId   string
 	DeviceName string
-	IDs        identity.Generator
 	Now        func() time.Time
-	Hostname   func() (string, error)
 }
 
 func LoadOrCreateDevice(options DeviceOptions) (Device, error) {
 	if strings.TrimSpace(options.StateDir) == "" {
 		return Device{}, fmt.Errorf("state dir is required")
 	}
-	if options.IDs == nil {
-		options.IDs = identity.NewULIDGenerator()
+	deviceId := strings.TrimSpace(options.DeviceId)
+	if deviceId == "" {
+		return Device{}, fmt.Errorf("device id is required")
+	}
+	deviceName := strings.TrimSpace(options.DeviceName)
+	if deviceName == "" {
+		return Device{}, fmt.Errorf("device name is required")
 	}
 	if options.Now == nil {
 		options.Now = time.Now
 	}
-	if options.Hostname == nil {
-		options.Hostname = os.Hostname
-	}
-	path := filepath.Join(options.StateDir, DeviceFileName)
+	now := options.Now().UTC()
+	path := filepath.Join(options.StateDir, "devices", safeDeviceSegment(deviceId), DeviceFileName)
 	device, err := readDevice(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return Device{}, err
 		}
-		device, err = newDevice(options)
-		if err != nil {
-			return Device{}, err
-		}
+		device = Device{Id: deviceId, Name: deviceName, CreatedAt: now}
 	}
-	if name := strings.TrimSpace(options.DeviceName); name != "" {
-		device.Name = name
+	device.Id = deviceId
+	device.Name = deviceName
+	if device.CreatedAt.IsZero() {
+		device.CreatedAt = now
 	}
+	device.UpdatedAt = now
 	if err := writeDevice(path, device); err != nil {
 		return Device{}, err
 	}
@@ -69,7 +70,7 @@ func readDevice(path string) (Device, error) {
 	if err := json.Unmarshal(data, &device); err != nil {
 		return Device{}, fmt.Errorf("read device identity: %w", err)
 	}
-	if strings.TrimSpace(device.ID) == "" {
+	if strings.TrimSpace(device.Id) == "" {
 		return Device{}, fmt.Errorf("read device identity: missing id")
 	}
 	if strings.TrimSpace(device.Name) == "" {
@@ -79,21 +80,6 @@ func readDevice(path string) (Device, error) {
 		return Device{}, fmt.Errorf("read device identity: missing created_at")
 	}
 	return device, nil
-}
-
-func newDevice(options DeviceOptions) (Device, error) {
-	id, err := options.IDs.NewID()
-	if err != nil {
-		return Device{}, fmt.Errorf("generate device id: %w", err)
-	}
-	name := strings.TrimSpace(options.DeviceName)
-	if name == "" {
-		name, err = options.Hostname()
-		if err != nil || strings.TrimSpace(name) == "" {
-			name = "termbridge-device"
-		}
-	}
-	return Device{ID: id, Name: name, CreatedAt: options.Now().UTC()}, nil
 }
 
 func writeDevice(path string, device Device) error {
@@ -106,4 +92,14 @@ func writeDevice(path string, device Device) error {
 	}
 	data = append(data, '\n')
 	return os.WriteFile(path, data, 0o644)
+}
+
+func safeDeviceSegment(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || value == "." || value == ".." {
+		return "unknown"
+	}
+	value = strings.ReplaceAll(value, string(os.PathSeparator), "_")
+	value = strings.ReplaceAll(value, "/", "_")
+	return value
 }

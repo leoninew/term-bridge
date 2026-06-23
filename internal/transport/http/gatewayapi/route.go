@@ -16,41 +16,41 @@ import (
 const requestTimeout = 5 * time.Second
 
 type agentRoute struct {
-	deviceID string
+	deviceId string
 	conn     *websocket.Conn
 	writeMu  sync.Mutex
-	pending  map[tunnel.StreamID]chan tunnel.Frame
-	terms    map[tunnel.StreamID]*terminalRelay
+	pending  map[tunnel.StreamId]chan tunnel.Frame
+	terms    map[tunnel.StreamId]*terminalRelay
 	mu       sync.Mutex
 }
 
 type terminalRelay struct {
-	sessionID string
+	sessionId string
 	browser   *websocket.Conn
 	done      chan struct{}
 }
 
-func newAgentRoute(deviceID string, conn *websocket.Conn) *agentRoute {
-	return &agentRoute{deviceID: deviceID, conn: conn, pending: map[tunnel.StreamID]chan tunnel.Frame{}, terms: map[tunnel.StreamID]*terminalRelay{}}
+func newAgentRoute(deviceId string, conn *websocket.Conn) *agentRoute {
+	return &agentRoute{deviceId: deviceId, conn: conn, pending: map[tunnel.StreamId]chan tunnel.Frame{}, terms: map[tunnel.StreamId]*terminalRelay{}}
 }
 
 func (r *agentRoute) request(ctx context.Context, method string, params any) (json.RawMessage, error) {
-	streamID := tunnel.StreamID(fmt.Sprintf("req-%d", time.Now().UnixNano()))
+	streamId := tunnel.StreamId(fmt.Sprintf("req-%d", time.Now().UnixNano()))
 	paramsData, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
-	frame, err := tunnel.NewFrame(streamID, tunnel.FrameRequest, tunnel.RequestPayload{Method: method, Params: paramsData})
+	frame, err := tunnel.NewFrame(streamId, tunnel.FrameRequest, tunnel.RequestPayload{Method: method, Params: paramsData})
 	if err != nil {
 		return nil, err
 	}
 	ch := make(chan tunnel.Frame, 1)
 	r.mu.Lock()
-	r.pending[streamID] = ch
+	r.pending[streamId] = ch
 	r.mu.Unlock()
 	defer func() {
 		r.mu.Lock()
-		delete(r.pending, streamID)
+		delete(r.pending, streamId)
 		r.mu.Unlock()
 	}()
 	if err := r.writeFrame(ctx, frame); err != nil {
@@ -86,25 +86,25 @@ func (r *agentRoute) writeFrame(ctx context.Context, frame tunnel.Frame) error {
 func (r *agentRoute) dispatch(frame tunnel.Frame) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if ch := r.pending[frame.StreamID]; ch != nil && (frame.Type == tunnel.FrameResponse || frame.Type == tunnel.FrameError) {
+	if ch := r.pending[frame.StreamId]; ch != nil && (frame.Type == tunnel.FrameResponse || frame.Type == tunnel.FrameError) {
 		ch <- frame
 		return true
 	}
-	if term := r.terms[frame.StreamID]; term != nil {
+	if term := r.terms[frame.StreamId]; term != nil {
 		return term.dispatch(frame)
 	}
 	return false
 }
 
-func (r *agentRoute) addTerminal(streamID tunnel.StreamID, term *terminalRelay) {
+func (r *agentRoute) addTerminal(streamId tunnel.StreamId, term *terminalRelay) {
 	r.mu.Lock()
-	r.terms[streamID] = term
+	r.terms[streamId] = term
 	r.mu.Unlock()
 }
 
-func (r *agentRoute) removeTerminal(streamID tunnel.StreamID) {
+func (r *agentRoute) removeTerminal(streamId tunnel.StreamId) {
 	r.mu.Lock()
-	delete(r.terms, streamID)
+	delete(r.terms, streamId)
 	r.mu.Unlock()
 }
 
@@ -114,7 +114,7 @@ func (r *agentRoute) closeTerminals(reason string) {
 	for _, term := range r.terms {
 		terms = append(terms, term)
 	}
-	r.terms = map[tunnel.StreamID]*terminalRelay{}
+	r.terms = map[tunnel.StreamId]*terminalRelay{}
 	r.mu.Unlock()
 	for _, term := range terms {
 		_ = term.browser.Write(context.Background(), websocket.MessageText, []byte(reason))

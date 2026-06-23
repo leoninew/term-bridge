@@ -5,39 +5,56 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
 
-const (
-	Username   = "admin"
-	Password   = "admin"
-	CookieName = "termbridge_gateway_session"
-)
+const CookieName = "termbridge_gateway_session"
+
+type Credentials struct {
+	Username string
+	Password string
+}
 
 type Manager struct {
+	username string
+	password string
 	mu       sync.Mutex
 	sessions map[string]time.Time
 	now      func() time.Time
 }
 
-func NewManager() *Manager {
-	return &Manager{sessions: map[string]time.Time{}, now: time.Now}
+func NewManager(credentials Credentials) *Manager {
+	return &Manager{
+		username: strings.TrimSpace(credentials.Username),
+		password: strings.TrimSpace(credentials.Password),
+		sessions: map[string]time.Time{},
+		now:      time.Now,
+	}
 }
 
-func ValidCredentials(username string, password string) bool {
-	return subtle.ConstantTimeCompare([]byte(username), []byte(Username)) == 1 && subtle.ConstantTimeCompare([]byte(password), []byte(Password)) == 1
+func (m *Manager) Username() string {
+	return m.username
+}
+
+func (m *Manager) ValidCredentials(username string, password string) bool {
+	if m.username == "" || m.password == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(username), []byte(m.username)) == 1 &&
+		subtle.ConstantTimeCompare([]byte(password), []byte(m.password)) == 1
 }
 
 func (m *Manager) Login(w http.ResponseWriter, username string, password string) bool {
-	if !ValidCredentials(username, password) {
+	if !m.ValidCredentials(username, password) {
 		return false
 	}
-	sessionID := randomSessionID()
+	sessionId := randomSessionId()
 	m.mu.Lock()
-	m.sessions[sessionID] = m.now().UTC()
+	m.sessions[sessionId] = m.now().UTC()
 	m.mu.Unlock()
-	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: sessionID, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: sessionId, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
 	return true
 }
 
@@ -72,7 +89,7 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func randomSessionID() string {
+func randomSessionId() string {
 	var data [32]byte
 	if _, err := rand.Read(data[:]); err != nil {
 		panic(err)

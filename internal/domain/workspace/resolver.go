@@ -15,7 +15,7 @@ type Store interface {
 
 type Resolver struct {
 	Store Store
-	IDs   identity.Generator
+	Ids   identity.Generator
 	Now   func() time.Time
 }
 
@@ -34,14 +34,14 @@ func (r Resolver) Resolve(path string) (Workspace, error) {
 		return Workspace{}, err
 	}
 
-	id, err := r.IDs.NewID()
+	id, err := r.Ids.NewId()
 	if err != nil {
 		return Workspace{}, err
 	}
 	now := r.now()
 	workspace := Workspace{
 		SchemaVersion:        SchemaVersion,
-		ID:                   id,
+		Id:                   id,
 		Key:                  key,
 		Name:                 NameForPath(normalized, key),
 		Path:                 normalized,

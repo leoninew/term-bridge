@@ -17,7 +17,10 @@ import (
 )
 
 type Config struct {
-	ServerURL  string
+	ServerUrl  string
+	Username   string
+	Password   string
+	DeviceId   string
 	DeviceName string
 	StateDir   string
 	Runtime    RuntimeAccess
@@ -28,20 +31,20 @@ type Client struct {
 	config Config
 	device Device
 	mu     sync.Mutex
-	terms  map[tunnel.StreamID]chan tunnel.Frame
+	terms  map[tunnel.StreamId]chan tunnel.Frame
 }
 
 func New(config Config) *Client {
-	return &Client{config: config, terms: map[tunnel.StreamID]chan tunnel.Frame{}}
+	return &Client{config: config, terms: map[tunnel.StreamId]chan tunnel.Frame{}}
 }
 
 func (c *Client) Run(ctx context.Context) error {
-	device, err := LoadOrCreateDevice(DeviceOptions{StateDir: c.config.StateDir, DeviceName: c.config.DeviceName})
+	device, err := LoadOrCreateDevice(DeviceOptions{StateDir: c.config.StateDir, DeviceId: c.config.DeviceId, DeviceName: c.config.DeviceName})
 	if err != nil {
 		return err
 	}
 	c.device = device
-	conn, _, err := websocket.Dial(ctx, tunnelURL(c.config.ServerURL), &websocket.DialOptions{HTTPHeader: basicAuthHeader("admin", "admin")})
+	conn, _, err := websocket.Dial(ctx, tunnelUrl(c.config.ServerUrl), &websocket.DialOptions{HTTPHeader: basicAuthHeader(c.config.Username, c.config.Password)})
 	if err != nil {
 		return err
 	}
@@ -51,7 +54,7 @@ func (c *Client) Run(ctx context.Context) error {
 		<-ctx.Done()
 		_ = conn.CloseNow()
 	}()
-	hello, err := tunnel.NewFrame(tunnel.ControlStreamID, tunnel.FrameHello, tunnel.HelloPayload{DeviceID: device.ID, DeviceName: device.Name, ProtocolVersion: tunnel.ProtocolVersion})
+	hello, err := tunnel.NewFrame(tunnel.ControlStreamId, tunnel.FrameHello, tunnel.HelloPayload{DeviceId: device.Id, DeviceName: device.Name, ProtocolVersion: tunnel.ProtocolVersion})
 	if err != nil {
 		return err
 	}
@@ -96,7 +99,7 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 		case tunnel.FrameTerminalAttach:
 			go c.handleTerminal(ctx, conn, &writeMu, frame)
 		case tunnel.FramePing:
-			pong, _ := tunnel.NewFrame(tunnel.ControlStreamID, tunnel.FramePong, nil)
+			pong, _ := tunnel.NewFrame(tunnel.ControlStreamId, tunnel.FramePong, nil)
 			_ = writeTunnelFrame(ctx, conn, &writeMu, pong)
 		}
 	}
@@ -105,38 +108,110 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 func (c *Client) handleRequest(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, frame tunnel.Frame) {
 	request, err := tunnel.DecodePayload[tunnel.RequestPayload](frame)
 	if err != nil {
-		c.writeResponse(ctx, conn, writeMu, frame.StreamID, nil, err)
+		c.writeResponse(ctx, conn, writeMu, frame.StreamId, nil, err)
 		return
 	}
 	if c.config.Runtime == nil {
-		c.writeResponse(ctx, conn, writeMu, frame.StreamID, nil, fmt.Errorf("runtime access unavailable"))
+		c.writeResponse(ctx, conn, writeMu, frame.StreamId, nil, fmt.Errorf("runtime access unavailable"))
 		return
 	}
-	var result any
-	switch request.Method {
-	case "workspace_tree":
-		result, err = c.config.Runtime.WorkspaceTree(ctx)
-	case "sessions":
-		result, err = c.config.Runtime.ListSessions(ctx)
-	case "history":
-		var params struct {
-			SessionID string `json:"session_id"`
-		}
-		if len(request.Params) > 0 {
-			err = json.Unmarshal(request.Params, &params)
-		}
-		if err == nil {
-			var data []byte
-			data, err = c.config.Runtime.ReadHistory(ctx, params.SessionID)
-			result = string(data)
-		}
-	default:
-		err = fmt.Errorf("unknown request method: %s", request.Method)
-	}
-	c.writeResponse(ctx, conn, writeMu, frame.StreamID, result, err)
+	result, err := c.handleRuntimeRequest(ctx, request)
+	c.writeResponse(ctx, conn, writeMu, frame.StreamId, result, err)
 }
 
-func (c *Client) writeResponse(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, streamID tunnel.StreamID, result any, err error) {
+func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.RequestPayload) (any, error) {
+	switch request.Method {
+	case "workspaces":
+		return c.config.Runtime.ListWorkspaces(ctx)
+	case "workspace_tree":
+		return c.config.Runtime.WorkspaceTree(ctx)
+	case "workspace_order":
+		var params struct {
+			WorkspaceIds []string `json:"workspace_ids"`
+		}
+		if err := decodeRequestParams(request.Params, &params); err != nil {
+			return nil, err
+		}
+		return c.config.Runtime.UpdateWorkspaceOrder(ctx, params.WorkspaceIds)
+	case "delete_workspace":
+		var params struct {
+			WorkspaceId string `json:"workspace_id"`
+		}
+		if err := decodeRequestParams(request.Params, &params); err != nil {
+			return nil, err
+		}
+		return nil, c.config.Runtime.DeleteWorkspace(ctx, params.WorkspaceId)
+	case "workspace_sessions":
+		var params struct {
+			WorkspaceId string `json:"workspace_id"`
+		}
+		if err := decodeRequestParams(request.Params, &params); err != nil {
+			return nil, err
+		}
+		return c.config.Runtime.ListSessionsByWorkspaceId(ctx, params.WorkspaceId)
+	case "sessions":
+		return c.config.Runtime.ListSessions(ctx)
+	case "create_session":
+		var params terminalapp.CreateSessionRequest
+		if err := decodeRequestParams(request.Params, &params); err != nil {
+			return nil, err
+		}
+		return c.config.Runtime.CreateSession(ctx, params)
+	case "get_session":
+		var params struct {
+			SessionId string `json:"session_id"`
+		}
+		if err := decodeRequestParams(request.Params, &params); err != nil {
+			return nil, err
+		}
+		return c.config.Runtime.GetSession(ctx, params.SessionId)
+	case "update_session":
+		var params struct {
+			SessionId string                           `json:"session_id"`
+			Request   terminalapp.UpdateSessionRequest `json:"request"`
+		}
+		if err := decodeRequestParams(request.Params, &params); err != nil {
+			return nil, err
+		}
+		return c.config.Runtime.UpdateSession(ctx, params.SessionId, params.Request)
+	case "delete_session":
+		var params struct {
+			SessionId string `json:"session_id"`
+		}
+		if err := decodeRequestParams(request.Params, &params); err != nil {
+			return nil, err
+		}
+		return nil, c.config.Runtime.DeleteSession(ctx, params.SessionId)
+	case "close_session":
+		var params struct {
+			SessionId string `json:"session_id"`
+		}
+		if err := decodeRequestParams(request.Params, &params); err != nil {
+			return nil, err
+		}
+		return c.config.Runtime.CloseSession(ctx, params.SessionId)
+	case "history":
+		var params struct {
+			SessionId string `json:"session_id"`
+		}
+		if err := decodeRequestParams(request.Params, &params); err != nil {
+			return nil, err
+		}
+		data, err := c.config.Runtime.ReadHistory(ctx, params.SessionId)
+		return string(data), err
+	default:
+		return nil, fmt.Errorf("unknown request method: %s", request.Method)
+	}
+}
+
+func decodeRequestParams(params json.RawMessage, value any) error {
+	if len(params) == 0 {
+		params = []byte(`{}`)
+	}
+	return json.Unmarshal(params, value)
+}
+
+func (c *Client) writeResponse(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, streamId tunnel.StreamId, result any, err error) {
 	response := tunnel.ResponsePayload{OK: err == nil}
 	if err != nil {
 		response.Error = err.Error()
@@ -149,7 +224,7 @@ func (c *Client) writeResponse(ctx context.Context, conn *websocket.Conn, writeM
 			response.Result = data
 		}
 	}
-	frame, frameErr := tunnel.NewFrame(streamID, tunnel.FrameResponse, response)
+	frame, frameErr := tunnel.NewFrame(streamId, tunnel.FrameResponse, response)
 	if frameErr != nil {
 		return
 	}
@@ -158,17 +233,17 @@ func (c *Client) writeResponse(ctx context.Context, conn *websocket.Conn, writeM
 
 func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, frame tunnel.Frame) {
 	if c.config.Runtime == nil {
-		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamID, "runtime access unavailable")
+		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamId, "runtime access unavailable")
 		return
 	}
 	payload, err := tunnel.DecodePayload[tunnel.TerminalAttachPayload](frame)
 	if err != nil {
-		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamID, err.Error())
+		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamId, err.Error())
 		return
 	}
-	stream, err := c.config.Runtime.Attach(ctx, payload.SessionID)
+	stream, err := c.config.Runtime.Attach(ctx, payload.SessionId)
 	if err != nil {
-		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamID, err.Error())
+		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamId, err.Error())
 		return
 	}
 	defer stream.Detach("gateway_detached")
@@ -176,8 +251,8 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 		_ = stream.Resize(payload.Cols, payload.Rows)
 	}
 	inbound := make(chan tunnel.Frame, 16)
-	c.addTerminal(frame.StreamID, inbound)
-	defer c.removeTerminal(frame.StreamID)
+	c.addTerminal(frame.StreamId, inbound)
+	defer c.removeTerminal(frame.StreamId)
 	for {
 		select {
 		case <-ctx.Done():
@@ -199,12 +274,12 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 			}
 		case outbound, ok := <-stream.Outbound():
 			if !ok {
-				closed, _ := tunnel.NewFrame(frame.StreamID, tunnel.FrameTerminalClosed, nil)
+				closed, _ := tunnel.NewFrame(frame.StreamId, tunnel.FrameTerminalClosed, nil)
 				_ = writeTunnelFrame(ctx, conn, writeMu, closed)
 				return
 			}
 			data := outboundData(outbound)
-			output, _ := tunnel.NewFrame(frame.StreamID, tunnel.FrameTerminalOutput, tunnel.TerminalDataPayload{Data: data})
+			output, _ := tunnel.NewFrame(frame.StreamId, tunnel.FrameTerminalOutput, tunnel.TerminalDataPayload{Data: data})
 			_ = writeTunnelFrame(ctx, conn, writeMu, output)
 		}
 	}
@@ -212,7 +287,7 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 
 func (c *Client) dispatchTerminal(frame tunnel.Frame) bool {
 	c.mu.Lock()
-	ch := c.terms[frame.StreamID]
+	ch := c.terms[frame.StreamId]
 	c.mu.Unlock()
 	if ch == nil {
 		return false
@@ -224,20 +299,20 @@ func (c *Client) dispatchTerminal(frame tunnel.Frame) bool {
 	return true
 }
 
-func (c *Client) addTerminal(streamID tunnel.StreamID, ch chan tunnel.Frame) {
+func (c *Client) addTerminal(streamId tunnel.StreamId, ch chan tunnel.Frame) {
 	c.mu.Lock()
-	c.terms[streamID] = ch
+	c.terms[streamId] = ch
 	c.mu.Unlock()
 }
 
-func (c *Client) removeTerminal(streamID tunnel.StreamID) {
+func (c *Client) removeTerminal(streamId tunnel.StreamId) {
 	c.mu.Lock()
-	delete(c.terms, streamID)
+	delete(c.terms, streamId)
 	c.mu.Unlock()
 }
 
-func writeTerminalError(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, streamID tunnel.StreamID, message string) error {
-	frame, err := tunnel.NewFrame(streamID, tunnel.FrameError, tunnel.ErrorPayload{Message: message})
+func writeTerminalError(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, streamId tunnel.StreamId, message string) error {
+	frame, err := tunnel.NewFrame(streamId, tunnel.FrameError, tunnel.ErrorPayload{Message: message})
 	if err != nil {
 		return err
 	}
@@ -269,10 +344,10 @@ func (c *Client) Device() Device {
 	return c.device
 }
 
-func tunnelURL(serverURL string) string {
-	parsed, err := url.Parse(serverURL)
+func tunnelUrl(serverUrl string) string {
+	parsed, err := url.Parse(serverUrl)
 	if err != nil {
-		return serverURL
+		return serverUrl
 	}
 	if parsed.Scheme == "https" {
 		parsed.Scheme = "wss"

@@ -8,7 +8,7 @@ import (
 )
 
 func TestEncodeDecodeFrame(t *testing.T) {
-	frame, err := NewFrame(ControlStreamID, FrameHello, HelloPayload{DeviceID: "dev-1", DeviceName: "local", ProtocolVersion: ProtocolVersion})
+	frame, err := NewFrame(ControlStreamId, FrameHello, HelloPayload{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: ProtocolVersion})
 	if err != nil {
 		t.Fatalf("NewFrame() error = %v", err)
 	}
@@ -20,14 +20,14 @@ func TestEncodeDecodeFrame(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode() error = %v", err)
 	}
-	if decoded.StreamID != ControlStreamID || decoded.Type != FrameHello {
+	if decoded.StreamId != ControlStreamId || decoded.Type != FrameHello {
 		t.Fatalf("decoded frame = %#v", decoded)
 	}
 	payload, err := DecodePayload[HelloPayload](decoded)
 	if err != nil {
 		t.Fatalf("DecodePayload() error = %v", err)
 	}
-	if payload.DeviceID != "dev-1" || payload.DeviceName != "local" || payload.ProtocolVersion != ProtocolVersion {
+	if payload.DeviceId != "dev-1" || payload.DeviceName != "local" || payload.ProtocolVersion != ProtocolVersion {
 		t.Fatalf("payload = %#v", payload)
 	}
 }
@@ -66,11 +66,11 @@ func TestDecodeRejectsUnknownFrameType(t *testing.T) {
 }
 
 func TestDecodeRejectsVersionMismatch(t *testing.T) {
-	payload, err := json.Marshal(HelloPayload{DeviceID: "dev-1", DeviceName: "local", ProtocolVersion: ProtocolVersion + 1})
+	payload, err := json.Marshal(HelloPayload{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: ProtocolVersion + 1})
 	if err != nil {
 		t.Fatalf("Marshal() error = %v", err)
 	}
-	frame := Frame{StreamID: ControlStreamID, Type: FrameHello, Payload: payload}
+	frame := Frame{StreamId: ControlStreamId, Type: FrameHello, Payload: payload}
 	data, err := json.Marshal(frame)
 	if err != nil {
 		t.Fatalf("Marshal(frame) error = %v", err)
@@ -98,7 +98,7 @@ func TestCloseAndErrorFrames(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Decode(%s) error = %v", frameType, err)
 		}
-		if decoded.Type != frameType || decoded.StreamID != "term-1" {
+		if decoded.Type != frameType || decoded.StreamId != "term-1" {
 			t.Fatalf("decoded = %#v", decoded)
 		}
 	}

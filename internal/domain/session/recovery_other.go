@@ -12,10 +12,10 @@ import (
 type OSAliveChecker struct{}
 
 func (OSAliveChecker) Check(record process.Record) AliveStatus {
-	if record.PID <= 0 {
+	if record.Pid <= 0 {
 		return AliveMissing
 	}
-	proc, err := os.FindProcess(record.PID)
+	proc, err := os.FindProcess(record.Pid)
 	if err != nil {
 		return AliveMissing
 	}

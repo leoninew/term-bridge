@@ -14,7 +14,7 @@ type Store interface {
 
 type Manager struct {
 	Store Store
-	IDs   identity.Generator
+	Ids   identity.Generator
 	Now   func() time.Time
 }
 
@@ -28,16 +28,16 @@ type CreateOptions struct {
 }
 
 func (m Manager) Create(options CreateOptions) (Session, error) {
-	id, err := m.IDs.NewID()
+	id, err := m.Ids.NewId()
 	if err != nil {
 		return Session{}, err
 	}
 	now := m.now()
 	session := Session{
 		SchemaVersion: SchemaVersion,
-		ID:            id,
+		Id:            id,
 		Name:          options.Name,
-		WorkspaceId:   options.Workspace.ID,
+		WorkspaceId:   options.Workspace.Id,
 		WorkspaceKey:  options.Workspace.Key,
 		LaunchCwd:     options.LaunchCwd,
 		Command:       options.Command,
@@ -49,7 +49,7 @@ func (m Manager) Create(options CreateOptions) (Session, error) {
 	if err := m.Store.SaveSession(session); err != nil {
 		return Session{}, err
 	}
-	if err := m.Store.SaveState(session.WorkspaceKey, session.ID, StateRecord{SchemaVersion: SchemaVersion, State: StateStarting, Reason: "session_created", UpdatedAt: now}); err != nil {
+	if err := m.Store.SaveState(session.WorkspaceKey, session.Id, StateRecord{SchemaVersion: SchemaVersion, State: StateStarting, Reason: "session_created", UpdatedAt: now}); err != nil {
 		return Session{}, err
 	}
 	return session, nil

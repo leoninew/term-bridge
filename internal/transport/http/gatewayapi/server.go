@@ -3,6 +3,7 @@ package gatewayapi
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,19 +17,30 @@ import (
 	"termbridge-go/internal/transport/http/gatewayapi/auth"
 )
 
-type Config struct{}
+type Config struct {
+	Username       string
+	Password       string
+	AllowedOrigins []string
+	DebugErrors    bool
+	Logger         *slog.Logger
+}
 
 type Handler struct {
-	auth     *auth.Manager
-	registry *DeviceRegistry
-	routes   map[string]*agentRoute
-	routeMu  sync.Mutex
-	writers  map[string]tunnel.StreamID
-	writerMu sync.Mutex
+	config             Config
+	auth               *auth.Manager
+	registry           *DeviceRegistry
+	routes             map[string]*agentRoute
+	routeMu            sync.Mutex
+	writers            map[string]tunnel.StreamId
+	writerMu           sync.Mutex
+	cacheMu            sync.Mutex
+	workspaceTreeCache map[string]json.RawMessage
+	sessionsCache      map[string]json.RawMessage
+	historyCache       map[string]map[string]string
 }
 
 type DeviceSummary struct {
-	ID          string    `json:"id"`
+	Id          string    `json:"id"`
 	Name        string    `json:"name"`
 	Online      bool      `json:"online"`
 	ConnectedAt time.Time `json:"connected_at"`
@@ -47,7 +59,14 @@ func NewDeviceRegistry() *DeviceRegistry {
 func (r *DeviceRegistry) Register(id string, name string, now time.Time) DeviceSummary {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	device := DeviceSummary{ID: id, Name: name, Online: true, ConnectedAt: now, LastSeen: now}
+	device := r.devices[id]
+	if device.ConnectedAt.IsZero() {
+		device.ConnectedAt = now
+	}
+	device.Id = id
+	device.Name = name
+	device.Online = true
+	device.LastSeen = now
 	r.devices[id] = device
 	return device
 }
@@ -75,17 +94,27 @@ func (r *DeviceRegistry) List() []DeviceSummary {
 }
 
 func New(config Config) *Handler {
-	return &Handler{auth: auth.NewManager(), registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, writers: map[string]tunnel.StreamID{}}
+	config = normalizeConfig(config)
+	return &Handler{
+		config:             config,
+		auth:               auth.NewManager(auth.Credentials{Username: config.Username, Password: config.Password}),
+		registry:           NewDeviceRegistry(),
+		routes:             map[string]*agentRoute{},
+		writers:            map[string]tunnel.StreamId{},
+		workspaceTreeCache: map[string]json.RawMessage{},
+		sessionsCache:      map[string]json.RawMessage{},
+		historyCache:       map[string]map[string]string{},
+	}
 }
 
 func (h *Handler) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/gateway/health", h.handleHealth)
-	mux.HandleFunc("/api/gateway/login", h.handleLogin)
-	mux.HandleFunc("/api/gateway/logout", h.auth.Middleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
-	mux.HandleFunc("/api/gateway/me", h.auth.Middleware(http.HandlerFunc(h.handleMe)).ServeHTTP)
-	mux.HandleFunc("/api/gateway/devices", h.auth.Middleware(http.HandlerFunc(h.handleDevices)).ServeHTTP)
-	mux.HandleFunc("/api/gateway/devices/", h.auth.Middleware(http.HandlerFunc(h.handleDevice)).ServeHTTP)
+	mux.HandleFunc("/api/health", h.handleHealth)
+	mux.HandleFunc("/api/login", h.handleLogin)
+	mux.HandleFunc("/api/logout", h.auth.Middleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
+	mux.HandleFunc("/api/me", h.auth.Middleware(http.HandlerFunc(h.handleMe)).ServeHTTP)
+	mux.HandleFunc("/api/devices", h.auth.Middleware(http.HandlerFunc(h.handleDevices)).ServeHTTP)
+	mux.HandleFunc("/api/devices/", h.auth.Middleware(http.HandlerFunc(h.handleDevice)).ServeHTTP)
 	mux.HandleFunc("/api/gateway/agent/tunnel", h.handleAgentTunnel)
 	return mux
 }
@@ -111,8 +140,7 @@ func (s *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+	if !decodeJSONRequest(w, r, &request) {
 		return
 	}
 	if !s.auth.Login(w, request.Username, request.Password) {
@@ -136,10 +164,14 @@ func (s *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 		methodNotAllowed(w, http.MethodGet)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "username": auth.Username})
+	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "username": s.auth.Username()})
 }
 
 func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/api/devices" {
+		http.NotFound(w, r)
+		return
+	}
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w, http.MethodGet)
 		return
@@ -148,50 +180,178 @@ func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
-	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/gateway/devices/"), "/")
+	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/devices/"), "/")
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 || parts[0] == "" {
 		http.NotFound(w, r)
 		return
 	}
-	deviceID := parts[0]
-	route := s.routeFor(deviceID)
-	if route == nil {
-		http.Error(w, "route unavailable", http.StatusServiceUnavailable)
+	deviceId := parts[0]
+	route := s.routeFor(deviceId)
+	switch parts[1] {
+	case "workspaces":
+		s.handleWorkspaceRoute(w, r, route, deviceId, parts)
+	case "sessions":
+		s.handleSessionRoute(w, r, route, deviceId, parts)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, parts []string) {
+	if len(parts) == 2 && r.Method == http.MethodGet {
+		s.handleJSONRelay(w, r, route, deviceId, "workspaces", nil, "")
 		return
 	}
-	if len(parts) == 2 && parts[1] == "sessions" && r.Method == http.MethodGet {
-		s.handleRelayRequest(w, r, route, "sessions", nil)
+	if len(parts) == 3 && parts[2] == "tree" && r.Method == http.MethodGet {
+		s.handleJSONRelay(w, r, route, deviceId, "workspace_tree", nil, "workspace_tree")
 		return
 	}
-	if len(parts) == 3 && parts[1] == "workspaces" && parts[2] == "tree" && r.Method == http.MethodGet {
-		s.handleRelayRequest(w, r, route, "workspace_tree", nil)
+	if len(parts) == 3 && parts[2] == "order" && r.Method == http.MethodPatch {
+		var request struct {
+			WorkspaceIds []string `json:"workspace_ids"`
+		}
+		if !decodeJSONRequest(w, r, &request) {
+			return
+		}
+		s.handleJSONRelay(w, r, route, deviceId, "workspace_order", request, "")
 		return
 	}
-	if len(parts) == 4 && parts[1] == "sessions" && parts[3] == "history" && r.Method == http.MethodGet {
-		s.handleHistoryRelay(w, r, route, parts[2])
+	if len(parts) == 3 && r.Method == http.MethodDelete {
+		s.handleJSONRelay(w, r, route, deviceId, "delete_workspace", map[string]string{"workspace_id": parts[2]}, "")
 		return
 	}
-	if len(parts) == 4 && parts[1] == "sessions" && parts[3] == "ws" && r.Method == http.MethodGet {
-		s.handleTerminalWS(w, r, route, parts[2])
+	if len(parts) == 4 && parts[3] == "sessions" && r.Method == http.MethodGet {
+		s.handleJSONRelay(w, r, route, deviceId, "workspace_sessions", map[string]string{"workspace_id": parts[2]}, "")
 		return
 	}
 	http.NotFound(w, r)
 }
 
-func (s *Handler) handleRelayRequest(w http.ResponseWriter, r *http.Request, route *agentRoute, method string, params any) {
+func (s *Handler) handleSessionRoute(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, parts []string) {
+	if len(parts) == 2 {
+		switch r.Method {
+		case http.MethodGet:
+			s.handleJSONRelay(w, r, route, deviceId, "sessions", nil, "sessions")
+		case http.MethodPost:
+			var request json.RawMessage
+			if !decodeJSONRequest(w, r, &request) {
+				return
+			}
+			s.handleJSONRelayWithStatus(w, r, route, deviceId, "create_session", request, "", http.StatusCreated)
+		default:
+			methodNotAllowed(w, http.MethodGet, http.MethodPost)
+		}
+		return
+	}
+	if len(parts) < 3 || parts[2] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	sessionId := parts[2]
+	if len(parts) == 3 {
+		switch r.Method {
+		case http.MethodGet:
+			s.handleJSONRelay(w, r, route, deviceId, "get_session", map[string]string{"session_id": sessionId}, "")
+		case http.MethodPatch:
+			var request json.RawMessage
+			if !decodeJSONRequest(w, r, &request) {
+				return
+			}
+			s.handleJSONRelay(w, r, route, deviceId, "update_session", map[string]any{"session_id": sessionId, "request": request}, "")
+		case http.MethodDelete:
+			s.handleNoContentRelay(w, r, route, "delete_session", map[string]string{"session_id": sessionId})
+		default:
+			methodNotAllowed(w, http.MethodGet, http.MethodPatch, http.MethodDelete)
+		}
+		return
+	}
+	if len(parts) != 4 {
+		http.NotFound(w, r)
+		return
+	}
+	switch parts[3] {
+	case "close":
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w, http.MethodPost)
+			return
+		}
+		s.handleJSONRelay(w, r, route, deviceId, "close_session", map[string]string{"session_id": sessionId}, "")
+	case "history":
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+		s.handleHistoryRelay(w, r, route, deviceId, sessionId)
+	case "ws":
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+		if route == nil {
+			http.Error(w, "device offline", http.StatusServiceUnavailable)
+			return
+		}
+		s.handleTerminalWS(w, r, route, sessionId)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (s *Handler) handleJSONRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, method string, params any, cacheKind string) {
+	s.handleJSONRelayWithStatus(w, r, route, deviceId, method, params, cacheKind, http.StatusOK)
+}
+
+func (s *Handler) handleJSONRelayWithStatus(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, method string, params any, cacheKind string, status int) {
+	if route == nil {
+		if cached, ok := s.cachedJSON(deviceId, cacheKind); ok {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-TermBridge-Offline", "true")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(cached)
+			return
+		}
+		http.Error(w, "device offline", http.StatusServiceUnavailable)
+		return
+	}
 	result, err := route.request(r.Context(), method, params)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
+	if cacheKind != "" {
+		s.storeJSONCache(deviceId, cacheKind, result)
+	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(status)
 	_, _ = w.Write(result)
 }
 
-func (s *Handler) handleHistoryRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, sessionID string) {
-	result, err := route.request(r.Context(), "history", map[string]string{"session_id": sessionID})
+func (s *Handler) handleNoContentRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, method string, params any) {
+	if route == nil {
+		http.Error(w, "device offline", http.StatusServiceUnavailable)
+		return
+	}
+	if _, err := route.request(r.Context(), method, params); err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Handler) handleHistoryRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, sessionId string) {
+	if route == nil {
+		if cached, ok := s.cachedHistory(deviceId, sessionId); ok {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.Header().Set("X-TermBridge-Offline", "true")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(cached))
+			return
+		}
+		http.Error(w, "device offline", http.StatusServiceUnavailable)
+		return
+	}
+	result, err := route.request(r.Context(), "history", map[string]string{"session_id": sessionId})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
@@ -201,35 +361,36 @@ func (s *Handler) handleHistoryRelay(w http.ResponseWriter, r *http.Request, rou
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
+	s.storeHistoryCache(deviceId, sessionId, text)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(text))
 }
 
-func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route *agentRoute, sessionID string) {
+func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route *agentRoute, sessionId string) {
 	s.writerMu.Lock()
-	if _, exists := s.writers[sessionID]; exists {
+	if _, exists := s.writers[sessionId]; exists {
 		s.writerMu.Unlock()
 		http.Error(w, "session already has an active writer", http.StatusConflict)
 		return
 	}
-	streamID := tunnel.StreamID("term-" + strconv.FormatInt(time.Now().UnixNano(), 10))
-	s.writers[sessionID] = streamID
+	streamId := tunnel.StreamId("term-" + strconv.FormatInt(time.Now().UnixNano(), 10))
+	s.writers[sessionId] = streamId
 	s.writerMu.Unlock()
 	defer func() {
 		s.writerMu.Lock()
-		delete(s.writers, sessionID)
+		delete(s.writers, sessionId)
 		s.writerMu.Unlock()
-		route.removeTerminal(streamID)
+		route.removeTerminal(streamId)
 	}()
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{terminalproto.Subprotocol}})
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{terminalproto.Subprotocol}, OriginPatterns: s.originPatterns(r)})
 	if err != nil {
 		return
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
-	term := &terminalRelay{sessionID: sessionID, browser: conn, done: make(chan struct{})}
-	route.addTerminal(streamID, term)
-	attach, err := tunnel.NewFrame(streamID, tunnel.FrameTerminalAttach, tunnel.TerminalAttachPayload{SessionID: sessionID})
+	term := &terminalRelay{sessionId: sessionId, browser: conn, done: make(chan struct{})}
+	route.addTerminal(streamId, term)
+	attach, err := tunnel.NewFrame(streamId, tunnel.FrameTerminalAttach, tunnel.TerminalAttachPayload{SessionId: sessionId})
 	if err != nil || route.writeFrame(r.Context(), attach) != nil {
 		return
 	}
@@ -237,7 +398,7 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 		for {
 			messageType, data, err := conn.Read(r.Context())
 			if err != nil {
-				closeFrame, _ := tunnel.NewFrame(streamID, tunnel.FrameClose, nil)
+				closeFrame, _ := tunnel.NewFrame(streamId, tunnel.FrameClose, nil)
 				_ = route.writeFrame(context.Background(), closeFrame)
 				closeOnce(term.done)
 				return
@@ -253,10 +414,10 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 				case terminalproto.TypeHello:
 					continue
 				case terminalproto.TypeResize:
-					resize, _ := tunnel.NewFrame(streamID, tunnel.FrameTerminalResize, tunnel.TerminalResizePayload{Cols: message.Cols, Rows: message.Rows})
+					resize, _ := tunnel.NewFrame(streamId, tunnel.FrameTerminalResize, tunnel.TerminalResizePayload{Cols: message.Cols, Rows: message.Rows})
 					_ = route.writeFrame(r.Context(), resize)
 				case terminalproto.TypeDetach:
-					closeFrame, _ := tunnel.NewFrame(streamID, tunnel.FrameClose, nil)
+					closeFrame, _ := tunnel.NewFrame(streamId, tunnel.FrameClose, nil)
 					_ = route.writeFrame(context.Background(), closeFrame)
 					closeOnce(term.done)
 					return
@@ -264,7 +425,7 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 					_ = writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypePong, Nonce: message.Nonce})
 				}
 			case websocket.MessageBinary:
-				input, _ := tunnel.NewFrame(streamID, tunnel.FrameTerminalInput, tunnel.TerminalDataPayload{Data: data})
+				input, _ := tunnel.NewFrame(streamId, tunnel.FrameTerminalInput, tunnel.TerminalDataPayload{Data: data})
 				_ = route.writeFrame(r.Context(), input)
 			}
 		}
@@ -286,7 +447,7 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username, password, ok := r.BasicAuth()
-	if !ok || !auth.ValidCredentials(username, password) {
+	if !ok || !s.auth.ValidCredentials(username, password) {
 		w.Header().Set("WWW-Authenticate", `Basic realm="termbridge-gateway"`)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -307,19 +468,19 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hello, err := tunnel.DecodePayload[tunnel.HelloPayload](frame)
-	if err != nil || hello.DeviceID == "" || hello.DeviceName == "" {
+	if err != nil || hello.DeviceId == "" || hello.DeviceName == "" {
 		_ = conn.Close(websocket.StatusPolicyViolation, "invalid hello")
 		return
 	}
-	s.registry.Register(hello.DeviceID, hello.DeviceName, time.Now().UTC())
-	route := newAgentRoute(hello.DeviceID, conn)
-	s.setRoute(hello.DeviceID, route)
+	s.registry.Register(hello.DeviceId, hello.DeviceName, time.Now().UTC())
+	route := newAgentRoute(hello.DeviceId, conn)
+	s.setRoute(hello.DeviceId, route)
 	defer func() {
-		s.clearRoute(hello.DeviceID, route)
+		s.clearRoute(hello.DeviceId, route)
 		route.closeTerminals("device disconnected")
-		s.registry.MarkOffline(hello.DeviceID, time.Now().UTC())
+		s.registry.MarkOffline(hello.DeviceId, time.Now().UTC())
 	}()
-	ack, err := tunnel.NewFrame(tunnel.ControlStreamID, tunnel.FrameHelloAck, tunnel.HelloAckPayload{ProtocolVersion: tunnel.ProtocolVersion})
+	ack, err := tunnel.NewFrame(tunnel.ControlStreamId, tunnel.FrameHelloAck, tunnel.HelloAckPayload{ProtocolVersion: tunnel.ProtocolVersion})
 	if err != nil {
 		return
 	}
@@ -339,7 +500,7 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if frame.Type == tunnel.FramePing {
-			pong, err := tunnel.NewFrame(tunnel.ControlStreamID, tunnel.FramePong, nil)
+			pong, err := tunnel.NewFrame(tunnel.ControlStreamId, tunnel.FramePong, nil)
 			if err != nil {
 				continue
 			}
@@ -348,10 +509,10 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Handler) setRoute(deviceID string, route *agentRoute) {
+func (s *Handler) setRoute(deviceId string, route *agentRoute) {
 	s.routeMu.Lock()
-	old := s.routes[deviceID]
-	s.routes[deviceID] = route
+	old := s.routes[deviceId]
+	s.routes[deviceId] = route
 	s.routeMu.Unlock()
 	if old != nil {
 		old.closeTerminals("device reconnected")
@@ -359,27 +520,100 @@ func (s *Handler) setRoute(deviceID string, route *agentRoute) {
 	}
 }
 
-func (s *Handler) clearRoute(deviceID string, route *agentRoute) {
+func (s *Handler) clearRoute(deviceId string, route *agentRoute) {
 	s.routeMu.Lock()
-	if s.routes[deviceID] == route {
-		delete(s.routes, deviceID)
+	if s.routes[deviceId] == route {
+		delete(s.routes, deviceId)
 	}
 	s.routeMu.Unlock()
 }
 
-func (s *Handler) routeFor(deviceID string) *agentRoute {
+func (s *Handler) routeFor(deviceId string) *agentRoute {
 	s.routeMu.Lock()
 	defer s.routeMu.Unlock()
-	return s.routes[deviceID]
+	return s.routes[deviceId]
 }
 
-func methodNotAllowed(w http.ResponseWriter, allowed string) {
-	w.Header().Set("Allow", allowed)
+func (s *Handler) cachedJSON(deviceId string, kind string) (json.RawMessage, bool) {
+	if kind == "" {
+		return nil, false
+	}
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	switch kind {
+	case "workspace_tree":
+		value, ok := s.workspaceTreeCache[deviceId]
+		return append(json.RawMessage(nil), value...), ok
+	case "sessions":
+		value, ok := s.sessionsCache[deviceId]
+		return append(json.RawMessage(nil), value...), ok
+	default:
+		return nil, false
+	}
+}
+
+func (s *Handler) storeJSONCache(deviceId string, kind string, value json.RawMessage) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	switch kind {
+	case "workspace_tree":
+		s.workspaceTreeCache[deviceId] = append(json.RawMessage(nil), value...)
+	case "sessions":
+		s.sessionsCache[deviceId] = append(json.RawMessage(nil), value...)
+	}
+}
+
+func (s *Handler) cachedHistory(deviceId string, sessionId string) (string, bool) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	bySession := s.historyCache[deviceId]
+	if bySession == nil {
+		return "", false
+	}
+	value, ok := bySession[sessionId]
+	return value, ok
+}
+
+func (s *Handler) storeHistoryCache(deviceId string, sessionId string, value string) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	bySession := s.historyCache[deviceId]
+	if bySession == nil {
+		bySession = map[string]string{}
+		s.historyCache[deviceId] = bySession
+	}
+	bySession[sessionId] = value
+}
+
+func (s *Handler) originPatterns(r *http.Request) []string {
+	patterns := []string{"http://" + r.Host, "https://" + r.Host}
+	patterns = append(patterns, s.config.AllowedOrigins...)
+	return patterns
+}
+
+func methodNotAllowed(w http.ResponseWriter, allowed ...string) {
+	w.Header().Set("Allow", strings.Join(allowed, ", "))
 	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+}
+
+func decodeJSONRequest(w http.ResponseWriter, r *http.Request, value any) bool {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, terminalproto.MaxJSONMessageBytes))
+	if err := decoder.Decode(value); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return false
+	}
+	return true
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
+}
+
+func normalizeConfig(config Config) Config {
+	if config.Logger == nil {
+		panic("gateway api logger is required")
+	}
+	return config
 }

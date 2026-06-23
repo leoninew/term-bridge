@@ -17,9 +17,9 @@ import (
 
 const TruncatedBodySuffix = "..."
 
-const requestIDHeader = "X-Request-ID"
+const requestIdHeader = "X-Request-ID"
 
-var requestIDCounter atomic.Uint64
+var requestIdCounter atomic.Uint64
 
 type Config struct {
 	RequestBodyLimit  int
@@ -28,16 +28,16 @@ type Config struct {
 
 func Middleware(logger *slog.Logger, config Config) func(http.Handler) http.Handler {
 	if logger == nil {
-		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+		panic("request logger is required")
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			startedAt := time.Now()
-			requestID := requestIDFor(r)
-			if requestID != "" {
-				w.Header().Set(requestIDHeader, requestID)
+			requestId := requestIdFor(r)
+			if requestId != "" {
+				w.Header().Set(requestIdHeader, requestId)
 			}
-			requestAttrs := requestLogAttrs(r, requestID)
+			requestAttrs := requestLogAttrs(r, requestId)
 			requestBody, bodyErr := readRequestBodyForLog(r, config.RequestBodyLimit)
 
 			startedAttrs := append([]any{}, requestAttrs...)
@@ -66,23 +66,23 @@ func Middleware(logger *slog.Logger, config Config) func(http.Handler) http.Hand
 	}
 }
 
-func requestLogAttrs(r *http.Request, requestID string) []any {
+func requestLogAttrs(r *http.Request, requestId string) []any {
 	return []any{
 		"method", r.Method,
 		"path", r.URL.Path,
 		"uri", r.URL.RequestURI(),
-		"request_id", requestID,
+		"request_id", requestId,
 		"remote_addr", r.RemoteAddr,
 		"user_agent", r.UserAgent(),
 	}
 }
 
-func requestIDFor(r *http.Request) string {
-	requestID := strings.TrimSpace(r.Header.Get(requestIDHeader))
-	if requestID != "" {
-		return requestID
+func requestIdFor(r *http.Request) string {
+	requestId := strings.TrimSpace(r.Header.Get(requestIdHeader))
+	if requestId != "" {
+		return requestId
 	}
-	return strconv.FormatInt(time.Now().UnixNano(), 36) + "-" + strconv.FormatUint(requestIDCounter.Add(1), 36)
+	return strconv.FormatInt(time.Now().UnixNano(), 36) + "-" + strconv.FormatUint(requestIdCounter.Add(1), 36)
 }
 
 func readRequestBodyForLog(r *http.Request, limit int) (string, error) {

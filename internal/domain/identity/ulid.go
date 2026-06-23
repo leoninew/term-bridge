@@ -9,25 +9,25 @@ import (
 )
 
 type Generator interface {
-	NewID() (string, error)
+	NewId() (string, error)
 }
 
-type ULIDGenerator struct {
+type UlidGenerator struct {
 	entropy io.Reader
 }
 
-func NewULIDGenerator() ULIDGenerator {
-	return ULIDGenerator{entropy: rand.Reader}
+func NewUlidGenerator() UlidGenerator {
+	return UlidGenerator{entropy: rand.Reader}
 }
 
-func NewULIDGeneratorWithEntropy(entropy io.Reader) ULIDGenerator {
+func NewUlidGeneratorWithEntropy(entropy io.Reader) UlidGenerator {
 	if entropy == nil {
 		entropy = rand.Reader
 	}
-	return ULIDGenerator{entropy: entropy}
+	return UlidGenerator{entropy: entropy}
 }
 
-func (g ULIDGenerator) NewID() (string, error) {
+func (g UlidGenerator) NewId() (string, error) {
 	id, err := ulid.New(ulid.Timestamp(time.Now().UTC()), g.entropy)
 	if err != nil {
 		return "", err

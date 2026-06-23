@@ -75,7 +75,7 @@ func TestCreateSessionPersistsRuntimeRecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
-	if response.SessionId == "" || response.WorkspaceId == "" || response.WSURL == "" {
+	if response.SessionId == "" || response.WorkspaceId == "" || response.WsUrl == "" {
 		t.Fatalf("response = %#v", response)
 	}
 	if len(manager.specs) != 1 {
@@ -331,7 +331,7 @@ func TestWorkspaceTreeAndOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WorkspaceTree() error = %v", err)
 	}
-	if len(tree) != 1 || tree[0].ID != response.WorkspaceId || len(tree[0].Children) != 1 || tree[0].Children[0].Name != "Go version" {
+	if len(tree) != 1 || tree[0].Id != response.WorkspaceId || len(tree[0].Children) != 1 || tree[0].Children[0].Name != "Go version" {
 		t.Fatalf("tree = %#v", tree)
 	}
 	workspaces, err := registry.UpdateWorkspaceOrder([]string{response.WorkspaceId})
@@ -386,7 +386,7 @@ func TestCloseSessionReturnsStoppedSummary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CloseSession() error = %v", err)
 	}
-	if summary.ID != response.SessionId || summary.LifecycleState != session.StateStopped {
+	if summary.Id != response.SessionId || summary.LifecycleState != session.StateStopped {
 		t.Fatalf("summary = %#v, want stopped session %s", summary, response.SessionId)
 	}
 }
@@ -512,7 +512,7 @@ func (s *fakeSession) Close() error {
 func (s *fakeSession) KillTree() error      { return nil }
 func (s *fakeSession) Wait() termpty.Result { return <-s.done }
 func (s *fakeSession) ProcessInfo() process.Record {
-	return process.Record{SchemaVersion: 1, PID: 123, OwnerPID: os.Getpid(), Executable: "go", CommandLine: "go version", Cwd: ".", StartedAt: time.Now().UTC()}
+	return process.Record{SchemaVersion: 1, Pid: 123, OwnerPid: os.Getpid(), Executable: "go", CommandLine: "go version", Cwd: ".", StartedAt: time.Now().UTC()}
 }
 func (s *fakeSession) finish(result termpty.Result) {
 	close(s.output)

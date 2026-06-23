@@ -53,7 +53,7 @@ func (r *SessionRuntime) attach() (*Client, error) {
 		r.mu.Unlock()
 		return nil, fmt.Errorf("session is closed")
 	}
-	id, err := r.registry.ids.NewID()
+	id, err := r.registry.ids.NewId()
 	if err != nil {
 		r.mu.Unlock()
 		return nil, err
@@ -61,7 +61,7 @@ func (r *SessionRuntime) attach() (*Client, error) {
 	client := &Client{id: id, runtime: r, queue: make(chan Outbound, r.registry.clientQueueSize)}
 	attachment := AttachmentAttached
 	if r.registry.logger != nil {
-		r.registry.logger.Info("terminal attach start", "session_id", r.session.ID, "client_id", id, "current_cols", r.current.Cols, "current_rows", r.current.Rows)
+		r.registry.logger.Info("terminal attach start", "session_id", r.session.Id, "client_id", id, "current_cols", r.current.Cols, "current_rows", r.current.Rows)
 	}
 	r.mu.Unlock()
 
@@ -79,7 +79,7 @@ func (r *SessionRuntime) attach() (*Client, error) {
 	r.clients[id] = client
 	r.attachment = attachment
 	if r.registry.logger != nil {
-		r.registry.logger.Info("terminal attach live", "session_id", r.session.ID, "client_id", id, "clients", len(r.clients))
+		r.registry.logger.Info("terminal attach live", "session_id", r.session.Id, "client_id", id, "clients", len(r.clients))
 	}
 	r.mu.Unlock()
 	return client, nil
@@ -87,9 +87,9 @@ func (r *SessionRuntime) attach() (*Client, error) {
 
 func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentState) error {
 	if r.registry.logger != nil {
-		r.registry.logger.Info("terminal replay enqueue start", "session_id", r.session.ID, "client_id", client.ID())
+		r.registry.logger.Info("terminal replay enqueue start", "session_id", r.session.Id, "client_id", client.Id())
 	}
-	if !client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeStarted, SessionId: r.session.ID, WorkspaceId: r.session.WorkspaceId, WorkspaceKey: r.session.WorkspaceKey, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(attachment)}}) {
+	if !client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeStarted, SessionId: r.session.Id, WorkspaceId: r.session.WorkspaceId, WorkspaceKey: r.session.WorkspaceKey, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(attachment)}}) {
 		return fmt.Errorf("client queue full")
 	}
 	if !client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeReplayStarted}}) {
@@ -98,14 +98,14 @@ func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentStat
 	if err := r.history.Flush(); err != nil {
 		return err
 	}
-	historyPath := r.registry.store.HistoryPath(r.session.WorkspaceKey, r.session.ID)
+	historyPath := r.registry.store.HistoryPath(r.session.WorkspaceKey, r.session.Id)
 	data, err := os.ReadFile(historyPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	if len(data) > 0 {
 		if r.registry.logger != nil {
-			r.registry.logger.Info("terminal replay enqueue history", "session_id", r.session.ID, "client_id", client.ID(), "bytes", len(data))
+			r.registry.logger.Info("terminal replay enqueue history", "session_id", r.session.Id, "client_id", client.Id(), "bytes", len(data))
 		}
 		if !client.enqueue(Outbound{Kind: OutboundBinary, Binary: data}) {
 			return fmt.Errorf("client queue full")
@@ -116,7 +116,7 @@ func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentStat
 		return fmt.Errorf("client queue full")
 	}
 	if r.registry.logger != nil {
-		r.registry.logger.Info("terminal replay enqueue finish", "session_id", r.session.ID, "client_id", client.ID(), "queued_bytes", client.QueuedBytes())
+		r.registry.logger.Info("terminal replay enqueue finish", "session_id", r.session.Id, "client_id", client.Id(), "queued_bytes", client.QueuedBytes())
 	}
 	return nil
 }
@@ -158,7 +158,7 @@ func (r *SessionRuntime) resize(cols int, rows int) error {
 	r.current = size
 	r.mu.Unlock()
 	if r.registry.logger != nil {
-		r.registry.logger.Info("terminal pty resize", "session_id", r.session.ID, "previous_cols", previous.Cols, "previous_rows", previous.Rows, "cols", size.Cols, "rows", size.Rows)
+		r.registry.logger.Info("terminal pty resize", "session_id", r.session.Id, "previous_cols", previous.Cols, "previous_rows", previous.Rows, "cols", size.Cols, "rows", size.Rows)
 	}
 	return r.pty.Resize(size)
 }
@@ -193,7 +193,7 @@ func (r *SessionRuntime) closeSession(reason string) error {
 	clients := r.snapshotClientsLocked()
 	done := r.done
 	r.mu.Unlock()
-	_ = r.registry.store.SaveState(r.session.WorkspaceKey, r.session.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopping, Reason: reason, UpdatedAt: time.Now().UTC()})
+	_ = r.registry.store.SaveState(r.session.WorkspaceKey, r.session.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopping, Reason: reason, UpdatedAt: time.Now().UTC()})
 	for _, client := range clients {
 		client.enqueue(Outbound{Kind: OutboundText, Text: terminalproto.ServerMessage{Type: terminalproto.TypeState, LifecycleState: string(session.StateStopping), AttachmentState: string(AttachmentDetached), Reason: reason}})
 	}
@@ -211,13 +211,13 @@ func (r *SessionRuntime) readLoop() {
 		if n > 0 {
 			chunk := copyBytes(buf[:n])
 			if _, writeErr := r.history.Write(chunk); writeErr != nil && r.registry.logger != nil {
-				r.registry.logger.Warn("write web terminal history", "session_id", r.session.ID, "error", writeErr)
+				r.registry.logger.Warn("write web terminal history", "session_id", r.session.Id, "error", writeErr)
 			}
 			r.publishBinary(chunk)
 		}
 		if err != nil {
 			if !isClosedReadError(err) && r.registry.logger != nil {
-				r.registry.logger.Warn("read web terminal pty", "session_id", r.session.ID, "error", err)
+				r.registry.logger.Warn("read web terminal pty", "session_id", r.session.Id, "error", err)
 			}
 			return
 		}
@@ -250,15 +250,15 @@ func (r *SessionRuntime) waitLoop() {
 	if exit.WaitErr != nil {
 		waitErr = exit.WaitErr.Error()
 	}
-	if err := r.registry.store.SaveExit(r.session.WorkspaceKey, r.session.ID, process.ExitRecord{SchemaVersion: 1, ExitCode: exit.Code, Reason: "user_process_exited", Forced: exit.Forced, Closed: exit.Closed, StartedAt: startedAt, EndedAt: endedAt, WaitError: waitErr}); err != nil && r.registry.logger != nil {
-		r.registry.logger.Warn("save web terminal exit", "session_id", r.session.ID, "error", err)
+	if err := r.registry.store.SaveExit(r.session.WorkspaceKey, r.session.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: exit.Code, Reason: "user_process_exited", Forced: exit.Forced, Closed: exit.Closed, StartedAt: startedAt, EndedAt: endedAt, WaitError: waitErr}); err != nil && r.registry.logger != nil {
+		r.registry.logger.Warn("save web terminal exit", "session_id", r.session.Id, "error", err)
 	}
-	if err := r.registry.store.SaveState(r.session.WorkspaceKey, r.session.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "user_process_exited", UpdatedAt: endedAt}); err != nil && r.registry.logger != nil {
-		r.registry.logger.Warn("save web terminal stopped state", "session_id", r.session.ID, "error", err)
+	if err := r.registry.store.SaveState(r.session.WorkspaceKey, r.session.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "user_process_exited", UpdatedAt: endedAt}); err != nil && r.registry.logger != nil {
+		r.registry.logger.Warn("save web terminal stopped state", "session_id", r.session.Id, "error", err)
 	}
 	r.broadcastText(terminalproto.ServerMessage{Type: terminalproto.TypeExited, ExitCode: &exit.Code, State: string(session.StateStopped), LifecycleState: string(session.StateStopped), AttachmentState: string(AttachmentDetached)})
 	r.closeClients()
-	r.registry.removeRuntime(r.session.ID)
+	r.registry.removeRuntime(r.session.Id)
 	close(r.done)
 }
 

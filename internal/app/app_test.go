@@ -35,7 +35,7 @@ func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
 	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO, hooks runner.Hooks) (runner.Result, error) {
 		gotSpec = spec
 		gotTerminalOutput = streams.TerminalOutput
-		hooks.OnStarted(process.Record{SchemaVersion: 1, PID: 123, Executable: "pwsh", CommandLine: "pwsh -NoLogo", Cwd: spec.Cwd, StartedAt: time.Now().UTC()})
+		hooks.OnStarted(process.Record{SchemaVersion: 1, Pid: 123, Executable: "pwsh", CommandLine: "pwsh -NoLogo", Cwd: spec.Cwd, StartedAt: time.Now().UTC()})
 		_, _ = streams.Stdout.Write([]byte("TERM_BRIDGE_HISTORY_TEST\n"))
 		return runner.Result{ExitCode: 7, Exit: process.ExitResult{Code: 7}, Process: process.Record{StartedAt: time.Now().UTC()}}, nil
 	}
@@ -56,10 +56,10 @@ func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
 	if gotTerminalOutput != stdout {
 		t.Fatalf("TerminalOutput = %#v, want original stdout", gotTerminalOutput)
 	}
-	if got := globOne(t, filepath.Join(cwd, ".termbridge", "*", "*", "history.log")); got == "" {
+	if got := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "history.log")); got == "" {
 		t.Fatal("history.log was not created")
 	}
-	if got := globOne(t, filepath.Join(cwd, ".termbridge", "*", "*", "exit.json")); got == "" {
+	if got := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "exit.json")); got == "" {
 		t.Fatal("exit.json was not created")
 	}
 }
@@ -87,7 +87,7 @@ func TestRunReturnsRuntimeErrorFromRunnerAndMarksFailed(t *testing.T) {
 	if len(result.Command) != 1 || result.Command[0] != "pwsh" {
 		t.Fatalf("Result.Command = %#v", result.Command)
 	}
-	stateFile := globOne(t, filepath.Join(cwd, ".termbridge", "*", "*", "state.json"))
+	stateFile := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "state.json"))
 	if stateFile == "" {
 		t.Fatal("state.json was not created")
 	}
@@ -99,7 +99,7 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	configContent := "serve:\n  host: 127.0.0.1\n  port: 9090\n  dev: true\nagent:\n  server_url: http://127.0.0.1:9090\n  device_name: local-mac\n"
+	configContent := "serve:\n  host: 127.0.0.1\n  port: 9090\n  dev: true\nauth:\n  username: admin\n  password: admin\nagent:\n  server_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\n"
 	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
 		t.Fatalf("WriteFile(config) error = %v", err)
 	}
@@ -113,7 +113,7 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	var gotClient *agent.Client
 	runBackendServer = func(ctx context.Context, server *httpserver.Server, onListening func(httpserver.Info)) error {
 		gotServer = server
-		onListening(httpserver.Info{URL: "http://127.0.0.1:9090"})
+		onListening(httpserver.Info{Url: "http://127.0.0.1:9090"})
 		<-ctx.Done()
 		return ctx.Err()
 	}
@@ -132,21 +132,16 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	if gotServer == nil {
 		t.Fatal("runBackendServer was not called")
 	}
-	localResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(localResponse, httptest.NewRequest(http.MethodGet, "/api/health", nil))
-	if localResponse.Code != http.StatusOK || !strings.Contains(localResponse.Body.String(), `"status":"ok"`) {
-		t.Fatalf("local API response = %d %s", localResponse.Code, localResponse.Body.String())
-	}
-	gatewayResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(gatewayResponse, httptest.NewRequest(http.MethodGet, "/api/gateway/health", nil))
-	if gatewayResponse.Code != http.StatusOK || !strings.Contains(gatewayResponse.Body.String(), `"status":"ok"`) {
-		t.Fatalf("gateway API response = %d %s", gatewayResponse.Code, gatewayResponse.Body.String())
+	healthResponse := httptest.NewRecorder()
+	gotServer.ServeHTTP(healthResponse, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+	if healthResponse.Code != http.StatusOK || !strings.Contains(healthResponse.Body.String(), `"status":"ok"`) {
+		t.Fatalf("health response = %d %s", healthResponse.Code, healthResponse.Body.String())
 	}
 	if gotClient == nil {
 		t.Fatal("runAgentClient was not called")
 	}
 	gotConfig := gotClient.Config()
-	if gotConfig.ServerURL != "http://127.0.0.1:9090" || gotConfig.DeviceName != "local-mac" {
+	if gotConfig.ServerUrl != "http://127.0.0.1:9090" || gotConfig.Username != "admin" || gotConfig.Password != "admin" || gotConfig.DeviceId != "dev-1" || gotConfig.DeviceName != "local-mac" {
 		t.Fatalf("agent config = %#v", gotConfig)
 	}
 	out := stdout.String()
@@ -172,7 +167,7 @@ func TestRunExecUsesConfiguredStateDirAndHistoryLimits(t *testing.T) {
 	oldRunRuntime := runRuntime
 	defer func() { runRuntime = oldRunRuntime }()
 	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO, hooks runner.Hooks) (runner.Result, error) {
-		hooks.OnStarted(process.Record{SchemaVersion: 1, PID: 123, Executable: "pwsh", CommandLine: "pwsh", Cwd: spec.Cwd, StartedAt: time.Now().UTC()})
+		hooks.OnStarted(process.Record{SchemaVersion: 1, Pid: 123, Executable: "pwsh", CommandLine: "pwsh", Cwd: spec.Cwd, StartedAt: time.Now().UTC()})
 		_, _ = streams.Stdout.Write([]byte("abcdef\nsecond\n"))
 		return runner.Result{ExitCode: 0, Exit: process.ExitResult{Code: 0}, Process: process.Record{StartedAt: time.Now().UTC()}}, nil
 	}
@@ -181,11 +176,11 @@ func TestRunExecUsesConfiguredStateDirAndHistoryLimits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	defaultState := globOne(t, filepath.Join(cwd, ".termbridge", "*", "*", "session.json"))
+	defaultState := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "session.json"))
 	if defaultState != "" {
 		t.Fatalf("default .termbridge state was created despite configured state_dir: %s", defaultState)
 	}
-	historyPath := globOne(t, filepath.Join(configuredStateDir, "*", "*", "history.log"))
+	historyPath := globOne(t, filepath.Join(configuredStateDir, "workspaces", "*", "sessions", "*", "history.log"))
 	if historyPath == "" {
 		t.Fatal("configured state dir history.log was not created")
 	}
@@ -207,7 +202,7 @@ func TestRunWorkspaceAndSessionList(t *testing.T) {
 	oldRunRuntime := runRuntime
 	defer func() { runRuntime = oldRunRuntime }()
 	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO, hooks runner.Hooks) (runner.Result, error) {
-		hooks.OnStarted(process.Record{SchemaVersion: 1, PID: 123, Executable: "pwsh", CommandLine: "pwsh", Cwd: spec.Cwd, StartedAt: time.Now().UTC()})
+		hooks.OnStarted(process.Record{SchemaVersion: 1, Pid: 123, Executable: "pwsh", CommandLine: "pwsh", Cwd: spec.Cwd, StartedAt: time.Now().UTC()})
 		return runner.Result{ExitCode: 0, Exit: process.ExitResult{Code: 0}, Process: process.Record{StartedAt: time.Now().UTC()}}, nil
 	}
 	_, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandExec, Exec: ExecCommand{Command: []string{"pwsh"}}}, Stdin: bytes.NewReader(nil), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}})

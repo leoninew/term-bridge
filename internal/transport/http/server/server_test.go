@@ -12,25 +12,17 @@ import (
 
 func TestServerLogsUnifiedBackendRequests(t *testing.T) {
 	var logBuffer bytes.Buffer
-	localHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	apiHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/health" {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"local"}`))
-	})
-	gatewayHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/gateway/health" {
 			http.NotFound(w, r)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"gateway"}`))
 	})
-	server := New(Config{Logger: slog.New(slog.NewJSONHandler(&logBuffer, nil)), RequestBodyLimit: 4096, ResponseBodyLimit: 4096}, localHandler, gatewayHandler)
+	server := New(Config{Logger: slog.New(slog.NewJSONHandler(&logBuffer, nil)), RequestBodyLimit: 4096, ResponseBodyLimit: 4096}, apiHandler)
 
-	request := httptest.NewRequest(http.MethodGet, "/api/gateway/health?x=1", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/health?x=1", nil)
 	request.Header.Set("User-Agent", "test-agent")
 	response := httptest.NewRecorder()
 	server.ServeHTTP(response, request)
@@ -44,8 +36,8 @@ func TestServerLogsUnifiedBackendRequests(t *testing.T) {
 	assertLogValue(t, started, "msg", "request started")
 	assertLogValue(t, completed, "msg", "request completed")
 	assertLogValue(t, started, "method", http.MethodGet)
-	assertLogValue(t, started, "path", "/api/gateway/health")
-	assertLogValue(t, started, "uri", "/api/gateway/health?x=1")
+	assertLogValue(t, started, "path", "/api/health")
+	assertLogValue(t, started, "uri", "/api/health?x=1")
 	assertLogNumber(t, completed, "status", http.StatusOK)
 	assertLogValue(t, completed, "response_body", response.Body.String())
 	if started["request_id"] == "" || started["request_id"] != completed["request_id"] {

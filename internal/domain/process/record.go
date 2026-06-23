@@ -4,8 +4,8 @@ import "time"
 
 type Record struct {
 	SchemaVersion int       `json:"schema_version"`
-	PID           int       `json:"pid"`
-	OwnerPID      int       `json:"owner_pid"`
+	Pid           int       `json:"pid"`
+	OwnerPid      int       `json:"owner_pid"`
 	Executable    string    `json:"executable"`
 	CommandLine   string    `json:"command_line"`
 	Cwd           string    `json:"cwd"`

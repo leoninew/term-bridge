@@ -7,7 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
+	"unicode"
 
 	"termbridge-go/internal/domain/process"
 	"termbridge-go/internal/domain/session"
@@ -29,6 +31,10 @@ func NewStore(root string) Store {
 	return Store{Root: root}
 }
 
+func NewDeviceStore(root string, deviceId string) Store {
+	return Store{Root: filepath.Join(root, "devices", safeSegment(deviceId))}
+}
+
 func RootForCwd(cwd string, stateDir string) string {
 	if stateDir == "" {
 		stateDir = StateDirName
@@ -39,12 +45,16 @@ func RootForCwd(cwd string, stateDir string) string {
 	return filepath.Join(cwd, stateDir)
 }
 
+func (s Store) WorkspaceRoot() string {
+	return filepath.Join(s.Root, "workspaces")
+}
+
 func (s Store) WorkspaceDir(key string) string {
-	return filepath.Join(s.Root, key)
+	return filepath.Join(s.WorkspaceRoot(), safeSegment(key))
 }
 
 func (s Store) SessionDir(workspaceKey string, sessionId string) string {
-	return filepath.Join(s.WorkspaceDir(workspaceKey), sessionId)
+	return filepath.Join(s.WorkspaceDir(workspaceKey), "sessions", safeSegment(sessionId))
 }
 
 func (s Store) SaveWorkspace(value workspace.Workspace) error {
@@ -64,7 +74,7 @@ func (s Store) FindWorkspaceById(workspaceId string) (workspace.Workspace, error
 		return workspace.Workspace{}, err
 	}
 	for _, value := range workspaces {
-		if value.ID == workspaceId {
+		if value.Id == workspaceId {
 			return value, nil
 		}
 	}
@@ -81,7 +91,7 @@ func (s Store) SaveSession(value session.Session) error {
 	if err := s.SaveWorkspace(ws); err != nil {
 		return err
 	}
-	path := filepath.Join(s.SessionDir(value.WorkspaceKey, value.ID), "session.json")
+	path := filepath.Join(s.SessionDir(value.WorkspaceKey, value.Id), "session.json")
 	return writeJSON(path, value)
 }
 
@@ -91,7 +101,7 @@ func (s Store) LoadSession(workspaceKey string, sessionId string) (session.Sessi
 		return session.Session{}, err
 	}
 	for _, child := range ws.Children {
-		if child.ID == sessionId {
+		if child.Id == sessionId {
 			return sessionFromWorkspaceNode(ws, child), nil
 		}
 	}
@@ -167,7 +177,7 @@ func (s Store) HistoryPath(workspaceKey string, sessionId string) string {
 }
 
 func (s Store) ListWorkspaces() ([]workspace.Workspace, []Warning, error) {
-	entries, err := os.ReadDir(s.Root)
+	entries, err := os.ReadDir(s.WorkspaceRoot())
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil, nil
 	}
@@ -180,7 +190,7 @@ func (s Store) ListWorkspaces() ([]workspace.Workspace, []Warning, error) {
 		if !entry.IsDir() {
 			continue
 		}
-		path := filepath.Join(s.Root, entry.Name(), "workspace.json")
+		path := filepath.Join(s.WorkspaceRoot(), entry.Name(), "workspace.json")
 		var value workspace.Workspace
 		if err := readJSON(path, &value); err != nil {
 			warnings = append(warnings, Warning{Path: path, Err: err})
@@ -223,9 +233,9 @@ func (s Store) UpdateWorkspaceOrder(workspaceIds []string, now time.Time) ([]wor
 	if err != nil {
 		return nil, err
 	}
-	byID := make(map[string]workspace.Workspace, len(workspaces))
+	byId := make(map[string]workspace.Workspace, len(workspaces))
 	for _, ws := range workspaces {
-		byID[ws.ID] = ws
+		byId[ws.Id] = ws
 	}
 	seen := map[string]bool{}
 	for _, id := range workspaceIds {
@@ -233,7 +243,7 @@ func (s Store) UpdateWorkspaceOrder(workspaceIds []string, now time.Time) ([]wor
 			return nil, fmt.Errorf("duplicate workspace_id %q", id)
 		}
 		seen[id] = true
-		ws, ok := byID[id]
+		ws, ok := byId[id]
 		if !ok {
 			return nil, os.ErrNotExist
 		}
@@ -242,7 +252,7 @@ func (s Store) UpdateWorkspaceOrder(workspaceIds []string, now time.Time) ([]wor
 		if err := s.SaveWorkspace(ws); err != nil {
 			return nil, err
 		}
-		byID[id] = ws
+		byId[id] = ws
 	}
 	updated, _, err := s.ListWorkspaces()
 	return updated, err
@@ -253,17 +263,17 @@ func (s Store) listSessionsInWorkspace(ws workspace.Workspace) ([]session.View, 
 	var warnings []Warning
 	for _, child := range ws.Children {
 		sess := sessionFromWorkspaceNode(ws, child)
-		stateRecord, err := s.LoadState(ws.Key, child.ID)
+		stateRecord, err := s.LoadState(ws.Key, child.Id)
 		if err != nil {
-			warnings = append(warnings, Warning{Path: filepath.Join(s.SessionDir(ws.Key, child.ID), "state.json"), Err: err})
+			warnings = append(warnings, Warning{Path: filepath.Join(s.SessionDir(ws.Key, child.Id), "state.json"), Err: err})
 		}
 		view := session.View{Session: sess, State: stateRecord, CommandText: formatCommand(sess.Command)}
-		if exit, err := s.LoadExit(ws.Key, child.ID); err == nil {
+		if exit, err := s.LoadExit(ws.Key, child.Id); err == nil {
 			code := exit.ExitCode
 			view.ExitCode = &code
 			view.ExitReason = exit.Reason
 		} else if !errors.Is(err, os.ErrNotExist) {
-			warnings = append(warnings, Warning{Path: filepath.Join(s.SessionDir(ws.Key, child.ID), "exit.json"), Err: err})
+			warnings = append(warnings, Warning{Path: filepath.Join(s.SessionDir(ws.Key, child.Id), "exit.json"), Err: err})
 		}
 		views = append(views, view)
 	}
@@ -272,7 +282,7 @@ func (s Store) listSessionsInWorkspace(ws workspace.Workspace) ([]session.View, 
 
 func sessionNodeFromSession(value session.Session) workspace.SessionNode {
 	return workspace.SessionNode{
-		ID:        value.ID,
+		Id:        value.Id,
 		Name:      value.Name,
 		LaunchCwd: value.LaunchCwd,
 		Command: workspace.CommandRecord{
@@ -291,9 +301,9 @@ func sessionNodeFromSession(value session.Session) workspace.SessionNode {
 func sessionFromWorkspaceNode(ws workspace.Workspace, child workspace.SessionNode) session.Session {
 	return session.Session{
 		SchemaVersion: session.SchemaVersion,
-		ID:            child.ID,
+		Id:            child.Id,
 		Name:          child.Name,
-		WorkspaceId:   ws.ID,
+		WorkspaceId:   ws.Id,
 		WorkspaceKey:  ws.Key,
 		LaunchCwd:     child.LaunchCwd,
 		Command: session.CommandRecord{
@@ -311,7 +321,7 @@ func sessionFromWorkspaceNode(ws workspace.Workspace, child workspace.SessionNod
 
 func upsertSessionNode(ws *workspace.Workspace, child workspace.SessionNode) {
 	for i := range ws.Children {
-		if ws.Children[i].ID == child.ID {
+		if ws.Children[i].Id == child.Id {
 			ws.Children[i] = child
 			return
 		}
@@ -321,7 +331,7 @@ func upsertSessionNode(ws *workspace.Workspace, child workspace.SessionNode) {
 
 func removeSessionNode(ws *workspace.Workspace, sessionId string) {
 	for i := range ws.Children {
-		if ws.Children[i].ID == sessionId {
+		if ws.Children[i].Id == sessionId {
 			ws.Children = append(ws.Children[:i], ws.Children[i+1:]...)
 			return
 		}
@@ -401,7 +411,7 @@ func sortWorkspaces(values []workspace.Workspace) {
 		if left.Name != right.Name {
 			return left.Name < right.Name
 		}
-		return left.ID < right.ID
+		return left.Id < right.Id
 	})
 }
 
@@ -420,16 +430,25 @@ func formatCommand(command session.CommandRecord) string {
 	if len(command.Args) == 0 {
 		return command.Command
 	}
-	return command.Command + " " + joinArgs(command.Args)
+	return command.Command + " " + strings.Join(command.Args, " ")
 }
 
-func joinArgs(args []string) string {
-	out := ""
-	for i, arg := range args {
-		if i > 0 {
-			out += " "
+func safeSegment(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "unknown"
+	}
+	var builder strings.Builder
+	for _, r := range value {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' || r == '.' {
+			builder.WriteRune(r)
+			continue
 		}
-		out += arg
+		builder.WriteByte('_')
+	}
+	out := strings.Trim(builder.String(), ".")
+	if out == "" || out == ".." {
+		return "unknown"
 	}
 	return out
 }

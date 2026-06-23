@@ -60,8 +60,8 @@ func (m Manager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.S
 		cleanupTree: cleanupTree,
 		process: process.Record{
 			SchemaVersion: 1,
-			PID:           cmd.Process.Pid,
-			OwnerPID:      os.Getpid(),
+			Pid:           cmd.Process.Pid,
+			OwnerPid:      os.Getpid(),
 			Executable:    spec.EffectiveCommand(),
 			CommandLine:   strings.Join(append([]string{spec.Command}, spec.Args...), " "),
 			Cwd:           spec.Cwd,

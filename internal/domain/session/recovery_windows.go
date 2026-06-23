@@ -17,10 +17,10 @@ const stillActive = 259
 type OSAliveChecker struct{}
 
 func (OSAliveChecker) Check(record process.Record) AliveStatus {
-	if record.PID <= 0 {
+	if record.Pid <= 0 {
 		return AliveMissing
 	}
-	handle, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(record.PID))
+	handle, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(record.Pid))
 	if err != nil {
 		return AliveMissing
 	}

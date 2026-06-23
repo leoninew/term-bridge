@@ -9,9 +9,9 @@ const ProtocolVersion = 2
 
 const MaxFrameBytes = 32 * 1024 * 1024
 
-const ControlStreamID StreamID = "control"
+const ControlStreamId StreamId = "control"
 
-type StreamID string
+type StreamId string
 
 type FrameType string
 
@@ -32,13 +32,13 @@ const (
 )
 
 type Frame struct {
-	StreamID StreamID        `json:"stream_id"`
+	StreamId StreamId        `json:"stream_id"`
 	Type     FrameType       `json:"type"`
 	Payload  json.RawMessage `json:"payload,omitempty"`
 }
 
 type HelloPayload struct {
-	DeviceID        string `json:"device_id"`
+	DeviceId        string `json:"device_id"`
 	DeviceName      string `json:"device_name"`
 	ProtocolVersion int    `json:"protocol_version"`
 }
@@ -63,7 +63,7 @@ type ResponsePayload struct {
 }
 
 type TerminalAttachPayload struct {
-	SessionID string `json:"session_id"`
+	SessionId string `json:"session_id"`
 	Cols      int    `json:"cols,omitempty"`
 	Rows      int    `json:"rows,omitempty"`
 }
@@ -77,8 +77,8 @@ type TerminalResizePayload struct {
 	Rows int `json:"rows"`
 }
 
-func NewFrame(streamID StreamID, frameType FrameType, payload any) (Frame, error) {
-	frame := Frame{StreamID: streamID, Type: frameType}
+func NewFrame(streamId StreamId, frameType FrameType, payload any) (Frame, error) {
+	frame := Frame{StreamId: streamId, Type: frameType}
 	if payload == nil {
 		return frame, nil
 	}
@@ -124,7 +124,7 @@ func DecodePayload[T any](frame Frame) (T, error) {
 }
 
 func Validate(frame Frame) error {
-	if frame.StreamID == "" {
+	if frame.StreamId == "" {
 		return fmt.Errorf("tunnel frame missing stream_id")
 	}
 	if !knownFrameType(frame.Type) {

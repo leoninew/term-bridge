@@ -7,10 +7,10 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func TestULIDGeneratorReturnsParseableID(t *testing.T) {
-	id, err := NewULIDGenerator().NewID()
+func TestUlidGeneratorReturnsParseableID(t *testing.T) {
+	id, err := NewUlidGenerator().NewId()
 	if err != nil {
-		t.Fatalf("NewID() error = %v", err)
+		t.Fatalf("NewId() error = %v", err)
 	}
 	if _, err := ulid.ParseStrict(id); err != nil {
 		t.Fatalf("ParseStrict(%q) error = %v", id, err)
@@ -26,10 +26,10 @@ func (zeroReader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func TestULIDGeneratorUsesUppercaseCanonicalEncoding(t *testing.T) {
-	id, err := NewULIDGeneratorWithEntropy(zeroReader{}).NewID()
+func TestUlidGeneratorUsesUppercaseCanonicalEncoding(t *testing.T) {
+	id, err := NewUlidGeneratorWithEntropy(zeroReader{}).NewId()
 	if err != nil {
-		t.Fatalf("NewID() error = %v", err)
+		t.Fatalf("NewId() error = %v", err)
 	}
 	if id != strings.ToUpper(id) {
 		t.Fatalf("id = %q, want canonical uppercase", id)

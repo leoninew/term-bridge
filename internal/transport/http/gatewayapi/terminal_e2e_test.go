@@ -20,7 +20,7 @@ import (
 )
 
 func TestGatewayAgentTerminalAttachE2E(t *testing.T) {
-	gateway := New(Config{})
+	gateway := New(testGatewayConfig())
 	server := httptest.NewServer(gateway)
 	defer server.Close()
 
@@ -31,16 +31,16 @@ func TestGatewayAgentTerminalAttachE2E(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	errCh := make(chan error, 1)
-	client := agentapp.New(agentapp.Config{ServerURL: server.URL, DeviceName: device.Name, StateDir: stateDir, Runtime: runtime})
+	client := agentapp.New(agentapp.Config{ServerUrl: server.URL, Username: "admin", Password: "admin", DeviceId: device.Id, DeviceName: device.Name, StateDir: stateDir, Runtime: runtime})
 	go func() {
 		errCh <- client.Run(ctx)
 	}()
-	waitForRoute(t, gateway, device.ID)
+	waitForRoute(t, gateway, device.Id)
 
 	cookie := loginCookie(t, gateway)
 	header := http.Header{}
 	header.Set("Cookie", cookie.Name+"="+cookie.Value)
-	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/gateway/devices/"+device.ID+"/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/"+device.Id+"/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		t.Fatalf("browser Dial() error = %v", err)
 	}
@@ -95,12 +95,15 @@ func TestGatewayAgentTerminalAttachE2E(t *testing.T) {
 
 func writeGatewayE2EDevice(t *testing.T, stateDir string) agentapp.Device {
 	t.Helper()
-	device := agentapp.Device{ID: "gateway-e2e-device", Name: "gateway-e2e", CreatedAt: time.Now().UTC()}
+	device := agentapp.Device{Id: "gateway-e2e-device", Name: "gateway-e2e", CreatedAt: time.Now().UTC()}
 	data, err := json.MarshalIndent(device, "", "  ")
 	if err != nil {
 		t.Fatalf("MarshalIndent() error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(stateDir, agentapp.DeviceFileName), append(data, '\n'), 0o644); err != nil {
+	if err := os.MkdirAll(filepath.Join(stateDir, "devices", device.Id), 0o755); err != nil {
+		t.Fatalf("MkdirAll(device) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(stateDir, "devices", device.Id, agentapp.DeviceFileName), append(data, '\n'), 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 	return device
@@ -113,7 +116,7 @@ type fakeRuntimeAccess struct {
 }
 
 type attachedStream struct {
-	sessionID string
+	sessionId string
 	stream    *fakeTerminalStream
 }
 
@@ -121,37 +124,73 @@ func newFakeRuntimeAccess() *fakeRuntimeAccess {
 	return &fakeRuntimeAccess{streams: map[string]*fakeTerminalStream{}, attach: make(chan attachedStream, 1)}
 }
 
+func (r *fakeRuntimeAccess) ListWorkspaces(context.Context) ([]terminalapp.WorkspaceSummary, error) {
+	return []terminalapp.WorkspaceSummary{{Id: "ws-1", Key: "ws-1", Name: "Workspace", Path: "."}}, nil
+}
+
 func (r *fakeRuntimeAccess) WorkspaceTree(context.Context) ([]terminalapp.WorkspaceTreeNode, error) {
-	return []terminalapp.WorkspaceTreeNode{{ID: "ws-1", Key: "ws-1", Name: "Workspace", Path: ".", Children: []terminalapp.WorkspaceSessionSummary{{ID: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}}}}, nil
+	return []terminalapp.WorkspaceTreeNode{{Id: "ws-1", Key: "ws-1", Name: "Workspace", Path: ".", Children: []terminalapp.WorkspaceSessionSummary{{Id: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}}}}, nil
+}
+
+func (r *fakeRuntimeAccess) UpdateWorkspaceOrder(context.Context, []string) ([]terminalapp.WorkspaceSummary, error) {
+	return r.ListWorkspaces(context.Background())
+}
+
+func (r *fakeRuntimeAccess) DeleteWorkspace(context.Context, string) error {
+	return nil
+}
+
+func (r *fakeRuntimeAccess) ListSessionsByWorkspaceId(context.Context, string) ([]terminalapp.WorkspaceSessionSummary, error) {
+	return []terminalapp.WorkspaceSessionSummary{{Id: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}}, nil
 }
 
 func (r *fakeRuntimeAccess) ListSessions(context.Context) ([]terminalapp.SessionSummary, error) {
-	return []terminalapp.SessionSummary{{ID: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}}, nil
+	return []terminalapp.SessionSummary{{Id: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}}, nil
+}
+
+func (r *fakeRuntimeAccess) CreateSession(context.Context, terminalapp.CreateSessionRequest) (terminalapp.CreateSessionResponse, error) {
+	return terminalapp.CreateSessionResponse{SessionId: "sess-1", WorkspaceId: "ws-1", WorkspaceKey: "ws-1", State: string(session.StateRunning), WsUrl: "/api/devices/gateway-e2e-device/sessions/sess-1/ws"}, nil
+}
+
+func (r *fakeRuntimeAccess) GetSession(context.Context, string) (terminalapp.SessionSummary, error) {
+	return terminalapp.SessionSummary{Id: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}, nil
+}
+
+func (r *fakeRuntimeAccess) UpdateSession(context.Context, string, terminalapp.UpdateSessionRequest) (terminalapp.SessionSummary, error) {
+	return r.GetSession(context.Background(), "sess-1")
+}
+
+func (r *fakeRuntimeAccess) DeleteSession(context.Context, string) error {
+	return nil
+}
+
+func (r *fakeRuntimeAccess) CloseSession(context.Context, string) (terminalapp.SessionSummary, error) {
+	return r.GetSession(context.Background(), "sess-1")
 }
 
 func (r *fakeRuntimeAccess) ReadHistory(context.Context, string) ([]byte, error) {
 	return []byte("POMELO_M6_ATTACH_READY\n"), nil
 }
 
-func (r *fakeRuntimeAccess) Attach(_ context.Context, sessionID string) (agentapp.TerminalStream, error) {
+func (r *fakeRuntimeAccess) Attach(_ context.Context, sessionId string) (agentapp.TerminalStream, error) {
 	stream := newFakeTerminalStream()
 	r.mu.Lock()
-	r.streams[sessionID] = stream
+	r.streams[sessionId] = stream
 	r.mu.Unlock()
-	r.attach <- attachedStream{sessionID: sessionID, stream: stream}
+	r.attach <- attachedStream{sessionId: sessionId, stream: stream}
 	return stream, nil
 }
 
-func (r *fakeRuntimeAccess) waitAttach(t *testing.T, sessionID string) *fakeTerminalStream {
+func (r *fakeRuntimeAccess) waitAttach(t *testing.T, sessionId string) *fakeTerminalStream {
 	t.Helper()
 	select {
 	case attached := <-r.attach:
-		if attached.sessionID != sessionID {
-			t.Fatalf("attached session = %q, want %q", attached.sessionID, sessionID)
+		if attached.sessionId != sessionId {
+			t.Fatalf("attached session = %q, want %q", attached.sessionId, sessionId)
 		}
 		return attached.stream
 	case <-time.After(2 * time.Second):
-		t.Fatalf("timed out waiting for attach %s", sessionID)
+		t.Fatalf("timed out waiting for attach %s", sessionId)
 		return nil
 	}
 }

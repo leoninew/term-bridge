@@ -15,7 +15,7 @@ import (
 )
 
 func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
-	gateway := New(Config{})
+	gateway := New(testGatewayConfig())
 	server := httptest.NewServer(gateway)
 	defer server.Close()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -30,7 +30,7 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 	cookie := loginCookie(t, gateway)
 	header := http.Header{}
 	header.Set("Cookie", cookie.Name+"="+cookie.Value)
-	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/gateway/devices/dev-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		t.Fatalf("browser Dial() error = %v", err)
 	}
@@ -43,7 +43,7 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 	if !bytes.Equal(output, wantOutput) {
 		t.Fatalf("terminal output = %q, want %q", output, wantOutput)
 	}
-	_, response, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/gateway/devices/dev-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	_, response, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err == nil {
 		t.Fatal("second writer Dial() error = nil, want conflict")
 	}
@@ -66,19 +66,19 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 	<-agentDone
 }
 
-func runTerminalAgent(t *testing.T, ctx context.Context, serverURL string, inputCh chan<- []byte) {
+func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, inputCh chan<- []byte) {
 	t.Helper()
 	requestHeader := http.Header{}
-	req, _ := http.NewRequest(http.MethodGet, serverURL, nil)
+	req, _ := http.NewRequest(http.MethodGet, serverUrl, nil)
 	req.SetBasicAuth("admin", "admin")
 	requestHeader.Set("Authorization", req.Header.Get("Authorization"))
-	conn, _, err := websocket.Dial(ctx, "ws"+serverURL[len("http"):]+"/api/gateway/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
+	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/api/gateway/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
 	if err != nil {
 		t.Errorf("Dial() error = %v", err)
 		return
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
-	hello, _ := tunnel.NewFrame(tunnel.ControlStreamID, tunnel.FrameHello, tunnel.HelloPayload{DeviceID: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion})
+	hello, _ := tunnel.NewFrame(tunnel.ControlStreamId, tunnel.FrameHello, tunnel.HelloPayload{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion})
 	helloData, _ := tunnel.Encode(hello)
 	if err := conn.Write(ctx, websocket.MessageText, helloData); err != nil {
 		t.Errorf("hello Write() error = %v", err)
@@ -99,7 +99,7 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverURL string, input
 		}
 		switch frame.Type {
 		case tunnel.FrameTerminalAttach:
-			output, _ := tunnel.NewFrame(frame.StreamID, tunnel.FrameTerminalOutput, tunnel.TerminalDataPayload{Data: []byte{'h', 'e', 'l', 'l', 'o', 0xff, 0xfe, 0x1b, '[', '2', 'J'}})
+			output, _ := tunnel.NewFrame(frame.StreamId, tunnel.FrameTerminalOutput, tunnel.TerminalDataPayload{Data: []byte{'h', 'e', 'l', 'l', 'o', 0xff, 0xfe, 0x1b, '[', '2', 'J'}})
 			outputData, _ := tunnel.Encode(output)
 			_ = conn.Write(ctx, websocket.MessageText, outputData)
 		case tunnel.FrameTerminalInput:
@@ -114,13 +114,13 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverURL string, input
 }
 
 func TestRouteUnavailable(t *testing.T) {
-	gateway := New(Config{})
+	gateway := New(testGatewayConfig())
 	cookie := loginCookie(t, gateway)
-	request := httptest.NewRequest(http.MethodGet, "/api/gateway/devices/missing/sessions", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/devices/missing/sessions", nil)
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, request)
-	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "route unavailable") {
+	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "device offline") {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 }

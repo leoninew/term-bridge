@@ -35,14 +35,14 @@ func TestKillTreeStopsUnixChildProcess(t *testing.T) {
 		readDone <- err
 	}()
 	waitForFile(t, marker)
-	childPID := strings.TrimSpace(string(readBytes(t, marker)))
-	if childPID == "" {
+	childPid := strings.TrimSpace(string(readBytes(t, marker)))
+	if childPid == "" {
 		t.Fatal("child pid marker is empty")
 	}
 	if err := session.KillTree(); err != nil {
 		t.Fatalf("KillTree() error = %v", err)
 	}
-	waitForProcessExit(t, childPID)
+	waitForProcessExit(t, childPid)
 	_ = session.Close()
 	select {
 	case <-readDone:

@@ -15,7 +15,7 @@ import (
 )
 
 func TestAgentTunnelRegistersDevice(t *testing.T) {
-	gateway := New(Config{})
+	gateway := New(testGatewayConfig())
 	server := httptest.NewServer(gateway)
 	defer server.Close()
 
@@ -30,7 +30,7 @@ func TestAgentTunnelRegistersDevice(t *testing.T) {
 		t.Fatalf("Dial() error = %v", err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
-	hello, err := tunnel.NewFrame(tunnel.ControlStreamID, tunnel.FrameHello, tunnel.HelloPayload{DeviceID: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion})
+	hello, err := tunnel.NewFrame(tunnel.ControlStreamId, tunnel.FrameHello, tunnel.HelloPayload{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion})
 	if err != nil {
 		t.Fatalf("NewFrame() error = %v", err)
 	}
@@ -54,20 +54,20 @@ func TestAgentTunnelRegistersDevice(t *testing.T) {
 	}
 
 	devices := gateway.registry.List()
-	if len(devices) != 1 || devices[0].ID != "dev-1" || devices[0].Name != "local" || !devices[0].Online {
+	if len(devices) != 1 || devices[0].Id != "dev-1" || devices[0].Name != "local" || !devices[0].Online {
 		t.Fatalf("devices = %#v", devices)
 	}
 }
 
 func TestDevicesEndpointReturnsRegisteredDevices(t *testing.T) {
-	gateway := New(Config{})
+	gateway := New(testGatewayConfig())
 	gateway.registry.Register("dev-1", "local", time.Now().UTC())
 	loginResponse := httptest.NewRecorder()
-	gateway.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/gateway/login", stringsReader(`{"username":"admin","password":"admin"}`)))
+	gateway.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/login", stringsReader(`{"username":"admin","password":"admin"}`)))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d", loginResponse.Code)
 	}
-	request := httptest.NewRequest(http.MethodGet, "/api/gateway/devices", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
 	request.AddCookie(loginResponse.Result().Cookies()[0])
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, request)
@@ -78,7 +78,7 @@ func TestDevicesEndpointReturnsRegisteredDevices(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &devices); err != nil {
 		t.Fatalf("Unmarshal() error = %v; body=%s", err, response.Body.String())
 	}
-	if len(devices) != 1 || devices[0].ID != "dev-1" || !devices[0].Online {
+	if len(devices) != 1 || devices[0].Id != "dev-1" || !devices[0].Online {
 		t.Fatalf("devices = %#v", devices)
 	}
 }

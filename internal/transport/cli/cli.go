@@ -260,7 +260,7 @@ func PrintServeUsage(w io.Writer) {
 	fmt.Fprintln(w, "  termbridge [options] serve")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Serve starts the unified backend service and Agent connector.")
-	fmt.Fprintln(w, "Backend listen settings, Agent upstream URL, and device name are read from config.")
+	fmt.Fprintln(w, "Backend listen settings, Agent upstream Url, and device name are read from config.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
 	fmt.Fprintln(w, "  --help          show serve help")

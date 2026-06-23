@@ -15,7 +15,7 @@ import (
 )
 
 func TestBrowserAPIRelay(t *testing.T) {
-	gateway := New(Config{})
+	gateway := New(testGatewayConfig())
 	server := httptest.NewServer(gateway)
 	defer server.Close()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -46,9 +46,9 @@ func TestBrowserAPIRelay(t *testing.T) {
 		path string
 		want string
 	}{
-		{"/api/gateway/devices/dev-1/workspaces/tree", "Workspace"},
-		{"/api/gateway/devices/dev-1/sessions", "sess-1"},
-		{"/api/gateway/devices/dev-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
+		{"/api/devices/dev-1/workspaces/tree", "Workspace"},
+		{"/api/devices/dev-1/sessions", "sess-1"},
+		{"/api/devices/dev-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
 	} {
 		request := httptest.NewRequest(http.MethodGet, tc.path, nil)
 		request.AddCookie(cookie)
@@ -72,7 +72,7 @@ func rawResponse(raw string) tunnel.ResponsePayload {
 func loginCookie(t *testing.T, gateway *Handler) *http.Cookie {
 	t.Helper()
 	response := httptest.NewRecorder()
-	gateway.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/gateway/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
+	gateway.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("login status = %d; body=%s", response.Code, response.Body.String())
 	}
@@ -83,31 +83,31 @@ func loginCookie(t *testing.T, gateway *Handler) *http.Cookie {
 	return cookies[0]
 }
 
-func waitForRoute(t *testing.T, gateway *Handler, deviceID string) {
+func waitForRoute(t *testing.T, gateway *Handler, deviceId string) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if gateway.routeFor(deviceID) != nil {
+		if gateway.routeFor(deviceId) != nil {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatalf("route %s not registered", deviceID)
+	t.Fatalf("route %s not registered", deviceId)
 }
 
-func runFakeAgent(t *testing.T, ctx context.Context, serverURL string, respond func(tunnel.Frame) tunnel.ResponsePayload) {
+func runFakeAgent(t *testing.T, ctx context.Context, serverUrl string, respond func(tunnel.Frame) tunnel.ResponsePayload) {
 	t.Helper()
 	requestHeader := http.Header{}
-	req, _ := http.NewRequest(http.MethodGet, serverURL, nil)
+	req, _ := http.NewRequest(http.MethodGet, serverUrl, nil)
 	req.SetBasicAuth("admin", "admin")
 	requestHeader.Set("Authorization", req.Header.Get("Authorization"))
-	conn, _, err := websocket.Dial(ctx, "ws"+serverURL[len("http"):]+"/api/gateway/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
+	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/api/gateway/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
 	if err != nil {
 		t.Errorf("Dial() error = %v", err)
 		return
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
-	hello, _ := tunnel.NewFrame(tunnel.ControlStreamID, tunnel.FrameHello, tunnel.HelloPayload{DeviceID: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion})
+	hello, _ := tunnel.NewFrame(tunnel.ControlStreamId, tunnel.FrameHello, tunnel.HelloPayload{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion})
 	helloData, _ := tunnel.Encode(hello)
 	if err := conn.Write(ctx, websocket.MessageText, helloData); err != nil {
 		t.Errorf("hello Write() error = %v", err)
@@ -126,7 +126,7 @@ func runFakeAgent(t *testing.T, ctx context.Context, serverURL string, respond f
 		if err != nil || frame.Type != tunnel.FrameRequest {
 			continue
 		}
-		response, _ := tunnel.NewFrame(frame.StreamID, tunnel.FrameResponse, respond(frame))
+		response, _ := tunnel.NewFrame(frame.StreamId, tunnel.FrameResponse, respond(frame))
 		responseData, _ := tunnel.Encode(response)
 		_ = conn.Write(ctx, websocket.MessageText, responseData)
 	}

@@ -58,7 +58,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Serve.Host != "127.0.0.1" || cfg.Serve.Port != 9010 || cfg.Serve.Open || cfg.Serve.Dev {
 		t.Fatalf("Serve = %#v", cfg.Serve)
 	}
-	if cfg.Agent.ServerURL != "http://127.0.0.1:9010" || cfg.Agent.DeviceName != "local-dev" {
+	if cfg.Agent.ServerUrl != "http://127.0.0.1:9010" || cfg.Agent.DeviceId != "" || cfg.Agent.DeviceName != "" {
 		t.Fatalf("Agent = %#v", cfg.Agent)
 	}
 	if !reflect.DeepEqual(cfg.Command, []string{"pwsh"}) {
@@ -108,7 +108,7 @@ func TestLoadRejectsInvalidServePort(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsEmptyAgentServerURL(t *testing.T) {
+func TestLoadRejectsEmptyAgentServerUrl(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeConfig(t, cwd, "agent:\n  server_url: \"\"\n")
@@ -167,7 +167,7 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	configPath := filepath.Join(cwd, FileName)
 	logDir := filepath.Join(cwd, "configured-logs")
 	stateDir := filepath.Join(cwd, "configured-state")
-	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\n  request_body_limit: 128\n  response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: " + filepath.ToSlash(stateDir) + "\nserve:\n  host: 0.0.0.0\n  port: 9090\n  open: true\n  dev: true\nagent:\n  server_url: http://127.0.0.1:9090\n  device_name: office-pc\n"
+	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\n  request_body_limit: 128\n  response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: " + filepath.ToSlash(stateDir) + "\nserve:\n  host: 0.0.0.0\n  port: 9090\n  open: true\n  dev: true\nagent:\n  server_url: http://127.0.0.1:9090\n  device_id: office-id\n  device_name: office-pc\n"
 	writeConfig(t, cwd, content)
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -201,7 +201,7 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	if cfg.Serve.Host != "0.0.0.0" || cfg.Serve.Port != 9090 || !cfg.Serve.Open || !cfg.Serve.Dev {
 		t.Fatalf("Serve = %#v", cfg.Serve)
 	}
-	if cfg.Agent.ServerURL != "http://127.0.0.1:9090" || cfg.Agent.DeviceName != "office-pc" {
+	if cfg.Agent.ServerUrl != "http://127.0.0.1:9090" || cfg.Agent.DeviceId != "office-id" || cfg.Agent.DeviceName != "office-pc" {
 		t.Fatalf("Agent = %#v", cfg.Agent)
 	}
 }
@@ -259,6 +259,45 @@ func TestLoadUsesPackagedDefaultConfigAndUserOverride(t *testing.T) {
 	}
 	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Join(cwd, ".termbridge") {
 		t.Fatalf("StateDir = %q", cfg.Runtime.StateDir)
+	}
+}
+
+func TestDefaultDeviceNameUsesHostnameOnly(t *testing.T) {
+	hostname, err := os.Hostname()
+	want := "termbridge-device"
+	if err == nil {
+		if sanitized := sanitizeName(hostname); sanitized != "" {
+			want = sanitized
+		}
+	}
+	if got := defaultDeviceName(); got != want {
+		t.Fatalf("defaultDeviceName() = %q, want %q", got, want)
+	}
+}
+
+func TestEnsureLocalIdentityRewritesLegacyDefaultDeviceName(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	deviceId := "1234567890abcdef"
+	legacyName := defaultDeviceName() + "-" + deviceId[:8]
+	writeConfig(t, cwd, "auth:\n  username: admin\n  password: secret\nagent:\n  server_url: http://127.0.0.1:9010\n  device_id: "+deviceId+"\n  device_name: "+legacyName+"\n")
+
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	updated, bootstrap, err := EnsureLocalIdentity(cfg)
+	if err != nil {
+		t.Fatalf("EnsureLocalIdentity() error = %v", err)
+	}
+	if bootstrap.Generated {
+		t.Fatal("BootstrapResult.Generated = true, want false")
+	}
+	if updated.Agent.DeviceId != deviceId || updated.Agent.DeviceName != defaultDeviceName() {
+		t.Fatalf("Agent = %#v", updated.Agent)
+	}
+	if updated.Auth.Username != "admin" || updated.Auth.Password != "secret" {
+		t.Fatalf("Auth = %#v", updated.Auth)
 	}
 }
 

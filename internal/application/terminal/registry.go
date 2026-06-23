@@ -101,7 +101,7 @@ type UpdateWorkspaceOrderRequest struct {
 }
 
 type WorkspaceTreeNode struct {
-	ID        string                    `json:"id"`
+	Id        string                    `json:"id"`
 	Key       string                    `json:"key"`
 	Name      string                    `json:"name"`
 	Path      string                    `json:"path"`
@@ -115,11 +115,11 @@ type CreateSessionResponse struct {
 	WorkspaceId  string `json:"workspace_id"`
 	WorkspaceKey string `json:"workspace_key"`
 	State        string `json:"state"`
-	WSURL        string `json:"ws_url"`
+	WsUrl        string `json:"ws_url"`
 }
 
 type WorkspaceSummary struct {
-	ID        string    `json:"id"`
+	Id        string    `json:"id"`
 	Key       string    `json:"key"`
 	Name      string    `json:"name"`
 	Path      string    `json:"path"`
@@ -128,7 +128,7 @@ type WorkspaceSummary struct {
 }
 
 type SessionSummary struct {
-	ID              string          `json:"id"`
+	Id              string          `json:"id"`
 	Name            string          `json:"name"`
 	WorkspaceId     string          `json:"workspace_id"`
 	WorkspaceKey    string          `json:"workspace_key"`
@@ -142,7 +142,7 @@ type SessionSummary struct {
 }
 
 type WorkspaceSessionSummary struct {
-	ID              string          `json:"id"`
+	Id              string          `json:"id"`
 	Name            string          `json:"name"`
 	Command         string          `json:"command"`
 	Cwd             string          `json:"cwd"`
@@ -193,7 +193,7 @@ func NewRegistry(config Config) *Registry {
 		historyConfig:    config.History,
 		manager:          config.Manager,
 		logger:           config.Logger,
-		ids:              identity.NewULIDGenerator(),
+		ids:              identity.NewUlidGenerator(),
 		clientQueueSize:  queueSize,
 		clientQueueBytes: queueBytes,
 		envDenylist:      append([]string(nil), config.EnvDenylist...),
@@ -230,7 +230,7 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 		r.logger.Info("terminal session create request", "name", name, "cwd", absCwd, "command", strings.Join(request.Command, " "), "cols", size.Cols, "rows", size.Rows)
 	}
 
-	resolver := workspace.Resolver{Store: r.store, IDs: r.ids}
+	resolver := workspace.Resolver{Store: r.store, Ids: r.ids}
 	ws, err := resolver.Resolve(absCwd)
 	if err != nil {
 		return CreateSessionResponse{}, apperrors.Runtime("resolve workspace", err)
@@ -247,7 +247,7 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 		EnvStrategy: envStrategy,
 		EnvCount:    len(env),
 	}
-	manager := session.Manager{Store: r.store, IDs: r.ids}
+	manager := session.Manager{Store: r.store, Ids: r.ids}
 	sess, err := manager.Create(session.CreateOptions{
 		Workspace: ws,
 		Name:      name,
@@ -265,60 +265,60 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 		return CreateSessionResponse{}, apperrors.Runtime("create session", err)
 	}
 
-	historyWriter, err := history.NewWriter(r.store.HistoryPath(sess.WorkspaceKey, sess.ID), history.Config{MaxLines: r.historyConfig.MaxLines, MaxBytes: r.historyConfig.MaxBytes, MaxLineBytes: r.historyConfig.MaxLineBytes})
+	historyWriter, err := history.NewWriter(r.store.HistoryPath(sess.WorkspaceKey, sess.Id), history.Config{MaxLines: r.historyConfig.MaxLines, MaxBytes: r.historyConfig.MaxBytes, MaxLineBytes: r.historyConfig.MaxLineBytes})
 	if err != nil {
-		_ = r.store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "history_create_failed", UpdatedAt: time.Now().UTC()})
+		_ = r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "history_create_failed", UpdatedAt: time.Now().UTC()})
 		return CreateSessionResponse{}, apperrors.Runtime("create history writer", err)
 	}
 
 	spec, err := process.NewSpec(absCwd, request.Command, size)
 	if err != nil {
 		_ = historyWriter.Close()
-		_ = r.store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "build_process_spec_failed", UpdatedAt: time.Now().UTC()})
+		_ = r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "build_process_spec_failed", UpdatedAt: time.Now().UTC()})
 		return CreateSessionResponse{}, apperrors.Runtime("build process spec", err)
 	}
 	spec.Env = env
 	resolved, err := process.ResolveExecutable(spec.Command)
 	if err != nil {
 		_ = historyWriter.Close()
-		_ = r.store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "resolve_executable_failed", UpdatedAt: time.Now().UTC()})
+		_ = r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "resolve_executable_failed", UpdatedAt: time.Now().UTC()})
 		return CreateSessionResponse{}, apperrors.Runtime("resolve executable", err)
 	}
 	spec = spec.WithResolvedCommand(resolved)
 
 	if r.logger != nil {
-		r.logger.Info("terminal pty start", "session_id", sess.ID, "workspace_id", sess.WorkspaceId, "cols", spec.InitialSize.Cols, "rows", spec.InitialSize.Rows, "command", spec.EffectiveCommand())
+		r.logger.Info("terminal pty start", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cols", spec.InitialSize.Cols, "rows", spec.InitialSize.Rows, "command", spec.EffectiveCommand())
 	}
 	ptySession, err := r.manager.Start(ctx, spec)
 	if err != nil {
 		_ = historyWriter.Close()
-		_ = r.store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "pty_start_failed", UpdatedAt: time.Now().UTC()})
+		_ = r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "pty_start_failed", UpdatedAt: time.Now().UTC()})
 		return CreateSessionResponse{}, apperrors.Runtime("start pty", err)
 	}
 	if reporter, ok := ptySession.(termpty.ProcessReporter); ok {
-		if err := r.store.SaveProcess(sess.WorkspaceKey, sess.ID, reporter.ProcessInfo()); err != nil {
+		if err := r.store.SaveProcess(sess.WorkspaceKey, sess.Id, reporter.ProcessInfo()); err != nil {
 			_ = ptySession.Close()
 			_ = historyWriter.Close()
-			_ = r.store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_process_failed", UpdatedAt: time.Now().UTC()})
+			_ = r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_process_failed", UpdatedAt: time.Now().UTC()})
 			return CreateSessionResponse{}, apperrors.Runtime("save process", err)
 		}
 	}
-	if err := r.store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: time.Now().UTC()}); err != nil {
+	if err := r.store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: time.Now().UTC()}); err != nil {
 		_ = ptySession.Close()
 		_ = historyWriter.Close()
 		return CreateSessionResponse{}, apperrors.Runtime("save running state", err)
 	}
 
 	if r.logger != nil {
-		r.logger.Info("terminal pty started", "session_id", sess.ID, "workspace_id", sess.WorkspaceId)
+		r.logger.Info("terminal pty started", "session_id", sess.Id, "workspace_id", sess.WorkspaceId)
 	}
 	runtime := newSessionRuntime(r, sess, ptySession, historyWriter, size)
 	r.mu.Lock()
-	r.runtimes[sess.ID] = runtime
+	r.runtimes[sess.Id] = runtime
 	r.mu.Unlock()
 	runtime.start()
 
-	return CreateSessionResponse{SessionId: sess.ID, WorkspaceId: sess.WorkspaceId, WorkspaceKey: sess.WorkspaceKey, State: string(session.StateRunning), WSURL: "/api/sessions/" + sess.ID + "/ws"}, nil
+	return CreateSessionResponse{SessionId: sess.Id, WorkspaceId: sess.WorkspaceId, WorkspaceKey: sess.WorkspaceKey, State: string(session.StateRunning), WsUrl: "/api/sessions/" + sess.Id + "/ws"}, nil
 }
 
 func (r *Registry) Attach(sessionId string) (*Client, error) {
@@ -363,12 +363,12 @@ func (r *Registry) WorkspaceTree() ([]WorkspaceTreeNode, error) {
 	}
 	nodes := make([]WorkspaceTreeNode, 0, len(workspaces))
 	for _, ws := range workspaces {
-		views, _, err := r.store.ListSessionsByWorkspaceId(ws.ID)
+		views, _, err := r.store.ListSessionsByWorkspaceId(ws.Id)
 		if err != nil {
 			return nil, apperrors.Runtime("list workspace sessions", err)
 		}
 		nodes = append(nodes, WorkspaceTreeNode{
-			ID:        ws.ID,
+			Id:        ws.Id,
 			Key:       ws.Key,
 			Name:      ws.Name,
 			Path:      ws.Path,
@@ -468,7 +468,7 @@ func (r *Registry) DeleteWorkspace(workspaceId string) error {
 		return apperrors.Runtime("list workspace sessions", err)
 	}
 	for _, view := range views {
-		if r.hasRuntime(view.Session.ID) || !session.Terminal(view.State.State) {
+		if r.hasRuntime(view.Session.Id) || !session.Terminal(view.State.State) {
 			return apperrors.Usage("cannot delete workspace with running sessions")
 		}
 	}
@@ -500,8 +500,8 @@ func (r *Registry) History(sessionId string) ([]byte, error) {
 		return nil, apperrors.Runtime("list sessions", err)
 	}
 	for _, view := range views {
-		if view.Session.ID == sessionId {
-			data, err := os.ReadFile(r.store.HistoryPath(view.Session.WorkspaceKey, view.Session.ID))
+		if view.Session.Id == sessionId {
+			data, err := os.ReadFile(r.store.HistoryPath(view.Session.WorkspaceKey, view.Session.Id))
 			if errors.Is(err, os.ErrNotExist) {
 				return nil, nil
 			}
@@ -595,7 +595,7 @@ func (r *Registry) findSessionView(sessionId string) (session.View, error) {
 		return session.View{}, apperrors.Runtime("list sessions", err)
 	}
 	for _, view := range views {
-		if view.Session.ID == sessionId {
+		if view.Session.Id == sessionId {
 			return view, nil
 		}
 	}
@@ -606,7 +606,7 @@ func (r *Registry) summariesFromViews(views []session.View) []SessionSummary {
 	recoverer := session.Recoverer{Store: r.store}
 	out := make([]SessionSummary, 0, len(views))
 	for _, view := range views {
-		if !r.hasRuntime(view.Session.ID) {
+		if !r.hasRuntime(view.Session.Id) {
 			refreshed, err := recoverer.Refresh(view)
 			if err == nil {
 				view = refreshed
@@ -623,7 +623,7 @@ func (r *Registry) workspaceSessionSummariesFromViews(views []session.View) []Wo
 	out := make([]WorkspaceSessionSummary, 0, len(summaries))
 	for _, summary := range summaries {
 		out = append(out, WorkspaceSessionSummary{
-			ID:              summary.ID,
+			Id:              summary.Id,
 			Name:            summary.Name,
 			Command:         summary.Command,
 			Cwd:             summary.Cwd,
@@ -638,20 +638,20 @@ func (r *Registry) workspaceSessionSummariesFromViews(views []session.View) []Wo
 }
 
 func summaryFromWorkspace(ws workspace.Workspace) WorkspaceSummary {
-	return WorkspaceSummary{ID: ws.ID, Key: ws.Key, Name: ws.Name, Path: ws.Path, SortOrder: ws.SortOrder, UpdatedAt: ws.UpdatedAt}
+	return WorkspaceSummary{Id: ws.Id, Key: ws.Key, Name: ws.Name, Path: ws.Path, SortOrder: ws.SortOrder, UpdatedAt: ws.UpdatedAt}
 }
 
 func (r *Registry) summaryFromView(view session.View) SessionSummary {
 	attachment := AttachmentUnattached
 	lifecycleState := view.State.State
 	r.mu.Lock()
-	if runtime := r.runtimes[view.Session.ID]; runtime != nil {
+	if runtime := r.runtimes[view.Session.Id]; runtime != nil {
 		attachment = runtime.attachmentState()
 		lifecycleState = runtime.lifecycleState()
 	}
 	r.mu.Unlock()
 	return SessionSummary{
-		ID:              view.Session.ID,
+		Id:              view.Session.Id,
 		Name:            view.Session.Name,
 		WorkspaceId:     view.Session.WorkspaceId,
 		WorkspaceKey:    view.Session.WorkspaceKey,
@@ -711,12 +711,12 @@ func (c *Client) MarkSent(outbound Outbound) {
 	c.markSent(outbound)
 }
 
-func (c *Client) ID() string {
+func (c *Client) Id() string {
 	return c.id
 }
 
-func (c *Client) SessionID() string {
-	return c.runtime.session.ID
+func (c *Client) SessionId() string {
+	return c.runtime.session.Id
 }
 
 func (c *Client) QueuedBytes() int {

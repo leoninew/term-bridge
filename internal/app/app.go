@@ -26,7 +26,6 @@ import (
 	"termbridge-go/internal/infrastructure/pty/gopty"
 	"termbridge-go/internal/infrastructure/repository/state"
 	"termbridge-go/internal/transport/http/gatewayapi"
-	"termbridge-go/internal/transport/http/localapi"
 	httpserver "termbridge-go/internal/transport/http/server"
 )
 
@@ -102,6 +101,13 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	bootstrap := config.BootstrapResult{}
+	if options.Command.Kind == CommandServe {
+		cfg, bootstrap, err = config.EnsureLocalIdentity(cfg)
+		if err != nil {
+			return Result{}, err
+		}
+	}
 
 	var logOutput io.Writer
 	if options.Command.Kind == CommandServe {
@@ -122,8 +128,8 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	case CommandSession:
 		return runSessionList(cfg, options.Stdout)
 	case CommandServe:
-		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "serve_host", cfg.Serve.Host, "serve_port", cfg.Serve.Port, "serve_dev", cfg.Serve.Dev, "agent_server_url", cfg.Agent.ServerURL, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.ConfigFile)
-		return runServe(ctx, cfg, logger, options)
+		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "serve_host", cfg.Serve.Host, "serve_port", cfg.Serve.Port, "serve_dev", cfg.Serve.Dev, "agent_server_url", cfg.Agent.ServerUrl, "agent_device_id", cfg.Agent.DeviceId, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.ConfigFile)
+		return runServe(ctx, cfg, bootstrap, logger, options)
 	default:
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("missing command")
 	}
@@ -131,8 +137,8 @@ func Run(ctx context.Context, options Options) (Result, error) {
 
 func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, options Options) (Result, error) {
 	store := state.NewStore(cfg.Runtime.StateDir)
-	ids := identity.NewULIDGenerator()
-	resolver := workspace.Resolver{Store: store, IDs: ids}
+	ids := identity.NewUlidGenerator()
+	resolver := workspace.Resolver{Store: store, Ids: ids}
 	ws, err := resolver.Resolve(cfg.Cwd)
 	if err != nil {
 		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("resolve workspace", err)
@@ -145,7 +151,7 @@ func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, opt
 		EnvStrategy: "inherit",
 		EnvCount:    len(processEnv()),
 	}
-	manager := session.Manager{Store: store, IDs: ids}
+	manager := session.Manager{Store: store, Ids: ids}
 	sess, err := manager.Create(session.CreateOptions{
 		Workspace: ws,
 		Name:      strings.Join(cfg.Command, " "),
@@ -158,34 +164,34 @@ func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, opt
 		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("create session", err)
 	}
 
-	historyWriter, err := history.NewWriter(store.HistoryPath(sess.WorkspaceKey, sess.ID), history.Config{MaxLines: cfg.History.MaxLines, MaxBytes: cfg.History.MaxBytes, MaxLineBytes: cfg.History.MaxLineBytes})
+	historyWriter, err := history.NewWriter(store.HistoryPath(sess.WorkspaceKey, sess.Id), history.Config{MaxLines: cfg.History.MaxLines, MaxBytes: cfg.History.MaxBytes, MaxLineBytes: cfg.History.MaxLineBytes})
 	if err != nil {
-		_ = store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "history_create_failed", UpdatedAt: time.Now().UTC()})
+		_ = store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "history_create_failed", UpdatedAt: time.Now().UTC()})
 		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("create history writer", err)
 	}
 	defer func() { _ = historyWriter.Close() }()
 
 	spec, err := process.NewSpec(cfg.Cwd, cfg.Command, process.DefaultTerminalSize())
 	if err != nil {
-		_ = store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "build_process_spec_failed", UpdatedAt: time.Now().UTC()})
+		_ = store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "build_process_spec_failed", UpdatedAt: time.Now().UTC()})
 		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("build process spec", err)
 	}
 
 	var hookErr error
 	hooks := runner.Hooks{
 		OnStarted: func(record process.Record) {
-			if err := store.SaveProcess(sess.WorkspaceKey, sess.ID, record); err != nil {
+			if err := store.SaveProcess(sess.WorkspaceKey, sess.Id, record); err != nil {
 				hookErr = err
 				logger.Error("save process record", "error", err)
 				return
 			}
-			if err := store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: time.Now().UTC()}); err != nil {
+			if err := store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: time.Now().UTC()}); err != nil {
 				hookErr = err
 				logger.Error("save running state", "error", err)
 			}
 		},
 		OnStopping: func(_ process.StopMode, reason string) {
-			if err := store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopping, Reason: reason, UpdatedAt: time.Now().UTC()}); err != nil {
+			if err := store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopping, Reason: reason, UpdatedAt: time.Now().UTC()}); err != nil {
 				hookErr = err
 				logger.Error("save stopping state", "error", err)
 			}
@@ -199,11 +205,11 @@ func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, opt
 	runtimeResult, err := runRuntime(ctx, logger, spec, runner.IO{Stdin: options.Stdin, Stdout: io.MultiWriter(stdout, historyWriter), Stderr: options.Stderr, TerminalOutput: stdout}, hooks)
 	endedAt := time.Now().UTC()
 	if err != nil {
-		_ = store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "runtime_failed", UpdatedAt: endedAt})
+		_ = store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "runtime_failed", UpdatedAt: endedAt})
 		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, err
 	}
 	if hookErr != nil {
-		_ = store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "persistence_failed", UpdatedAt: endedAt})
+		_ = store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "persistence_failed", UpdatedAt: endedAt})
 		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("persist session lifecycle", hookErr)
 	}
 	if err := historyWriter.Close(); err != nil {
@@ -224,27 +230,31 @@ func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, opt
 	if runtimeResult.Exit.WaitErr != nil {
 		waitErr = runtimeResult.Exit.WaitErr.Error()
 	}
-	if err := store.SaveExit(sess.WorkspaceKey, sess.ID, process.ExitRecord{SchemaVersion: 1, ExitCode: runtimeResult.ExitCode, Reason: "user_process_exited", Forced: runtimeResult.Exit.Forced, Closed: runtimeResult.Exit.Closed, StartedAt: startedAt, EndedAt: endedAt, WaitError: waitErr}); err != nil {
-		_ = store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_exit_failed", UpdatedAt: endedAt})
+	if err := store.SaveExit(sess.WorkspaceKey, sess.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: runtimeResult.ExitCode, Reason: "user_process_exited", Forced: runtimeResult.Exit.Forced, Closed: runtimeResult.Exit.Closed, StartedAt: startedAt, EndedAt: endedAt, WaitError: waitErr}); err != nil {
+		_ = store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_exit_failed", UpdatedAt: endedAt})
 		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("save exit record", err)
 	}
-	if err := store.SaveState(sess.WorkspaceKey, sess.ID, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "user_process_exited", UpdatedAt: endedAt}); err != nil {
+	if err := store.SaveState(sess.WorkspaceKey, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "user_process_exited", UpdatedAt: endedAt}); err != nil {
 		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("save stopped state", err)
 	}
 
 	return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...), ExitCode: runtimeResult.ExitCode}, nil
 }
 
-func runServe(ctx context.Context, cfg config.Config, logger *logging.Logger, options Options) (Result, error) {
+func runServe(ctx context.Context, cfg config.Config, bootstrap config.BootstrapResult, logger *logging.Logger, options Options) (Result, error) {
 	stdout := options.Stdout
 	if stdout == nil {
 		stdout = io.Discard
 	}
+	if bootstrap.Generated {
+		fmt.Fprintf(stdout, "TermBridge generated login credentials in %s\n", bootstrap.ConfigFile)
+		fmt.Fprintf(stdout, "Username: %s\n", bootstrap.Username)
+		fmt.Fprintf(stdout, "Password: %s\n", bootstrap.Password)
+	}
 	registry := newWebTerminalRegistry(cfg, logger)
-	localHandler := localapi.New(localapi.Config{AllowedOrigins: cfg.Web.AllowedOrigins, DebugErrors: cfg.Web.Error.Debug, Logger: logger.Slog}, registry)
-	gatewayHandler := gatewayapi.New(gatewayapi.Config{})
-	server := httpserver.New(httpserver.Config{Host: cfg.Serve.Host, Port: cfg.Serve.Port, Open: cfg.Serve.Open, Dev: cfg.Serve.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit}, localHandler, gatewayHandler)
-	client := agent.New(agent.Config{ServerURL: cfg.Agent.ServerURL, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})
+	gatewayHandler := gatewayapi.New(gatewayapi.Config{Username: cfg.Auth.Username, Password: cfg.Auth.Password, AllowedOrigins: cfg.Web.AllowedOrigins, DebugErrors: cfg.Web.Error.Debug, Logger: logger.Slog})
+	server := httpserver.New(httpserver.Config{Host: cfg.Serve.Host, Port: cfg.Serve.Port, Open: cfg.Serve.Open, Dev: cfg.Serve.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit}, gatewayHandler)
+	client := agent.New(agent.Config{ServerUrl: cfg.Agent.ServerUrl, Username: cfg.Auth.Username, Password: cfg.Auth.Password, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})
 
 	serveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -253,7 +263,7 @@ func runServe(ctx context.Context, cfg config.Config, logger *logging.Logger, op
 
 	go func() {
 		err := runBackendServer(serveCtx, server, func(info httpserver.Info) {
-			fmt.Fprintf(stdout, "TermBridge serve listening on %s\n", info.URL)
+			fmt.Fprintf(stdout, "TermBridge serve listening on %s\n", info.Url)
 			if cfg.Serve.Dev {
 				fmt.Fprintln(stdout, "Dev mode enabled for unified backend.")
 			}
@@ -275,7 +285,7 @@ func runServe(ctx context.Context, cfg config.Config, logger *logging.Logger, op
 		return Result{Cwd: cfg.Cwd}, nil
 	}
 
-	fmt.Fprintf(stdout, "TermBridge agent connector targeting %s\n", cfg.Agent.ServerURL)
+	fmt.Fprintf(stdout, "TermBridge agent connector targeting %s\n", cfg.Agent.ServerUrl)
 	go func() {
 		errCh <- normalizeServeError(runAgentClient(serveCtx, client))
 	}()
@@ -303,7 +313,7 @@ func normalizeServeError(err error) error {
 func newWebTerminalRegistry(cfg config.Config, logger *logging.Logger) *terminalapp.Registry {
 	return terminalapp.NewRegistry(terminalapp.Config{
 		Cwd:         cfg.Cwd,
-		Store:       state.NewStore(cfg.Runtime.StateDir),
+		Store:       state.NewDeviceStore(cfg.Runtime.StateDir, cfg.Agent.DeviceId),
 		LogDir:      cfg.LogDir,
 		History:     cfg.History,
 		Manager:     gopty.NewManager(),
@@ -333,7 +343,7 @@ func runWorkspaceList(cfg config.Config, stdout io.Writer) (Result, error) {
 	w := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "WORKSPACE ID\tKEY\tNAME\tPATH\tSESSIONS\tUPDATED")
 	for _, ws := range workspaces {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s\n", ws.ID, ws.Key, ws.Name, ws.Path, counts[ws.Key], ws.UpdatedAt.Format(time.RFC3339))
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s\n", ws.Id, ws.Key, ws.Name, ws.Path, counts[ws.Key], ws.UpdatedAt.Format(time.RFC3339))
 	}
 	_ = w.Flush()
 	return Result{Cwd: cfg.Cwd}, nil
@@ -352,7 +362,7 @@ func runSessionList(cfg config.Config, stdout io.Writer) (Result, error) {
 	for i, view := range views {
 		refreshed, err := recoverer.Refresh(view)
 		if err != nil {
-			warnings = append(warnings, state.Warning{Path: view.Session.ID, Err: err})
+			warnings = append(warnings, state.Warning{Path: view.Session.Id, Err: err})
 			continue
 		}
 		views[i] = refreshed
@@ -368,7 +378,7 @@ func runSessionList(cfg config.Config, stdout io.Writer) (Result, error) {
 		if view.ExitCode != nil {
 			exit = fmt.Sprintf("%d", *view.ExitCode)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", view.Session.ID, view.Session.WorkspaceId, view.State.State, exit, view.CommandText, view.Session.LaunchCwd, view.Session.UpdatedAt.Format(time.RFC3339), view.Session.LogPath)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", view.Session.Id, view.Session.WorkspaceId, view.State.State, exit, view.CommandText, view.Session.LaunchCwd, view.Session.UpdatedAt.Format(time.RFC3339), view.Session.LogPath)
 	}
 	_ = w.Flush()
 	return Result{Cwd: cfg.Cwd}, nil

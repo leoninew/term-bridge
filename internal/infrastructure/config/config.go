@@ -1,13 +1,17 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
+	"go.yaml.in/yaml/v3"
 
 	apperrors "termbridge-go/internal/infrastructure/errors"
 )
@@ -30,6 +34,7 @@ type Config struct {
 	Web                  WebConfig
 	Serve                ServeConfig
 	Agent                AgentConfig
+	Auth                 AuthConfig
 	ConfigFile           string
 }
 
@@ -61,8 +66,21 @@ type ServeConfig struct {
 }
 
 type AgentConfig struct {
-	ServerURL  string
+	ServerUrl  string
+	DeviceId   string
 	DeviceName string
+}
+
+type AuthConfig struct {
+	Username string
+	Password string
+}
+
+type BootstrapResult struct {
+	ConfigFile string
+	Generated  bool
+	Username   string
+	Password   string
 }
 
 type Options struct {
@@ -135,8 +153,13 @@ func Load(options Options) (Config, error) {
 			Dev:  v.GetBool("serve.dev"),
 		},
 		Agent: AgentConfig{
-			ServerURL:  strings.TrimSpace(v.GetString("agent.server_url")),
+			ServerUrl:  strings.TrimSpace(v.GetString("agent.server_url")),
+			DeviceId:   strings.TrimSpace(v.GetString("agent.device_id")),
 			DeviceName: strings.TrimSpace(v.GetString("agent.device_name")),
+		},
+		Auth: AuthConfig{
+			Username: strings.TrimSpace(v.GetString("auth.username")),
+			Password: strings.TrimSpace(v.GetString("auth.password")),
 		},
 		ConfigFile: configFile,
 	}
@@ -164,6 +187,72 @@ func Load(options Options) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
+	configFile := filepath.Join(cfg.Cwd, FileName)
+	document := map[string]any{}
+	if data, err := os.ReadFile(configFile); err == nil {
+		if len(strings.TrimSpace(string(data))) > 0 {
+			if err := yaml.Unmarshal(data, &document); err != nil {
+				return Config{}, BootstrapResult{}, apperrors.Config("read local config file", err)
+			}
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return Config{}, BootstrapResult{}, apperrors.Config("read local config file", err)
+	}
+
+	changed := false
+	generatedPassword := ""
+	username := strings.TrimSpace(cfg.Auth.Username)
+	if username == "" {
+		username = currentUsername()
+		setNestedString(document, "auth", "username", username)
+		changed = true
+	}
+	password := strings.TrimSpace(cfg.Auth.Password)
+	if password == "" {
+		generated, err := randomHex(24)
+		if err != nil {
+			return Config{}, BootstrapResult{}, apperrors.Config("generate auth password", err)
+		}
+		password = generated
+		generatedPassword = generated
+		setNestedString(document, "auth", "password", password)
+		changed = true
+	}
+	deviceId := strings.TrimSpace(cfg.Agent.DeviceId)
+	if deviceId == "" {
+		generated, err := randomHex(16)
+		if err != nil {
+			return Config{}, BootstrapResult{}, apperrors.Config("generate device id", err)
+		}
+		deviceId = generated
+		setNestedString(document, "agent", "device_id", deviceId)
+		changed = true
+	}
+	deviceName := strings.TrimSpace(cfg.Agent.DeviceName)
+	if deviceName == "" || legacyDefaultDeviceName(deviceName, deviceId) {
+		deviceName = defaultDeviceName()
+		setNestedString(document, "agent", "device_name", deviceName)
+		changed = true
+	}
+
+	if changed {
+		data, err := yaml.Marshal(document)
+		if err != nil {
+			return Config{}, BootstrapResult{}, apperrors.Config("marshal local config file", err)
+		}
+		if err := os.WriteFile(configFile, data, 0o600); err != nil {
+			return Config{}, BootstrapResult{}, apperrors.Config("write local config file", err)
+		}
+	}
+
+	loaded, err := Load(Options{Cwd: cfg.Cwd, Command: cfg.Command})
+	if err != nil {
+		return Config{}, BootstrapResult{}, err
+	}
+	return loaded, BootstrapResult{ConfigFile: configFile, Generated: generatedPassword != "", Username: username, Password: generatedPassword}, nil
 }
 
 func resolveCwd(path string) (string, error) {
@@ -232,7 +321,10 @@ func rejectUnknownKeys(v *viper.Viper) error {
 		"serve.open":              {},
 		"serve.dev":               {},
 		"agent.server_url":        {},
+		"agent.device_id":         {},
 		"agent.device_name":       {},
+		"auth.username":           {},
+		"auth.password":           {},
 	}
 	for _, key := range v.AllKeys() {
 		if _, ok := allowed[key]; !ok {
@@ -322,8 +414,8 @@ func validateServe(cfg ServeConfig) error {
 }
 
 func validateAgent(cfg AgentConfig) error {
-	if strings.TrimSpace(cfg.ServerURL) == "" {
-		return apperrors.Config("invalid agent.server_url", fmt.Errorf("empty URL"))
+	if strings.TrimSpace(cfg.ServerUrl) == "" {
+		return apperrors.Config("invalid agent.server_url", fmt.Errorf("empty Url"))
 	}
 	return nil
 }
@@ -333,4 +425,85 @@ func ensureLogDir(path string) error {
 		return apperrors.Config("create log dir", err)
 	}
 	return nil
+}
+
+func setNestedString(document map[string]any, section string, key string, value string) {
+	nested, ok := document[section].(map[string]any)
+	if !ok {
+		if generic, ok := document[section].(map[any]any); ok {
+			nested = make(map[string]any, len(generic))
+			for k, v := range generic {
+				if text, ok := k.(string); ok {
+					nested[text] = v
+				}
+			}
+		} else {
+			nested = map[string]any{}
+		}
+		document[section] = nested
+	}
+	nested[key] = value
+}
+
+func randomHex(byteCount int) (string, error) {
+	data := make([]byte, byteCount)
+	if _, err := rand.Read(data); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(data), nil
+}
+
+func currentUsername() string {
+	for _, key := range []string{"USERNAME", "USER"} {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	current, err := user.Current()
+	if err == nil && strings.TrimSpace(current.Username) != "" {
+		name := current.Username
+		if index := strings.LastIndexAny(name, `\\/`); index >= 0 {
+			name = name[index+1:]
+		}
+		if strings.TrimSpace(name) != "" {
+			return name
+		}
+	}
+	return "termbridge"
+}
+
+func defaultDeviceName() string {
+	hostname, err := os.Hostname()
+	if err != nil || strings.TrimSpace(hostname) == "" {
+		hostname = "termbridge-device"
+	}
+	hostname = sanitizeName(hostname)
+	if hostname == "" {
+		return "termbridge-device"
+	}
+	return hostname
+}
+
+func legacyDefaultDeviceName(deviceName string, deviceId string) bool {
+	deviceName = strings.TrimSpace(deviceName)
+	deviceId = strings.TrimSpace(deviceId)
+	if deviceName == "" || deviceId == "" {
+		return false
+	}
+	short := deviceId
+	if len(short) > 8 {
+		short = short[:8]
+	}
+	if short == "" || !strings.HasSuffix(deviceName, "-"+short) {
+		return false
+	}
+	prefix := strings.TrimSuffix(deviceName, "-"+short)
+	return prefix == defaultDeviceName()
+}
+
+func sanitizeName(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.ReplaceAll(value, " ", "-")
+	value = strings.ReplaceAll(value, "_", "-")
+	return strings.Trim(value, "-")
 }

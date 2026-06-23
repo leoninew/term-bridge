@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -31,15 +30,14 @@ type Server struct {
 }
 
 type Info struct {
-	URL string
+	Url string
 }
 
-func New(config Config, localHandler http.Handler, gatewayHandler http.Handler) *Server {
+func New(config Config, apiHandler http.Handler) *Server {
 	config = normalizeConfig(config)
 	mux := http.NewServeMux()
-	mux.Handle("/api/gateway/", gatewayHandler)
-	mux.Handle("/api", localHandler)
-	mux.Handle("/api/", localHandler)
+	mux.Handle("/api", apiHandler)
+	mux.Handle("/api/", apiHandler)
 	return &Server{config: config, server: &http.Server{Handler: requestlog.Middleware(config.Logger, requestlog.Config{RequestBodyLimit: config.RequestBodyLimit, ResponseBodyLimit: config.ResponseBodyLimit})(mux)}}
 }
 
@@ -53,9 +51,9 @@ func (s *Server) Listen() (net.Listener, Info, error) {
 	if err != nil {
 		return nil, Info{}, apperrors.Runtime("listen backend server", err)
 	}
-	info := Info{URL: "http://" + listener.Addr().String()}
+	info := Info{Url: "http://" + listener.Addr().String()}
 	if s.config.Open {
-		go openBrowser(info.URL)
+		go openBrowser(info.Url)
 	}
 	return listener, info, nil
 }
@@ -91,7 +89,7 @@ func normalizeConfig(config Config) Config {
 		config.Port = 9010
 	}
 	if config.Logger == nil {
-		config.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+		panic("http server logger is required")
 	}
 	if config.RequestBodyLimit <= 0 {
 		config.RequestBodyLimit = 4096

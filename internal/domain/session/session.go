@@ -20,7 +20,7 @@ type HistoryRecord struct {
 
 type Session struct {
 	SchemaVersion int           `json:"schema_version"`
-	ID            string        `json:"session_id"`
+	Id            string        `json:"session_id"`
 	Name          string        `json:"name"`
 	WorkspaceId   string        `json:"workspace_id"`
 	WorkspaceKey  string        `json:"workspace_key"`

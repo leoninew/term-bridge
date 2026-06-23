@@ -13,12 +13,12 @@ import (
 	"termbridge-go/internal/protocol/tunnel"
 )
 
-func TestTunnelURL(t *testing.T) {
-	if got := tunnelURL("http://127.0.0.1:8080"); got != "ws://127.0.0.1:8080/api/gateway/agent/tunnel" {
-		t.Fatalf("tunnelURL(http) = %q", got)
+func TestTunnelUrl(t *testing.T) {
+	if got := tunnelUrl("http://127.0.0.1:8080"); got != "ws://127.0.0.1:8080/api/gateway/agent/tunnel" {
+		t.Fatalf("tunnelUrl(http) = %q", got)
 	}
-	if got := tunnelURL("https://example.com/base/"); got != "wss://example.com/base/api/gateway/agent/tunnel" {
-		t.Fatalf("tunnelURL(https) = %q", got)
+	if got := tunnelUrl("https://example.com/base/"); got != "wss://example.com/base/api/gateway/agent/tunnel" {
+		t.Fatalf("tunnelUrl(https) = %q", got)
 	}
 }
 
@@ -49,21 +49,21 @@ func TestClientRunSendsHello(t *testing.T) {
 			return
 		}
 		helloCh <- payload
-		ack, _ := tunnel.NewFrame(tunnel.ControlStreamID, tunnel.FrameHelloAck, tunnel.HelloAckPayload{ProtocolVersion: tunnel.ProtocolVersion})
+		ack, _ := tunnel.NewFrame(tunnel.ControlStreamId, tunnel.FrameHelloAck, tunnel.HelloAckPayload{ProtocolVersion: tunnel.ProtocolVersion})
 		ackData, _ := tunnel.Encode(ack)
 		_ = conn.Write(r.Context(), websocket.MessageText, ackData)
 		<-r.Context().Done()
 	}))
 	defer server.Close()
 	ctx, cancel := context.WithCancel(context.Background())
-	client := New(Config{ServerURL: server.URL, DeviceName: "local", StateDir: stateDir})
+	client := New(Config{ServerUrl: server.URL, Username: "admin", Password: "admin", DeviceId: "dev-1", DeviceName: "local", StateDir: stateDir})
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- client.Run(ctx)
 	}()
 	select {
 	case hello := <-helloCh:
-		if hello.DeviceID == "" || hello.DeviceName != "local" || hello.ProtocolVersion != tunnel.ProtocolVersion {
+		if hello.DeviceId == "" || hello.DeviceName != "local" || hello.ProtocolVersion != tunnel.ProtocolVersion {
 			t.Fatalf("hello = %#v", hello)
 		}
 	case <-time.After(2 * time.Second):

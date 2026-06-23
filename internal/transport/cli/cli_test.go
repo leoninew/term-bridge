@@ -304,7 +304,7 @@ func TestRunCommandCreatesLogStateAndReturnsCommandExitCode(t *testing.T) {
 	if info.Size() == 0 {
 		t.Fatal("log file is empty")
 	}
-	matches, err := filepath.Glob(filepath.Join(cwd, ".termbridge", "*", "*", "exit.json"))
+	matches, err := filepath.Glob(filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "exit.json"))
 	if err != nil {
 		t.Fatalf("Glob() error = %v", err)
 	}

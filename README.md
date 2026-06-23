@@ -19,15 +19,14 @@ TermBridge-go 是 TermBridge 的 Go 重写版本，一个本地浏览器工作�
 
 - `internal/transport/cli`：命令行入口解析与用户输出。
 - `internal/transport/http/server`：唯一 HTTP server owner，负责监听、生命周期、全局 middleware 和 route mount。
-- `internal/transport/http/localapi`：本地 workbench 的 `/api/...` route adapter。
-- `internal/transport/http/gatewayapi`：Gateway Browser API、Agent tunnel 和 terminal WebSocket route adapter。
+- `internal/transport/http/gatewayapi`：统一 Browser API、Agent tunnel 和 terminal WebSocket route adapter。
 - `internal/transport/http/middleware/requestlog`：HTTP request/response logging middleware。
 - `internal/application`：Agent connector、terminal registry 和 command runner 等 application/use case 层。
 - `internal/domain`：workspace、session、process、identity 等核心领域模型。
 - `internal/protocol`：terminal 和 tunnel wire protocol。
 - `internal/infrastructure`：config、logging、PTY adapter、history writer 和 filesystem repository 实现。
 
-`gatewayapi` 和 `localapi` 只是 HTTP route 模块，不拥有独立后端 server lifecycle；统一后端 server 只在 `internal/transport/http/server` 中存在。
+`gatewayapi` 只是 HTTP route 模块，不拥有独立后端 server lifecycle；统一后端 server 只在 `internal/transport/http/server` 中存在。
 
 ## 开发方式
 
@@ -37,7 +36,7 @@ TermBridge-go 是 TermBridge 的 Go 重写版本，一个本地浏览器工作�
 just serve
 ```
 
-`just serve` 通过 Air 热加载启动正式入口 `termbridge serve`。统一后端默认监听 `localhost:9010`，同一个 HTTP server 挂载 local Web API 路由和 `/api/gateway/...` 路由，并同时启动 Agent connector。运行参数来自 `.termbridge.default.yaml` 和 `.termbridge.yaml`。
+`just serve` 通过 Air 热加载启动正式入口 `termbridge serve`。统一后端默认监听 `localhost:9010`，同一个 HTTP server 挂载 device-scoped Browser API 路由和 Agent tunnel 路由，并同时启动 Agent connector。运行参数来自 `.termbridge.default.yaml` 和 `.termbridge.yaml`。
 
 ### 前端开发服务
 
@@ -97,7 +96,6 @@ serve:
 
 agent:
   server_url: http://127.0.0.1:9010
-  device_name: local-dev
 ```
 
 其中：
@@ -105,7 +103,7 @@ agent:
 - `serve.host` / `serve.port` 控制统一后端监听地址。
 - `serve.open` / `serve.dev` 控制统一后端的本地开发行为。
 - `agent.server_url` 控制 Agent connector 连接哪个统一后端地址。
-- `agent.device_name` 控制设备显示名；为空时由本地 device identity 逻辑决定。
+- `agent.device_name` 控制设备显示名；为空时默认使用本机 hostname。
 
 ### 前端访问面
 
