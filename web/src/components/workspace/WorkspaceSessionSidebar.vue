@@ -2,18 +2,61 @@
   <aside class="flex h-full min-w-0 flex-col overflow-hidden bg-[#070b12]">
     <header class="flex h-11 shrink-0 items-center border-b border-slate-800/80 bg-[#0a0f18] px-2">
       <div class="flex w-full items-center gap-1.5">
-        <label class="relative min-w-0 flex-1">
-          <span class="sr-only">{{ t('sidebar.searchSessions') }}</span>
-          <Search
-            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-500"
-          />
-          <input
-            v-model="searchQuery"
-            type="search"
-            :placeholder="t('sidebar.searchPlaceholder')"
-            class="h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 py-1.5 pl-8 pr-2 text-sm text-slate-200 outline-none placeholder:text-slate-600"
-          />
-        </label>
+        <div class="grid min-w-0 flex-1 grid-cols-[4fr_6fr] gap-1.5">
+          <SelectRoot
+            :model-value="props.selectedDeviceId"
+            :disabled="deviceSelectDisabled"
+            @update:model-value="changeDevice"
+          >
+            <SelectTrigger
+              class="flex h-8 w-full min-w-0 items-center justify-between gap-1 rounded-md border border-slate-800 bg-slate-950/80 px-2 text-left text-sm text-slate-200 outline-none hover:border-slate-700 focus:border-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
+              :aria-label="t('gateway.devices')"
+              :title="selectedDeviceLabel"
+            >
+              <SelectValue
+                class="min-w-0 truncate"
+                :placeholder="deviceSelectPlaceholder"
+              />
+              <ChevronDown class="size-3.5 shrink-0 text-slate-500" aria-hidden="true" />
+            </SelectTrigger>
+            <SelectPortal>
+              <SelectContent
+                side="bottom"
+                align="start"
+                :side-offset="4"
+                class="z-50 max-h-64 min-w-40 overflow-hidden rounded-md border border-slate-800 bg-slate-950 p-1 text-sm text-slate-200 shadow-xl"
+              >
+                <SelectViewport>
+                  <SelectItem
+                    v-for="device in props.devices"
+                    :key="device.id"
+                    :value="device.id"
+                    :text-value="device.name"
+                    class="relative flex cursor-pointer select-none items-center rounded px-7 py-1.5 outline-none hover:bg-slate-800 focus:bg-slate-800 data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                  >
+                    <SelectItemIndicator class="absolute left-2 inline-flex items-center">
+                      <Check class="size-4 text-blue-500" />
+                    </SelectItemIndicator>
+                    <SelectItemText class="min-w-0 truncate">{{ device.name }}</SelectItemText>
+                  </SelectItem>
+                </SelectViewport>
+              </SelectContent>
+            </SelectPortal>
+          </SelectRoot>
+
+          <label class="relative min-w-0">
+            <span class="sr-only">{{ t('sidebar.searchSessions') }}</span>
+            <Search
+              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-500"
+            />
+            <input
+              v-model="searchQuery"
+              type="search"
+              :placeholder="t('sidebar.searchPlaceholder')"
+              class="h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 py-1.5 pl-8 pr-2 text-sm text-slate-200 outline-none placeholder:text-slate-600"
+            />
+          </label>
+        </div>
         <button
           v-if="props.allowMutations"
           type="button"
@@ -29,7 +72,13 @@
 
     <div class="min-h-0 flex-1 overflow-y-auto p-1.5">
       <div
-        v-if="workspaceTree.length === 0"
+        v-if="!props.selectedDeviceId"
+        class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500"
+      >
+        {{ deviceSelectPlaceholder }}
+      </div>
+      <div
+        v-else-if="workspaceTree.length === 0"
         class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500"
       >
         {{ t('sidebar.emptyWorkspaces') }}
@@ -189,7 +238,7 @@
     </div>
 
     <footer
-      class="flex h-8 shrink-0 items-center border-t border-slate-800/80 bg-[#0a0f18] px-2 text-sm text-slate-500"
+      class="flex h-8 shrink-0 items-center gap-2 border-t border-slate-800/80 bg-[#0a0f18] px-2 text-sm text-slate-500"
     >
       <DropdownMenuRoot>
         <DropdownMenuTrigger
@@ -248,6 +297,7 @@
   import { useI18n } from 'vue-i18n'
   import {
     Check,
+    ChevronDown,
     ChevronRight,
     CircleStop,
     Folder,
@@ -269,9 +319,19 @@
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
+    SelectContent,
+    SelectItem,
+    SelectItemIndicator,
+    SelectItemText,
+    SelectPortal,
+    SelectRoot,
+    SelectTrigger,
+    SelectValue,
+    SelectViewport,
   } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
   import { localeLabels, locales, setLocale, type AppLocale } from '../../i18n'
+  import type { DeviceSummary } from '../../features/gateway/api'
   import type {
     SessionSummary,
     WorkspaceSummary,
@@ -295,6 +355,8 @@
     workspaceTree: WorkspaceTreeSummary[]
     activeSessionId: string | null
     allowMutations?: boolean
+    devices: DeviceSummary[]
+    selectedDeviceId: string
   }>()
 
   const emit = defineEmits<{
@@ -307,6 +369,7 @@
     removeWorkspace: [workspace: WorkspaceSummary]
     unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
     reorderWorkspaces: [workspaceIds: string[]]
+    selectDevice: [deviceId: string]
   }>()
 
   const { t, locale } = useI18n()
@@ -316,9 +379,23 @@
   const draggableTreeItems = ref<WorkspaceTreeItem[]>([])
 
   const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
+  const selectedDevice = computed(
+    () => props.devices.find((device) => device.id === props.selectedDeviceId) ?? null,
+  )
+  const deviceSelectPlaceholder = computed(() =>
+    props.devices.length === 0 ? t('gateway.noDevices') : t('gateway.selectDevicePlaceholder'),
+  )
+  const selectedDeviceLabel = computed(() => selectedDevice.value?.name ?? deviceSelectPlaceholder.value)
+  const deviceSelectDisabled = computed(() => props.devices.length === 0)
   const localeOptions = computed(() =>
     locales.map((value) => ({ value, label: localeLabels[value] })),
   )
+
+  function changeDevice(value: unknown) {
+    if (typeof value === 'string' && value !== props.selectedDeviceId) {
+      emit('selectDevice', value)
+    }
+  }
 
   function changeLocale(value: unknown) {
     if (typeof value === 'string' && locales.includes(value as AppLocale)) {

@@ -6,16 +6,32 @@ import type {
   UpdateSessionRequest,
 } from '../../protocol/terminal'
 
-export async function listSessions(): Promise<SessionSummary[]> {
-  const response = await fetch('/api/sessions')
+export type ApiResult<T> = {
+  data: T
+  offline: boolean
+}
+
+function devicePath(deviceId: string, path: string): string {
+  return `/api/devices/${encodeURIComponent(deviceId)}${path}`
+}
+
+function offline(response: Response): boolean {
+  return response.headers.get('x-termbridge-offline') === 'true'
+}
+
+export async function listSessions(deviceId: string): Promise<ApiResult<SessionSummary[]>> {
+  const response = await fetch(devicePath(deviceId, '/sessions'))
   if (!response.ok) {
     throw new Error(await responseError('List sessions failed', response))
   }
-  return ((await response.json()) as SessionSummary[] | null) ?? []
+  return { data: ((await response.json()) as SessionSummary[] | null) ?? [], offline: offline(response) }
 }
 
-export async function createSession(request: CreateSessionRequest): Promise<CreateSessionResponse> {
-  const response = await fetch('/api/sessions', {
+export async function createSession(
+  deviceId: string,
+  request: CreateSessionRequest,
+): Promise<CreateSessionResponse> {
+  const response = await fetch(devicePath(deviceId, '/sessions'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -26,8 +42,8 @@ export async function createSession(request: CreateSessionRequest): Promise<Crea
   return (await response.json()) as CreateSessionResponse
 }
 
-export async function getSession(sessionId: string): Promise<SessionSummary> {
-  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`)
+export async function getSession(deviceId: string, sessionId: string): Promise<SessionSummary> {
+  const response = await fetch(devicePath(deviceId, `/sessions/${encodeURIComponent(sessionId)}`))
   if (!response.ok) {
     throw new Error(await responseError('Get session failed', response))
   }
@@ -35,10 +51,11 @@ export async function getSession(sessionId: string): Promise<SessionSummary> {
 }
 
 export async function updateSession(
+  deviceId: string,
   sessionId: string,
   request: UpdateSessionRequest,
 ): Promise<SessionSummary> {
-  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+  const response = await fetch(devicePath(deviceId, `/sessions/${encodeURIComponent(sessionId)}`), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -49,8 +66,8 @@ export async function updateSession(
   return (await response.json()) as SessionSummary
 }
 
-export async function deleteSession(sessionId: string): Promise<void> {
-  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+export async function deleteSession(deviceId: string, sessionId: string): Promise<void> {
+  const response = await fetch(devicePath(deviceId, `/sessions/${encodeURIComponent(sessionId)}`), {
     method: 'DELETE',
   })
   if (!response.ok) {
@@ -58,22 +75,28 @@ export async function deleteSession(sessionId: string): Promise<void> {
   }
 }
 
-export async function readHistory(sessionId: string): Promise<string> {
-  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/history`)
+export async function readHistory(deviceId: string, sessionId: string): Promise<ApiResult<string>> {
+  const response = await fetch(
+    devicePath(deviceId, `/sessions/${encodeURIComponent(sessionId)}/history`),
+  )
   if (!response.ok) {
     throw new Error(await responseError('Read history failed', response))
   }
-  return response.text()
+  return { data: await response.text(), offline: offline(response) }
 }
 
-export async function closeSession(sessionId: string): Promise<SessionSummary> {
-  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/close`, {
+export async function closeSession(deviceId: string, sessionId: string): Promise<SessionSummary> {
+  const response = await fetch(devicePath(deviceId, `/sessions/${encodeURIComponent(sessionId)}/close`), {
     method: 'POST',
   })
   if (!response.ok) {
     throw new Error(await responseError('Close session failed', response))
   }
   return (await response.json()) as SessionSummary
+}
+
+export function terminalWsUrl(deviceId: string, sessionId: string): string {
+  return devicePath(deviceId, `/sessions/${encodeURIComponent(sessionId)}/ws`)
 }
 
 export async function responseError(prefix: string, response: Response): Promise<string> {

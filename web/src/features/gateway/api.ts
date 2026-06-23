@@ -1,7 +1,6 @@
-import type { SessionSummary, WorkspaceTreeSummary } from '../../protocol/terminal'
 import { responseError } from '../sessions/api'
 
-export type GatewayDeviceSummary = {
+export type DeviceSummary = {
   id: string
   name: string
   online: boolean
@@ -9,67 +8,39 @@ export type GatewayDeviceSummary = {
   last_seen: string
 }
 
-export async function gatewayMe(): Promise<{ authenticated: boolean; username: string }> {
-  const response = await fetch('/api/gateway/me')
+export async function authMe(): Promise<{ authenticated: boolean; username: string }> {
+  const response = await fetch('/api/me')
   if (response.status === 401) {
     return { authenticated: false, username: '' }
   }
   if (!response.ok) {
-    throw new Error(await responseError('Gateway auth check failed', response))
+    throw new Error(await responseError('Auth check failed', response))
   }
   return (await response.json()) as { authenticated: boolean; username: string }
 }
 
-export async function gatewayLogin(username: string, password: string): Promise<void> {
-  const response = await fetch('/api/gateway/login', {
+export async function authLogin(username: string, password: string): Promise<void> {
+  const response = await fetch('/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   })
   if (!response.ok) {
-    throw new Error(await responseError('Gateway login failed', response))
+    throw new Error(await responseError('Login failed', response))
   }
 }
 
-export async function gatewayLogout(): Promise<void> {
-  const response = await fetch('/api/gateway/logout', { method: 'POST' })
+export async function authLogout(): Promise<void> {
+  const response = await fetch('/api/logout', { method: 'POST' })
   if (!response.ok) {
-    throw new Error(await responseError('Gateway logout failed', response))
+    throw new Error(await responseError('Logout failed', response))
   }
 }
 
-export async function listGatewayDevices(): Promise<GatewayDeviceSummary[]> {
-  const response = await fetch('/api/gateway/devices')
+export async function listDevices(): Promise<DeviceSummary[]> {
+  const response = await fetch('/api/devices')
   if (!response.ok) {
-    throw new Error(await responseError('List gateway devices failed', response))
+    throw new Error(await responseError('List devices failed', response))
   }
-  return ((await response.json()) as GatewayDeviceSummary[] | null) ?? []
-}
-
-export async function listGatewayWorkspaceTree(deviceId: string): Promise<WorkspaceTreeSummary[]> {
-  const response = await fetch(
-    `/api/gateway/devices/${encodeURIComponent(deviceId)}/workspaces/tree`,
-  )
-  if (!response.ok) {
-    throw new Error(await responseError('List gateway workspace tree failed', response))
-  }
-  return ((await response.json()) as WorkspaceTreeSummary[] | null) ?? []
-}
-
-export async function listGatewaySessions(deviceId: string): Promise<SessionSummary[]> {
-  const response = await fetch(`/api/gateway/devices/${encodeURIComponent(deviceId)}/sessions`)
-  if (!response.ok) {
-    throw new Error(await responseError('List gateway sessions failed', response))
-  }
-  return ((await response.json()) as SessionSummary[] | null) ?? []
-}
-
-export async function readGatewayHistory(deviceId: string, sessionId: string): Promise<string> {
-  const response = await fetch(
-    `/api/gateway/devices/${encodeURIComponent(deviceId)}/sessions/${encodeURIComponent(sessionId)}/history`,
-  )
-  if (!response.ok) {
-    throw new Error(await responseError('Read gateway history failed', response))
-  }
-  return response.text()
+  return ((await response.json()) as DeviceSummary[] | null) ?? []
 }

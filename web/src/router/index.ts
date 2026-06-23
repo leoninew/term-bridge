@@ -25,9 +25,7 @@ export const router = createRouter({
     },
     {
       path: '/gateway',
-      name: 'gateway',
-      component: () => import('../views/SessionsView.vue'),
-      props: { gatewayRoute: true },
+      redirect: { name: 'sessions' },
     },
     {
       path: '/:pathMatch(.*)*',
