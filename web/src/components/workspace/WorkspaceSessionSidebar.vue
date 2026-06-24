@@ -1,6 +1,10 @@
 <template>
-  <aside class="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--color-sidebar-bg)] text-[var(--color-text)]">
-    <header class="flex h-11 shrink-0 items-center border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2">
+  <aside
+    class="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--color-sidebar-bg)] text-[var(--color-text)]"
+  >
+    <header
+      class="flex h-11 shrink-0 items-center border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2"
+    >
       <div class="flex w-full items-center gap-1.5">
         <div class="grid min-w-0 flex-1 grid-cols-[4fr_6fr] gap-1.5">
           <SelectRoot
@@ -14,7 +18,10 @@
               :title="selectedDeviceLabel"
             >
               <SelectValue class="min-w-0 truncate" :placeholder="deviceSelectPlaceholder" />
-              <ChevronDown class="size-3.5 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
+              <ChevronDown
+                class="size-3.5 shrink-0 text-[var(--color-text-subtle)]"
+                aria-hidden="true"
+              />
             </SelectTrigger>
             <SelectPortal>
               <SelectContent
@@ -116,7 +123,11 @@
               class="size-4 shrink-0 text-[var(--color-text-subtle)]"
               aria-hidden="true"
             />
-            <Folder v-else class="size-4 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
+            <Folder
+              v-else
+              class="size-4 shrink-0 text-[var(--color-text-subtle)]"
+              aria-hidden="true"
+            />
             <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{
               workspace.workspace.name
             }}</span>
@@ -171,7 +182,10 @@
               @keydown.enter.prevent="selectSession(session.session)"
               @keydown.space.prevent="selectSession(session.session)"
             >
-              <SquareTerminal class="size-4 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
+              <SquareTerminal
+                class="size-4 shrink-0 text-[var(--color-text-subtle)]"
+                aria-hidden="true"
+              />
               <span class="min-w-0 flex-1 truncate text-sm">{{
                 session.session.name || session.session.command
               }}</span>

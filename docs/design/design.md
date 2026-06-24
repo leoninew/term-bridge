@@ -1,6 +1,6 @@
 # TermBridge-go 设计文档
 
-最后修改时间: 2026-06-22
+最后修改时间: 2026-06-24 22:57:53
 
 ## 背景
 
@@ -44,7 +44,7 @@ Workspace
 **技术原则：**
 
 1. **TermBridge 自主管理运行时**：不依赖 ttyd、tmux 等外部会话管理组件，所有运行时状态由 TermBridge 管理
-2. **Workspace 是唯一状态对象**：不存在 Workspace → tmux Session 的双层状态模型，统一为 Workspace → PTY → Process
+2. **TermBridge 自主管理 Workspace / Session 状态**：不存在 Workspace → tmux Session 的双层外部状态模型；当前统一为 Workspace → Session → PTY → Process，其中 Session 是 TermBridge 自主管理的运行记录和 attach 单元
 3. **Agent 主动连接 Gate**：支持 NAT 穿透、家庭宽带、企业网络
 
 ---
@@ -64,8 +64,8 @@ Workspace
 │                     │
 │ Auth                │
 │ Device Registry     │
-│ Workspace Registry  │
-│ Routing             │
+│ Workspace/Session   │
+│ Routing / Relay     │
 └─────────┬───────────┘
           │ WSS
           ▼
@@ -73,14 +73,14 @@ Workspace
 │ TermBridge Agent    │
 │                     │
 │ Workspace Manager   │
-│ PTY Manager         │
-│ Process Manager     │
+│ Session Manager     │
+│ PTY / Process       │
 │ History Manager     │
 └─────────┬───────────┘
           │
           ▼
 ┌─────────────────────┐
-│ Workspace           │
+│ Workspace / Session │
 │                     │
 │ Claude Code         │
 │ Codex               │
@@ -104,15 +104,21 @@ Windows ConPTY
 user command
 ```
 
-### 三级资源模型
+### 统一资源模型
 
 ```text
 User
     ↓
 Device (MacBook / Home-PC / VPS)
     ↓
-Workspace (Claude / Codex / Shell)
+Workspace (Project / Working directory)
+    ↓
+Session (Claude / Codex / Shell command run)
+    ↓
+Terminal
 ```
+
+Session 是 TermBridge runtime 管理的命令运行记录和 attach 单元，不是 tmux session；PTY / Process lifecycle 仍归本地 runtime 所有。
 
 ### 技术路线
 
@@ -150,6 +156,8 @@ Claude Code / Codex
 ```text
 Workspace
     ↓
+Session
+    ↓
 PTY
     ↓
 Process
@@ -163,11 +171,12 @@ Process
 {
   "id": "workspace-001",
   "name": "project-a",
-  "runtime": "claude",
-  "status": "running"
+  "path": "D:\\project",
+  "updated_at": "2026-06-24T00:00:00Z"
 }
 ```
 
+- **Session Metadata / History**：命令、cwd、lifecycle state、attachment state、exit code、history path。
 - **Workspace Recovery**：
 
 ```text
@@ -202,9 +211,10 @@ Workspace
 
 - **User**：用户
 - **Device**：MacBook、Home-PC、VPS
-- **Workspace**：Claude、Codex、Shell 三级资源模型
+- **Workspace**：项目目录 / 工作区
+- **Session**：Claude、Codex、Shell 等命令运行记录和 attach 单元
 - **Device Registry**：设备注册中心
-- **Workspace Registry**：Workspace 路由中心
+- **Workspace / Session Registry**：Workspace 与 Session 路由中心
 - **Reverse Tunnel**：Agent ──WSS──► Gate 长连接
 
 ### 核心收益
@@ -225,17 +235,19 @@ PTY
 
 #### 架构
 
-统一状态模型：
+统一运行时状态模型：
 
 ```text
 Workspace
+    ↓
+Session
     ↓
 PTY
     ↓
 Process
 ```
 
-不存在额外 Session 层。
+这里的 Session 是 TermBridge 自主管理的运行记录、history 和 attach 单元，不是 tmux session，也不拥有独立于 runtime 的进程生命周期。
 
 #### 云端扩展
 
@@ -280,6 +292,8 @@ ttyd + tmux 的封装工具
 5. **GUI 定位**: CLI 容器，不拥有 runtime
 6. **Web 策略**: Gateway 前技术验证，Gateway 后正式产品入口
 7. **命令执行入口**: 命令执行入口为 `termbridge [options] exec -- <command...>`
+8. **统一工作台入口**: 前端以 `/sessions` 作为统一 device/workspace/session workbench
+9. **Browser API 方向**: 当前产品路径收敛到 `/api/devices/:deviceId/...` device-scoped API
 
 ### 设计原则
 
@@ -291,6 +305,7 @@ ttyd + tmux 的封装工具
 6. **Ctrl+C 是停止当前命令，不是 detach**：必须区分 interrupt foreground process / close session / kill process tree
 7. **先 CLI Runtime，后本地产品面，再 Gateway**：不在 CLI runtime 稳定前提前建设复杂 Gateway
 8. **Serve 是远程能力统一入口**：Gateway service 和 Agent connector 对外不再作为两个模式暴露，统一通过 `termbridge serve` 启动
+9. **统一 Device workbench 是长期产品面**：本地 self-connected Gate 和云端 Gate 都通过同一套 device-scoped Browser API 暴露 workspace/session/terminal 能力
 
 ### 当前 serve / Gateway 边界
 
@@ -320,7 +335,7 @@ termbridge serve
 2. Agent connector 连接哪个 Gateway 由配置决定，不通过 CLI 参数或环境变量作为正式入口传递。
 3. Gateway service 不拥有 PTY / Process lifecycle，不直接运行用户命令。
 4. Agent connector 通过本地 runtime adapter 访问 workspace、session、history 和 terminal stream。
-5. 前端只有一套，通过不同路由或访问面区分 local / Gateway 能力。
+5. 前端只有一套，`/sessions` 是统一 session workbench；local self-connected Gate 和云端 Gate 的差异应由 device、connection state 和配置表达。
 
 ### 后续仍需决策
 

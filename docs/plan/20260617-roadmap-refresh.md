@@ -1,5 +1,5 @@
 # Roadmap 里程碑计划
-最后修改时间: 2026-06-22 13:54:03
+最后修改时间: 2026-06-24 22:57:53
 
 Review status: Accepted
 
@@ -215,12 +215,13 @@ M2.5: Web Terminal Technical Spike（已实现，风险进入 M5）
 M3: Session / Workspace Runtime Model（主体已完成）
 M4: Local Product Surface: CLI first, GUI optional container（收口中）
 M5: Runtime Hardening
-M6: Gateway Web Terminal MVP（工程链路已实现，M6.1 收口为 serve 统一入口）
+M6: Gateway Web Terminal MVP（工程链路已实现，M6.1 收口为 serve 统一入口，device-scoped API 与多项 mutation relay 已实现）
+M6.2: Unified Device Workbench Closeout（下一步：收口 /sessions 统一 device/workspace/session 工作台）
 M7: Multi-device Beta
 M8: Security / Packaging / Release
 ```
 
-建议优先完成 M1-M3；M2.5 必须在 M6 前完成；只有 M5 通过后再进入 Gateway 正式产品化。
+建议优先完成 M1-M3；M2.5 必须在 M6 前完成；M6 工程链路完成后，进入 M6.2 收口统一 device workbench，并在 M7 前补齐 M5 manual verification 与 auth/device credential 方案。
 
 ---
 
@@ -990,7 +991,7 @@ M6.1 决策：
 2. 开发入口收口为 `just serve`。
 3. Gateway/Agent 运行参数进入 `.termbridge.default.yaml` / `.termbridge.yaml` 配置和配置覆盖机制。
 4. 删除独立 `termbridge gateway` / `termbridge agent` 入口、`just gateway` / `just agent` 平级入口和 M6 专用 `m6-*` just target。
-5. 前端保持单体，通过不同路由或访问面区分 local/Gateway 能力。
+5. 前端保持单体，`/sessions` 作为统一 session workbench；local self-connected Gate 和云端 Gate 的差异由 device、connection state 和配置表达。
 
 ### Minimal model
 
@@ -1028,6 +1029,81 @@ RemoteAttach
 
 ```text
 Gateway relay 只负责连接和路由，不改变 TermBridge runtime ownership。
+```
+
+---
+
+## M6.2：Unified Device Workbench Closeout
+
+### Objective
+
+收口当前已经实现的统一 Gate / Device 模型，让 `/sessions` 成为稳定的 device / workspace / session / terminal 工作台。
+
+当前事实：
+
+```text
+/sessions
+  ↓
+/api/devices/:deviceId/...
+  ↓
+Gateway Browser API
+  ↓
+Agent tunnel
+  ↓
+TermBridge runtime
+```
+
+本地 self-connected Gate 和云端 Gate 的差异由 device、connection state 和配置表达。
+
+### Current status
+
+已具备：
+
+```text
+1. 前端统一入口为 /sessions。
+2. 前端 session/workspace API 已走 /api/devices/:deviceId/...。
+3. Gateway / Agent relay 已覆盖 workspace tree、history、terminal attach。
+4. Gateway / Agent relay 已覆盖 create/update/close/delete/rerun session 与 workspace reorder/delete 等 mutation。
+5. termbridge serve 已同时启动统一后端和 Agent connector。
+```
+
+### Deliverables
+
+```text
+README / design / roadmap 与当前实现同步
+默认 local device 选择规则
+多 device 切换 UX
+Device loading / empty / offline / reconnect 状态
+workspace/session store 按 device reset 或隔离
+terminal socket lifecycle 与 device offline 处理
+create / edit / close / delete / rerun / reorder / history / attach 的 device-scoped 验证矩阵
+```
+
+### Acceptance criteria
+
+```text
+1. README 和 design 明确 /sessions 是统一 workbench。
+2. 文档明确当前 Browser API 方向为 /api/devices/:deviceId/...。
+3. 文档明确 Gateway mutation relay 已覆盖当前 workspace/session 基础写操作。
+4. self-connected local device 在 /sessions 中可被默认发现和使用。
+5. device offline / reconnect / empty 状态在 UI 中可理解。
+6. device 切换不会污染 workspace/session/terminal 状态。
+7. 进入 M7 前有统一 workbench 的自动化或人工验证记录。
+```
+
+### Risks
+
+```text
+如果只补 API 而不收口 device UX，/sessions 会在多设备场景下出现状态污染或错误 attach。
+如果不补 M5 manual verification，M7 会放大 runtime/TUI/Windows 风险。
+```
+
+### Gate
+
+进入 M7 前必须确认：
+
+```text
+/sessions 已是统一 device workbench；device-scoped API、mutation、terminal attach 和基础 offline/reconnect UX 均有验证记录。
 ```
 
 ---

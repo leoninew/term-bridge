@@ -1,11 +1,15 @@
 <template>
-  <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--color-panel-bg)]">
+  <section
+    class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--color-panel-bg)]"
+  >
     <TabsRoot
       :model-value="activeSessionId ?? undefined"
       class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
       @update:model-value="emit('activateTab', String($event))"
     >
-      <div class="flex h-11 shrink-0 items-center border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2">
+      <div
+        class="flex h-11 shrink-0 items-center border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2"
+      >
         <TabsList as-child>
           <VueDraggable
             :model-value="openedTabs"
@@ -30,7 +34,10 @@
                 :value="tab.sessionId"
                 class="tab-drag-handle flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 outline-none"
               >
-                <SquareTerminal class="size-4 shrink-0 text-[var(--color-text-muted)]" aria-hidden="true" />
+                <SquareTerminal
+                  class="size-4 shrink-0 text-[var(--color-text-muted)]"
+                  aria-hidden="true"
+                />
                 <span class="truncate">{{ sessionTitle(tab.workspaceId, tab.sessionId) }}</span>
               </TabsTrigger>
               <button
@@ -82,7 +89,9 @@
         v-if="!createSessionFormOpen && openedTabs.length === 0"
         class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-[var(--color-text-muted)]"
       >
-        <h3 class="text-lg font-semibold text-[var(--color-text)]">{{ t('workbench.noTabTitle') }}</h3>
+        <h3 class="text-lg font-semibold text-[var(--color-text)]">
+          {{ t('workbench.noTabTitle') }}
+        </h3>
         <p>
           {{
             !selectedDeviceId
@@ -105,7 +114,7 @@
     >
       <template v-if="activeSession">
         <span>{{ t('workbench.status') }}</span>
-        <span class="text-[var(--color-text)]">{{ activeLifecycleLabel }}</span>
+        <span class="text-[var(--color-text)]">{{ activeSession.lifecycle_state }}</span>
         <span class="text-[var(--color-border-strong)]">·</span>
         <span>{{ t('workbench.command') }}</span>
         <span class="min-w-0 truncate text-[var(--color-text)]">{{ activeSession.command }}</span>
@@ -116,7 +125,6 @@
 </template>
 
 <script setup lang="ts">
-  import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { SquareTerminal, X } from '@lucide/vue'
   import { TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
@@ -126,7 +134,7 @@
   import type { ServerControlMessage, SessionSummary } from '../../protocol/terminal'
   import type { OpenSessionTab } from '../../store/workbench'
 
-  const props = defineProps<{
+  defineProps<{
     openedTabs: OpenSessionTab[]
     activeSessionId: string | null
     activeTab: OpenSessionTab | null
@@ -157,9 +165,4 @@
   }>()
 
   const { t } = useI18n()
-
-  const activeLifecycleLabel = computed(() => {
-    const state = props.activeSession?.lifecycle_state
-    return state ? state.charAt(0).toUpperCase() + state.slice(1) : ''
-  })
 </script>

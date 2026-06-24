@@ -40,7 +40,9 @@
       <SplitterResizeHandle
         class="group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[var(--color-app-bg)] outline-none"
       >
-        <span class="w-px bg-[var(--color-border)] transition group-hover:bg-[var(--color-border-strong)]" />
+        <span
+          class="w-px bg-[var(--color-border)] transition group-hover:bg-[var(--color-border-strong)]"
+        />
       </SplitterResizeHandle>
 
       <SplitterPanel id="terminal-workbench" :min-size="55">

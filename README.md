@@ -4,7 +4,7 @@ TermBridge-go 是 TermBridge 的 Go 重写版本，一个本地浏览器工作�
 
 ## 设计文档
 
-- [设计文档](docs/design.md) - 项目背景、愿景、架构设计、技术路线
+- [设计文档](docs/design/design.md) - 项目背景、愿景、架构设计、技术路线
 
 ## 开发要求
 
@@ -75,11 +75,12 @@ termbridge serve
 
 `serve` 启动后只有一个后端 HTTP server，并挂载：
 
-- `/api/...`：本地 workbench 所需的 workspace/session/history/terminal API。
-- `/api/gateway/...`：Browser API、terminal WebSocket、device registry、routing 和 relay。
-- Agent connector：按配置主动连接目标后端，并通过本地 runtime adapter 暴露 workspace/session/history/terminal attach 能力。
+- `/api/login`、`/api/logout`、`/api/me`：当前 single-user Web 登录接口。
+- `/api/devices` 与 `/api/devices/:deviceId/...`：统一 device-scoped Browser API，覆盖 workspace/session/history/terminal 能力。
+- `/api/gateway/agent/tunnel`：Agent connector 使用的内部 tunnel 入口。
+- Agent connector：按配置主动连接目标 Gate，并通过本地 runtime adapter 暴露 workspace/session/history/terminal attach 与 mutation 能力。
 
-Gateway 路由不拥有 PTY 或 process lifecycle；用户进程仍由本地 TermBridge runtime 管理。
+Gateway / Browser API 路由不拥有 PTY 或 process lifecycle；用户进程仍由本地 TermBridge runtime 管理。
 
 ### Gateway/Agent 配置
 
@@ -107,19 +108,17 @@ agent:
 
 ### 前端访问面
 
-前端只有一套。当前同一前端承载 local 和 Gateway 访问面：
+前端只有一套，`/sessions` 是统一 session workbench。
 
-- `/`：本地 workbench 访问面。
-- `/gateway`：Gateway 访问面。
+当前统一 workbench 使用 device-scoped API：
 
-M6 Gateway MVP 当前支持：
+- `/api/devices`：查看在线 device。
+- `/api/devices/:deviceId/workspaces/tree`：查看 workspace / session tree。
+- `/api/devices/:deviceId/workspaces/:workspaceId/sessions`：创建和读取 workspace 下的 session。
+- `/api/devices/:deviceId/workspaces/:workspaceId/sessions/:sessionId`：读取、更新或删除 session。
+- `/api/devices/:deviceId/workspaces/:workspaceId/sessions/:sessionId/close`：关闭 session。
+- `/api/devices/:deviceId/workspaces/:workspaceId/sessions/:sessionId/rerun`：重新运行 session。
+- `/api/devices/:deviceId/workspaces/:workspaceId/sessions/:sessionId/history`：读取 session history。
+- `/api/devices/:deviceId/workspaces/:workspaceId/sessions/:sessionId/ws`：attach terminal。
 
-- 查看 device / workspace / session。
-- 读取 session history。
-- attach 已存在 terminal session。
-
-M6 Gateway MVP 当前不支持：
-
-- 通过 Gateway 创建 session。
-- 通过 Gateway 修改 workspace/session。
-- 正式用户系统、device pairing、token rotation 或生产部署能力。
+当前仍不支持正式用户系统、device pairing、token rotation 或生产部署能力。

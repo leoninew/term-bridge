@@ -28,13 +28,5 @@ export const router = createRouter({
       name: 'help',
       component: () => import('../views/HelpView.vue'),
     },
-    {
-      path: '/gateway',
-      redirect: { name: 'sessions' },
-    },
-    {
-      path: '/:pathMatch(.*)*',
-      redirect: { name: 'sessions' },
-    },
   ],
 })

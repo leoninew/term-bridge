@@ -6,7 +6,9 @@
       class="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl"
       @submit.prevent="emit('submit')"
     >
-      <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">{{ t('gateway.loginTitle') }}</h1>
+      <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
+        {{ t('gateway.loginTitle') }}
+      </h1>
       <p class="mt-1 text-[var(--color-text-muted)]">{{ t('gateway.loginDescription') }}</p>
       <label class="mt-4 block">
         <span class="text-[var(--color-text)]">{{ t('gateway.username') }}</span>
