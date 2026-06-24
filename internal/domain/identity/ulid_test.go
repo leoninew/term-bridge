@@ -7,7 +7,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func TestUlidGeneratorReturnsParseableID(t *testing.T) {
+func TestUlidGeneratorReturnsParseableId(t *testing.T) {
 	id, err := NewUlidGenerator().NewId()
 	if err != nil {
 		t.Fatalf("NewId() error = %v", err)

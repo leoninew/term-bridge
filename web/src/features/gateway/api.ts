@@ -1,4 +1,4 @@
-import { responseError } from '../sessions/api'
+import { apiClient } from '../api/client'
 
 export type DeviceSummary = {
   id: string
@@ -8,39 +8,48 @@ export type DeviceSummary = {
   last_seen: string
 }
 
-export async function authMe(): Promise<{ authenticated: boolean; username: string }> {
-  const response = await fetch('/api/me')
-  if (response.status === 401) {
-    return { authenticated: false, username: '' }
+export type AuthMeResp = {
+  authenticated: boolean
+  username: string
+}
+
+export type AuthLoginReq = {
+  username: string
+  password: string
+}
+
+export async function authMe(): Promise<AuthMeResp> {
+  try {
+    const response = await apiClient.get<AuthMeResp>('/api/me')
+    return response.data
+  } catch (err) {
+    if (isUnauthorizedApiError(err)) {
+      return { authenticated: false, username: '' }
+    }
+    throw err
   }
-  if (!response.ok) {
-    throw new Error(await responseError('Auth check failed', response))
-  }
-  return (await response.json()) as { authenticated: boolean; username: string }
 }
 
 export async function authLogin(username: string, password: string): Promise<void> {
-  const response = await fetch('/api/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
-  })
-  if (!response.ok) {
-    throw new Error(await responseError('Login failed', response))
-  }
+  const request: AuthLoginReq = { username, password }
+  await apiClient.post('/api/login', request)
 }
 
 export async function authLogout(): Promise<void> {
-  const response = await fetch('/api/logout', { method: 'POST' })
-  if (!response.ok) {
-    throw new Error(await responseError('Logout failed', response))
-  }
+  await apiClient.post('/api/logout')
 }
 
 export async function listDevices(): Promise<DeviceSummary[]> {
-  const response = await fetch('/api/devices')
-  if (!response.ok) {
-    throw new Error(await responseError('List devices failed', response))
-  }
-  return ((await response.json()) as DeviceSummary[] | null) ?? []
+  const response = await apiClient.get<DeviceSummary[] | null>('/api/devices')
+  return response.data ?? []
+}
+
+function isUnauthorizedApiError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    'status' in err &&
+    'code' in err &&
+    err.status === 401 &&
+    err.code === 'unauthorized'
+  )
 }

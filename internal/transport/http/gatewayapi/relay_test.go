@@ -23,10 +23,13 @@ func TestBrowserAPIRelay(t *testing.T) {
 	agentDone := make(chan struct{})
 	go func() {
 		defer close(agentDone)
-		runFakeAgent(t, ctx, server.URL, func(frame tunnel.Frame) tunnel.ResponsePayload {
-			request, err := tunnel.DecodePayload[tunnel.RequestPayload](frame)
+		runFakeAgent(t, ctx, server.URL, func(frame tunnel.Frame) tunnel.ResponseResp {
+			request, err := tunnel.DecodePayload[tunnel.RequestReq](frame)
 			if err != nil {
-				return tunnel.ResponsePayload{OK: false, Error: err.Error()}
+				return tunnel.ResponseResp{OK: false, Error: err.Error()}
+			}
+			if request.RequestId != "req_test_relay" {
+				return tunnel.ResponseResp{OK: false, Error: "missing request id"}
 			}
 			switch request.Method {
 			case "workspace_tree":
@@ -36,7 +39,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 			case "history":
 				return rawResponse(`"` + strings.Repeat("h", 64*1024) + `"`)
 			default:
-				return tunnel.ResponsePayload{OK: false, Error: "unknown method"}
+				return tunnel.ResponseResp{OK: false, Error: "unknown method"}
 			}
 		})
 	}()
@@ -51,6 +54,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 		{"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
 	} {
 		request := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		request.Header.Set(requestIdHeader, "req_test_relay")
 		request.AddCookie(cookie)
 		response := httptest.NewRecorder()
 		gateway.ServeHTTP(response, request)
@@ -65,8 +69,8 @@ func TestBrowserAPIRelay(t *testing.T) {
 	<-agentDone
 }
 
-func rawResponse(raw string) tunnel.ResponsePayload {
-	return tunnel.ResponsePayload{OK: true, Result: []byte(raw)}
+func rawResponse(raw string) tunnel.ResponseResp {
+	return tunnel.ResponseResp{OK: true, Result: []byte(raw)}
 }
 
 func loginCookie(t *testing.T, gateway *Handler) *http.Cookie {
@@ -95,7 +99,7 @@ func waitForRoute(t *testing.T, gateway *Handler, deviceId string) {
 	t.Fatalf("route %s not registered", deviceId)
 }
 
-func runFakeAgent(t *testing.T, ctx context.Context, serverUrl string, respond func(tunnel.Frame) tunnel.ResponsePayload) {
+func runFakeAgent(t *testing.T, ctx context.Context, serverUrl string, respond func(tunnel.Frame) tunnel.ResponseResp) {
 	t.Helper()
 	requestHeader := http.Header{}
 	req, _ := http.NewRequest(http.MethodGet, serverUrl, nil)

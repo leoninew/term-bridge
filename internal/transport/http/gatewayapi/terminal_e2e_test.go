@@ -144,19 +144,19 @@ func (r *fakeRuntimeAccess) ListSessionsByWorkspaceId(context.Context, string) (
 	return []terminalapp.WorkspaceSessionSummary{{Id: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}}, nil
 }
 
-func (r *fakeRuntimeAccess) CreateSession(context.Context, terminalapp.CreateSessionRequest) (terminalapp.CreateSessionResponse, error) {
-	return terminalapp.CreateSessionResponse{SessionId: "sess-1", WorkspaceId: "ws-1", State: string(session.StateRunning)}, nil
+func (r *fakeRuntimeAccess) CreateSession(context.Context, terminalapp.CreateSessionReq) (terminalapp.CreateSessionResp, error) {
+	return terminalapp.CreateSessionResp{SessionId: "sess-1", WorkspaceId: "ws-1", State: string(session.StateRunning)}, nil
 }
 
-func (r *fakeRuntimeAccess) RerunSession(context.Context, string, string, terminalapp.RerunSessionRequest) (terminalapp.CreateSessionResponse, error) {
-	return terminalapp.CreateSessionResponse{SessionId: "sess-1", WorkspaceId: "ws-1", State: string(session.StateRunning)}, nil
+func (r *fakeRuntimeAccess) RerunSession(context.Context, string, string, terminalapp.RerunSessionReq) (terminalapp.CreateSessionResp, error) {
+	return terminalapp.CreateSessionResp{SessionId: "sess-1", WorkspaceId: "ws-1", State: string(session.StateRunning)}, nil
 }
 
 func (r *fakeRuntimeAccess) GetSession(context.Context, string, string) (terminalapp.SessionSummary, error) {
 	return terminalapp.SessionSummary{Id: "sess-1", WorkspaceId: "ws-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}, nil
 }
 
-func (r *fakeRuntimeAccess) UpdateSession(context.Context, string, string, terminalapp.UpdateSessionRequest) (terminalapp.SessionSummary, error) {
+func (r *fakeRuntimeAccess) UpdateSession(context.Context, string, string, terminalapp.UpdateSessionReq) (terminalapp.SessionSummary, error) {
 	return r.GetSession(context.Background(), "ws-1", "sess-1")
 }
 

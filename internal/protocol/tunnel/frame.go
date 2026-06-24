@@ -51,22 +51,24 @@ type ErrorPayload struct {
 	Message string `json:"message"`
 }
 
-type RequestPayload struct {
-	Method string          `json:"method"`
-	Params json.RawMessage `json:"params,omitempty"`
+type RequestReq struct {
+	Method    string          `json:"method"`
+	Params    json.RawMessage `json:"params,omitempty"`
+	RequestId string          `json:"request_id,omitempty"`
 }
 
-type ResponsePayload struct {
+type ResponseResp struct {
 	OK     bool            `json:"ok"`
 	Result json.RawMessage `json:"result,omitempty"`
 	Error  string          `json:"error,omitempty"`
 }
 
-type TerminalAttachPayload struct {
+type TerminalAttachReq struct {
 	WorkspaceId string `json:"workspace_id"`
 	SessionId   string `json:"session_id"`
 	Cols        int    `json:"cols,omitempty"`
 	Rows        int    `json:"rows,omitempty"`
+	RequestId   string `json:"request_id,omitempty"`
 }
 
 type TerminalDataPayload struct {

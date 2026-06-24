@@ -31,10 +31,11 @@ export type ServerControlMessage =
   | { type: 'error'; code: string; message: string; error?: string }
   | { type: 'pong'; nonce: string }
 
-export type ApiErrorResponse = {
+export type ApiErrorResp = {
   code: string
-  message: string
   error: string
+  requestId: string
+  details?: unknown
 }
 
 export type WorkspaceSummary = {
@@ -65,7 +66,7 @@ export type WorkspaceTreeSummary = WorkspaceSummary & {
   children: WorkspaceTreeSession[]
 }
 
-export type CreateSessionRequest = {
+export type CreateSessionReq = {
   workspace_id?: string
   name: string
   cwd: string
@@ -74,16 +75,16 @@ export type CreateSessionRequest = {
   rows: number
 }
 
-export type UpdateSessionRequest = {
+export type UpdateSessionReq = {
   name: string
 }
 
-export type RerunSessionRequest = {
+export type RerunSessionReq = {
   cols: number
   rows: number
 }
 
-export type CreateSessionResponse = {
+export type CreateSessionResp = {
   session_id: string
   workspace_id: string
   state: LifecycleState

@@ -5,7 +5,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -99,6 +98,10 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, input
 		}
 		switch frame.Type {
 		case tunnel.FrameTerminalAttach:
+			attach, err := tunnel.DecodePayload[tunnel.TerminalAttachReq](frame)
+			if err != nil || attach.RequestId == "" {
+				return
+			}
 			output, _ := tunnel.NewFrame(frame.StreamId, tunnel.FrameTerminalOutput, tunnel.TerminalDataPayload{Data: []byte{'h', 'e', 'l', 'l', 'o', 0xff, 0xfe, 0x1b, '[', '2', 'J'}})
 			outputData, _ := tunnel.Encode(output)
 			_ = conn.Write(ctx, websocket.MessageText, outputData)
@@ -120,7 +123,8 @@ func TestRouteUnavailable(t *testing.T) {
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, request)
-	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "device offline") {
-		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	body := assertAPIError(t, response, http.StatusServiceUnavailable, errorCodeDeviceOffline)
+	if body.Error != errorMessageDeviceOffline {
+		t.Fatalf("error = %q, want %q", body.Error, errorMessageDeviceOffline)
 	}
 }

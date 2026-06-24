@@ -29,7 +29,7 @@ func TestCreateSessionExpandsHomeCwd(t *testing.T) {
 	manager := &fakeManager{session: fake}
 	registry := NewRegistry(Config{Cwd: home, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
 
-	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Cwd: "~/Downloads", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	_, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Cwd: "~/Downloads", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -51,7 +51,7 @@ func TestCreateSessionAcceptsHomeCwd(t *testing.T) {
 	manager := &fakeManager{session: fake}
 	registry := NewRegistry(Config{Cwd: home, Store: state.NewStore(root), LogDir: filepath.Join(home, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
 
-	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Home shell", Cwd: "~", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	_, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Home shell", Cwd: "~", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -71,7 +71,7 @@ func TestCreateSessionPersistsRuntimeRecords(t *testing.T) {
 	manager := &fakeManager{session: fake}
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
 
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -107,7 +107,7 @@ func TestRuntimeInitialSizeMatchesCreatedPTYSize(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -136,7 +136,7 @@ func TestAttachDetachAndInput(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -161,7 +161,7 @@ func TestHistoryReturnsWrittenOutput(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -194,7 +194,7 @@ func TestSlowClientDetachDoesNotStopRuntimeOrHistory(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 4096, MaxLineBytes: 4096}, Manager: &fakeManager{session: fake}, ClientQueueSize: 4, ClientQueueBytes: 4096})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Large output", Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Large output", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -227,7 +227,7 @@ func TestRuntimeSummaryOverridesStaleFailedState(t *testing.T) {
 	fake := newFakeSession()
 	store := state.NewStore(root)
 	registry := NewRegistry(Config{Cwd: cwd, Store: store, LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -254,7 +254,7 @@ func TestCreateSessionRequiresName(t *testing.T) {
 	cwd := t.TempDir()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: newFakeSession()}})
 
-	_, err := registry.CreateSession(context.Background(), CreateSessionRequest{Command: []string{"go", "version"}})
+	_, err := registry.CreateSession(context.Background(), CreateSessionReq{Command: []string{"go", "version"}})
 	if err == nil {
 		t.Fatal("CreateSession() error = nil, want error")
 	}
@@ -265,12 +265,12 @@ func TestUpdateSessionChangesName(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Old name", Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Old name", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 
-	summary, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, UpdateSessionRequest{Name: "New name"})
+	summary, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, UpdateSessionReq{Name: "New name"})
 	if err != nil {
 		t.Fatalf("UpdateSession() error = %v", err)
 	}
@@ -289,7 +289,7 @@ func TestUpdateSessionChangesName(t *testing.T) {
 }
 
 func TestUpdateSessionRejectsUnsupportedFields(t *testing.T) {
-	var request UpdateSessionRequest
+	var request UpdateSessionReq
 	if err := request.UnmarshalJSON([]byte(`{"name":"ok","cwd":"/tmp"}`)); err == nil {
 		t.Fatal("UnmarshalJSON() error = nil, want unsupported field error")
 	}
@@ -300,7 +300,7 @@ func TestDeleteSessionRejectsRunningAndAllowsStopped(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -323,7 +323,7 @@ func TestWorkspaceTreeAndOrder(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -350,7 +350,7 @@ func TestDeleteWorkspaceProtectsRunningSessions(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -373,7 +373,7 @@ func TestCloseSessionReturnsStoppedSummary(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -398,7 +398,7 @@ func TestRerunSessionArchivesHistoryAndReusesSessionId(t *testing.T) {
 	second := newFakeSession()
 	manager := &fakeManager{sessions: []*fakeSession{first, second}}
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -408,7 +408,7 @@ func TestRerunSessionArchivesHistoryAndReusesSessionId(t *testing.T) {
 	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 	waitRuntimeRemoved(t, registry, response.SessionId)
 
-	rerun, err := registry.RerunSession(context.Background(), response.WorkspaceId, response.SessionId, RerunSessionRequest{Cols: 100, Rows: 30})
+	rerun, err := registry.RerunSession(context.Background(), response.WorkspaceId, response.SessionId, RerunSessionReq{Cols: 100, Rows: 30})
 	if err != nil {
 		t.Fatalf("RerunSession() error = %v", err)
 	}
@@ -458,11 +458,11 @@ func TestRerunSessionRejectsRunningSession(t *testing.T) {
 	cwd := t.TempDir()
 	fake := newFakeSession()
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
-	if _, err := registry.RerunSession(context.Background(), response.WorkspaceId, response.SessionId, RerunSessionRequest{}); err == nil {
+	if _, err := registry.RerunSession(context.Background(), response.WorkspaceId, response.SessionId, RerunSessionReq{}); err == nil {
 		t.Fatal("RerunSession() error = nil, want running session rejection")
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
@@ -475,7 +475,7 @@ func TestRerunSessionFailureMarksFailed(t *testing.T) {
 	first := newFakeSession()
 	manager := &fakeManager{sessions: []*fakeSession{first}}
 	registry := NewRegistry(Config{Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: manager})
-	response, err := registry.CreateSession(context.Background(), CreateSessionRequest{Name: "Go version", Command: []string{"go", "version"}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
@@ -486,7 +486,7 @@ func TestRerunSessionFailureMarksFailed(t *testing.T) {
 		t.Fatalf("RemoveAll(cwd) error = %v", err)
 	}
 
-	if _, err := registry.RerunSession(context.Background(), response.WorkspaceId, response.SessionId, RerunSessionRequest{}); err == nil {
+	if _, err := registry.RerunSession(context.Background(), response.WorkspaceId, response.SessionId, RerunSessionReq{}); err == nil {
 		t.Fatal("RerunSession() error = nil, want invalid cwd")
 	}
 	stateRecord, err := state.NewStore(root).LoadState(response.WorkspaceId, response.SessionId)

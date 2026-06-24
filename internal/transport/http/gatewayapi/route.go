@@ -34,13 +34,13 @@ func newAgentRoute(deviceId string, conn *websocket.Conn) *agentRoute {
 	return &agentRoute{deviceId: deviceId, conn: conn, pending: map[tunnel.StreamId]chan tunnel.Frame{}, terms: map[tunnel.StreamId]*terminalRelay{}}
 }
 
-func (r *agentRoute) request(ctx context.Context, method string, params any) (json.RawMessage, error) {
+func (r *agentRoute) request(ctx context.Context, method string, params any, requestId string) (json.RawMessage, error) {
 	streamId := tunnel.StreamId(fmt.Sprintf("req-%d", time.Now().UnixNano()))
 	paramsData, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
-	frame, err := tunnel.NewFrame(streamId, tunnel.FrameRequest, tunnel.RequestPayload{Method: method, Params: paramsData})
+	frame, err := tunnel.NewFrame(streamId, tunnel.FrameRequest, tunnel.RequestReq{Method: method, Params: paramsData, RequestId: requestId})
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (r *agentRoute) request(ctx context.Context, method string, params any) (js
 	case <-waitCtx.Done():
 		return nil, waitCtx.Err()
 	case responseFrame := <-ch:
-		response, err := tunnel.DecodePayload[tunnel.ResponsePayload](responseFrame)
+		response, err := tunnel.DecodePayload[tunnel.ResponseResp](responseFrame)
 		if err != nil {
 			return nil, err
 		}

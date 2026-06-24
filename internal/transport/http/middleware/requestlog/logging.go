@@ -70,7 +70,7 @@ func requestLogAttrs(r *http.Request, requestId string) []any {
 	return []any{
 		"method", r.Method,
 		"path", r.URL.Path,
-		"uri", r.URL.RequestURI(),
+		"query", r.URL.RawQuery,
 		"request_id", requestId,
 		"remote_addr", r.RemoteAddr,
 		"user_agent", r.UserAgent(),

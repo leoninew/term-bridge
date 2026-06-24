@@ -67,7 +67,7 @@ type Registry struct {
 	launching map[string]bool
 }
 
-type CreateSessionRequest struct {
+type CreateSessionReq struct {
 	WorkspaceId string   `json:"workspace_id,omitempty"`
 	Name        string   `json:"name"`
 	Cwd         string   `json:"cwd"`
@@ -76,16 +76,16 @@ type CreateSessionRequest struct {
 	Rows        int      `json:"rows"`
 }
 
-type RerunSessionRequest struct {
+type RerunSessionReq struct {
 	Cols int `json:"cols"`
 	Rows int `json:"rows"`
 }
 
-type UpdateSessionRequest struct {
+type UpdateSessionReq struct {
 	Name string `json:"name"`
 }
 
-func (r *UpdateSessionRequest) UnmarshalJSON(data []byte) error {
+func (r *UpdateSessionReq) UnmarshalJSON(data []byte) error {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -103,7 +103,7 @@ func (r *UpdateSessionRequest) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type UpdateWorkspaceOrderRequest struct {
+type UpdateWorkspaceOrderReq struct {
 	WorkspaceIds []string `json:"workspace_ids"`
 }
 
@@ -116,7 +116,7 @@ type WorkspaceTreeNode struct {
 	Children  []WorkspaceSessionSummary `json:"children"`
 }
 
-type CreateSessionResponse struct {
+type CreateSessionResp struct {
 	SessionId   string `json:"session_id"`
 	WorkspaceId string `json:"workspace_id"`
 	State       string `json:"state"`
@@ -221,13 +221,13 @@ func (r *Registry) workspaceForCreateSession(workspaceId string, cwd string) (wo
 	return ws, nil
 }
 
-func (r *Registry) CreateSession(ctx context.Context, request CreateSessionRequest) (CreateSessionResponse, error) {
+func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReq) (CreateSessionResp, error) {
 	name := strings.TrimSpace(request.Name)
 	if name == "" {
-		return CreateSessionResponse{}, apperrors.Usage("missing session name")
+		return CreateSessionResp{}, apperrors.Usage("missing session name")
 	}
 	if len(request.Command) == 0 {
-		return CreateSessionResponse{}, apperrors.Usage("missing session command")
+		return CreateSessionResp{}, apperrors.Usage("missing session command")
 	}
 	cwd := request.Cwd
 	if strings.TrimSpace(cwd) == "" {
@@ -235,16 +235,16 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 	}
 	absCwd, err := resolveSessionCwd(cwd)
 	if err != nil {
-		return CreateSessionResponse{}, err
+		return CreateSessionResp{}, err
 	}
 	if info, err := os.Stat(absCwd); err != nil {
-		return CreateSessionResponse{}, apperrors.Config("invalid session cwd", err)
+		return CreateSessionResp{}, apperrors.Config("invalid session cwd", err)
 	} else if !info.IsDir() {
-		return CreateSessionResponse{}, apperrors.Config("invalid session cwd", fmt.Errorf("not a directory"))
+		return CreateSessionResp{}, apperrors.Config("invalid session cwd", fmt.Errorf("not a directory"))
 	}
 	size := process.TerminalSize{Cols: request.Cols, Rows: request.Rows}.OrDefault()
 	if err := terminalproto.ValidateSize(size.Cols, size.Rows); err != nil {
-		return CreateSessionResponse{}, apperrors.Usage(err.Error())
+		return CreateSessionResp{}, apperrors.Usage(err.Error())
 	}
 	if r.logger != nil {
 		r.logger.Info("terminal session create request", "name", name, "cwd", absCwd, "command", strings.Join(request.Command, " "), "cols", size.Cols, "rows", size.Rows)
@@ -252,7 +252,7 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 
 	ws, err := r.workspaceForCreateSession(request.WorkspaceId, absCwd)
 	if err != nil {
-		return CreateSessionResponse{}, err
+		return CreateSessionResp{}, err
 	}
 
 	env := filterEnv(os.Environ(), r.envDenylist)
@@ -280,39 +280,39 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReque
 		},
 	})
 	if err != nil {
-		return CreateSessionResponse{}, apperrors.Runtime("create session", err)
+		return CreateSessionResp{}, apperrors.Runtime("create session", err)
 	}
 
 	if err := r.startSessionRuntime(ctx, sess, request.Command, size); err != nil {
 		r.saveSessionFailed(sess, startFailureReason(err))
-		return CreateSessionResponse{}, err
+		return CreateSessionResp{}, err
 	}
-	return CreateSessionResponse{SessionId: sess.Id, WorkspaceId: sess.WorkspaceId, State: string(session.StateRunning)}, nil
+	return CreateSessionResp{SessionId: sess.Id, WorkspaceId: sess.WorkspaceId, State: string(session.StateRunning)}, nil
 }
 
-func (r *Registry) RerunSession(ctx context.Context, workspaceId string, sessionId string, request RerunSessionRequest) (CreateSessionResponse, error) {
+func (r *Registry) RerunSession(ctx context.Context, workspaceId string, sessionId string, request RerunSessionReq) (CreateSessionResp, error) {
 	view, err := r.sessionView(workspaceId, sessionId)
 	if err != nil {
-		return CreateSessionResponse{}, err
+		return CreateSessionResp{}, err
 	}
 	if !session.Terminal(view.State.State) {
-		return CreateSessionResponse{}, apperrors.Usage("cannot rerun running session")
+		return CreateSessionResp{}, apperrors.Usage("cannot rerun running session")
 	}
 	command := commandFromSession(view.Session)
 	if len(command) == 0 {
 		r.saveSessionFailed(view.Session, "missing_rerun_command")
-		return CreateSessionResponse{}, apperrors.Usage("missing session command")
+		return CreateSessionResp{}, apperrors.Usage("missing session command")
 	}
 	if err := validateSessionCwd(view.Session.LaunchCwd); err != nil {
 		r.saveSessionFailed(view.Session, "invalid_rerun_cwd")
-		return CreateSessionResponse{}, err
+		return CreateSessionResp{}, err
 	}
 	size := process.TerminalSize{Cols: request.Cols, Rows: request.Rows}.OrDefault()
 	if err := terminalproto.ValidateSize(size.Cols, size.Rows); err != nil {
-		return CreateSessionResponse{}, apperrors.Usage(err.Error())
+		return CreateSessionResp{}, apperrors.Usage(err.Error())
 	}
 	if err := r.claimSessionStart(sessionId); err != nil {
-		return CreateSessionResponse{}, err
+		return CreateSessionResp{}, err
 	}
 	defer r.releaseSessionStart(sessionId)
 
@@ -320,13 +320,13 @@ func (r *Registry) RerunSession(ctx context.Context, workspaceId string, session
 	_, err = r.archiveCurrentHistory(workspaceId, sessionId, archiveId)
 	if err != nil {
 		r.saveSessionFailed(view.Session, "archive_history_failed")
-		return CreateSessionResponse{}, apperrors.Runtime("archive history", err)
+		return CreateSessionResp{}, apperrors.Runtime("archive history", err)
 	}
 	if err := r.startClaimedSessionRuntime(ctx, view.Session, command, size); err != nil {
 		r.saveSessionFailed(view.Session, startFailureReason(err))
-		return CreateSessionResponse{}, err
+		return CreateSessionResp{}, err
 	}
-	return CreateSessionResponse{SessionId: view.Session.Id, WorkspaceId: view.Session.WorkspaceId, State: string(session.StateRunning)}, nil
+	return CreateSessionResp{SessionId: view.Session.Id, WorkspaceId: view.Session.WorkspaceId, State: string(session.StateRunning)}, nil
 }
 
 func (r *Registry) startSessionRuntime(ctx context.Context, sess session.Session, command []string, size process.TerminalSize) error {
@@ -584,7 +584,7 @@ func (r *Registry) ListSessionsByWorkspaceId(workspaceId string) ([]WorkspaceSes
 	return r.workspaceSessionSummariesFromViews(views), nil
 }
 
-func (r *Registry) UpdateSession(workspaceId string, sessionId string, request UpdateSessionRequest) (SessionSummary, error) {
+func (r *Registry) UpdateSession(workspaceId string, sessionId string, request UpdateSessionReq) (SessionSummary, error) {
 	name := strings.TrimSpace(request.Name)
 	if name == "" {
 		return SessionSummary{}, apperrors.Usage("missing session name")

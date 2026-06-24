@@ -77,7 +77,9 @@ func TestMiddlewareRejectsUnauthenticated(t *testing.T) {
 	manager := testManager()
 	handler := manager.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}))
+	}), func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/devices", nil))
 	if response.Code != http.StatusUnauthorized {

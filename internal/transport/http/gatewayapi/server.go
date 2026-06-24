@@ -109,11 +109,13 @@ func (h *Handler) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/health", h.handleHealth)
 	mux.HandleFunc("/api/login", h.handleLogin)
-	mux.HandleFunc("/api/logout", h.auth.Middleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
-	mux.HandleFunc("/api/me", h.auth.Middleware(http.HandlerFunc(h.handleMe)).ServeHTTP)
-	mux.HandleFunc("/api/devices", h.auth.Middleware(http.HandlerFunc(h.handleDevices)).ServeHTTP)
-	mux.HandleFunc("/api/devices/", h.auth.Middleware(http.HandlerFunc(h.handleDevice)).ServeHTTP)
+	mux.HandleFunc("/api/logout", h.auth.Middleware(http.HandlerFunc(h.handleLogout), h.writeUnauthorized).ServeHTTP)
+	mux.HandleFunc("/api/me", h.auth.Middleware(http.HandlerFunc(h.handleMe), h.writeUnauthorized).ServeHTTP)
+	mux.HandleFunc("/api/devices", h.auth.Middleware(http.HandlerFunc(h.handleDevices), h.writeUnauthorized).ServeHTTP)
+	mux.HandleFunc("/api/devices/", h.auth.Middleware(http.HandlerFunc(h.handleDevice), h.writeUnauthorized).ServeHTTP)
 	mux.HandleFunc("/api/gateway/agent/tunnel", h.handleAgentTunnel)
+	mux.HandleFunc("/api", h.writeNotFound)
+	mux.HandleFunc("/api/", h.writeNotFound)
 	return mux
 }
 
@@ -123,7 +125,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		methodNotAllowed(w, http.MethodGet)
+		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -131,18 +133,18 @@ func (s *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (s *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		methodNotAllowed(w, http.MethodPost)
+		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
 	var request struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if !decodeJSONRequest(w, r, &request) {
+	if !s.decodeJSONRequest(w, r, &request) {
 		return
 	}
 	if !s.auth.Login(w, request.Username, request.Password) {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		s.writeUnauthorized(w, r)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
@@ -150,7 +152,7 @@ func (s *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		methodNotAllowed(w, http.MethodPost)
+		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
 	s.auth.Logout(w, r)
@@ -159,7 +161,7 @@ func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 func (s *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		methodNotAllowed(w, http.MethodGet)
+		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "username": s.auth.Username()})
@@ -167,11 +169,11 @@ func (s *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 
 func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/api/devices" {
-		http.NotFound(w, r)
+		s.writeNotFound(w, r)
 		return
 	}
 	if r.Method != http.MethodGet {
-		methodNotAllowed(w, http.MethodGet)
+		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
 	writeJSON(w, http.StatusOK, s.registry.List())
@@ -181,7 +183,7 @@ func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/devices/"), "/")
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 || parts[0] == "" {
-		http.NotFound(w, r)
+		s.writeNotFound(w, r)
 		return
 	}
 	deviceId := parts[0]
@@ -192,15 +194,15 @@ func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 	case "sessions":
 		if len(parts) == 2 && r.Method == http.MethodPost {
 			var request json.RawMessage
-			if !decodeJSONRequest(w, r, &request) {
+			if !s.decodeJSONRequest(w, r, &request) {
 				return
 			}
 			s.handleJSONRelayWithStatus(w, r, route, deviceId, "create_session", request, "", http.StatusCreated)
 			return
 		}
-		http.NotFound(w, r)
+		s.writeNotFound(w, r)
 	default:
-		http.NotFound(w, r)
+		s.writeNotFound(w, r)
 	}
 }
 
@@ -217,7 +219,7 @@ func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, r
 		var request struct {
 			WorkspaceIds []string `json:"workspace_ids"`
 		}
-		if !decodeJSONRequest(w, r, &request) {
+		if !s.decodeJSONRequest(w, r, &request) {
 			return
 		}
 		s.handleJSONRelay(w, r, route, deviceId, "workspace_order", request, "")
@@ -231,7 +233,7 @@ func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, r
 		s.handleWorkspaceSessionRoute(w, r, route, deviceId, parts[2], parts[4:])
 		return
 	}
-	http.NotFound(w, r)
+	s.writeNotFound(w, r)
 }
 
 func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, workspaceId string, parts []string) {
@@ -241,18 +243,18 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 			s.handleJSONRelay(w, r, route, deviceId, "workspace_sessions", map[string]string{"workspace_id": workspaceId}, "")
 		case http.MethodPost:
 			var request json.RawMessage
-			if !decodeJSONRequest(w, r, &request) {
+			if !s.decodeJSONRequest(w, r, &request) {
 				return
 			}
 			s.handleJSONRelayWithStatus(w, r, route, deviceId, "create_session", workspaceSessionParams(workspaceId, request), "", http.StatusCreated)
 		default:
-			methodNotAllowed(w, http.MethodGet, http.MethodPost)
+			s.methodNotAllowed(w, r, http.MethodGet, http.MethodPost)
 		}
 		return
 	}
 	sessionId := parts[0]
 	if sessionId == "" {
-		http.NotFound(w, r)
+		s.writeNotFound(w, r)
 		return
 	}
 	params := map[string]string{"workspace_id": workspaceId, "session_id": sessionId}
@@ -262,56 +264,56 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 			s.handleJSONRelay(w, r, route, deviceId, "get_session", params, "")
 		case http.MethodPatch:
 			var request json.RawMessage
-			if !decodeJSONRequest(w, r, &request) {
+			if !s.decodeJSONRequest(w, r, &request) {
 				return
 			}
 			s.handleJSONRelay(w, r, route, deviceId, "update_session", map[string]any{"workspace_id": workspaceId, "session_id": sessionId, "request": request}, "")
 		case http.MethodDelete:
 			s.handleNoContentRelay(w, r, route, "delete_session", params)
 		default:
-			methodNotAllowed(w, http.MethodGet, http.MethodPatch, http.MethodDelete)
+			s.methodNotAllowed(w, r, http.MethodGet, http.MethodPatch, http.MethodDelete)
 		}
 		return
 	}
 	if len(parts) != 2 {
-		http.NotFound(w, r)
+		s.writeNotFound(w, r)
 		return
 	}
 	switch parts[1] {
 	case "close":
 		if r.Method != http.MethodPost {
-			methodNotAllowed(w, http.MethodPost)
+			s.methodNotAllowed(w, r, http.MethodPost)
 			return
 		}
 		s.handleJSONRelay(w, r, route, deviceId, "close_session", params, "")
 	case "rerun":
 		if r.Method != http.MethodPost {
-			methodNotAllowed(w, http.MethodPost)
+			s.methodNotAllowed(w, r, http.MethodPost)
 			return
 		}
 		var request json.RawMessage
-		if !decodeJSONRequest(w, r, &request) {
+		if !s.decodeJSONRequest(w, r, &request) {
 			return
 		}
 		s.handleJSONRelay(w, r, route, deviceId, "rerun_session", map[string]any{"workspace_id": workspaceId, "session_id": sessionId, "request": request}, "")
 	case "history":
 		if r.Method != http.MethodGet {
-			methodNotAllowed(w, http.MethodGet)
+			s.methodNotAllowed(w, r, http.MethodGet)
 			return
 		}
 		s.handleHistoryRelay(w, r, route, deviceId, workspaceId, sessionId)
 	case "ws":
 		if r.Method != http.MethodGet {
-			methodNotAllowed(w, http.MethodGet)
+			s.methodNotAllowed(w, r, http.MethodGet)
 			return
 		}
 		if route == nil {
-			http.Error(w, "device offline", http.StatusServiceUnavailable)
+			s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeDeviceOffline, errorMessageDeviceOffline, nil)
 			return
 		}
 		s.handleTerminalWS(w, r, route, workspaceId, sessionId)
 	default:
-		http.NotFound(w, r)
+		s.writeNotFound(w, r)
 	}
 }
 
@@ -337,12 +339,12 @@ func (s *Handler) handleJSONRelayWithStatus(w http.ResponseWriter, r *http.Reque
 			_, _ = w.Write(cached)
 			return
 		}
-		http.Error(w, "device offline", http.StatusServiceUnavailable)
+		s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeDeviceOffline, errorMessageDeviceOffline, nil)
 		return
 	}
-	result, err := route.request(r.Context(), method, params)
+	result, err := route.request(r.Context(), method, params, s.requestIdFor(w, r))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
 		return
 	}
 	if cacheKind != "" {
@@ -355,11 +357,11 @@ func (s *Handler) handleJSONRelayWithStatus(w http.ResponseWriter, r *http.Reque
 
 func (s *Handler) handleNoContentRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, method string, params any) {
 	if route == nil {
-		http.Error(w, "device offline", http.StatusServiceUnavailable)
+		s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeDeviceOffline, errorMessageDeviceOffline, nil)
 		return
 	}
-	if _, err := route.request(r.Context(), method, params); err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+	if _, err := route.request(r.Context(), method, params, s.requestIdFor(w, r)); err != nil {
+		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -374,17 +376,17 @@ func (s *Handler) handleHistoryRelay(w http.ResponseWriter, r *http.Request, rou
 			_, _ = w.Write([]byte(cached))
 			return
 		}
-		http.Error(w, "device offline", http.StatusServiceUnavailable)
+		s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeDeviceOffline, errorMessageDeviceOffline, nil)
 		return
 	}
-	result, err := route.request(r.Context(), "history", map[string]string{"workspace_id": workspaceId, "session_id": sessionId})
+	result, err := route.request(r.Context(), "history", map[string]string{"workspace_id": workspaceId, "session_id": sessionId}, s.requestIdFor(w, r))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
 		return
 	}
 	var text string
 	if err := json.Unmarshal(result, &text); err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstreamInvalid, err)
 		return
 	}
 	s.storeHistoryCache(deviceId, workspaceId, sessionId, text)
@@ -398,7 +400,7 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 	s.writerMu.Lock()
 	if _, exists := s.writers[writerKey]; exists {
 		s.writerMu.Unlock()
-		http.Error(w, "session already has an active writer", http.StatusConflict)
+		s.writeAPIError(w, r, http.StatusConflict, errorCodeConflict, errorMessageConflict, nil)
 		return
 	}
 	streamId := tunnel.StreamId("term-" + strconv.FormatInt(time.Now().UnixNano(), 10))
@@ -417,7 +419,7 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 	defer conn.Close(websocket.StatusNormalClosure, "")
 	term := &terminalRelay{sessionId: sessionId, browser: conn, done: make(chan struct{})}
 	route.addTerminal(streamId, term)
-	attach, err := tunnel.NewFrame(streamId, tunnel.FrameTerminalAttach, tunnel.TerminalAttachPayload{WorkspaceId: workspaceId, SessionId: sessionId})
+	attach, err := tunnel.NewFrame(streamId, tunnel.FrameTerminalAttach, tunnel.TerminalAttachReq{WorkspaceId: workspaceId, SessionId: sessionId, RequestId: s.requestIdFor(w, r)})
 	if err != nil || route.writeFrame(r.Context(), attach) != nil {
 		return
 	}
@@ -470,13 +472,13 @@ func writeTerminalControl(conn *websocket.Conn, message terminalproto.ServerMess
 
 func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		methodNotAllowed(w, http.MethodGet)
+		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
 	username, password, ok := r.BasicAuth()
 	if !ok || !s.auth.ValidCredentials(username, password) {
 		w.Header().Set("WWW-Authenticate", `Basic realm="termbridge-gateway"`)
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		s.writeUnauthorized(w, r)
 		return
 	}
 	conn, err := websocket.Accept(w, r, nil)
@@ -615,20 +617,6 @@ func (s *Handler) originPatterns(r *http.Request) []string {
 	patterns := []string{"http://" + r.Host, "https://" + r.Host}
 	patterns = append(patterns, s.config.AllowedOrigins...)
 	return patterns
-}
-
-func methodNotAllowed(w http.ResponseWriter, allowed ...string) {
-	w.Header().Set("Allow", strings.Join(allowed, ", "))
-	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-}
-
-func decodeJSONRequest(w http.ResponseWriter, r *http.Request, value any) bool {
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, terminalproto.MaxJSONMessageBytes))
-	if err := decoder.Decode(value); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return false
-	}
-	return true
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

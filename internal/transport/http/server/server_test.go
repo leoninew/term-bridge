@@ -37,7 +37,7 @@ func TestServerLogsUnifiedBackendRequests(t *testing.T) {
 	assertLogValue(t, completed, "msg", "request completed")
 	assertLogValue(t, started, "method", http.MethodGet)
 	assertLogValue(t, started, "path", "/api/health")
-	assertLogValue(t, started, "uri", "/api/health?x=1")
+	assertLogValue(t, started, "query", "x=1")
 	assertLogNumber(t, completed, "status", http.StatusOK)
 	assertLogValue(t, completed, "response_body", response.Body.String())
 	if started["request_id"] == "" || started["request_id"] != completed["request_id"] {

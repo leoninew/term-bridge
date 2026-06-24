@@ -38,6 +38,18 @@ func New(config Config) *Client {
 	return &Client{config: config, terms: map[tunnel.StreamId]chan tunnel.Frame{}}
 }
 
+func (c *Client) logInfo(message string, attrs ...any) {
+	if c.config.Logger != nil {
+		c.config.Logger.Info(message, attrs...)
+	}
+}
+
+func (c *Client) logWarn(message string, attrs ...any) {
+	if c.config.Logger != nil {
+		c.config.Logger.Warn(message, attrs...)
+	}
+}
+
 func (c *Client) Run(ctx context.Context) error {
 	device, err := LoadOrCreateDevice(DeviceOptions{StateDir: c.config.StateDir, DeviceId: c.config.DeviceId, DeviceName: c.config.DeviceName})
 	if err != nil {
@@ -106,20 +118,29 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 }
 
 func (c *Client) handleRequest(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, frame tunnel.Frame) {
-	request, err := tunnel.DecodePayload[tunnel.RequestPayload](frame)
+	request, err := tunnel.DecodePayload[tunnel.RequestReq](frame)
 	if err != nil {
+		c.logWarn("agent tunnel request decode failed", "stream_id", frame.StreamId, "error", err)
 		c.writeResponse(ctx, conn, writeMu, frame.StreamId, nil, err)
 		return
 	}
+	attrs := []any{"stream_id", frame.StreamId, "method", request.Method, "request_id", request.RequestId}
 	if c.config.Runtime == nil {
-		c.writeResponse(ctx, conn, writeMu, frame.StreamId, nil, fmt.Errorf("runtime access unavailable"))
+		err := fmt.Errorf("runtime access unavailable")
+		c.logWarn("agent tunnel request failed", append(attrs, "error", err)...)
+		c.writeResponse(ctx, conn, writeMu, frame.StreamId, nil, err)
 		return
 	}
 	result, err := c.handleRuntimeRequest(ctx, request)
+	if err != nil {
+		c.logWarn("agent tunnel request failed", append(attrs, "error", err)...)
+	} else {
+		c.logInfo("agent tunnel request handled", attrs...)
+	}
 	c.writeResponse(ctx, conn, writeMu, frame.StreamId, result, err)
 }
 
-func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.RequestPayload) (any, error) {
+func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.RequestReq) (any, error) {
 	switch request.Method {
 	case "workspaces":
 		return c.config.Runtime.ListWorkspaces(ctx)
@@ -150,16 +171,16 @@ func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.Reques
 		}
 		return c.config.Runtime.ListSessionsByWorkspaceId(ctx, params.WorkspaceId)
 	case "create_session":
-		var params terminalapp.CreateSessionRequest
+		var params terminalapp.CreateSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
 		return c.config.Runtime.CreateSession(ctx, params)
 	case "rerun_session":
 		var params struct {
-			WorkspaceId string                          `json:"workspace_id"`
-			SessionId   string                          `json:"session_id"`
-			Request     terminalapp.RerunSessionRequest `json:"request"`
+			WorkspaceId string                      `json:"workspace_id"`
+			SessionId   string                      `json:"session_id"`
+			Request     terminalapp.RerunSessionReq `json:"request"`
 		}
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
@@ -176,9 +197,9 @@ func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.Reques
 		return c.config.Runtime.GetSession(ctx, params.WorkspaceId, params.SessionId)
 	case "update_session":
 		var params struct {
-			WorkspaceId string                           `json:"workspace_id"`
-			SessionId   string                           `json:"session_id"`
-			Request     terminalapp.UpdateSessionRequest `json:"request"`
+			WorkspaceId string                       `json:"workspace_id"`
+			SessionId   string                       `json:"session_id"`
+			Request     terminalapp.UpdateSessionReq `json:"request"`
 		}
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
@@ -225,7 +246,7 @@ func decodeRequestParams(params json.RawMessage, value any) error {
 }
 
 func (c *Client) writeResponse(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, streamId tunnel.StreamId, result any, err error) {
-	response := tunnel.ResponsePayload{OK: err == nil}
+	response := tunnel.ResponseResp{OK: err == nil}
 	if err != nil {
 		response.Error = err.Error()
 	} else {
@@ -245,21 +266,30 @@ func (c *Client) writeResponse(ctx context.Context, conn *websocket.Conn, writeM
 }
 
 func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, frame tunnel.Frame) {
-	if c.config.Runtime == nil {
-		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamId, "runtime access unavailable")
+	payload, err := tunnel.DecodePayload[tunnel.TerminalAttachReq](frame)
+	if err != nil {
+		c.logWarn("agent terminal attach decode failed", "stream_id", frame.StreamId, "error", err)
+		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamId, err.Error())
 		return
 	}
-	payload, err := tunnel.DecodePayload[tunnel.TerminalAttachPayload](frame)
-	if err != nil {
+	attrs := []any{"stream_id", frame.StreamId, "workspace_id", payload.WorkspaceId, "session_id", payload.SessionId, "request_id", payload.RequestId}
+	if c.config.Runtime == nil {
+		err := fmt.Errorf("runtime access unavailable")
+		c.logWarn("agent terminal attach failed", append(attrs, "error", err)...)
 		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamId, err.Error())
 		return
 	}
 	stream, err := c.config.Runtime.Attach(ctx, payload.WorkspaceId, payload.SessionId)
 	if err != nil {
+		c.logWarn("agent terminal attach failed", append(attrs, "error", err)...)
 		_ = writeTerminalError(ctx, conn, writeMu, frame.StreamId, err.Error())
 		return
 	}
-	defer stream.Detach("gateway_detached")
+	c.logInfo("agent terminal attached", attrs...)
+	defer func() {
+		stream.Detach("gateway_detached")
+		c.logInfo("agent terminal detached", attrs...)
+	}()
 	if payload.Cols > 0 && payload.Rows > 0 {
 		_ = stream.Resize(payload.Cols, payload.Rows)
 	}

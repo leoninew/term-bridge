@@ -24,7 +24,7 @@ func TestMiddlewareIncludesMetadata(t *testing.T) {
 	assertLogValue(t, started, "level", "INFO")
 	assertLogValue(t, started, "method", http.MethodGet)
 	assertLogValue(t, started, "path", "/api/test")
-	assertLogValue(t, started, "uri", "/api/test?x=1")
+	assertLogValue(t, started, "query", "x=1")
 	if started["request_id"] == "" {
 		t.Fatal("expected started request_id")
 	}
@@ -41,7 +41,7 @@ func TestMiddlewareIncludesMetadata(t *testing.T) {
 	assertLogValue(t, completed, "level", "INFO")
 	assertLogValue(t, completed, "method", http.MethodGet)
 	assertLogValue(t, completed, "path", "/api/test")
-	assertLogValue(t, completed, "uri", "/api/test?x=1")
+	assertLogValue(t, completed, "query", "x=1")
 	assertLogNumber(t, completed, "status", http.StatusCreated)
 	assertLogNumber(t, completed, "bytes", len(`{"ok":true}`))
 	if _, ok := completed["duration_ms"]; !ok {

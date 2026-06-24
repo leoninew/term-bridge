@@ -1,10 +1,11 @@
+import type { AxiosResponse } from 'axios'
+import { apiClient } from '../api/client'
 import type {
-  ApiErrorResponse,
-  CreateSessionRequest,
-  CreateSessionResponse,
-  RerunSessionRequest,
+  CreateSessionReq,
+  CreateSessionResp,
+  RerunSessionReq,
   SessionSummary,
-  UpdateSessionRequest,
+  UpdateSessionReq,
 } from '../../protocol/terminal'
 
 export type ApiResult<T> = {
@@ -21,27 +22,20 @@ function workspaceSessionPath(workspaceId: string, sessionId?: string): string {
   return sessionId ? `${base}/${encodeURIComponent(sessionId)}` : base
 }
 
-function offline(response: Response): boolean {
-  return response.headers.get('x-termbridge-offline') === 'true'
+function offline(response: AxiosResponse): boolean {
+  return String(response.headers['x-termbridge-offline'] ?? '').toLowerCase() === 'true'
 }
 
 export async function createSession(
   deviceId: string,
   workspaceId: string | null,
-  request: CreateSessionRequest,
-): Promise<CreateSessionResponse> {
-  const response = await fetch(
+  request: CreateSessionReq,
+): Promise<CreateSessionResp> {
+  const response = await apiClient.post<CreateSessionResp>(
     devicePath(deviceId, workspaceId ? workspaceSessionPath(workspaceId) : '/sessions'),
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(workspaceId ? { ...request, workspace_id: workspaceId } : request),
-    },
+    workspaceId ? { ...request, workspace_id: workspaceId } : request,
   )
-  if (!response.ok) {
-    throw new Error(await responseError('Create session failed', response))
-  }
-  return (await response.json()) as CreateSessionResponse
+  return response.data
 }
 
 export async function getSession(
@@ -49,28 +43,23 @@ export async function getSession(
   workspaceId: string,
   sessionId: string,
 ): Promise<SessionSummary> {
-  const response = await fetch(devicePath(deviceId, workspaceSessionPath(workspaceId, sessionId)))
-  if (!response.ok) {
-    throw new Error(await responseError('Get session failed', response))
-  }
-  return (await response.json()) as SessionSummary
+  const response = await apiClient.get<SessionSummary>(
+    devicePath(deviceId, workspaceSessionPath(workspaceId, sessionId)),
+  )
+  return response.data
 }
 
 export async function updateSession(
   deviceId: string,
   workspaceId: string,
   sessionId: string,
-  request: UpdateSessionRequest,
+  request: UpdateSessionReq,
 ): Promise<SessionSummary> {
-  const response = await fetch(devicePath(deviceId, workspaceSessionPath(workspaceId, sessionId)), {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-  })
-  if (!response.ok) {
-    throw new Error(await responseError('Edit session failed', response))
-  }
-  return (await response.json()) as SessionSummary
+  const response = await apiClient.patch<SessionSummary>(
+    devicePath(deviceId, workspaceSessionPath(workspaceId, sessionId)),
+    request,
+  )
+  return response.data
 }
 
 export async function deleteSession(
@@ -78,12 +67,7 @@ export async function deleteSession(
   workspaceId: string,
   sessionId: string,
 ): Promise<void> {
-  const response = await fetch(devicePath(deviceId, workspaceSessionPath(workspaceId, sessionId)), {
-    method: 'DELETE',
-  })
-  if (!response.ok) {
-    throw new Error(await responseError('Delete session failed', response))
-  }
+  await apiClient.delete(devicePath(deviceId, workspaceSessionPath(workspaceId, sessionId)))
 }
 
 export async function readHistory(
@@ -91,13 +75,11 @@ export async function readHistory(
   workspaceId: string,
   sessionId: string,
 ): Promise<ApiResult<string>> {
-  const response = await fetch(
+  const response = await apiClient.get<string>(
     devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/history`),
+    { responseType: 'text' },
   )
-  if (!response.ok) {
-    throw new Error(await responseError('Read history failed', response))
-  }
-  return { data: await response.text(), offline: offline(response) }
+  return { data: response.data, offline: offline(response) }
 }
 
 export async function closeSession(
@@ -105,54 +87,25 @@ export async function closeSession(
   workspaceId: string,
   sessionId: string,
 ): Promise<SessionSummary> {
-  const response = await fetch(
+  const response = await apiClient.post<SessionSummary>(
     devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/close`),
-    {
-      method: 'POST',
-    },
   )
-  if (!response.ok) {
-    throw new Error(await responseError('Close session failed', response))
-  }
-  return (await response.json()) as SessionSummary
+  return response.data
 }
 
 export async function rerunSession(
   deviceId: string,
   workspaceId: string,
   sessionId: string,
-  request: RerunSessionRequest,
-): Promise<CreateSessionResponse> {
-  const response = await fetch(
+  request: RerunSessionReq,
+): Promise<CreateSessionResp> {
+  const response = await apiClient.post<CreateSessionResp>(
     devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/rerun`),
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    },
+    request,
   )
-  if (!response.ok) {
-    throw new Error(await responseError('Rerun session failed', response))
-  }
-  return (await response.json()) as CreateSessionResponse
+  return response.data
 }
 
 export function terminalWsUrl(deviceId: string, workspaceId: string, sessionId: string): string {
   return devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/ws`)
-}
-
-export async function responseError(prefix: string, response: Response): Promise<string> {
-  const body = (await response.text()).trim()
-  if (!body) {
-    return `${prefix} (${response.status})`
-  }
-  try {
-    const parsed = JSON.parse(body) as Partial<ApiErrorResponse>
-    if (typeof parsed.code === 'string' && typeof parsed.message === 'string') {
-      return `${prefix} (${response.status} ${parsed.code}): ${parsed.message}`
-    }
-  } catch {
-    return `${prefix} (${response.status}): ${body}`
-  }
-  return `${prefix} (${response.status}): ${body}`
 }

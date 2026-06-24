@@ -79,10 +79,10 @@ func (m *Manager) Authenticated(r *http.Request) bool {
 	return ok
 }
 
-func (m *Manager) Middleware(next http.Handler) http.Handler {
+func (m *Manager) Middleware(next http.Handler, unauthorized http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !m.Authenticated(r) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			unauthorized(w, r)
 			return
 		}
 		next.ServeHTTP(w, r)
