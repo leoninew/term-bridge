@@ -11,6 +11,7 @@
   import type { ServerControlMessage } from '../../protocol/terminal'
   import { createXterm } from './useXterm'
   import { useTerminalSocket } from '../../features/sessions/useTerminalSocket'
+  import { useThemeStore } from '../../store/theme'
 
   const props = defineProps<{
     wsUrl: string | null
@@ -23,6 +24,7 @@
   }>()
 
   const terminalElement = ref<HTMLElement | null>(null)
+  const themeStore = useThemeStore()
   const replaying = ref(false)
   let xterm: ReturnType<typeof createXterm> | null = null
 
@@ -75,6 +77,7 @@
       (data) => socket.sendBinary(data),
       (cols, rows) => socket.sendControl({ type: 'resize', cols, rows }),
       { source: 'live', sessionId: props.sessionId },
+      themeStore.theme,
     )
     if (terminalElement.value) {
       xterm.open(terminalElement.value)
@@ -85,6 +88,11 @@
   watch(
     () => props.wsUrl,
     () => connect(),
+  )
+
+  watch(
+    () => themeStore.theme,
+    (theme) => xterm?.setTheme(theme),
   )
 
   onBeforeUnmount(() => {

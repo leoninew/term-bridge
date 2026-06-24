@@ -2,7 +2,7 @@
   <ToastProvider>
     <section
       v-if="!gateway.authInitialized"
-      class="flex h-screen min-h-screen items-center justify-center bg-[#05070d] p-6 text-sm text-slate-500"
+      class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
     >
       {{ t('gateway.checkingAuth') }}
     </section>
@@ -10,7 +10,7 @@
     <SplitterGroup
       v-else-if="gateway.authenticated"
       direction="horizontal"
-      class="flex h-screen min-h-screen overflow-hidden bg-[#05070d] text-sm text-slate-200"
+      class="flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
     >
       <SplitterPanel id="workspace-sidebar" :default-size="22" :min-size="16" :max-size="35">
         <WorkspaceSessionSidebar
@@ -38,9 +38,9 @@
       </SplitterPanel>
 
       <SplitterResizeHandle
-        class="group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[#05070d] outline-none"
+        class="group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[var(--color-app-bg)] outline-none"
       >
-        <span class="w-px bg-slate-800 transition group-hover:bg-slate-700" />
+        <span class="w-px bg-[var(--color-border)] transition group-hover:bg-[var(--color-border-strong)]" />
       </SplitterResizeHandle>
 
       <SplitterPanel id="terminal-workbench" :min-size="55">

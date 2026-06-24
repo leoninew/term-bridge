@@ -1,4 +1,5 @@
 import { createI18n } from 'vue-i18n'
+import { readStorageValue, writeStorageValue } from './store/storage'
 
 export const locales = ['zh-CN', 'en-US'] as const
 export type AppLocale = (typeof locales)[number]
@@ -8,7 +9,7 @@ export const localeLabels: Record<AppLocale, string> = {
   'en-US': 'English',
 }
 
-const savedLocale = window.localStorage.getItem('termbridge.locale')
+const savedLocale = readStorageValue('termbridge.locale')
 const initialLocale: AppLocale = locales.includes(savedLocale as AppLocale)
   ? (savedLocale as AppLocale)
   : 'zh-CN'
@@ -27,7 +28,12 @@ export const messages = {
       removing: '移除中…',
       settings: '设置',
       language: '语言',
+      theme: '主题',
       close: '关闭',
+    },
+    theme: {
+      light: '浅色',
+      dark: '暗色',
     },
     sidebar: {
       searchSessions: '搜索会话',
@@ -138,7 +144,12 @@ export const messages = {
       removing: 'Removing…',
       settings: 'Settings',
       language: 'Language',
+      theme: 'Theme',
       close: 'Close',
+    },
+    theme: {
+      light: 'Light',
+      dark: 'Dark',
     },
     sidebar: {
       searchSessions: 'Search sessions',
@@ -254,5 +265,5 @@ export const i18n = createI18n({
 
 export function setLocale(locale: AppLocale) {
   i18n.global.locale.value = locale
-  window.localStorage.setItem('termbridge.locale', locale)
+  writeStorageValue('termbridge.locale', locale)
 }

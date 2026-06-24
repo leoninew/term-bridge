@@ -1,6 +1,6 @@
 <template>
-  <aside class="flex h-full min-w-0 flex-col overflow-hidden bg-[#070b12]">
-    <header class="flex h-11 shrink-0 items-center border-b border-slate-800/80 bg-[#0a0f18] px-2">
+  <aside class="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--color-sidebar-bg)] text-[var(--color-text)]">
+    <header class="flex h-11 shrink-0 items-center border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2">
       <div class="flex w-full items-center gap-1.5">
         <div class="grid min-w-0 flex-1 grid-cols-[4fr_6fr] gap-1.5">
           <SelectRoot
@@ -9,19 +9,19 @@
             @update:model-value="changeDevice"
           >
             <SelectTrigger
-              class="flex h-8 w-full min-w-0 items-center justify-between gap-1 rounded-md border border-slate-800 bg-slate-950/80 px-2 text-left text-sm text-slate-200 outline-none hover:border-slate-700 focus:border-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
+              class="flex h-8 w-full min-w-0 items-center justify-between gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-left text-sm text-[var(--color-text)] outline-none hover:border-[var(--color-border-strong)] focus:border-[var(--color-border-strong)] disabled:cursor-not-allowed disabled:opacity-60"
               :aria-label="t('gateway.devices')"
               :title="selectedDeviceLabel"
             >
               <SelectValue class="min-w-0 truncate" :placeholder="deviceSelectPlaceholder" />
-              <ChevronDown class="size-3.5 shrink-0 text-slate-500" aria-hidden="true" />
+              <ChevronDown class="size-3.5 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
             </SelectTrigger>
             <SelectPortal>
               <SelectContent
                 side="bottom"
                 align="start"
                 :side-offset="4"
-                class="z-50 max-h-64 min-w-40 overflow-hidden rounded-md border border-slate-800 bg-slate-950 p-1 text-sm text-slate-200 shadow-xl"
+                class="z-50 max-h-64 min-w-40 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
               >
                 <SelectViewport>
                   <SelectItem
@@ -29,7 +29,7 @@
                     :key="device.id"
                     :value="device.id"
                     :text-value="device.name"
-                    class="relative flex cursor-pointer select-none items-center rounded px-7 py-1.5 outline-none hover:bg-slate-800 focus:bg-slate-800 data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                    class="relative flex cursor-pointer select-none items-center rounded px-7 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                   >
                     <SelectItemIndicator class="absolute left-2 inline-flex items-center">
                       <Check class="size-4 text-blue-500" />
@@ -44,19 +44,19 @@
           <label class="relative min-w-0">
             <span class="sr-only">{{ t('sidebar.searchSessions') }}</span>
             <Search
-              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-500"
+              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--color-text-subtle)]"
             />
             <input
               v-model="searchQuery"
               type="search"
               :placeholder="t('sidebar.searchPlaceholder')"
-              class="h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 py-1.5 pl-8 pr-2 text-sm text-slate-200 outline-none placeholder:text-slate-600"
+              class="h-8 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] py-1.5 pl-8 pr-2 text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)]"
             />
           </label>
         </div>
         <button
           type="button"
-          class="flex size-8 shrink-0 items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+          class="flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text)] hover:bg-[var(--color-control-hover)]"
           :aria-label="t('sidebar.newSession')"
           :title="t('sidebar.newSession')"
           @click="emit('newSession')"
@@ -69,19 +69,19 @@
     <div class="min-h-0 flex-1 overflow-y-auto p-1.5">
       <div
         v-if="!props.selectedDeviceId"
-        class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500"
+        class="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2 text-sm text-[var(--color-text-muted)]"
       >
         {{ deviceSelectPlaceholder }}
       </div>
       <div
         v-else-if="workspaceTree.length === 0"
-        class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500"
+        class="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2 text-sm text-[var(--color-text-muted)]"
       >
         {{ t('sidebar.emptyWorkspaces') }}
       </div>
       <div
         v-else-if="treeItems.length === 0"
-        class="rounded-md border border-dashed border-slate-800 bg-slate-950/60 p-2 text-sm text-slate-500"
+        class="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2 text-sm text-[var(--color-text-muted)]"
       >
         {{
           normalizedSearchQuery
@@ -105,7 +105,7 @@
           <div
             role="button"
             tabindex="0"
-            class="workspace-drag-handle group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border border-transparent px-1 py-0.5 text-left text-slate-300 hover:border-slate-800 hover:bg-slate-900/40"
+            class="workspace-drag-handle group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border border-transparent px-1 py-0.5 text-left text-[var(--color-text)] hover:border-[var(--color-border)] hover:bg-[var(--color-control-hover)]"
             :style="{ paddingLeft: '6px' }"
             @click="toggleWorkspace(workspace.value)"
             @keydown.enter.prevent="toggleWorkspace(workspace.value)"
@@ -113,10 +113,10 @@
           >
             <FolderOpen
               v-if="workspaceExpanded(workspace.value)"
-              class="size-4 shrink-0 text-slate-500"
+              class="size-4 shrink-0 text-[var(--color-text-subtle)]"
               aria-hidden="true"
             />
-            <Folder v-else class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+            <Folder v-else class="size-4 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
             <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{
               workspace.workspace.name
             }}</span>
@@ -125,7 +125,7 @@
             >
               <button
                 type="button"
-                class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
+                class="flex size-5 shrink-0 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
                 :aria-label="
                   t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })
                 "
@@ -140,7 +140,7 @@
                   !canRemoveWorkspace(workspace) ||
                   props.removingWorkspaceId === workspace.workspace.id
                 "
-                class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
+                class="flex size-5 shrink-0 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-red-500"
                 :aria-label="removeWorkspaceLabel(workspace)"
                 :title="removeWorkspaceLabel(workspace)"
                 @click.stop="emit('removeWorkspace', workspace.workspace)"
@@ -163,22 +163,22 @@
               class="group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-left transition"
               :class="
                 isActiveSessionSelection(session.session.id)
-                  ? 'border-slate-700 bg-slate-900 text-slate-100'
-                  : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900/50 hover:text-slate-200'
+                  ? 'border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text-strong)]'
+                  : 'border-transparent text-[var(--color-text-muted)] hover:border-[var(--color-border)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)]'
               "
               :style="{ paddingLeft: '38px' }"
               @click="selectSession(session.session)"
               @keydown.enter.prevent="selectSession(session.session)"
               @keydown.space.prevent="selectSession(session.session)"
             >
-              <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+              <SquareTerminal class="size-4 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
               <span class="min-w-0 flex-1 truncate text-sm">{{
                 session.session.name || session.session.command
               }}</span>
               <span class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
                 <button
                   type="button"
-                  class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
+                  class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
                   :aria-label="
                     t('sidebar.editSessionAria', {
                       name: session.session.name || session.session.command,
@@ -198,7 +198,7 @@
                 v-if="session.session.lifecycle_state === 'running'"
                 type="button"
                 :disabled="props.stoppingSessionId === session.session.id"
-                class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
+                class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-red-500"
                 :aria-label="
                   t('sidebar.stopSessionAria', {
                     name: session.session.name || session.session.command,
@@ -221,7 +221,7 @@
                 v-if="['stopped', 'failed'].includes(session.session.lifecycle_state)"
                 type="button"
                 :disabled="props.rerunningSessionId === session.session.id"
-                class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-100"
+                class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
                 :aria-label="
                   t('sidebar.rerunSessionAria', {
                     name: session.session.name || session.session.command,
@@ -244,7 +244,7 @@
                 v-if="['stopped', 'failed'].includes(session.session.lifecycle_state)"
                 type="button"
                 :disabled="props.deletingSessionId === session.session.id"
-                class="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-red-200"
+                class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-red-500"
                 :aria-label="
                   t('sidebar.deleteSessionAria', {
                     name: session.session.name || session.session.command,
@@ -270,11 +270,11 @@
     </div>
 
     <footer
-      class="flex h-8 shrink-0 items-center gap-2 border-t border-slate-800/80 bg-[#0a0f18] px-2 text-sm text-slate-500"
+      class="flex h-8 shrink-0 items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-panel-header)] px-2 text-sm text-[var(--color-text-muted)]"
     >
       <DropdownMenuRoot>
         <DropdownMenuTrigger
-          class="flex h-6 items-center gap-1.5 rounded px-1.5 text-slate-500 outline-none hover:bg-slate-900 hover:text-slate-200 focus:bg-slate-900 focus:text-slate-200"
+          class="flex h-6 items-center gap-1.5 rounded px-1.5 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus:bg-[var(--color-control-hover)] focus:text-[var(--color-text)]"
           :aria-label="t('common.settings')"
           :title="t('common.settings')"
         >
@@ -286,29 +286,29 @@
             side="top"
             align="start"
             :side-offset="8"
-            class="z-50 min-w-44 rounded-md border border-slate-800 bg-slate-950 p-1 text-sm text-slate-200 shadow-xl"
+            class="z-50 min-w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
           >
             <DropdownMenuSub>
               <DropdownMenuSubTrigger
-                class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 outline-none hover:bg-slate-800 focus:bg-slate-800"
+                class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
               >
                 <span class="inline-flex items-center gap-2">
-                  <Languages class="size-4 text-slate-500" />
+                  <Languages class="size-4 text-[var(--color-text-subtle)]" />
                   {{ t('common.language') }}
                 </span>
-                <ChevronRight class="size-4 text-slate-500" />
+                <ChevronRight class="size-4 text-[var(--color-text-subtle)]" />
               </DropdownMenuSubTrigger>
               <DropdownMenuPortal>
                 <DropdownMenuSubContent
                   :side-offset="8"
-                  class="z-50 min-w-36 rounded-md border border-slate-800 bg-slate-950 p-1 text-sm text-slate-200 shadow-xl"
+                  class="z-50 min-w-36 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
                 >
                   <DropdownMenuRadioGroup :model-value="locale" @update:model-value="changeLocale">
                     <DropdownMenuRadioItem
                       v-for="item in localeOptions"
                       :key="item.value"
                       :value="item.value"
-                      class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-slate-800 focus:bg-slate-800"
+                      class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
                     >
                       <Check
                         :class="locale === item.value ? 'opacity-100' : 'opacity-0'"
@@ -320,8 +320,44 @@
                 </DropdownMenuSubContent>
               </DropdownMenuPortal>
             </DropdownMenuSub>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger
+                class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
+              >
+                <span class="inline-flex items-center gap-2">
+                  <Sun class="size-4 text-[var(--color-text-subtle)]" />
+                  {{ t('common.theme') }}
+                </span>
+                <ChevronRight class="size-4 text-[var(--color-text-subtle)]" />
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent
+                  :side-offset="8"
+                  class="z-50 min-w-36 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
+                >
+                  <DropdownMenuRadioGroup
+                    :model-value="themeStore.theme"
+                    @update:model-value="changeTheme"
+                  >
+                    <DropdownMenuRadioItem
+                      v-for="item in themeOptions"
+                      :key="item.value"
+                      :value="item.value"
+                      class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
+                    >
+                      <Check
+                        :class="themeStore.theme === item.value ? 'opacity-100' : 'opacity-0'"
+                        class="size-4 text-blue-500"
+                      />
+                      <component :is="item.icon" class="size-4 text-[var(--color-text-subtle)]" />
+                      {{ item.label }}
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
             <DropdownMenuItem
-              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-red-100 outline-none hover:bg-red-950/60 focus:bg-red-950/60"
+              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-red-600 outline-none hover:bg-red-500/10 focus:bg-red-500/10 dark:text-red-100"
               @select="emit('logout')"
             >
               <LogOut class="size-4 text-red-300" />
@@ -347,12 +383,14 @@
     Languages,
     Loader2,
     LogOut,
+    Moon,
     Pencil,
     Plus,
     RotateCcw,
     Search,
     Settings,
     SquareTerminal,
+    Sun,
     Trash2,
   } from '@lucide/vue'
   import {
@@ -379,6 +417,7 @@
   import { VueDraggable } from 'vue-draggable-plus'
   import { localeLabels, locales, setLocale, type AppLocale } from '../../i18n'
   import type { DeviceSummary } from '../../features/gateway/api'
+  import { themes, useThemeStore, type AppTheme } from '../../store/theme'
   import type {
     SessionSummary,
     WorkspaceSummary,
@@ -425,6 +464,7 @@
   }>()
 
   const { t, locale } = useI18n()
+  const themeStore = useThemeStore()
   const searchQuery = ref('')
   const expandedKeys = ref<string[]>([])
   const initializedExpandedKeys = new Set<string>()
@@ -444,6 +484,13 @@
   const localeOptions = computed(() =>
     locales.map((value) => ({ value, label: localeLabels[value] })),
   )
+  const themeOptions = computed(() =>
+    themes.map((value) => ({
+      value,
+      label: t(`theme.${value}`),
+      icon: value === 'light' ? Sun : Moon,
+    })),
+  )
 
   function changeDevice(value: unknown) {
     if (typeof value === 'string' && value !== props.selectedDeviceId) {
@@ -454,6 +501,12 @@
   function changeLocale(value: unknown) {
     if (typeof value === 'string' && locales.includes(value as AppLocale)) {
       setLocale(value as AppLocale)
+    }
+  }
+
+  function changeTheme(value: unknown) {
+    if (typeof value === 'string' && themes.includes(value as AppTheme)) {
+      themeStore.setTheme(value as AppTheme)
     }
   }
 

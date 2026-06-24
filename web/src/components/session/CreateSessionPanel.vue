@@ -1,51 +1,51 @@
 <template>
   <section
     ref="workbench"
-    class="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-[#090d14] p-6"
+    class="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-[var(--color-panel-bg)] p-6"
   >
     <form
-      class="flex w-full max-w-xl flex-col gap-3 rounded-lg border border-slate-800 bg-slate-950/70 p-4 shadow-xl"
+      class="flex w-full max-w-xl flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-xl"
       @submit.prevent="emit('submit')"
     >
-      <div class="flex items-start gap-3 border-b border-slate-800/80 pb-3">
+      <div class="flex items-start gap-3 border-b border-[var(--color-border)] pb-3">
         <span
-          class="flex size-9 shrink-0 items-center justify-center rounded-md border border-slate-800 bg-[#0a0f18] text-slate-400"
+          class="flex size-9 shrink-0 items-center justify-center rounded-md border border-[var(--color-border)] bg-[var(--color-panel-header)] text-[var(--color-text-muted)]"
         >
           <SquareTerminal class="size-4" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-          <h3 class="text-base font-semibold text-slate-100">
+          <h3 class="text-base font-semibold text-[var(--color-text-strong)]">
             {{ t('dialog.newSessionTitle') }}
           </h3>
-          <p class="mt-0.5 text-sm text-slate-500">
+          <p class="mt-0.5 text-sm text-[var(--color-text-muted)]">
             {{ t('dialog.newSessionDescription') }}
           </p>
         </div>
       </div>
 
-      <label class="flex flex-col gap-1.5 text-sm text-slate-300">
+      <label class="flex flex-col gap-1.5 text-sm text-[var(--color-text)]">
         <span>{{ t('dialog.cwd') }}</span>
         <input
           :value="cwd"
-          class="h-9 rounded-md border border-slate-800 bg-[#05070d] px-2 text-slate-100 outline-none placeholder:text-slate-600 focus:border-slate-600"
+          class="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)]"
           :placeholder="t('dialog.workingDirectoryPlaceholder')"
           @input="emit('update:cwd', ($event.target as HTMLInputElement).value)"
         />
       </label>
-      <label class="flex flex-col gap-1.5 text-sm text-slate-300">
+      <label class="flex flex-col gap-1.5 text-sm text-[var(--color-text)]">
         <span>{{ t('dialog.name') }}</span>
         <input
           :value="name"
-          class="h-9 rounded-md border border-slate-800 bg-[#05070d] px-2 text-slate-100 outline-none placeholder:text-slate-600 focus:border-slate-600"
+          class="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)]"
           :placeholder="t('dialog.sessionNamePlaceholder')"
           @input="emit('update:name', ($event.target as HTMLInputElement).value)"
         />
       </label>
-      <label class="flex flex-col gap-1.5 text-sm text-slate-300">
+      <label class="flex flex-col gap-1.5 text-sm text-[var(--color-text)]">
         <span>{{ t('dialog.command') }}</span>
         <input
           :value="command"
-          class="h-9 rounded-md border border-slate-800 bg-[#05070d] px-2 text-slate-100 outline-none placeholder:text-slate-600 focus:border-slate-600"
+          class="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)]"
           :placeholder="t('dialog.commandPlaceholder')"
           @input="emit('update:command', ($event.target as HTMLInputElement).value)"
         />

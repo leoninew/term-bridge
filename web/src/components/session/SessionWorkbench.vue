@@ -1,11 +1,11 @@
 <template>
-  <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14]">
+  <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--color-panel-bg)]">
     <TabsRoot
       :model-value="activeSessionId ?? undefined"
       class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
       @update:model-value="emit('activateTab', String($event))"
     >
-      <div class="flex h-11 shrink-0 items-center border-b border-slate-800/80 bg-[#0a0f18] px-2">
+      <div class="flex h-11 shrink-0 items-center border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2">
         <TabsList as-child>
           <VueDraggable
             :model-value="openedTabs"
@@ -22,20 +22,20 @@
               class="group relative flex max-w-56 shrink-0 items-center rounded-md border px-0.5 text-sm transition"
               :class="
                 activeSessionId === tab.sessionId
-                  ? 'border-slate-700 bg-slate-900 text-slate-50'
-                  : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:border-slate-700 hover:bg-slate-900/80'
+                  ? 'border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text-strong)]'
+                  : 'border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-control-hover)]'
               "
             >
               <TabsTrigger
                 :value="tab.sessionId"
                 class="tab-drag-handle flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 outline-none"
               >
-                <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                <SquareTerminal class="size-4 shrink-0 text-[var(--color-text-muted)]" aria-hidden="true" />
                 <span class="truncate">{{ sessionTitle(tab.workspaceId, tab.sessionId) }}</span>
               </TabsTrigger>
               <button
                 type="button"
-                class="rounded-md p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+                class="rounded-md p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)]"
                 :aria-label="
                   t('workbench.closeTabAria', {
                     name: sessionTitle(tab.workspaceId, tab.sessionId),
@@ -80,9 +80,9 @@
 
       <section
         v-if="!createSessionFormOpen && openedTabs.length === 0"
-        class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-slate-500"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-[var(--color-text-muted)]"
       >
-        <h3 class="text-lg font-semibold text-slate-300">{{ t('workbench.noTabTitle') }}</h3>
+        <h3 class="text-lg font-semibold text-[var(--color-text)]">{{ t('workbench.noTabTitle') }}</h3>
         <p>
           {{
             !selectedDeviceId
@@ -92,7 +92,7 @@
         </p>
         <button
           type="button"
-          class="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-slate-100 hover:bg-slate-800"
+          class="rounded-md border border-[var(--color-border-strong)] bg-[var(--color-control-active)] px-2.5 py-1.5 text-[var(--color-text-strong)] hover:bg-[var(--color-control-hover)]"
           @click="emit('openCreate')"
         >
           {{ t('workbench.newSession') }}
@@ -101,14 +101,14 @@
     </TabsRoot>
 
     <footer
-      class="flex h-8 shrink-0 items-center gap-1.5 overflow-hidden border-t border-slate-800/80 bg-[#0a0f18] px-3 text-sm text-slate-500"
+      class="flex h-8 shrink-0 items-center gap-1.5 overflow-hidden border-t border-[var(--color-border)] bg-[var(--color-panel-header)] px-3 text-sm text-[var(--color-text-muted)]"
     >
       <template v-if="activeSession">
         <span>{{ t('workbench.status') }}</span>
-        <span class="text-slate-200">{{ activeLifecycleLabel }}</span>
-        <span class="text-slate-700">·</span>
+        <span class="text-[var(--color-text)]">{{ activeLifecycleLabel }}</span>
+        <span class="text-[var(--color-border-strong)]">·</span>
         <span>{{ t('workbench.command') }}</span>
-        <span class="min-w-0 truncate text-slate-200">{{ activeSession.command }}</span>
+        <span class="min-w-0 truncate text-[var(--color-text)]">{{ activeSession.command }}</span>
       </template>
       <span v-else>{{ t('workbench.noActiveSession') }}</span>
     </footer>

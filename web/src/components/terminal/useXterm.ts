@@ -3,6 +3,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { logTerminalDiagnostic, logTerminalDiagnosticSample } from './diagnostics'
+import type { AppTheme } from '../../store/theme'
 
 type ResizeCallback = (cols: number, rows: number) => void
 
@@ -12,6 +13,7 @@ type XtermController = {
   fit: () => void
   write: (data: Uint8Array) => void
   pendingBytes: () => number
+  setTheme: (theme: AppTheme) => void
   dispose: () => void
 }
 
@@ -22,18 +24,31 @@ type XtermDiagnostics = {
 
 const maxPendingBytes = 4 * 1024 * 1024
 
-function terminalOptions() {
+export function xtermThemeFor(theme: AppTheme) {
+  if (theme === 'light') {
+    return {
+      background: '#ffffff',
+      foreground: '#0f172a',
+      cursor: '#0f172a',
+      selectionBackground: '#bfdbfe',
+    }
+  }
+
+  return {
+    background: '#020617',
+    foreground: '#d7deea',
+    cursor: '#f8fafc',
+    selectionBackground: '#1e3a5f',
+  }
+}
+
+function terminalOptions(theme: AppTheme = 'dark') {
   return {
     cursorBlink: true,
     fontFamily: 'Cascadia Mono, Consolas, monospace',
     fontSize: 12,
     scrollback: 5000,
-    theme: {
-      background: '#020617',
-      foreground: '#d7deea',
-      cursor: '#f8fafc',
-      selectionBackground: '#1e3a5f',
-    },
+    theme: xtermThemeFor(theme),
   }
 }
 
@@ -70,8 +85,9 @@ export function createXterm(
   onBinary: (data: string) => void,
   onResize: ResizeCallback,
   diagnostics: XtermDiagnostics,
+  theme: AppTheme = 'dark',
 ): XtermController {
-  const terminal = new Terminal(terminalOptions())
+  const terminal = new Terminal(terminalOptions(theme))
   const fitAddon = new FitAddon()
   const webLinksAddon = new WebLinksAddon()
   const disposables = [terminal.onData(onData), terminal.onBinary(onBinary)]
@@ -195,6 +211,9 @@ export function createXterm(
     },
     pendingBytes() {
       return pending
+    },
+    setTheme(theme: AppTheme) {
+      terminal.options.theme = xtermThemeFor(theme)
     },
     dispose() {
       logTerminalDiagnostic('xterm.dispose', {

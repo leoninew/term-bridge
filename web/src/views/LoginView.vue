@@ -2,7 +2,7 @@
   <ToastProvider>
     <section
       v-if="!gateway.authInitialized"
-      class="flex h-screen min-h-screen items-center justify-center bg-[#05070d] p-6 text-sm text-slate-500"
+      class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
     >
       {{ t('gateway.checkingAuth') }}
     </section>
