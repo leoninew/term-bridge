@@ -162,7 +162,7 @@
               tabindex="0"
               class="group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-left transition"
               :class="
-                activeSessionId === session.session.id
+                isActiveSessionSelection(session.session.id)
                   ? 'border-slate-700 bg-slate-900 text-slate-100'
                   : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900/50 hover:text-slate-200'
               "
@@ -292,7 +292,10 @@
               <DropdownMenuSubTrigger
                 class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 outline-none hover:bg-slate-800 focus:bg-slate-800"
               >
-                <span class="inline-flex items-center gap-2">{{ t('common.language') }}</span>
+                <span class="inline-flex items-center gap-2">
+                  <Languages class="size-4 text-slate-500" />
+                  {{ t('common.language') }}
+                </span>
                 <ChevronRight class="size-4 text-slate-500" />
               </DropdownMenuSubTrigger>
               <DropdownMenuPortal>
@@ -317,6 +320,13 @@
                 </DropdownMenuSubContent>
               </DropdownMenuPortal>
             </DropdownMenuSub>
+            <DropdownMenuItem
+              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-red-100 outline-none hover:bg-red-950/60 focus:bg-red-950/60"
+              @select="emit('logout')"
+            >
+              <LogOut class="size-4 text-red-300" />
+              {{ t('gateway.logout') }}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenuPortal>
       </DropdownMenuRoot>
@@ -334,7 +344,9 @@
     CircleStop,
     Folder,
     FolderOpen,
+    Languages,
     Loader2,
+    LogOut,
     Pencil,
     Plus,
     RotateCcw,
@@ -345,6 +357,7 @@
   } from '@lucide/vue'
   import {
     DropdownMenuContent,
+    DropdownMenuItem,
     DropdownMenuPortal,
     DropdownMenuRadioGroup,
     DropdownMenuRadioItem,
@@ -408,6 +421,7 @@
     unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
     reorderWorkspaces: [workspaceIds: string[]]
     selectDevice: [deviceId: string]
+    logout: []
   }>()
 
   const { t, locale } = useI18n()
@@ -511,6 +525,10 @@
 
   function selectSession(session: SessionSummary) {
     emit('select', session)
+  }
+
+  function isActiveSessionSelection(sessionId: string) {
+    return props.activeSessionId === sessionId
   }
 
   function isActiveSession(session: SessionSummary) {

@@ -9,6 +9,11 @@ export const router = createRouter({
       redirect: { name: 'sessions' },
     },
     {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/LoginView.vue'),
+    },
+    {
       path: '/sessions',
       name: 'sessions',
       component: () => import('../views/SessionsView.vue'),

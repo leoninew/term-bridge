@@ -1,60 +1,23 @@
 <template>
   <ToastProvider>
     <section
-      v-if="!authInitialized"
+      v-if="!gateway.authInitialized"
       class="flex h-screen min-h-screen items-center justify-center bg-[#05070d] p-6 text-sm text-slate-500"
     >
       {{ t('gateway.checkingAuth') }}
     </section>
 
-    <section
-      v-else-if="!authenticated"
-      class="flex h-screen min-h-screen items-center justify-center bg-[#05070d] p-6 text-sm text-slate-200"
-    >
-      <form
-        class="w-full max-w-sm rounded-xl border border-slate-800 bg-[#0a0f18] p-5 shadow-xl"
-        @submit.prevent="login"
-      >
-        <h1 class="text-lg font-semibold text-slate-100">{{ t('gateway.loginTitle') }}</h1>
-        <p class="mt-1 text-slate-500">{{ t('gateway.loginDescription') }}</p>
-        <label class="mt-4 block">
-          <span class="text-slate-400">{{ t('gateway.username') }}</span>
-          <input
-            v-model="usernameInput"
-            class="mt-1 h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-2 text-slate-100 outline-none"
-            autocomplete="username"
-          />
-        </label>
-        <label class="mt-3 block">
-          <span class="text-slate-400">{{ t('gateway.password') }}</span>
-          <input
-            v-model="passwordInput"
-            type="password"
-            class="mt-1 h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-2 text-slate-100 outline-none"
-            autocomplete="current-password"
-          />
-        </label>
-        <button
-          type="submit"
-          class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50 hover:bg-blue-500 disabled:opacity-60"
-          :disabled="loggingIn"
-        >
-          {{ loggingIn ? t('gateway.signingIn') : t('gateway.signIn') }}
-        </button>
-      </form>
-    </section>
-
     <SplitterGroup
-      v-else
+      v-else-if="gateway.authenticated"
       direction="horizontal"
       class="flex h-screen min-h-screen overflow-hidden bg-[#05070d] text-sm text-slate-200"
     >
       <SplitterPanel id="workspace-sidebar" :default-size="22" :min-size="16" :max-size="35">
         <WorkspaceSessionSidebar
-          :workspace-tree="workspaceTree"
-          :active-session-id="activeTabId"
-          :devices="devices"
-          :selected-device-id="selectedDeviceId"
+          :workspace-tree="workspaceSessions.workspaceTree"
+          :active-session-id="workbench.activeSessionId"
+          :devices="gateway.devices"
+          :selected-device-id="gateway.selectedDeviceId"
           :stopping-session-id="stoppingSessionId"
           :rerunning-session-id="rerunningSessionId"
           :deleting-session-id="deletingSessionId"
@@ -63,13 +26,14 @@
           @select="openSessionTab"
           @refresh="refresh"
           @new-session="openCreateSessionForm"
-          @edit-session="openEditDialog"
+          @edit-session="dialogs.openEditDialog"
           @stop-session="stopSessionFromSidebar"
           @rerun-session="rerunSessionFromSidebar"
           @delete-session="openDeleteSessionDialog"
-          @remove-workspace="openRemoveWorkspaceDialog"
+          @remove-workspace="dialogs.openRemoveWorkspaceDialog"
           @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
           @reorder-workspaces="reorderWorkspaces"
+          @logout="logout"
         />
       </SplitterPanel>
 
@@ -80,550 +44,197 @@
       </SplitterResizeHandle>
 
       <SplitterPanel id="terminal-workbench" :min-size="55">
-        <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14]">
-          <TabsRoot
-            :model-value="activeTabId ?? undefined"
-            class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-            @update:model-value="activateOpenedTab"
-          >
-            <div
-              class="flex h-11 shrink-0 items-center border-b border-slate-800/80 bg-[#0a0f18] px-2"
-            >
-              <TabsList as-child>
-                <VueDraggable
-                  v-model="openedTabs"
-                  tag="div"
-                  class="flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
-                  :animation="150"
-                  handle=".tab-drag-handle"
-                  item-key="sessionId"
-                >
-                  <div
-                    v-for="tab in openedTabs"
-                    :key="tab.sessionId"
-                    class="group relative flex max-w-56 shrink-0 items-center rounded-md border px-0.5 text-sm transition"
-                    :class="
-                      activeTabId === tab.sessionId
-                        ? 'border-slate-700 bg-slate-900 text-slate-50'
-                        : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:border-slate-700 hover:bg-slate-900/80'
-                    "
-                  >
-                    <TabsTrigger
-                      :value="tab.sessionId"
-                      class="tab-drag-handle flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 outline-none"
-                    >
-                      <SquareTerminal class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                      <span class="truncate">{{ sessionTitle(tab.sessionId) }}</span>
-                    </TabsTrigger>
-                    <button
-                      type="button"
-                      class="rounded-md p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
-                      :aria-label="
-                        t('workbench.closeTabAria', { name: sessionTitle(tab.sessionId) })
-                      "
-                      :title="t('workbench.closeTabAria', { name: sessionTitle(tab.sessionId) })"
-                      @click.stop="closeTab(tab.sessionId)"
-                    >
-                      <X class="size-3.5" />
-                    </button>
-                  </div>
-                </VueDraggable>
-              </TabsList>
-            </div>
-
-            <section
-              v-if="createSessionFormOpen"
-              ref="createSessionWorkbench"
-              class="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-[#090d14] p-6"
-            >
-              <form
-                class="flex w-full max-w-xl flex-col gap-3 rounded-lg border border-slate-800 bg-slate-950/70 p-4 shadow-xl"
-                @submit.prevent="startSession"
-              >
-                <div class="flex items-start gap-3 border-b border-slate-800/80 pb-3">
-                  <span
-                    class="flex size-9 shrink-0 items-center justify-center rounded-md border border-slate-800 bg-[#0a0f18] text-slate-400"
-                  >
-                    <SquareTerminal class="size-4" aria-hidden="true" />
-                  </span>
-                  <div class="min-w-0">
-                    <h3 class="text-base font-semibold text-slate-100">
-                      {{ t('dialog.newSessionTitle') }}
-                    </h3>
-                    <p class="mt-0.5 text-sm text-slate-500">
-                      {{ t('dialog.newSessionDescription') }}
-                    </p>
-                  </div>
-                </div>
-
-                <label class="flex flex-col gap-1.5 text-sm text-slate-300">
-                  <span>{{ t('dialog.cwd') }}</span>
-                  <input
-                    v-model="cwd"
-                    class="h-9 rounded-md border border-slate-800 bg-[#05070d] px-2 text-slate-100 outline-none placeholder:text-slate-600 focus:border-slate-600"
-                    :placeholder="t('dialog.workingDirectoryPlaceholder')"
-                  />
-                </label>
-                <label class="flex flex-col gap-1.5 text-sm text-slate-300">
-                  <span>{{ t('dialog.name') }}</span>
-                  <input
-                    v-model="sessionName"
-                    class="h-9 rounded-md border border-slate-800 bg-[#05070d] px-2 text-slate-100 outline-none placeholder:text-slate-600 focus:border-slate-600"
-                    :placeholder="t('dialog.sessionNamePlaceholder')"
-                  />
-                </label>
-                <label class="flex flex-col gap-1.5 text-sm text-slate-300">
-                  <span>{{ t('dialog.command') }}</span>
-                  <input
-                    v-model="commandText"
-                    class="h-9 rounded-md border border-slate-800 bg-[#05070d] px-2 text-slate-100 outline-none placeholder:text-slate-600 focus:border-slate-600"
-                    :placeholder="t('dialog.commandPlaceholder')"
-                  />
-                </label>
-                <div class="mt-1 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    class="button button-secondary"
-                    :disabled="creatingSession"
-                    @click="cancelCreateSession"
-                  >
-                    {{ t('common.cancel') }}
-                  </button>
-                  <button type="submit" class="button button-primary" :disabled="creatingSession">
-                    {{ creatingSession ? t('common.creating') : t('common.create') }}
-                  </button>
-                </div>
-              </form>
-            </section>
-
-            <TabsContent
-              v-if="!createSessionFormOpen && activeSession && activeTab"
-              :key="activeSession.id"
-              :value="activeSession.id"
-              class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090d14] p-2"
-            >
-              <TerminalView
-                v-if="activeSession.lifecycle_state === 'running'"
-                :key="activeSession.id"
-                :ws-url="terminalWsUrl(activeSession.id)"
-                :session-id="activeSession.id"
-                @state="handleTerminalState"
-                @terminal-error="handleTerminalError"
-              />
-
-              <section v-else class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                <div
-                  v-if="activeTab.historyLoading"
-                  class="flex flex-1 items-center justify-center text-slate-500"
-                >
-                  {{ t('workbench.loadingHistory') }}
-                </div>
-                <div
-                  v-else-if="activeTab.historyError"
-                  class="rounded-md border border-slate-800 bg-slate-950/80 px-2 py-1.5 text-red-100"
-                >
-                  {{ activeTab.historyError }}
-                </div>
-                <HistoryTerminalView
-                  v-else-if="activeTab.historyText"
-                  :key="`${activeSession.id}-history`"
-                  :history="activeTab.historyText"
-                />
-                <div v-else class="flex flex-1 items-center justify-center text-slate-500">
-                  {{ t('workbench.noHistory') }}
-                </div>
-              </section>
-            </TabsContent>
-
-            <section
-              v-if="!createSessionFormOpen && openedTabs.length === 0"
-              class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-slate-500"
-            >
-              <h3 class="text-lg font-semibold text-slate-300">{{ t('workbench.noTabTitle') }}</h3>
-              <p>
-                {{
-                  !selectedDeviceId
-                    ? t('gateway.selectDevicePlaceholder')
-                    : t('workbench.noTabDescription')
-                }}
-              </p>
-              <button
-                type="button"
-                class="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-slate-100 hover:bg-slate-800"
-                @click="() => openCreateSessionForm()"
-              >
-                {{ t('workbench.newSession') }}
-              </button>
-            </section>
-          </TabsRoot>
-
-          <footer
-            class="flex h-8 shrink-0 items-center gap-1.5 overflow-hidden border-t border-slate-800/80 bg-[#0a0f18] px-3 text-sm text-slate-500"
-          >
-            <template v-if="activeSession">
-              <span>{{ t('workbench.status') }}</span>
-              <span class="text-slate-200">{{ activeLifecycleLabel }}</span>
-              <span class="text-slate-700">·</span>
-              <span>{{ t('workbench.command') }}</span>
-              <span class="min-w-0 truncate text-slate-200">{{ activeSession.command }}</span>
-            </template>
-            <span v-else>{{ t('workbench.noActiveSession') }}</span>
-          </footer>
-        </section>
+        <SessionWorkbench
+          :opened-tabs="workbench.openedTabs"
+          :active-session-id="workbench.activeSessionId"
+          :active-tab="workbench.activeTab"
+          :active-session="activeSession"
+          :selected-device-id="gateway.selectedDeviceId"
+          :create-session-form-open="workbench.createSessionFormOpen"
+          :create-cwd="createDraft.cwd"
+          :create-name="createDraft.sessionName"
+          :create-command="createDraft.commandText"
+          :creating-session="creatingSession"
+          :terminal-ws-url="activeTerminalWsUrl"
+          :session-title="sessionTitle"
+          @activate-tab="activateOpenedTab"
+          @close-tab="closeTab"
+          @reorder-tabs="workbench.openedTabs = $event"
+          @open-create="() => openCreateSessionForm()"
+          @submit-create="startSession"
+          @cancel-create="cancelCreateSession"
+          @update:create-cwd="createDraft.cwd = $event"
+          @update:create-name="createDraft.sessionName = $event"
+          @update:create-command="createDraft.commandText = $event"
+          @create-workbench="createSessionWorkbench = $event"
+          @terminal-state="handleTerminalState"
+          @terminal-error="handleTerminalError"
+        />
       </SplitterPanel>
     </SplitterGroup>
 
-    <DialogRoot v-model:open="editDialogOpen">
-      <DialogPortal>
-        <DialogOverlay class="dialog-overlay" />
-        <DialogContent class="dialog-content">
-          <DialogTitle class="dialog-title">{{ t('dialog.editSessionTitle') }}</DialogTitle>
-          <form class="dialog-form" @submit.prevent="editSelectedSession">
-            <label>
-              <span>{{ t('dialog.name') }}</span>
-              <input
-                ref="editInput"
-                v-model="editText"
-                :placeholder="t('dialog.sessionNamePlaceholder')"
-              />
-            </label>
-            <div class="dialog-actions">
-              <DialogClose as-child>
-                <button type="button" class="button button-secondary">
-                  {{ t('common.cancel') }}
-                </button>
-              </DialogClose>
-              <button type="submit" class="button button-primary" :disabled="editingSession">
-                {{ editingSession ? t('common.editing') : t('common.edit') }}
-              </button>
-            </div>
-          </form>
-        </DialogContent>
-      </DialogPortal>
-    </DialogRoot>
+    <EditSessionDialog
+      :open="dialogs.editDialogOpen"
+      :session="dialogs.selectedSession"
+      :editing="editingSession"
+      @update:open="dialogs.editDialogOpen = $event"
+      @submit="editSelectedSession"
+    />
 
-    <AlertDialogRoot v-model:open="deleteSessionDialogOpen">
-      <AlertDialogPortal>
-        <AlertDialogOverlay class="dialog-overlay" />
-        <AlertDialogContent class="dialog-content">
-          <AlertDialogTitle class="dialog-title">{{
-            t('dialog.deleteSessionTitle')
-          }}</AlertDialogTitle>
-          <AlertDialogDescription class="dialog-description">
-            <template v-if="selectedSession && isActiveLifecycle(selectedSession)">
-              {{ t('dialog.deleteActiveSessionDescription') }}
-            </template>
-            <template v-else>
-              {{
-                t('dialog.deleteSessionDescription', {
-                  name: selectedSession ? selectedSession.name : t('dialog.fallbackSession'),
-                })
-              }}
-            </template>
-          </AlertDialogDescription>
-          <div class="dialog-actions">
-            <AlertDialogCancel as-child>
-              <button type="button" class="button button-secondary">
-                {{ t('common.cancel') }}
-              </button>
-            </AlertDialogCancel>
-            <AlertDialogAction as-child>
-              <button
-                type="button"
-                class="button button-danger"
-                :disabled="
-                  !selectedSession || isActiveLifecycle(selectedSession) || !!deletingSessionId
-                "
-                @click="deleteSelectedSession"
-              >
-                {{ deletingSessionId ? t('common.deleting') : t('common.delete') }}
-              </button>
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialogPortal>
-    </AlertDialogRoot>
+    <DeleteSessionDialog
+      :open="dialogs.deleteSessionDialogOpen"
+      :session="dialogs.selectedSession"
+      :deleting="!!deletingSessionId"
+      @update:open="dialogs.deleteSessionDialogOpen = $event"
+      @confirm="deleteSelectedSession"
+    />
 
-    <AlertDialogRoot v-model:open="removeWorkspaceDialogOpen">
-      <AlertDialogPortal>
-        <AlertDialogOverlay class="dialog-overlay" />
-        <AlertDialogContent class="dialog-content">
-          <AlertDialogTitle class="dialog-title">{{
-            t('dialog.removeWorkspaceTitle')
-          }}</AlertDialogTitle>
-          <AlertDialogDescription class="dialog-description">
-            <template v-if="selectedWorkspace">
-              {{ t('dialog.removeWorkspaceDescription', { name: selectedWorkspace.name }) }}
-            </template>
-            <template v-else>
-              {{ t('dialog.removeWorkspaceDescription', { name: t('dialog.fallbackSession') }) }}
-            </template>
-          </AlertDialogDescription>
-          <div class="dialog-actions">
-            <AlertDialogCancel as-child>
-              <button type="button" class="button button-secondary">
-                {{ t('common.cancel') }}
-              </button>
-            </AlertDialogCancel>
-            <AlertDialogAction as-child>
-              <button
-                type="button"
-                class="button button-danger"
-                :disabled="!selectedWorkspace || !!removingWorkspaceId"
-                @click="removeSelectedWorkspace"
-              >
-                {{ removingWorkspaceId ? t('common.removing') : t('common.removeWorkspace') }}
-              </button>
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialogPortal>
-    </AlertDialogRoot>
+    <RemoveWorkspaceDialog
+      :open="dialogs.removeWorkspaceDialogOpen"
+      :workspace="dialogs.selectedWorkspace"
+      :removing="!!removingWorkspaceId"
+      @update:open="dialogs.removeWorkspaceDialogOpen = $event"
+      @confirm="removeSelectedWorkspace"
+    />
 
-    <ToastRoot
-      v-for="toast in toasts"
-      :key="toast.id"
-      class="toast-root"
-      :class="`toast-${toast.kind}`"
-      :duration="5000"
-      @update:open="(open) => !open && dismissToast(toast.id)"
-    >
-      <ToastTitle class="toast-title">{{ toast.title }}</ToastTitle>
-      <ToastDescription v-if="toast.description" class="toast-description">
-        {{ toast.description }}
-      </ToastDescription>
-      <ToastClose class="toast-close" :aria-label="t('common.close')" />
-    </ToastRoot>
-    <ToastViewport class="toast-viewport" />
+    <ToastHost />
   </ToastProvider>
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, onMounted, ref } from 'vue'
+  import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { SquareTerminal, X } from '@lucide/vue'
-  import { VueDraggable } from 'vue-draggable-plus'
-  import {
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogOverlay,
-    AlertDialogPortal,
-    AlertDialogRoot,
-    AlertDialogTitle,
-    DialogClose,
-    DialogContent,
-    DialogOverlay,
-    DialogPortal,
-    DialogRoot,
-    DialogTitle,
-    SplitterGroup,
-    SplitterPanel,
-    SplitterResizeHandle,
-    TabsContent,
-    TabsList,
-    TabsRoot,
-    TabsTrigger,
-    ToastClose,
-    ToastDescription,
-    ToastProvider,
-    ToastRoot,
-    ToastTitle,
-    ToastViewport,
-  } from 'reka-ui'
-  import HistoryTerminalView from '../components/terminal/HistoryTerminalView.vue'
-  import TerminalView from '../components/terminal/TerminalView.vue'
-  import { logTerminalDiagnostic } from '../components/terminal/diagnostics'
-  import { measureXtermSize } from '../components/terminal/useXterm'
+  import { useRouter } from 'vue-router'
+  import { SplitterGroup, SplitterPanel, SplitterResizeHandle, ToastProvider } from 'reka-ui'
+  import DeleteSessionDialog from '../components/session/DeleteSessionDialog.vue'
+  import EditSessionDialog from '../components/session/EditSessionDialog.vue'
+  import RemoveWorkspaceDialog from '../components/session/RemoveWorkspaceDialog.vue'
+  import SessionWorkbench from '../components/session/SessionWorkbench.vue'
+  import ToastHost from '../components/session/ToastHost.vue'
   import WorkspaceSessionSidebar from '../components/workspace/WorkspaceSessionSidebar.vue'
-  import type {
-    ServerControlMessage,
-    SessionSummary,
-    WorkspaceSummary,
-    WorkspaceTreeSummary,
-  } from '../protocol/terminal'
-  import { commandFromText } from '../protocol/terminal'
+  import { logTerminalDiagnostic } from '../components/terminal/diagnostics'
+  import { useCreateSessionDraft } from '../composable/useCreateSessionDraft'
+  import { useSessionDialogs } from '../composable/useSessionDialogs'
+  import { useTerminalSize } from '../composable/useTerminalSize'
   import {
     closeSession,
     createSession,
     deleteSession,
     getSession,
-    readHistory,
     rerunSession,
-    terminalWsUrl as sessionTerminalWsUrl,
+    terminalWsUrl,
     updateSession,
   } from '../features/sessions/api'
-  import { authLogin, authMe, listDevices, type DeviceSummary } from '../features/gateway/api'
-  import {
-    deleteWorkspace,
-    listWorkspaceTree,
-    updateWorkspaceOrder,
-  } from '../features/workspaces/api'
-
-  type OpenSessionTab = {
-    sessionId: string
-    historyText: string
-    historyLoaded: boolean
-    historyLoading: boolean
-    historyError: string | null
-  }
-
-  type ToastKind = 'success' | 'error' | 'info'
-  type AppToast = { id: number; kind: ToastKind; title: string; description?: string }
+  import { authLogout } from '../features/gateway/api'
+  import { deleteWorkspace } from '../features/workspaces/api'
+  import type { ServerControlMessage, SessionSummary, WorkspaceSummary } from '../protocol/terminal'
+  import { useGatewayStore } from '../store/gateway'
+  import { useNotificationsStore } from '../store/notifications'
+  import { useWorkbenchStore } from '../store/workbench'
+  import { useWorkspaceSessionsStore } from '../store/workspaceSessions'
 
   const { t } = useI18n()
-  const workspaceTree = ref<WorkspaceTreeSummary[]>([])
-  const workspaces = ref<WorkspaceSummary[]>([])
-  const sessions = ref<SessionSummary[]>([])
-  const openedTabs = ref<OpenSessionTab[]>([])
-  const activeTabId = ref<string | null>(null)
-  const sessionName = ref('')
-  const commandText = ref(defaultCommand())
-  const cwd = ref('')
-  const loading = ref(false)
+  const router = useRouter()
+  const gateway = useGatewayStore()
+  const workspaceSessions = useWorkspaceSessionsStore()
+  const workbench = useWorkbenchStore()
+  const notifications = useNotificationsStore()
+  const dialogs = useSessionDialogs()
+  const createDraft = useCreateSessionDraft()
+
+  const createSessionWorkbench = ref<HTMLElement | null>(null)
+  const { measureInitialTerminalSize } = useTerminalSize(createSessionWorkbench)
+
   const creatingSession = ref(false)
   const editingSession = ref(false)
   const stoppingSessionId = ref<string | null>(null)
   const rerunningSessionId = ref<string | null>(null)
   const deletingSessionId = ref<string | null>(null)
   const removingWorkspaceId = ref<string | null>(null)
-  const createSessionFormOpen = ref(false)
-  const createSessionWorkspace = ref<WorkspaceSummary | null>(null)
-  const editDialogOpen = ref(false)
-  const deleteSessionDialogOpen = ref(false)
-  const removeWorkspaceDialogOpen = ref(false)
-  const selectedSession = ref<SessionSummary | null>(null)
-  const selectedWorkspace = ref<WorkspaceSummary | null>(null)
-  const editText = ref('')
-  const toasts = ref<AppToast[]>([])
-  const authInitialized = ref(false)
-  const authenticated = ref(false)
-  const loggingIn = ref(false)
-  const usernameInput = ref('')
-  const passwordInput = ref('')
-  const devices = ref<DeviceSummary[]>([])
-  const selectedDeviceId = ref('')
-  const editInput = ref<{ focus: () => void; select: () => void } | null>(null)
-  const createSessionWorkbench = ref<HTMLElement | null>(null)
-  let toastId = 0
 
-  const activeSession = computed(
-    () => sessions.value.find((session) => session.id === activeTabId.value) ?? null,
-  )
+  const activeSession = computed(() => {
+    const tab = workbench.activeTab
+    return tab ? workspaceSessions.sessionById(tab.workspaceId, tab.sessionId) : null
+  })
 
-  const activeTab = computed(
-    () => openedTabs.value.find((tab) => tab.sessionId === activeTabId.value) ?? null,
-  )
-
-  const activeLifecycleLabel = computed(() => {
-    const state = activeSession.value?.lifecycle_state
-    return state ? state.charAt(0).toUpperCase() + state.slice(1) : ''
+  const activeTerminalWsUrl = computed(() => {
+    const session = activeSession.value
+    if (!session) {
+      return null
+    }
+    return terminalWsUrl(gateway.selectedDeviceId, session.workspace_id, session.id)
   })
 
   async function refresh() {
-    if (!selectedDeviceId.value) {
+    if (!gateway.selectedDeviceId) {
       return
     }
-    loading.value = true
     try {
-      const response = await listWorkspaceTree(selectedDeviceId.value)
-      applyWorkspaceTree(response.data)
-      if (activeTabId.value) {
-        await ensureHistoryLoaded(activeTabId.value)
-      }
+      await workspaceSessions.refresh(gateway.selectedDeviceId)
+      await notifyHistoryError(
+        await workbench.ensureActiveHistoryLoaded(
+          gateway.selectedDeviceId,
+          workspaceSessions.sessionById,
+        ),
+      )
     } catch (err) {
-      notifyError(t('toast.refreshFailed'), err)
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function login() {
-    if (loggingIn.value) {
-      return
-    }
-    loggingIn.value = true
-    try {
-      await authLogin(usernameInput.value, passwordInput.value)
-      authenticated.value = true
-      await loadDevices()
-    } catch (err) {
-      notifyError(t('gateway.loginFailed'), err)
-    } finally {
-      loggingIn.value = false
-    }
-  }
-
-  async function loadDevices() {
-    try {
-      devices.value = await listDevices()
-      if (devices.value.some((device) => device.id === selectedDeviceId.value)) {
-        await selectDevice()
-        return
-      }
-      selectedDeviceId.value = devices.value.length === 1 ? devices.value[0].id : ''
-      await selectDevice()
-    } catch (err) {
-      notifyError(t('toast.refreshFailed'), err)
+      notifications.notifyError(t('toast.refreshFailed'), err)
     }
   }
 
   async function selectDeviceId(deviceId: string) {
-    if (deviceId === selectedDeviceId.value) {
+    if (!gateway.selectDeviceId(deviceId)) {
       return
     }
-    selectedDeviceId.value = deviceId
     await selectDevice()
   }
 
   async function selectDevice() {
-    await resetWorkbenchForSourceChange()
+    workspaceSessions.reset()
+    workbench.resetForSourceChange()
     await refresh()
   }
 
-  async function resetWorkbenchForSourceChange() {
-    createSessionFormOpen.value = false
-    openedTabs.value = []
-    activeTabId.value = null
-    applyWorkspaceTree([])
+  async function logout() {
+    try {
+      await authLogout()
+      gateway.authenticated = false
+      gateway.passwordInput = ''
+      gateway.devices = []
+      gateway.selectedDeviceId = ''
+      workspaceSessions.reset()
+      workbench.resetForSourceChange()
+      await router.replace({ name: 'login' })
+    } catch (err) {
+      notifications.notifyError(t('gateway.logoutFailed'), err)
+    }
   }
 
   async function startSession() {
     if (creatingSession.value) {
       return
     }
-    const name = sessionName.value.trim()
-    const trimmedCwd = cwd.value.trim()
-    const command = commandFromText(commandText.value)
-    if (!name) {
-      pushToast('error', t('toast.createSessionFailed'), t('message.sessionNameRequired'))
-      return
-    }
-    if (!trimmedCwd) {
-      pushToast('error', t('toast.createSessionFailed'), t('message.workingDirectoryRequired'))
-      return
-    }
-    if (command.length === 0) {
-      pushToast('error', t('toast.createSessionFailed'), t('message.commandRequired'))
+    const draft = createDraft.validate()
+    if (draft.error) {
+      notifyCreateSessionValidationError(draft.error)
       return
     }
     creatingSession.value = true
     try {
       const size = measureInitialTerminalSize()
       logTerminalDiagnostic('session.create.request', {
-        name,
-        cwd: trimmedCwd,
-        command: command[0],
-        args: command.length - 1,
+        name: draft.value.name,
+        cwd: draft.value.cwd,
+        command: draft.value.command[0],
+        args: draft.value.command.length - 1,
         cols: size.cols,
         rows: size.rows,
       })
-      const workspaceId = createSessionWorkspace.value?.id ?? null
-      const created = await createSession(selectedDeviceId.value, workspaceId, {
-        ...(workspaceId ? { workspace_id: workspaceId } : {}),
-        name,
-        cwd: trimmedCwd,
-        command,
+      const created = await createSession(gateway.selectedDeviceId, draft.value.workspaceId, {
+        ...(draft.value.workspaceId ? { workspace_id: draft.value.workspaceId } : {}),
+        name: draft.value.name,
+        cwd: draft.value.cwd,
+        command: draft.value.command,
         cols: size.cols,
         rows: size.rows,
       })
@@ -633,7 +244,7 @@
         state: created.state,
       })
       const session = await getSession(
-        selectedDeviceId.value,
+        gateway.selectedDeviceId,
         created.workspace_id,
         created.session_id,
       )
@@ -643,180 +254,130 @@
         attachmentState: session.attachment_state,
         exitCode: session.exit_code,
       })
-      if (!upsertSessionInState(session)) {
+      if (!workspaceSessions.upsertSession(session)) {
         await refresh()
       }
-      resetCreateSessionForm()
-      createSessionFormOpen.value = false
+      createDraft.reset(undefined, t('dialog.defaultSessionName'))
+      workbench.closeCreateSessionForm()
       await openSessionTab(session)
-      pushToast('success', t('toast.sessionCreated'), session.name)
+      notifications.pushToast('success', t('toast.sessionCreated'), session.name)
     } catch (err) {
-      notifyError(t('toast.createSessionFailed'), err)
+      notifications.notifyError(t('toast.createSessionFailed'), err)
       await refresh()
     } finally {
       creatingSession.value = false
     }
   }
 
-  async function editSelectedSession() {
-    if (!selectedSession.value || editingSession.value) {
+  async function editSelectedSession(name: string) {
+    if (!dialogs.selectedSession || editingSession.value) {
       return
     }
-    const name = editText.value.trim()
     if (!name) {
-      pushToast('error', t('toast.editSessionFailed'), t('message.nameRequired'))
+      notifications.pushToast('error', t('toast.editSessionFailed'), t('message.nameRequired'))
       return
     }
     editingSession.value = true
     try {
       const updated = await updateSession(
-        selectedDeviceId.value,
-        selectedSession.value.workspace_id,
-        selectedSession.value.id,
+        gateway.selectedDeviceId,
+        dialogs.selectedSession.workspace_id,
+        dialogs.selectedSession.id,
         { name },
       )
-      updateSessionInState(updated)
-      selectedSession.value = updated
-      editDialogOpen.value = false
-      pushToast('success', t('toast.sessionEdited'), name)
+      workspaceSessions.updateSession(updated)
+      dialogs.selectedSession = updated
+      dialogs.editDialogOpen = false
+      notifications.pushToast('success', t('toast.sessionEdited'), name)
     } catch (err) {
-      notifyError(t('toast.editSessionFailed'), err)
+      notifications.notifyError(t('toast.editSessionFailed'), err)
     } finally {
       editingSession.value = false
     }
   }
 
   async function deleteSelectedSession() {
-    if (
-      !selectedSession.value ||
-      deletingSessionId.value ||
-      isActiveLifecycle(selectedSession.value)
-    ) {
+    const session = dialogs.selectedSession
+    if (!session || deletingSessionId.value || isActiveLifecycle(session)) {
       return
     }
-    const session = selectedSession.value
     deletingSessionId.value = session.id
     try {
-      await deleteSession(selectedDeviceId.value, session.workspace_id, session.id)
-      removeSessionFromState(session.id)
-      closeTab(session.id)
-      selectedSession.value = null
-      deleteSessionDialogOpen.value = false
-      pushToast('success', t('toast.sessionDeleted'), session.name)
+      await deleteSession(gateway.selectedDeviceId, session.workspace_id, session.id)
+      workspaceSessions.removeSession(session.workspace_id, session.id)
+      const nextSession = workbench.closeTab(
+        session.workspace_id,
+        session.id,
+        workspaceSessions.sessionById,
+      )
+      if (nextSession) {
+        await notifyHistoryError(
+          await workbench.ensureHistoryLoaded(gateway.selectedDeviceId, nextSession),
+        )
+      }
+      dialogs.clearSelectedSession()
+      dialogs.deleteSessionDialogOpen = false
+      notifications.pushToast('success', t('toast.sessionDeleted'), session.name)
     } catch (err) {
-      notifyError(t('toast.deleteSessionFailed'), err)
+      notifications.notifyError(t('toast.deleteSessionFailed'), err)
     } finally {
       deletingSessionId.value = null
     }
   }
 
   async function removeSelectedWorkspace() {
-    if (!selectedWorkspace.value || removingWorkspaceId.value) {
+    const workspace = dialogs.selectedWorkspace
+    if (!workspace || removingWorkspaceId.value) {
       return
     }
-    const workspace = selectedWorkspace.value
     removingWorkspaceId.value = workspace.id
     try {
-      await deleteWorkspace(selectedDeviceId.value, workspace.id)
-      removeWorkspaceFromState(workspace.id)
-      selectedWorkspace.value = null
-      removeWorkspaceDialogOpen.value = false
-      pushToast(
+      await deleteWorkspace(gateway.selectedDeviceId, workspace.id)
+      const removedSessions = workspaceSessions.removeWorkspace(workspace.id)
+      workbench.closeRemovedSessions(removedSessions)
+      dialogs.clearSelectedWorkspace()
+      dialogs.removeWorkspaceDialogOpen = false
+      notifications.pushToast(
         'success',
         t('toast.workspaceRemoved'),
         t('message.workspaceRemoved', { name: workspace.name }),
       )
     } catch (err) {
-      notifyError(t('toast.removeWorkspaceFailed'), err)
+      notifications.notifyError(t('toast.removeWorkspaceFailed'), err)
     } finally {
       removingWorkspaceId.value = null
     }
   }
 
   async function reorderWorkspaces(workspaceIds: string[]) {
-    const previousTree = workspaceTree.value
-    workspaceTree.value = orderWorkspaceTree(previousTree, workspaceIds)
     try {
-      const orderedWorkspaces = await updateWorkspaceOrder(selectedDeviceId.value, workspaceIds)
-      workspaceTree.value = orderWorkspaceTree(
-        workspaceTree.value,
-        orderedWorkspaces.map((workspace) => workspace.id),
-      )
-      workspaces.value = orderedWorkspaces
+      await workspaceSessions.reorderWorkspaces(gateway.selectedDeviceId, workspaceIds)
     } catch (err) {
-      notifyError(t('toast.updateWorkspaceOrderFailed'), err)
-      workspaceTree.value = previousTree
-      workspaces.value = previousTree.map(workspaceSummaryFromTree)
+      notifications.notifyError(t('toast.updateWorkspaceOrderFailed'), err)
       await refresh()
     }
   }
 
   async function openSessionTab(session: SessionSummary) {
-    createSessionFormOpen.value = false
-    if (!openedTabs.value.some((tab) => tab.sessionId === session.id)) {
-      openedTabs.value.push({
-        sessionId: session.id,
-        historyText: '',
-        historyLoaded: false,
-        historyLoading: false,
-        historyError: null,
-      })
-    }
-    setActiveTab(session.id)
-    await ensureHistoryLoaded(session.id)
+    await notifyHistoryError(await workbench.openSession(gateway.selectedDeviceId, session))
   }
 
-  function setActiveTab(sessionId: string) {
-    activeTabId.value = sessionId
+  async function activateOpenedTab(sessionId: string) {
+    await notifyHistoryError(
+      await workbench.activateSession(
+        gateway.selectedDeviceId,
+        sessionId,
+        workspaceSessions.sessionById,
+      ),
+    )
   }
 
-  function activateOpenedTab(value: string | number) {
-    createSessionFormOpen.value = false
-    const sessionId = String(value)
-    setActiveTab(sessionId)
-    void ensureHistoryLoaded(sessionId)
-  }
-
-  function closeTab(sessionId: string) {
-    const closingIndex = openedTabs.value.findIndex((tab) => tab.sessionId === sessionId)
-    if (closingIndex === -1) {
-      return
-    }
-    openedTabs.value.splice(closingIndex, 1)
-    if (activeTabId.value !== sessionId) {
-      return
-    }
-    activeTabId.value =
-      openedTabs.value[Math.min(closingIndex, openedTabs.value.length - 1)]?.sessionId ?? null
-    if (activeTabId.value) {
-      void ensureHistoryLoaded(activeTabId.value)
-    }
-  }
-
-  async function ensureHistoryLoaded(sessionId: string) {
-    const session = sessionFor(sessionId)
-    const tab = openedTabs.value.find((item) => item.sessionId === sessionId)
-    if (
-      !session ||
-      !tab ||
-      session.lifecycle_state === 'running' ||
-      tab.historyLoaded ||
-      tab.historyLoading
-    ) {
-      return
-    }
-    tab.historyLoading = true
-    tab.historyError = null
-    try {
-      const response = await readHistory(selectedDeviceId.value, session.workspace_id, sessionId)
-      tab.historyText = response.data
-      tab.historyLoaded = true
-    } catch (err) {
-      const message = errorMessage(err)
-      tab.historyError = message
-      pushToast('error', t('toast.readHistoryFailed'), message)
-    } finally {
-      tab.historyLoading = false
+  async function closeTab(workspaceId: string, sessionId: string) {
+    const nextSession = workbench.closeTab(workspaceId, sessionId, workspaceSessions.sessionById)
+    if (nextSession) {
+      await notifyHistoryError(
+        await workbench.ensureHistoryLoaded(gateway.selectedDeviceId, nextSession),
+      )
     }
   }
 
@@ -824,62 +385,30 @@
     logTerminalDiagnostic('session.form.open', {
       workspaceId: workspace?.id,
       workspacePath: workspace?.path,
-      activeTabId: activeTabId.value,
+      activeSessionId: workbench.activeSessionId,
     })
-    resetCreateSessionForm(workspace)
-    createSessionFormOpen.value = true
+    createDraft.reset(workspace, t('dialog.defaultSessionName'))
+    workbench.openCreateSessionForm()
   }
 
   function cancelCreateSession() {
-    logTerminalDiagnostic('session.form.cancel', { activeTabId: activeTabId.value })
-    createSessionFormOpen.value = false
-  }
-
-  function resetCreateSessionForm(workspace?: WorkspaceSummary) {
-    commandText.value = defaultCommand()
-    createSessionWorkspace.value = workspace ?? null
-    cwd.value = workspace?.path ?? '~'
-    sessionName.value = t('dialog.defaultSessionName')
-  }
-
-  function defaultCommand() {
-    const userAgent = window.navigator.userAgent.toLowerCase()
-    if (userAgent.includes('windows')) {
-      return 'cmd'
-    }
-    if (userAgent.includes('mac os') || userAgent.includes('macintosh')) {
-      return 'zsh'
-    }
-    if (userAgent.includes('linux')) {
-      return 'bash'
-    }
-    return 'bash'
-  }
-
-  function openEditDialog(session: SessionSummary) {
-    selectedSession.value = session
-    editText.value = session.name || session.command || ''
-    editDialogOpen.value = true
-    void nextTick(() => {
-      editInput.value?.focus()
-      editInput.value?.select()
-    })
+    logTerminalDiagnostic('session.form.cancel', { activeSessionId: workbench.activeSessionId })
+    workbench.closeCreateSessionForm()
   }
 
   async function stopSessionFromSidebar(session: SessionSummary) {
-    if (!isStoppableLifecycle(session)) {
-      return
-    }
-    if (stoppingSessionId.value) {
+    if (!isStoppableLifecycle(session) || stoppingSessionId.value) {
       return
     }
     stoppingSessionId.value = session.id
     try {
-      const updated = await closeSession(selectedDeviceId.value, session.workspace_id, session.id)
-      updateSessionInState(updated)
-      await ensureHistoryLoaded(session.id)
+      const updated = await closeSession(gateway.selectedDeviceId, session.workspace_id, session.id)
+      workspaceSessions.updateSession(updated)
+      await notifyHistoryError(
+        await workbench.ensureHistoryLoaded(gateway.selectedDeviceId, updated),
+      )
     } catch (err) {
-      notifyError(t('toast.stopSessionFailed'), err)
+      notifications.notifyError(t('toast.stopSessionFailed'), err)
     } finally {
       stoppingSessionId.value = null
     }
@@ -893,22 +422,22 @@
     try {
       const size = measureInitialTerminalSize()
       const response = await rerunSession(
-        selectedDeviceId.value,
+        gateway.selectedDeviceId,
         session.workspace_id,
         session.id,
         size,
       )
       const updated = await getSession(
-        selectedDeviceId.value,
+        gateway.selectedDeviceId,
         response.workspace_id,
         response.session_id,
       )
-      updateSessionInState(updated)
-      resetTabHistory(updated.id)
+      workspaceSessions.updateSession(updated)
+      workbench.resetTabHistory(updated.workspace_id, updated.id)
       await openSessionTab(updated)
-      pushToast('success', t('toast.sessionRerun'), updated.name)
+      notifications.pushToast('success', t('toast.sessionRerun'), updated.name)
     } catch (err) {
-      notifyError(t('toast.rerunSessionFailed'), err)
+      notifications.notifyError(t('toast.rerunSessionFailed'), err)
       await refreshSessionAfterRerunFailure(session)
     } finally {
       rerunningSessionId.value = null
@@ -916,171 +445,41 @@
   }
 
   async function refreshSessionAfterRerunFailure(session: SessionSummary) {
-    resetTabHistory(session.id)
+    workbench.resetTabHistory(session.workspace_id, session.id)
     try {
-      const updated = await getSession(selectedDeviceId.value, session.workspace_id, session.id)
-      updateSessionInState(updated)
-      await ensureHistoryLoaded(session.id)
+      const updated = await getSession(gateway.selectedDeviceId, session.workspace_id, session.id)
+      workspaceSessions.updateSession(updated)
+      await notifyHistoryError(
+        await workbench.ensureHistoryLoaded(gateway.selectedDeviceId, updated),
+      )
     } catch {
       await refresh()
     }
   }
 
-  function resetTabHistory(sessionId: string) {
-    const tab = openedTabs.value.find((item) => item.sessionId === sessionId)
-    if (!tab) {
-      return
-    }
-    tab.historyText = ''
-    tab.historyLoaded = false
-    tab.historyLoading = false
-    tab.historyError = null
-  }
-
   function openDeleteSessionDialog(session: SessionSummary) {
-    selectedSession.value = session
-    deleteSessionDialogOpen.value = true
+    dialogs.openDeleteSessionDialog(session)
     if (isActiveLifecycle(session)) {
-      pushToast('info', t('toast.sessionCannotBeDeletedYet'), t('message.closeSessionBeforeDelete'))
+      notifications.pushToast(
+        'info',
+        t('toast.sessionCannotBeDeletedYet'),
+        t('message.closeSessionBeforeDelete'),
+      )
     }
-  }
-
-  function openRemoveWorkspaceDialog(workspace: WorkspaceSummary) {
-    selectedWorkspace.value = workspace
-    removeWorkspaceDialogOpen.value = true
   }
 
   function explainUnsupportedDirectoryDelete(workspace: WorkspaceSummary) {
-    selectedWorkspace.value = workspace
-    pushToast(
+    dialogs.selectedWorkspace = workspace
+    notifications.pushToast(
       'info',
       t('toast.directoryDeleteUnsupported'),
       t('message.directoryDeleteUnsupported'),
     )
   }
 
-  function applyWorkspaceTree(nextWorkspaceTree: WorkspaceTreeSummary[]) {
-    workspaceTree.value = nextWorkspaceTree
-    workspaces.value = nextWorkspaceTree.map(workspaceSummaryFromTree)
-    sessions.value = nextWorkspaceTree.flatMap((workspace) =>
-      workspace.children.map((session) => ({
-        ...session,
-        workspace_id: session.workspace_id ?? workspace.id,
-      })),
-    )
-  }
-
-  function upsertSessionInState(updated: SessionSummary): boolean {
-    if (!workspaceTree.value.some((workspace) => workspace.id === updated.workspace_id)) {
-      return false
-    }
-
-    const existingIndex = sessions.value.findIndex((session) => session.id === updated.id)
-    if (existingIndex === -1) {
-      sessions.value = [...sessions.value, updated]
-    } else {
-      sessions.value = sessions.value.map((session) =>
-        session.id === updated.id ? updated : session,
-      )
-    }
-
-    workspaceTree.value = workspaceTree.value.map((workspace) => {
-      if (workspace.id !== updated.workspace_id) {
-        return workspace
-      }
-      const nextSession = sessionSummaryForWorkspaceTree(updated)
-      const childIndex = workspace.children.findIndex((session) => session.id === updated.id)
-      if (childIndex === -1) {
-        return { ...workspace, children: [...workspace.children, nextSession] }
-      }
-      return {
-        ...workspace,
-        children: workspace.children.map((session) =>
-          session.id === updated.id ? nextSession : session,
-        ),
-      }
-    })
-    return true
-  }
-
-  function updateSessionInState(updated: SessionSummary) {
-    if (!sessions.value.some((session) => session.id === updated.id)) {
-      return
-    }
-    upsertSessionInState(updated)
-  }
-
-  function removeSessionFromState(sessionId: string) {
-    sessions.value = sessions.value.filter((session) => session.id !== sessionId)
-    workspaceTree.value = workspaceTree.value.map((workspace) => ({
-      ...workspace,
-      children: workspace.children.filter((session) => session.id !== sessionId),
-    }))
-  }
-
-  function removeWorkspaceFromState(workspaceId: string) {
-    const removedSessionIds = new Set(
-      workspaceTree.value
-        .find((workspace) => workspace.id === workspaceId)
-        ?.children.map((session) => session.id) ?? [],
-    )
-    workspaceTree.value = workspaceTree.value.filter((workspace) => workspace.id !== workspaceId)
-    workspaces.value = workspaces.value.filter((workspace) => workspace.id !== workspaceId)
-    sessions.value = sessions.value.filter((session) => session.workspace_id !== workspaceId)
-    openedTabs.value = openedTabs.value.filter((tab) => !removedSessionIds.has(tab.sessionId))
-    if (
-      activeSession.value?.workspace_id === workspaceId ||
-      (activeTabId.value && removedSessionIds.has(activeTabId.value))
-    ) {
-      activeTabId.value = openedTabs.value[0]?.sessionId ?? null
-    }
-  }
-
-  function sessionSummaryForWorkspaceTree(session: SessionSummary) {
-    return {
-      id: session.id,
-      name: session.name,
-      command: session.command,
-      cwd: session.cwd,
-      lifecycle_state: session.lifecycle_state,
-      attachment_state: session.attachment_state,
-      exit_code: session.exit_code,
-      updated_at: session.updated_at,
-    }
-  }
-
-  function workspaceSummaryFromTree(workspace: WorkspaceTreeSummary): WorkspaceSummary {
-    return {
-      id: workspace.id,
-      name: workspace.name,
-      path: workspace.path,
-      sort_order: workspace.sort_order,
-      updated_at: workspace.updated_at,
-    }
-  }
-
-  function orderWorkspaceTree(tree: WorkspaceTreeSummary[], workspaceIds: string[]) {
-    const order = new Map(workspaceIds.map((workspaceId, index) => [workspaceId, index]))
-    return [...tree].sort((left, right) => {
-      const leftOrder = order.get(left.id) ?? Number.MAX_SAFE_INTEGER
-      const rightOrder = order.get(right.id) ?? Number.MAX_SAFE_INTEGER
-      return leftOrder - rightOrder
-    })
-  }
-
-  function sessionFor(sessionId: string) {
-    return sessions.value.find((session) => session.id === sessionId) ?? null
-  }
-
-  function sessionTitle(sessionId: string) {
-    const session = sessionFor(sessionId)
-    if (!session) {
-      return sessionId.slice(0, 8)
-    }
-    const workspaceName = workspaces.value.find(
-      (workspace) => workspace.id === session.workspace_id,
-    )?.name
-    return workspaceName ? `${session.name} · ${workspaceName}` : session.name
+  function sessionTitle(workspaceId: string, sessionId: string) {
+    const session = workspaceSessions.sessionById(workspaceId, sessionId)
+    return session ? workspaceSessions.sessionTitle(session) : sessionId.slice(0, 8)
   }
 
   function isActiveLifecycle(session: SessionSummary) {
@@ -1095,122 +494,65 @@
     return ['stopped', 'failed'].includes(session.lifecycle_state)
   }
 
-  function terminalWsUrl(sessionId: string) {
-    const session = sessions.value.find((s) => s.id === sessionId)
-    return session
-      ? sessionTerminalWsUrl(selectedDeviceId.value, session.workspace_id, sessionId)
-      : null
-  }
-
   function handleTerminalState(message: ServerControlMessage) {
     if (message.type === 'error') {
-      pushToast('error', t('toast.terminalError', { code: message.code }), message.message)
+      notifications.pushToast(
+        'error',
+        t('toast.terminalError', { code: message.code }),
+        message.message,
+      )
     }
     if (message.type === 'state' || message.type === 'exited') {
       void refreshActiveSession()
     }
   }
 
-  async function refreshActiveSession(sessionId = activeTabId.value) {
-    if (!sessionId || !selectedDeviceId.value) {
+  async function refreshActiveSession(session = activeSession.value) {
+    if (!session || !gateway.selectedDeviceId) {
       return
     }
     try {
-      const session = sessionFor(sessionId)
-      if (!session) {
-        return
-      }
-      const updated = await getSession(selectedDeviceId.value, session.workspace_id, sessionId)
-      updateSessionInState(updated)
-      await ensureHistoryLoaded(sessionId)
+      const updated = await getSession(gateway.selectedDeviceId, session.workspace_id, session.id)
+      workspaceSessions.updateSession(updated)
+      await notifyHistoryError(
+        await workbench.ensureHistoryLoaded(gateway.selectedDeviceId, updated),
+      )
     } catch (err) {
-      notifyError(t('toast.refreshFailed'), err)
+      notifications.notifyError(t('toast.refreshFailed'), err)
     }
   }
 
   function handleTerminalError(message: string) {
-    pushToast('error', t('toast.terminalConnectionFailed'), message)
+    notifications.pushToast('error', t('toast.terminalConnectionFailed'), message)
   }
 
-  function pushToast(kind: ToastKind, title: string, description?: string) {
-    toasts.value.push({ id: ++toastId, kind, title, description })
+  function notifyCreateSessionValidationError(
+    error: 'name-required' | 'cwd-required' | 'command-required',
+  ) {
+    const messageKey = {
+      'name-required': 'message.sessionNameRequired',
+      'cwd-required': 'message.workingDirectoryRequired',
+      'command-required': 'message.commandRequired',
+    }[error]
+    notifications.pushToast('error', t('toast.createSessionFailed'), t(messageKey))
   }
 
-  function notifyError(title: string, err: unknown) {
-    pushToast('error', title, errorMessage(err))
-  }
-
-  function dismissToast(id: number) {
-    toasts.value = toasts.value.filter((toast) => toast.id !== id)
-  }
-
-  function errorMessage(err: unknown) {
-    return err instanceof Error ? err.message : String(err)
-  }
-
-  function measureInitialTerminalSize(): { cols: number; rows: number } {
-    const measured = measureCreateSessionWorkbench()
-    if (measured) {
-      return measured
-    }
-    const cols = Math.max(80, Math.min(10000, Math.floor((window.innerWidth - 360) / 9)))
-    const rows = Math.max(24, Math.min(10000, Math.floor((window.innerHeight - 180) / 18)))
-    logTerminalDiagnostic('xterm.measure.fallback', { cols, rows })
-    return { cols, rows }
-  }
-
-  function measureCreateSessionWorkbench(): { cols: number; rows: number } | null {
-    const workbench = createSessionWorkbench.value
-    if (!workbench) {
-      logTerminalDiagnostic('xterm.measure.missing-workbench')
-      return null
-    }
-    const wrapper = document.createElement('section')
-    wrapper.style.position = 'fixed'
-    wrapper.style.left = '-10000px'
-    wrapper.style.top = '0'
-    wrapper.style.width = `${workbench.clientWidth}px`
-    wrapper.style.height = `${workbench.clientHeight}px`
-    wrapper.style.display = 'flex'
-    wrapper.style.flexDirection = 'column'
-    wrapper.style.padding = '8px'
-    wrapper.style.boxSizing = 'border-box'
-    wrapper.style.visibility = 'hidden'
-    wrapper.style.pointerEvents = 'none'
-
-    const shell = document.createElement('section')
-    shell.className = 'terminal-shell'
-    shell.style.flex = '1'
-
-    const container = document.createElement('div')
-    container.className = 'terminal-container'
-    shell.appendChild(container)
-    wrapper.appendChild(shell)
-    document.body.appendChild(wrapper)
-    try {
-      return measureXtermSize(container)
-    } finally {
-      wrapper.remove()
-    }
-  }
-
-  async function initializeAuth() {
-    try {
-      const me = await authMe()
-      authenticated.value = me.authenticated
-      usernameInput.value = me.username || usernameInput.value
-      if (me.authenticated) {
-        await loadDevices()
-      }
-    } catch (err) {
-      notifyError(t('toast.refreshFailed'), err)
-      authenticated.value = false
-    } finally {
-      authInitialized.value = true
+  async function notifyHistoryError(message: string | null) {
+    if (message) {
+      notifications.pushToast('error', t('toast.readHistoryFailed'), message)
     }
   }
 
   onMounted(async () => {
-    await initializeAuth()
+    try {
+      await gateway.initializeAuth()
+      if (!gateway.authenticated) {
+        await router.replace({ name: 'login' })
+        return
+      }
+      await selectDevice()
+    } catch (err) {
+      notifications.notifyError(t('toast.refreshFailed'), err)
+    }
   })
 </script>
