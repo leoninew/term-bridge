@@ -121,9 +121,16 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	configContent := "serve:\n  host: 127.0.0.1\n  port: 9090\n  dev: true\nauth:\n  username: admin\n  password: admin\nagent:\n  server_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\n"
+	configContent := "serve:\n  host: 127.0.0.1\n  port: 9090\n  dev: true\nagent:\n  server_url: http://127.0.0.1:9090\n"
 	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
 		t.Fatalf("WriteFile(config) error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(cwd, ".termbridge"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(state dir) error = %v", err)
+	}
+	identityContent := "{\n  \"auth\": {\n    \"username\": \"admin\",\n    \"password\": \"admin\"\n  },\n  \"agent\": {\n    \"device_id\": \"dev-1\",\n    \"device_name\": \"local-mac\"\n  }\n}\n"
+	if err := os.WriteFile(filepath.Join(cwd, ".termbridge", "device.json"), []byte(identityContent), 0o600); err != nil {
+		t.Fatalf("WriteFile(identity) error = %v", err)
 	}
 	oldRunBackendServer := runBackendServer
 	oldRunAgentClient := runAgentClient

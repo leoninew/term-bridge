@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
+	"strings"
 	"testing"
 
 	apperrors "termbridge-go/internal/infrastructure/errors"
@@ -167,7 +169,7 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	configPath := filepath.Join(cwd, FileName)
 	logDir := filepath.Join(cwd, "configured-logs")
 	stateDir := filepath.Join(cwd, "configured-state")
-	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\n  request_body_limit: 128\n  response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: " + filepath.ToSlash(stateDir) + "\nserve:\n  host: 0.0.0.0\n  port: 9090\n  open: true\n  dev: true\nagent:\n  server_url: http://127.0.0.1:9090\n  device_id: office-id\n  device_name: office-pc\n"
+	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\n  request_body_limit: 128\n  response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: " + filepath.ToSlash(stateDir) + "\nserve:\n  host: 0.0.0.0\n  port: 9090\n  open: true\n  dev: true\nagent:\n  server_url: http://127.0.0.1:9090\n"
 	writeConfig(t, cwd, content)
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -201,7 +203,7 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	if cfg.Serve.Host != "0.0.0.0" || cfg.Serve.Port != 9090 || !cfg.Serve.Open || !cfg.Serve.Dev {
 		t.Fatalf("Serve = %#v", cfg.Serve)
 	}
-	if cfg.Agent.ServerUrl != "http://127.0.0.1:9090" || cfg.Agent.DeviceId != "office-id" || cfg.Agent.DeviceName != "office-pc" {
+	if cfg.Agent.ServerUrl != "http://127.0.0.1:9090" || cfg.Agent.DeviceId != "" || cfg.Agent.DeviceName != "" {
 		t.Fatalf("Agent = %#v", cfg.Agent)
 	}
 }
@@ -275,12 +277,11 @@ func TestDefaultDeviceNameUsesHostnameOnly(t *testing.T) {
 	}
 }
 
-func TestEnsureLocalIdentityRewritesLegacyDefaultDeviceName(t *testing.T) {
+func TestEnsureLocalIdentityWritesCredentialsToDeviceJSON(t *testing.T) {
 	isolateHome(t)
+	t.Setenv("USERNAME", "tester")
 	cwd := t.TempDir()
-	deviceId := "1234567890abcdef"
-	legacyName := defaultDeviceName() + "-" + deviceId[:8]
-	writeConfig(t, cwd, "auth:\n  username: admin\n  password: secret\nagent:\n  server_url: http://127.0.0.1:9010\n  device_id: "+deviceId+"\n  device_name: "+legacyName+"\n")
+	writeDefaultConfig(t, cwd)
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
@@ -290,14 +291,99 @@ func TestEnsureLocalIdentityRewritesLegacyDefaultDeviceName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureLocalIdentity() error = %v", err)
 	}
-	if bootstrap.Generated {
-		t.Fatal("BootstrapResult.Generated = true, want false")
+	if !bootstrap.Generated {
+		t.Fatal("BootstrapResult.Generated = false, want true")
 	}
-	if updated.Agent.DeviceId != deviceId || updated.Agent.DeviceName != defaultDeviceName() {
+	if updated.Auth.Username != "tester" || updated.Auth.Password == "" {
+		t.Fatalf("Auth = %#v", updated.Auth)
+	}
+	if updated.Agent.DeviceId == "" || updated.Agent.DeviceName != defaultDeviceName() {
 		t.Fatalf("Agent = %#v", updated.Agent)
 	}
-	if updated.Auth.Username != "admin" || updated.Auth.Password != "secret" {
+
+	identityPath := filepath.Join(cwd, ".termbridge", LocalIdentityFileName)
+	if filepath.Clean(bootstrap.ConfigFile) != filepath.Clean(identityPath) {
+		t.Fatalf("BootstrapResult.ConfigFile = %q, want %q", bootstrap.ConfigFile, identityPath)
+	}
+	data, err := os.ReadFile(identityPath)
+	if err != nil {
+		t.Fatalf("ReadFile(identity) error = %v", err)
+	}
+	content := string(data)
+	for _, want := range []string{"\"auth\":", "\"username\": \"tester\"", "\"password\":", "\"agent\":", "\"device_id\":", "\"device_name\": " + strconv.Quote(defaultDeviceName())} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("identity json missing %q: %s", want, content)
+		}
+	}
+	if strings.Index(content, "\"auth\"") > strings.Index(content, "\"agent\"") {
+		t.Fatalf("auth appears after agent: %s", content)
+	}
+	if strings.Index(content, "\"username\"") > strings.Index(content, "\"password\"") {
+		t.Fatalf("username appears after password: %s", content)
+	}
+	if exists, err := fileExists(filepath.Join(cwd, FileName)); err != nil || exists {
+		t.Fatalf("local config exists = %v, err = %v; generated agent identity must stay out of .termbridge.yaml", exists, err)
+	}
+
+	reloaded, secondBootstrap, err := EnsureLocalIdentity(updated)
+	if err != nil {
+		t.Fatalf("second EnsureLocalIdentity() error = %v", err)
+	}
+	if secondBootstrap.Generated {
+		t.Fatal("second BootstrapResult.Generated = true, want false")
+	}
+	if reloaded.Auth.Username != updated.Auth.Username || reloaded.Auth.Password != updated.Auth.Password {
+		t.Fatalf("reloaded Auth = %#v, want %#v", reloaded.Auth, updated.Auth)
+	}
+}
+
+func TestEnsureLocalIdentityPreservesDeviceJSONAgentFields(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeConfig(t, cwd, "agent:\n  server_url: http://127.0.0.1:9010\n")
+	stateDir := filepath.Join(cwd, ".termbridge")
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(state dir) error = %v", err)
+	}
+	identityPath := filepath.Join(stateDir, LocalIdentityFileName)
+	before := "{\n  \"auth\": {\"username\": \"admin\"},\n  \"agent\": {\"device_id\": \"dev-1\", \"device_name\": \"local\"}\n}\n"
+	if err := os.WriteFile(identityPath, []byte(before), 0o600); err != nil {
+		t.Fatalf("WriteFile(identity) error = %v", err)
+	}
+
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	updated, bootstrap, err := EnsureLocalIdentity(cfg)
+	if err != nil {
+		t.Fatalf("EnsureLocalIdentity() error = %v", err)
+	}
+	if !bootstrap.Generated {
+		t.Fatal("BootstrapResult.Generated = false, want true")
+	}
+	if updated.Auth.Username != "admin" || updated.Auth.Password == "" {
 		t.Fatalf("Auth = %#v", updated.Auth)
+	}
+	if updated.Agent.DeviceId != "dev-1" || updated.Agent.DeviceName != "local" {
+		t.Fatalf("Agent = %#v", updated.Agent)
+	}
+
+	data, err := os.ReadFile(identityPath)
+	if err != nil {
+		t.Fatalf("ReadFile(identity) error = %v", err)
+	}
+	content := string(data)
+	for _, want := range []string{"\"auth\":", "\"username\": \"admin\"", "\"password\":", "\"agent\":", "\"device_id\": \"dev-1\"", "\"device_name\": \"local\""} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("identity json missing %q: %s", want, content)
+		}
+	}
+	if strings.Index(content, "\"auth\"") > strings.Index(content, "\"agent\"") {
+		t.Fatalf("auth appears after agent: %s", content)
+	}
+	if strings.Index(content, "\"username\"") > strings.Index(content, "\"password\"") {
+		t.Fatalf("username appears after password: %s", content)
 	}
 }
 

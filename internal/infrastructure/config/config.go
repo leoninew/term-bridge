@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
-	"go.yaml.in/yaml/v3"
 
 	apperrors "termbridge-go/internal/infrastructure/errors"
 )
@@ -72,8 +72,8 @@ type AgentConfig struct {
 }
 
 type AuthConfig struct {
-	Username string
-	Password string
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type BootstrapResult struct {
@@ -81,6 +81,49 @@ type BootstrapResult struct {
 	Generated  bool
 	Username   string
 	Password   string
+}
+
+// LocalIdentityFileName is the JSON file stored in state_dir for local identity.
+const LocalIdentityFileName = "device.json"
+
+type LocalIdentity struct {
+	Auth  AuthConfig          `json:"auth"`
+	Agent AgentIdentityConfig `json:"agent"`
+}
+
+type AgentIdentityConfig struct {
+	DeviceId   string `json:"device_id"`
+	DeviceName string `json:"device_name"`
+}
+
+// loadLocalIdentityFromFile reads local auth and agent identity from device.json.
+// Returns a zero-value identity if the file does not exist.
+func loadLocalIdentityFromFile(path string) (LocalIdentity, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return LocalIdentity{}, nil
+		}
+		return LocalIdentity{}, err
+	}
+	var identity LocalIdentity
+	if err := json.Unmarshal(data, &identity); err != nil {
+		return LocalIdentity{}, err
+	}
+	return identity, nil
+}
+
+// saveLocalIdentityToFile writes local auth and agent identity to state_dir/device.json.
+func saveLocalIdentityToFile(stateDir string, identity LocalIdentity) error {
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(identity, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	return os.WriteFile(filepath.Join(stateDir, LocalIdentityFileName), data, 0o600)
 }
 
 type Options struct {
@@ -153,13 +196,7 @@ func Load(options Options) (Config, error) {
 			Dev:  v.GetBool("serve.dev"),
 		},
 		Agent: AgentConfig{
-			ServerUrl:  strings.TrimSpace(v.GetString("agent.server_url")),
-			DeviceId:   strings.TrimSpace(v.GetString("agent.device_id")),
-			DeviceName: strings.TrimSpace(v.GetString("agent.device_name")),
-		},
-		Auth: AuthConfig{
-			Username: strings.TrimSpace(v.GetString("auth.username")),
-			Password: strings.TrimSpace(v.GetString("auth.password")),
+			ServerUrl: strings.TrimSpace(v.GetString("agent.server_url")),
 		},
 		ConfigFile: configFile,
 	}
@@ -190,27 +227,21 @@ func Load(options Options) (Config, error) {
 }
 
 func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
-	configFile := filepath.Join(cfg.Cwd, FileName)
-	document := map[string]any{}
-	if data, err := os.ReadFile(configFile); err == nil {
-		if len(strings.TrimSpace(string(data))) > 0 {
-			if err := yaml.Unmarshal(data, &document); err != nil {
-				return Config{}, BootstrapResult{}, apperrors.Config("read local config file", err)
-			}
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return Config{}, BootstrapResult{}, apperrors.Config("read local config file", err)
+	identityPath := filepath.Join(cfg.Runtime.StateDir, LocalIdentityFileName)
+	identity, err := loadLocalIdentityFromFile(identityPath)
+	if err != nil {
+		return Config{}, BootstrapResult{}, apperrors.Config("load local identity", err)
 	}
 
 	changed := false
 	generatedPassword := ""
-	username := strings.TrimSpace(cfg.Auth.Username)
+	username := strings.TrimSpace(identity.Auth.Username)
 	if username == "" {
 		username = currentUsername()
-		setNestedString(document, "auth", "username", username)
+		identity.Auth.Username = username
 		changed = true
 	}
-	password := strings.TrimSpace(cfg.Auth.Password)
+	password := strings.TrimSpace(identity.Auth.Password)
 	if password == "" {
 		generated, err := randomHex(24)
 		if err != nil {
@@ -218,41 +249,35 @@ func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
 		}
 		password = generated
 		generatedPassword = generated
-		setNestedString(document, "auth", "password", password)
+		identity.Auth.Password = password
 		changed = true
 	}
-	deviceId := strings.TrimSpace(cfg.Agent.DeviceId)
+	deviceId := strings.TrimSpace(identity.Agent.DeviceId)
 	if deviceId == "" {
 		generated, err := randomHex(16)
 		if err != nil {
 			return Config{}, BootstrapResult{}, apperrors.Config("generate device id", err)
 		}
 		deviceId = generated
-		setNestedString(document, "agent", "device_id", deviceId)
+		identity.Agent.DeviceId = deviceId
 		changed = true
 	}
-	deviceName := strings.TrimSpace(cfg.Agent.DeviceName)
-	if deviceName == "" || legacyDefaultDeviceName(deviceName, deviceId) {
+	deviceName := strings.TrimSpace(identity.Agent.DeviceName)
+	if deviceName == "" {
 		deviceName = defaultDeviceName()
-		setNestedString(document, "agent", "device_name", deviceName)
+		identity.Agent.DeviceName = deviceName
 		changed = true
 	}
-
 	if changed {
-		data, err := yaml.Marshal(document)
-		if err != nil {
-			return Config{}, BootstrapResult{}, apperrors.Config("marshal local config file", err)
-		}
-		if err := os.WriteFile(configFile, data, 0o600); err != nil {
-			return Config{}, BootstrapResult{}, apperrors.Config("write local config file", err)
+		if err := saveLocalIdentityToFile(cfg.Runtime.StateDir, identity); err != nil {
+			return Config{}, BootstrapResult{}, apperrors.Config("save local identity", err)
 		}
 	}
 
-	loaded, err := Load(Options{Cwd: cfg.Cwd, Command: cfg.Command})
-	if err != nil {
-		return Config{}, BootstrapResult{}, err
-	}
-	return loaded, BootstrapResult{ConfigFile: configFile, Generated: generatedPassword != "", Username: username, Password: generatedPassword}, nil
+	cfg.Auth = AuthConfig{Username: username, Password: password}
+	cfg.Agent.DeviceId = deviceId
+	cfg.Agent.DeviceName = deviceName
+	return cfg, BootstrapResult{ConfigFile: identityPath, Generated: generatedPassword != "", Username: username, Password: generatedPassword}, nil
 }
 
 func resolveCwd(path string) (string, error) {
@@ -321,10 +346,6 @@ func rejectUnknownKeys(v *viper.Viper) error {
 		"serve.open":              {},
 		"serve.dev":               {},
 		"agent.server_url":        {},
-		"agent.device_id":         {},
-		"agent.device_name":       {},
-		"auth.username":           {},
-		"auth.password":           {},
 	}
 	for _, key := range v.AllKeys() {
 		if _, ok := allowed[key]; !ok {
@@ -427,24 +448,6 @@ func ensureLogDir(path string) error {
 	return nil
 }
 
-func setNestedString(document map[string]any, section string, key string, value string) {
-	nested, ok := document[section].(map[string]any)
-	if !ok {
-		if generic, ok := document[section].(map[any]any); ok {
-			nested = make(map[string]any, len(generic))
-			for k, v := range generic {
-				if text, ok := k.(string); ok {
-					nested[text] = v
-				}
-			}
-		} else {
-			nested = map[string]any{}
-		}
-		document[section] = nested
-	}
-	nested[key] = value
-}
-
 func randomHex(byteCount int) (string, error) {
 	data := make([]byte, byteCount)
 	if _, err := rand.Read(data); err != nil {
@@ -482,23 +485,6 @@ func defaultDeviceName() string {
 		return "termbridge-device"
 	}
 	return hostname
-}
-
-func legacyDefaultDeviceName(deviceName string, deviceId string) bool {
-	deviceName = strings.TrimSpace(deviceName)
-	deviceId = strings.TrimSpace(deviceId)
-	if deviceName == "" || deviceId == "" {
-		return false
-	}
-	short := deviceId
-	if len(short) > 8 {
-		short = short[:8]
-	}
-	if short == "" || !strings.HasSuffix(deviceName, "-"+short) {
-		return false
-	}
-	prefix := strings.TrimSuffix(deviceName, "-"+short)
-	return prefix == defaultDeviceName()
 }
 
 func sanitizeName(value string) string {
