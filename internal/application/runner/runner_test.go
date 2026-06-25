@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -14,7 +15,7 @@ import (
 
 func TestRunReturnsUserExitCode(t *testing.T) {
 	manager := &fakeManager{session: newFakePTYSession("hello", termpty.Result{ExitCode: 7})}
-	r := CommandRunner{Manager: manager}
+	r := CommandRunner{Manager: manager, Logger: slog.Default()}
 
 	result, err := r.Run(context.Background(), process.ProcessSpec{Command: "go", Cwd: t.TempDir(), InitialSize: process.DefaultTerminalSize()}, IO{Stdin: bytes.NewReader(nil), Stdout: io.Discard, Stderr: io.Discard})
 	if err != nil {
@@ -29,7 +30,7 @@ func TestHandleInterruptEscalatesToKillTree(t *testing.T) {
 	session := newFakePTYSession("", termpty.Result{ExitCode: 0})
 	var stderr bytes.Buffer
 	var stops []string
-	r := CommandRunner{InterruptGrace: time.Millisecond, Hooks: Hooks{OnStopping: func(mode process.StopMode, reason string) {
+	r := CommandRunner{InterruptGrace: time.Millisecond, Logger: slog.Default(), Hooks: Hooks{OnStopping: func(mode process.StopMode, reason string) {
 		stops = append(stops, mode.String()+":"+reason)
 	}}}
 

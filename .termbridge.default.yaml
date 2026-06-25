@@ -2,8 +2,9 @@ log:
   level: info
   format: text
   dir: logs
-  request_body_limit: 4096
-  response_body_limit: 4096
+  http:
+    request_body_limit: 4096
+    response_body_limit: 4096
 
 history:
   max_lines: 10000
@@ -13,19 +14,15 @@ history:
 runtime:
   state_dir: .termbridge
 
-web:
-  allowed_origins:
-    - http://localhost:9011
-  env:
-    denylist: []
-  error:
-    debug: false
-
-serve:
-  host: 127.0.0.1
-  port: 9010
-  open: false
-  dev: false
+gate:
+  listen_url: http://127.0.0.1:9010
+  browser:
+    allowed_origins:
+      - http://localhost:9011
+  api:
+    expose_errors: false
 
 agent:
-  server_url: http://127.0.0.1:9010
+  connect_url: ""
+  device_id: ""
+  device_name: ""

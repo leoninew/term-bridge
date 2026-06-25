@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
+	"github.com/subosito/gotenv"
 
 	apperrors "termbridge-go/internal/infrastructure/errors"
 )
@@ -19,23 +21,28 @@ import (
 const (
 	DefaultFileName = ".termbridge.default.yaml"
 	FileName        = ".termbridge.yaml"
+	EnvFileName     = ".env"
+	EnvPrefix       = "TERMBRIDGE"
 )
 
 type Config struct {
-	Cwd                  string
-	Command              []string
-	LogLevel             string
-	LogFormat            string
-	LogDir               string
-	LogRequestBodyLimit  int
-	LogResponseBodyLimit int
-	History              HistoryConfig
-	Runtime              RuntimeConfig
-	Web                  WebConfig
-	Serve                ServeConfig
-	Agent                AgentConfig
-	Auth                 AuthConfig
-	ConfigFile           string
+	Cwd        string
+	Command    []string
+	LogLevel   string
+	LogFormat  string
+	LogDir     string
+	LogHTTP    LogHTTPConfig
+	History    HistoryConfig
+	Runtime    RuntimeConfig
+	Gate       GateConfig
+	Agent      AgentConfig
+	Auth       AuthConfig
+	ConfigFile string
+}
+
+type LogHTTPConfig struct {
+	RequestBodyLimit  int
+	ResponseBodyLimit int
 }
 
 type HistoryConfig struct {
@@ -48,25 +55,22 @@ type RuntimeConfig struct {
 	StateDir string
 }
 
-type WebConfig struct {
+type GateConfig struct {
+	ListenUrl string
+	Browser   GateBrowserConfig
+	API       GateAPIConfig
+}
+
+type GateBrowserConfig struct {
 	AllowedOrigins []string
-	EnvDenylist    []string
-	Error          WebErrorConfig
 }
 
-type WebErrorConfig struct {
-	Debug bool
-}
-
-type ServeConfig struct {
-	Host string
-	Port int
-	Open bool
-	Dev  bool
+type GateAPIConfig struct {
+	ExposeErrors bool
 }
 
 type AgentConfig struct {
-	ServerUrl  string
+	ConnectUrl string
 	DeviceId   string
 	DeviceName string
 }
@@ -83,12 +87,11 @@ type BootstrapResult struct {
 	Password   string
 }
 
-// LocalIdentityFileName is the JSON file stored in state_dir for local identity.
+// LocalIdentityFileName is the JSON file stored in state_dir for local login credentials.
 const LocalIdentityFileName = "device.json"
 
 type LocalIdentity struct {
-	Auth  AuthConfig          `json:"auth"`
-	Agent AgentIdentityConfig `json:"agent"`
+	Auth AuthConfig `json:"auth"`
 }
 
 type AgentIdentityConfig struct {
@@ -96,24 +99,33 @@ type AgentIdentityConfig struct {
 	DeviceName string `json:"device_name"`
 }
 
-// loadLocalIdentityFromFile reads local auth and agent identity from device.json.
-// Returns a zero-value identity if the file does not exist.
-func loadLocalIdentityFromFile(path string) (LocalIdentity, error) {
+// loadLocalIdentityFromFile reads local auth from device.json. Legacy agent fields
+// are returned separately so EnsureLocalIdentity can migrate them into .termbridge.yaml.
+// Returns zero values if the file does not exist.
+func loadLocalIdentityFromFile(path string) (LocalIdentity, AgentIdentityConfig, bool, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return LocalIdentity{}, nil
+			return LocalIdentity{}, AgentIdentityConfig{}, false, nil
 		}
-		return LocalIdentity{}, err
+		return LocalIdentity{}, AgentIdentityConfig{}, false, err
 	}
-	var identity LocalIdentity
-	if err := json.Unmarshal(data, &identity); err != nil {
-		return LocalIdentity{}, err
+	var file struct {
+		Auth  AuthConfig           `json:"auth"`
+		Agent *AgentIdentityConfig `json:"agent"`
 	}
-	return identity, nil
+	if err := json.Unmarshal(data, &file); err != nil {
+		return LocalIdentity{}, AgentIdentityConfig{}, false, err
+	}
+	legacyAgent := AgentIdentityConfig{}
+	hasLegacyAgent := file.Agent != nil
+	if file.Agent != nil {
+		legacyAgent = *file.Agent
+	}
+	return LocalIdentity{Auth: file.Auth}, legacyAgent, hasLegacyAgent, nil
 }
 
-// saveLocalIdentityToFile writes local auth and agent identity to state_dir/device.json.
+// saveLocalIdentityToFile writes only local auth credentials to state_dir/device.json.
 func saveLocalIdentityToFile(stateDir string, identity LocalIdentity) error {
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		return err
@@ -142,9 +154,11 @@ func Load(options Options) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	if err := loadEnvFile(filepath.Join(cwd, EnvFileName)); err != nil {
+		return Config{}, err
+	}
 
-	v := viper.New()
-	v.SetConfigType("yaml")
+	v := newLoader()
 
 	v.SetConfigFile(defaultConfigFile)
 	if err := v.ReadInConfig(); err != nil {
@@ -171,32 +185,34 @@ func Load(options Options) (Config, error) {
 	}
 
 	cfg := Config{
-		Cwd:                  cwd,
-		Command:              append([]string(nil), options.Command...),
-		LogLevel:             strings.ToLower(v.GetString("log.level")),
-		LogFormat:            strings.ToLower(v.GetString("log.format")),
-		LogDir:               logDir,
-		LogRequestBodyLimit:  v.GetInt("log.request_body_limit"),
-		LogResponseBodyLimit: v.GetInt("log.response_body_limit"),
+		Cwd:       cwd,
+		Command:   append([]string(nil), options.Command...),
+		LogLevel:  strings.ToLower(v.GetString("log.level")),
+		LogFormat: strings.ToLower(v.GetString("log.format")),
+		LogDir:    logDir,
+		LogHTTP: LogHTTPConfig{
+			RequestBodyLimit:  v.GetInt("log.http.request_body_limit"),
+			ResponseBodyLimit: v.GetInt("log.http.response_body_limit"),
+		},
 		History: HistoryConfig{
 			MaxLines:     v.GetInt("history.max_lines"),
 			MaxBytes:     v.GetInt64("history.max_bytes"),
 			MaxLineBytes: v.GetInt("history.max_line_bytes"),
 		},
 		Runtime: RuntimeConfig{StateDir: stateDir},
-		Web: WebConfig{
-			AllowedOrigins: cleanStringSlice(v.GetStringSlice("web.allowed_origins")),
-			EnvDenylist:    cleanStringSlice(v.GetStringSlice("web.env.denylist")),
-			Error:          WebErrorConfig{Debug: v.GetBool("web.error.debug")},
-		},
-		Serve: ServeConfig{
-			Host: strings.TrimSpace(v.GetString("serve.host")),
-			Port: v.GetInt("serve.port"),
-			Open: v.GetBool("serve.open"),
-			Dev:  v.GetBool("serve.dev"),
+		Gate: GateConfig{
+			ListenUrl: strings.TrimSpace(v.GetString("gate.listen_url")),
+			Browser: GateBrowserConfig{
+				AllowedOrigins: getStringSlice(v, "gate.browser.allowed_origins"),
+			},
+			API: GateAPIConfig{
+				ExposeErrors: v.GetBool("gate.api.expose_errors"),
+			},
 		},
 		Agent: AgentConfig{
-			ServerUrl: strings.TrimSpace(v.GetString("agent.server_url")),
+			ConnectUrl: strings.TrimSpace(v.GetString("agent.connect_url")),
+			DeviceId:   strings.TrimSpace(v.GetString("agent.device_id")),
+			DeviceName: strings.TrimSpace(v.GetString("agent.device_name")),
 		},
 		ConfigFile: configFile,
 	}
@@ -207,15 +223,14 @@ func Load(options Options) (Config, error) {
 	if err := validateLogFormat(cfg.LogFormat); err != nil {
 		return Config{}, err
 	}
-	if err := validateLogBodyLimits(cfg.LogRequestBodyLimit, cfg.LogResponseBodyLimit); err != nil {
-		return Config{}, err
-	}
+	normalizeLogBodyLimits(&cfg)
 	if err := validateHistory(cfg.History); err != nil {
 		return Config{}, err
 	}
-	if err := validateServe(cfg.Serve); err != nil {
+	if err := validateGate(cfg.Gate); err != nil {
 		return Config{}, err
 	}
+	normalizeAgentConfig(&cfg)
 	if err := validateAgent(cfg.Agent); err != nil {
 		return Config{}, err
 	}
@@ -228,18 +243,18 @@ func Load(options Options) (Config, error) {
 
 func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
 	identityPath := filepath.Join(cfg.Runtime.StateDir, LocalIdentityFileName)
-	identity, err := loadLocalIdentityFromFile(identityPath)
+	identity, legacyAgent, hasLegacyAgent, err := loadLocalIdentityFromFile(identityPath)
 	if err != nil {
 		return Config{}, BootstrapResult{}, apperrors.Config("load local identity", err)
 	}
 
-	changed := false
+	identityChanged := hasLegacyAgent
 	generatedPassword := ""
 	username := strings.TrimSpace(identity.Auth.Username)
 	if username == "" {
 		username = currentUsername()
 		identity.Auth.Username = username
-		changed = true
+		identityChanged = true
 	}
 	password := strings.TrimSpace(identity.Auth.Password)
 	if password == "" {
@@ -250,34 +265,77 @@ func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
 		password = generated
 		generatedPassword = generated
 		identity.Auth.Password = password
-		changed = true
+		identityChanged = true
 	}
-	deviceId := strings.TrimSpace(identity.Agent.DeviceId)
-	if deviceId == "" {
-		generated, err := randomHex(16)
-		if err != nil {
-			return Config{}, BootstrapResult{}, apperrors.Config("generate device id", err)
-		}
-		deviceId = generated
-		identity.Agent.DeviceId = deviceId
-		changed = true
-	}
-	deviceName := strings.TrimSpace(identity.Agent.DeviceName)
-	if deviceName == "" {
-		deviceName = defaultDeviceName()
-		identity.Agent.DeviceName = deviceName
-		changed = true
-	}
-	if changed {
+	if identityChanged {
 		if err := saveLocalIdentityToFile(cfg.Runtime.StateDir, identity); err != nil {
 			return Config{}, BootstrapResult{}, apperrors.Config("save local identity", err)
 		}
 	}
 
-	cfg.Auth = AuthConfig{Username: username, Password: password}
+	updated, err := ensureAgentIdentityInConfig(cfg, legacyAgent)
+	if err != nil {
+		return Config{}, BootstrapResult{}, err
+	}
+	updated.Auth = AuthConfig{Username: username, Password: password}
+	return updated, BootstrapResult{ConfigFile: identityPath, Generated: generatedPassword != "", Username: username, Password: generatedPassword}, nil
+}
+
+func ensureAgentIdentityInConfig(cfg Config, legacyAgent AgentIdentityConfig) (Config, error) {
+	changed := false
+	deviceId := strings.TrimSpace(cfg.Agent.DeviceId)
+	if deviceId == "" {
+		deviceId = strings.TrimSpace(legacyAgent.DeviceId)
+		if deviceId == "" {
+			generated, err := randomHex(16)
+			if err != nil {
+				return Config{}, apperrors.Config("generate device id", err)
+			}
+			deviceId = generated
+		}
+		changed = true
+	}
+	deviceName := strings.TrimSpace(cfg.Agent.DeviceName)
+	if deviceName == "" {
+		deviceName = strings.TrimSpace(legacyAgent.DeviceName)
+		if deviceName == "" {
+			deviceName = defaultDeviceName()
+		}
+		changed = true
+	}
 	cfg.Agent.DeviceId = deviceId
 	cfg.Agent.DeviceName = deviceName
-	return cfg, BootstrapResult{ConfigFile: identityPath, Generated: generatedPassword != "", Username: username, Password: generatedPassword}, nil
+	if !changed {
+		return cfg, nil
+	}
+	configFile := cfg.ConfigFile
+	if configFile == "" {
+		configFile = filepath.Join(cfg.Cwd, FileName)
+	}
+	if err := saveAgentIdentityToConfigFile(configFile, cfg.Agent); err != nil {
+		return Config{}, apperrors.Config("save agent identity", err)
+	}
+	cfg.ConfigFile = configFile
+	return cfg, nil
+}
+
+func saveAgentIdentityToConfigFile(path string, agent AgentConfig) error {
+	local := viper.New()
+	local.SetConfigType("yaml")
+	local.SetConfigFile(path)
+	if exists, err := fileExists(path); err != nil {
+		return err
+	} else if exists {
+		if err := local.ReadInConfig(); err != nil {
+			return err
+		}
+	}
+	local.Set("agent.device_id", strings.TrimSpace(agent.DeviceId))
+	local.Set("agent.device_name", strings.TrimSpace(agent.DeviceName))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return local.WriteConfigAs(path)
 }
 
 func resolveCwd(path string) (string, error) {
@@ -327,25 +385,61 @@ func fileExists(path string) (bool, error) {
 	return false, err
 }
 
+func loadEnvFile(path string) error {
+	exists, err := fileExists(path)
+	if err != nil {
+		return apperrors.Config("check env file", err)
+	}
+	if !exists {
+		return nil
+	}
+	if err := gotenv.Load(path); err != nil {
+		return apperrors.Config("read env file", err)
+	}
+	return nil
+}
+
+func newLoader() *viper.Viper {
+	loader := viper.New()
+	loader.SetConfigType("yaml")
+	bindEnv(loader)
+	return loader
+}
+
+func bindEnv(loader *viper.Viper) {
+	for _, key := range configKeys() {
+		_ = loader.BindEnv(key, envNameForKey(key))
+	}
+}
+
+func envNameForKey(key string) string {
+	return EnvPrefix + "_" + strings.ToUpper(strings.ReplaceAll(key, ".", "__"))
+}
+
+func configKeys() []string {
+	return []string{
+		"log.level",
+		"log.format",
+		"log.dir",
+		"log.http.request_body_limit",
+		"log.http.response_body_limit",
+		"history.max_lines",
+		"history.max_bytes",
+		"history.max_line_bytes",
+		"runtime.state_dir",
+		"gate.listen_url",
+		"gate.browser.allowed_origins",
+		"gate.api.expose_errors",
+		"agent.connect_url",
+		"agent.device_id",
+		"agent.device_name",
+	}
+}
+
 func rejectUnknownKeys(v *viper.Viper) error {
-	allowed := map[string]struct{}{
-		"log.level":               {},
-		"log.format":              {},
-		"log.dir":                 {},
-		"log.request_body_limit":  {},
-		"log.response_body_limit": {},
-		"history.max_lines":       {},
-		"history.max_bytes":       {},
-		"history.max_line_bytes":  {},
-		"runtime.state_dir":       {},
-		"web.allowed_origins":     {},
-		"web.env.denylist":        {},
-		"web.error.debug":         {},
-		"serve.host":              {},
-		"serve.port":              {},
-		"serve.open":              {},
-		"serve.dev":               {},
-		"agent.server_url":        {},
+	allowed := map[string]struct{}{}
+	for _, key := range configKeys() {
+		allowed[key] = struct{}{}
 	}
 	for _, key := range v.AllKeys() {
 		if _, ok := allowed[key]; !ok {
@@ -373,6 +467,13 @@ func resolveStateDir(cwd string, path string) (string, error) {
 		return filepath.Clean(path), nil
 	}
 	return filepath.Join(cwd, path), nil
+}
+
+func getStringSlice(v *viper.Viper, key string) []string {
+	if value, ok := v.Get(key).(string); ok {
+		return cleanStringSlice(strings.Split(value, ","))
+	}
+	return cleanStringSlice(v.GetStringSlice(key))
 }
 
 func cleanStringSlice(values []string) []string {
@@ -404,14 +505,13 @@ func validateLogFormat(format string) error {
 	}
 }
 
-func validateLogBodyLimits(requestLimit int, responseLimit int) error {
-	if requestLimit < 1 {
-		return apperrors.Config("invalid log.request_body_limit", fmt.Errorf("must be positive"))
+func normalizeLogBodyLimits(cfg *Config) {
+	if cfg.LogHTTP.RequestBodyLimit <= 0 {
+		cfg.LogHTTP.RequestBodyLimit = 0
 	}
-	if responseLimit < 1 {
-		return apperrors.Config("invalid log.response_body_limit", fmt.Errorf("must be positive"))
+	if cfg.LogHTTP.ResponseBodyLimit <= 0 {
+		cfg.LogHTTP.ResponseBodyLimit = 0
 	}
-	return nil
 }
 
 func validateHistory(cfg HistoryConfig) error {
@@ -427,16 +527,35 @@ func validateHistory(cfg HistoryConfig) error {
 	return nil
 }
 
-func validateServe(cfg ServeConfig) error {
-	if cfg.Port < 0 || cfg.Port > 65535 {
-		return apperrors.Config("invalid serve.port", fmt.Errorf("must be between 0 and 65535"))
+func validateGate(cfg GateConfig) error {
+	return validateHTTPURL("gate.listen_url", cfg.ListenUrl, true)
+}
+
+func normalizeAgentConfig(cfg *Config) {
+	if strings.TrimSpace(cfg.Agent.ConnectUrl) == "" {
+		cfg.Agent.ConnectUrl = cfg.Gate.ListenUrl
+		return
 	}
-	return nil
+	cfg.Agent.ConnectUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.ConnectUrl), "/")
 }
 
 func validateAgent(cfg AgentConfig) error {
-	if strings.TrimSpace(cfg.ServerUrl) == "" {
-		return apperrors.Config("invalid agent.server_url", fmt.Errorf("empty Url"))
+	return validateHTTPURL("agent.connect_url", cfg.ConnectUrl, false)
+}
+
+func validateHTTPURL(key string, value string, requirePort bool) error {
+	if strings.TrimSpace(value) == "" {
+		return apperrors.Config("invalid "+key, fmt.Errorf("empty URL"))
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return apperrors.Config("invalid "+key, fmt.Errorf("must be an absolute URL"))
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return apperrors.Config("invalid "+key, fmt.Errorf("scheme must be http or https"))
+	}
+	if requirePort && parsed.Port() == "" {
+		return apperrors.Config("invalid "+key, fmt.Errorf("port is required"))
 	}
 	return nil
 }

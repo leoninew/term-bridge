@@ -25,7 +25,7 @@ func TestAgentTunnelRegistersDevice(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, server.URL, nil)
 	req.SetBasicAuth("admin", "admin")
 	requestHeader.Set("Authorization", req.Header.Get("Authorization"))
-	conn, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/gateway/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
+	conn, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
 	if err != nil {
 		t.Fatalf("Dial() error = %v", err)
 	}

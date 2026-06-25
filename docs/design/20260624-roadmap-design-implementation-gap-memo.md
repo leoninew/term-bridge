@@ -62,7 +62,7 @@ termbridge [options] exec -- <command...>
 2. 创建 `gatewayapi.Handler`。
 3. 启动 HTTP server。
 4. 启动 Agent connector。
-5. Agent connector 连接目标来自配置 `agent.server_url`。
+5. Agent connector 连接目标来自配置 `agent.connect_url`；为空时回退到 `gate.listen_url`。
 
 这与统一 Gate / Device 模型的本地 self-connected Gate 雏形一致。
 

@@ -47,7 +47,6 @@ type Config struct {
 	Logger           *logging.Logger
 	ClientQueueSize  int
 	ClientQueueBytes int
-	EnvDenylist      []string
 }
 
 type Registry struct {
@@ -60,7 +59,6 @@ type Registry struct {
 	ids              identity.Generator
 	clientQueueSize  int
 	clientQueueBytes int
-	envDenylist      []string
 
 	mu        sync.Mutex
 	runtimes  map[string]*SessionRuntime
@@ -196,7 +194,6 @@ func NewRegistry(config Config) *Registry {
 		ids:              identity.NewUlidGenerator(),
 		clientQueueSize:  queueSize,
 		clientQueueBytes: queueBytes,
-		envDenylist:      append([]string(nil), config.EnvDenylist...),
 		runtimes:         map[string]*SessionRuntime{},
 		launching:        map[string]bool{},
 	}
@@ -246,24 +243,18 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReq) 
 	if err := terminalproto.ValidateSize(size.Cols, size.Rows); err != nil {
 		return CreateSessionResp{}, apperrors.Usage(err.Error())
 	}
-	if r.logger != nil {
-		r.logger.Info("terminal session create request", "name", name, "cwd", absCwd, "command", strings.Join(request.Command, " "), "cols", size.Cols, "rows", size.Rows)
-	}
+	r.logger.Info("terminal session create request", "name", name, "cwd", absCwd, "command", strings.Join(request.Command, " "), "cols", size.Cols, "rows", size.Rows)
 
 	ws, err := r.workspaceForCreateSession(request.WorkspaceId, absCwd)
 	if err != nil {
 		return CreateSessionResp{}, err
 	}
 
-	env := filterEnv(os.Environ(), r.envDenylist)
-	envStrategy := "inherit"
-	if len(r.envDenylist) > 0 {
-		envStrategy = "inherit_denylist"
-	}
+	env := os.Environ()
 	commandRecord := session.CommandRecord{
 		Command:     request.Command[0],
 		Args:        append([]string(nil), request.Command[1:]...),
-		EnvStrategy: envStrategy,
+		EnvStrategy: "inherit",
 		EnvCount:    len(env),
 	}
 	manager := session.Manager{Store: r.store, Ids: r.ids}
@@ -347,7 +338,7 @@ func (r *Registry) startClaimedSessionRuntime(ctx context.Context, sess session.
 		_ = historyWriter.Close()
 		return apperrors.Runtime("build process spec", err)
 	}
-	spec.Env = filterEnv(os.Environ(), r.envDenylist)
+	spec.Env = os.Environ()
 	resolved, err := process.ResolveExecutable(spec.Command)
 	if err != nil {
 		_ = historyWriter.Close()
@@ -355,9 +346,7 @@ func (r *Registry) startClaimedSessionRuntime(ctx context.Context, sess session.
 	}
 	spec = spec.WithResolvedCommand(resolved)
 
-	if r.logger != nil {
-		r.logger.Info("terminal pty start", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cols", spec.InitialSize.Cols, "rows", spec.InitialSize.Rows, "command", spec.EffectiveCommand())
-	}
+	r.logger.Info("terminal pty start", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cols", spec.InitialSize.Cols, "rows", spec.InitialSize.Rows, "command", spec.EffectiveCommand())
 	ptySession, err := r.manager.Start(ctx, spec)
 	if err != nil {
 		_ = historyWriter.Close()
@@ -389,9 +378,7 @@ func (r *Registry) startClaimedSessionRuntime(ctx context.Context, sess session.
 		return apperrors.Runtime("save running state", err)
 	}
 
-	if r.logger != nil {
-		r.logger.Info("terminal pty started", "session_id", sess.Id, "workspace_id", sess.WorkspaceId)
-	}
+	r.logger.Info("terminal pty started", "session_id", sess.Id, "workspace_id", sess.WorkspaceId)
 	runtime := newSessionRuntime(r, sess, ptySession, historyWriter, size)
 	r.mu.Lock()
 	r.runtimes[sess.Id] = runtime
@@ -417,7 +404,7 @@ func (r *Registry) releaseSessionStart(sessionId string) {
 }
 
 func (r *Registry) saveSessionFailed(sess session.Session, reason string) {
-	if err := r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: reason, UpdatedAt: time.Now().UTC()}); err != nil && r.logger != nil {
+	if err := r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: reason, UpdatedAt: time.Now().UTC()}); err != nil {
 		r.logger.Warn("save failed session state", "session_id", sess.Id, "reason", reason, "error", err)
 	}
 }
@@ -727,36 +714,6 @@ func expandHome(path string) (string, error) {
 		return "", fmt.Errorf("unsupported home path %q", path)
 	}
 	return path, nil
-}
-
-func filterEnv(env []string, denylist []string) []string {
-	if len(denylist) == 0 {
-		return append([]string(nil), env...)
-	}
-	out := make([]string, 0, len(env))
-	for _, entry := range env {
-		name := entry
-		if index := strings.IndexByte(entry, '='); index >= 0 {
-			name = entry[:index]
-		}
-		if envNameDenied(name, denylist) {
-			continue
-		}
-		out = append(out, entry)
-	}
-	return out
-}
-
-func envNameDenied(name string, denylist []string) bool {
-	for _, pattern := range denylist {
-		if pattern == "" {
-			continue
-		}
-		if ok, _ := filepath.Match(pattern, name); ok || strings.EqualFold(name, pattern) || strings.Contains(strings.ToUpper(name), strings.ToUpper(pattern)) {
-			return true
-		}
-	}
-	return false
 }
 
 func (r *Registry) removeRuntime(sessionId string) {

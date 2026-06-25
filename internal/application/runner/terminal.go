@@ -73,7 +73,7 @@ func watchResize(ctx context.Context, fd int, initial process.TerminalSize, sess
 			if next == last {
 				continue
 			}
-			if err := session.Resize(next); err != nil && logger != nil {
+			if err := session.Resize(next); err != nil {
 				logger.Warn("resize PTY", "error", err)
 			}
 			last = next

@@ -121,14 +121,14 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	configContent := "serve:\n  host: 127.0.0.1\n  port: 9090\n  dev: true\nagent:\n  server_url: http://127.0.0.1:9090\n"
+	configContent := "gate:\n  listen_url: http://127.0.0.1:9090\n  browser:\n    allowed_origins:\n      - http://localhost:9011\n  api:\n    expose_errors: true\nagent:\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\n"
 	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
 		t.Fatalf("WriteFile(config) error = %v", err)
 	}
 	if err := os.MkdirAll(filepath.Join(cwd, ".termbridge"), 0o755); err != nil {
 		t.Fatalf("MkdirAll(state dir) error = %v", err)
 	}
-	identityContent := "{\n  \"auth\": {\n    \"username\": \"admin\",\n    \"password\": \"admin\"\n  },\n  \"agent\": {\n    \"device_id\": \"dev-1\",\n    \"device_name\": \"local-mac\"\n  }\n}\n"
+	identityContent := "{\n  \"auth\": {\n    \"username\": \"admin\",\n    \"password\": \"admin\"\n  }\n}\n"
 	if err := os.WriteFile(filepath.Join(cwd, ".termbridge", "device.json"), []byte(identityContent), 0o600); err != nil {
 		t.Fatalf("WriteFile(identity) error = %v", err)
 	}
@@ -170,7 +170,7 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 		t.Fatal("runAgentClient was not called")
 	}
 	gotConfig := gotClient.Config()
-	if gotConfig.ServerUrl != "http://127.0.0.1:9090" || gotConfig.Username != "admin" || gotConfig.Password != "admin" || gotConfig.DeviceId != "dev-1" || gotConfig.DeviceName != "local-mac" {
+	if gotConfig.ConnectUrl != "http://127.0.0.1:9090" || gotConfig.Username != "admin" || gotConfig.Password != "admin" || gotConfig.DeviceId != "dev-1" || gotConfig.DeviceName != "local-mac" {
 		t.Fatalf("agent config = %#v", gotConfig)
 	}
 	out := stdout.String()

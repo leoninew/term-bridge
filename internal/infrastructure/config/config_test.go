@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -32,11 +31,11 @@ func TestLoadDefaults(t *testing.T) {
 	if filepath.Clean(cfg.LogDir) != filepath.Clean(wantLogDir) {
 		t.Fatalf("LogDir = %q, want %q", cfg.LogDir, wantLogDir)
 	}
-	if cfg.LogRequestBodyLimit != 4096 {
-		t.Fatalf("LogRequestBodyLimit = %d, want 4096", cfg.LogRequestBodyLimit)
+	if cfg.LogHTTP.RequestBodyLimit != 4096 {
+		t.Fatalf("LogHTTP.RequestBodyLimit = %d, want 4096", cfg.LogHTTP.RequestBodyLimit)
 	}
-	if cfg.LogResponseBodyLimit != 4096 {
-		t.Fatalf("LogResponseBodyLimit = %d, want 4096", cfg.LogResponseBodyLimit)
+	if cfg.LogHTTP.ResponseBodyLimit != 4096 {
+		t.Fatalf("LogHTTP.ResponseBodyLimit = %d, want 4096", cfg.LogHTTP.ResponseBodyLimit)
 	}
 	wantStateDir := filepath.Join(cwd, ".termbridge")
 	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(wantStateDir) {
@@ -54,14 +53,20 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.ConfigFile != "" {
 		t.Fatalf("ConfigFile = %q, want empty", cfg.ConfigFile)
 	}
-	if cfg.Web.Error.Debug {
-		t.Fatal("Web.Error.Debug = true, want false")
+	if cfg.Gate.ListenUrl != "http://127.0.0.1:9010" {
+		t.Fatalf("Gate.ListenUrl = %q, want http://127.0.0.1:9010", cfg.Gate.ListenUrl)
 	}
-	if cfg.Serve.Host != "127.0.0.1" || cfg.Serve.Port != 9010 || cfg.Serve.Open || cfg.Serve.Dev {
-		t.Fatalf("Serve = %#v", cfg.Serve)
+	if !reflect.DeepEqual(cfg.Gate.Browser.AllowedOrigins, []string{"http://localhost:9011"}) {
+		t.Fatalf("Gate.Browser.AllowedOrigins = %#v", cfg.Gate.Browser.AllowedOrigins)
 	}
-	if cfg.Agent.ServerUrl != "http://127.0.0.1:9010" || cfg.Agent.DeviceId != "" || cfg.Agent.DeviceName != "" {
-		t.Fatalf("Agent = %#v", cfg.Agent)
+	if cfg.Gate.API.ExposeErrors {
+		t.Fatal("Gate.API.ExposeErrors = true, want false")
+	}
+	if cfg.Agent.ConnectUrl != "http://127.0.0.1:9010" {
+		t.Fatalf("Agent.ConnectUrl = %q, want gate URL", cfg.Agent.ConnectUrl)
+	}
+	if cfg.Agent.DeviceId != "" || cfg.Agent.DeviceName != "" {
+		t.Fatalf("Agent = %#v, want empty identity", cfg.Agent)
 	}
 	if !reflect.DeepEqual(cfg.Command, []string{"pwsh"}) {
 		t.Fatalf("Command = %#v", cfg.Command)
@@ -96,10 +101,10 @@ func TestLoadRejectsInvalidHistoryLimit(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsInvalidServePort(t *testing.T) {
+func TestLoadRejectsInvalidGateListenURL(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
-	writeConfig(t, cwd, "serve:\n  port: 70000\n")
+	writeConfig(t, cwd, "gate:\n  listen_url: not-a-url\n")
 
 	_, err := Load(Options{Cwd: cwd})
 	if err == nil {
@@ -110,10 +115,10 @@ func TestLoadRejectsInvalidServePort(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsEmptyAgentServerUrl(t *testing.T) {
+func TestLoadRejectsInvalidAgentConnectURL(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
-	writeConfig(t, cwd, "agent:\n  server_url: \"\"\n")
+	writeConfig(t, cwd, "agent:\n  connect_url: ftp://example.com\n")
 
 	_, err := Load(Options{Cwd: cwd})
 	if err == nil {
@@ -124,42 +129,20 @@ func TestLoadRejectsEmptyAgentServerUrl(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsInvalidLogBodyLimit(t *testing.T) {
-	cases := []struct {
-		name    string
-		content string
-	}{
-		{name: "request", content: "log:\n  request_body_limit: 0\n"},
-		{name: "response", content: "log:\n  response_body_limit: -1\n"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			isolateHome(t)
-			cwd := t.TempDir()
-			writeConfig(t, cwd, tc.content)
-
-			_, err := Load(Options{Cwd: cwd})
-			if err == nil {
-				t.Fatal("Load() error = nil, want error")
-			}
-			if !apperrors.IsConfig(err) {
-				t.Fatalf("Load() error = %T, want config error", err)
-			}
-		})
-	}
-}
-
-func TestLoadRejectsUnknownConfigKey(t *testing.T) {
+func TestLoadNormalizesZeroOrNegativeLogBodyLimit(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
-	writeConfig(t, cwd, "log:\n  level: info\nunknown: true\n")
+	writeConfig(t, cwd, "log:\n  http:\n    request_body_limit: 0\n    response_body_limit: -1\n")
 
-	_, err := Load(Options{Cwd: cwd})
-	if err == nil {
-		t.Fatal("Load() error = nil, want error")
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
 	}
-	if !apperrors.IsConfig(err) {
-		t.Fatalf("Load() error = %T, want config error", err)
+	if cfg.LogHTTP.RequestBodyLimit != 0 {
+		t.Fatalf("LogHTTP.RequestBodyLimit = %d, want 0", cfg.LogHTTP.RequestBodyLimit)
+	}
+	if cfg.LogHTTP.ResponseBodyLimit != 0 {
+		t.Fatalf("LogHTTP.ResponseBodyLimit = %d, want 0", cfg.LogHTTP.ResponseBodyLimit)
 	}
 }
 
@@ -169,7 +152,7 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	configPath := filepath.Join(cwd, FileName)
 	logDir := filepath.Join(cwd, "configured-logs")
 	stateDir := filepath.Join(cwd, "configured-state")
-	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\n  request_body_limit: 128\n  response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: " + filepath.ToSlash(stateDir) + "\nserve:\n  host: 0.0.0.0\n  port: 9090\n  open: true\n  dev: true\nagent:\n  server_url: http://127.0.0.1:9090\n"
+	content := "log:\n  level: debug\n  format: json\n  dir: " + filepath.ToSlash(logDir) + "\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: " + filepath.ToSlash(stateDir) + "\ngate:\n  listen_url: http://0.0.0.0:9090\n  browser:\n    allowed_origins:\n      - \" http://localhost:9011 \"\n      - http://127.0.0.1:9011\n  api:\n    expose_errors: true\nagent:\n  connect_url: https://gate.example.com:9443/\n  device_id: dev-1\n  device_name: local-mac\n"
 	writeConfig(t, cwd, content)
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -185,11 +168,11 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	if cfg.LogFormat != "json" {
 		t.Fatalf("LogFormat = %q", cfg.LogFormat)
 	}
-	if cfg.LogRequestBodyLimit != 128 {
-		t.Fatalf("LogRequestBodyLimit = %d, want 128", cfg.LogRequestBodyLimit)
+	if cfg.LogHTTP.RequestBodyLimit != 128 {
+		t.Fatalf("LogHTTP.RequestBodyLimit = %d, want 128", cfg.LogHTTP.RequestBodyLimit)
 	}
-	if cfg.LogResponseBodyLimit != 256 {
-		t.Fatalf("LogResponseBodyLimit = %d, want 256", cfg.LogResponseBodyLimit)
+	if cfg.LogHTTP.ResponseBodyLimit != 256 {
+		t.Fatalf("LogHTTP.ResponseBodyLimit = %d, want 256", cfg.LogHTTP.ResponseBodyLimit)
 	}
 	if filepath.Clean(cfg.LogDir) != filepath.Clean(logDir) {
 		t.Fatalf("LogDir = %q, want %q", cfg.LogDir, logDir)
@@ -200,25 +183,117 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 	if cfg.History.MaxLines != 42 || cfg.History.MaxBytes != 2048 || cfg.History.MaxLineBytes != 128 {
 		t.Fatalf("History = %#v", cfg.History)
 	}
-	if cfg.Serve.Host != "0.0.0.0" || cfg.Serve.Port != 9090 || !cfg.Serve.Open || !cfg.Serve.Dev {
-		t.Fatalf("Serve = %#v", cfg.Serve)
+	if cfg.Gate.ListenUrl != "http://0.0.0.0:9090" {
+		t.Fatalf("Gate.ListenUrl = %q", cfg.Gate.ListenUrl)
 	}
-	if cfg.Agent.ServerUrl != "http://127.0.0.1:9090" || cfg.Agent.DeviceId != "" || cfg.Agent.DeviceName != "" {
+	if !reflect.DeepEqual(cfg.Gate.Browser.AllowedOrigins, []string{"http://localhost:9011", "http://127.0.0.1:9011"}) {
+		t.Fatalf("Gate.Browser.AllowedOrigins = %#v", cfg.Gate.Browser.AllowedOrigins)
+	}
+	if !cfg.Gate.API.ExposeErrors {
+		t.Fatal("Gate.API.ExposeErrors = false, want true")
+	}
+	if cfg.Agent.ConnectUrl != "https://gate.example.com:9443" {
+		t.Fatalf("Agent.ConnectUrl = %q", cfg.Agent.ConnectUrl)
+	}
+	if cfg.Agent.DeviceId != "dev-1" || cfg.Agent.DeviceName != "local-mac" {
 		t.Fatalf("Agent = %#v", cfg.Agent)
 	}
 }
 
-func TestLoadReadsWebErrorDebugConfig(t *testing.T) {
+func TestLoadDotEnvOverridesLocalConfigFile(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
-	writeConfig(t, cwd, "web:\n  error:\n    debug: true\n")
+	logDir := filepath.Join(cwd, "dotenv-logs")
+	stateDir := filepath.Join(cwd, "dotenv-state")
+	writeConfig(t, cwd, "log:\n  level: info\n  format: text\n  dir: local-logs\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 10\n  max_bytes: 1024\n  max_line_bytes: 64\nruntime:\n  state_dir: local-state\ngate:\n  listen_url: http://127.0.0.1:9090\n  browser:\n    allowed_origins:\n      - http://localhost:9011\n  api:\n    expose_errors: false\nagent:\n  connect_url: http://127.0.0.1:9090\n  device_id: local-device\n  device_name: local-name\n")
+	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_GATE__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_GATE__BROWSER__ALLOWED_ORIGINS=http://localhost:9011, http://127.0.0.1:9011,,\nTERMBRIDGE_GATE__API__EXPOSE_ERRORS=true\nTERMBRIDGE_AGENT__CONNECT_URL=https://gate.example.com\nTERMBRIDGE_AGENT__DEVICE_ID=dotenv-device\nTERMBRIDGE_AGENT__DEVICE_NAME=dotenv-name\n")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if !cfg.Web.Error.Debug {
-		t.Fatal("Web.Error.Debug = false, want true")
+	if cfg.LogLevel != "debug" || cfg.LogFormat != "json" {
+		t.Fatalf("log config = %s/%s", cfg.LogLevel, cfg.LogFormat)
+	}
+	if filepath.Clean(cfg.LogDir) != filepath.Clean(logDir) {
+		t.Fatalf("LogDir = %q, want %q", cfg.LogDir, logDir)
+	}
+	if cfg.LogHTTP.RequestBodyLimit != 512 || cfg.LogHTTP.ResponseBodyLimit != 1024 {
+		t.Fatalf("LogHTTP = %#v", cfg.LogHTTP)
+	}
+	if cfg.History.MaxLines != 20 || cfg.History.MaxBytes != 4096 || cfg.History.MaxLineBytes != 256 {
+		t.Fatalf("History = %#v", cfg.History)
+	}
+	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(stateDir) {
+		t.Fatalf("StateDir = %q, want %q", cfg.Runtime.StateDir, stateDir)
+	}
+	if cfg.Gate.ListenUrl != "http://127.0.0.1:9091" {
+		t.Fatalf("Gate.ListenUrl = %q", cfg.Gate.ListenUrl)
+	}
+	if !reflect.DeepEqual(cfg.Gate.Browser.AllowedOrigins, []string{"http://localhost:9011", "http://127.0.0.1:9011"}) {
+		t.Fatalf("Gate.Browser.AllowedOrigins = %#v", cfg.Gate.Browser.AllowedOrigins)
+	}
+	if !cfg.Gate.API.ExposeErrors {
+		t.Fatal("Gate.API.ExposeErrors = false, want true")
+	}
+	if cfg.Agent.ConnectUrl != "https://gate.example.com" || cfg.Agent.DeviceId != "dotenv-device" || cfg.Agent.DeviceName != "dotenv-name" {
+		t.Fatalf("Agent = %#v", cfg.Agent)
+	}
+}
+
+func TestLoadOSEnvOverridesDotEnv(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeDotEnv(t, cwd, "TERMBRIDGE_GATE__LISTEN_URL=http://127.0.0.1:8080\nTERMBRIDGE_AGENT__CONNECT_URL=http://127.0.0.1:8080\nTERMBRIDGE_GATE__API__EXPOSE_ERRORS=false\n")
+	t.Setenv("TERMBRIDGE_GATE__LISTEN_URL", "http://127.0.0.1:9092")
+	t.Setenv("TERMBRIDGE_AGENT__CONNECT_URL", "https://gate.example.com")
+	t.Setenv("TERMBRIDGE_GATE__API__EXPOSE_ERRORS", "true")
+
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Gate.ListenUrl != "http://127.0.0.1:9092" {
+		t.Fatalf("Gate.ListenUrl = %q", cfg.Gate.ListenUrl)
+	}
+	if cfg.Agent.ConnectUrl != "https://gate.example.com" {
+		t.Fatalf("Agent.ConnectUrl = %q", cfg.Agent.ConnectUrl)
+	}
+	if !cfg.Gate.API.ExposeErrors {
+		t.Fatal("Gate.API.ExposeErrors = false, want true")
+	}
+}
+
+func TestLoadIgnoresMissingDotEnv(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Gate.ListenUrl != "http://127.0.0.1:9010" {
+		t.Fatalf("Gate.ListenUrl = %q", cfg.Gate.ListenUrl)
+	}
+}
+
+func TestLoadRejectsInvalidDotEnv(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL='unterminated")
+
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !apperrors.IsConfig(err) {
+		t.Fatalf("Load() error = %T, want config error", err)
+	}
+	if !strings.Contains(err.Error(), "read env file") {
+		t.Fatalf("Load() error = %v, want env file context", err)
 	}
 }
 
@@ -277,7 +352,7 @@ func TestDefaultDeviceNameUsesHostnameOnly(t *testing.T) {
 	}
 }
 
-func TestEnsureLocalIdentityWritesCredentialsToDeviceJSON(t *testing.T) {
+func TestEnsureLocalIdentityWritesCredentialsAndAgentIdentityToFiles(t *testing.T) {
 	isolateHome(t)
 	t.Setenv("USERNAME", "tester")
 	cwd := t.TempDir()
@@ -300,6 +375,9 @@ func TestEnsureLocalIdentityWritesCredentialsToDeviceJSON(t *testing.T) {
 	if updated.Agent.DeviceId == "" || updated.Agent.DeviceName != defaultDeviceName() {
 		t.Fatalf("Agent = %#v", updated.Agent)
 	}
+	if updated.Agent.ConnectUrl != "http://127.0.0.1:9010" {
+		t.Fatalf("Agent.ConnectUrl = %q, want gate URL", updated.Agent.ConnectUrl)
+	}
 
 	identityPath := filepath.Join(cwd, ".termbridge", LocalIdentityFileName)
 	if filepath.Clean(bootstrap.ConfigFile) != filepath.Clean(identityPath) {
@@ -310,19 +388,28 @@ func TestEnsureLocalIdentityWritesCredentialsToDeviceJSON(t *testing.T) {
 		t.Fatalf("ReadFile(identity) error = %v", err)
 	}
 	content := string(data)
-	for _, want := range []string{"\"auth\":", "\"username\": \"tester\"", "\"password\":", "\"agent\":", "\"device_id\":", "\"device_name\": " + strconv.Quote(defaultDeviceName())} {
+	for _, want := range []string{"\"auth\":", "\"username\": \"tester\"", "\"password\":"} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("identity json missing %q: %s", want, content)
 		}
 	}
-	if strings.Index(content, "\"auth\"") > strings.Index(content, "\"agent\"") {
-		t.Fatalf("auth appears after agent: %s", content)
+	if strings.Contains(content, "\"agent\":") {
+		t.Fatalf("identity json still contains agent block: %s", content)
 	}
-	if strings.Index(content, "\"username\"") > strings.Index(content, "\"password\"") {
-		t.Fatalf("username appears after password: %s", content)
+
+	configPath := filepath.Join(cwd, FileName)
+	configData, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile(config) error = %v", err)
 	}
-	if exists, err := fileExists(filepath.Join(cwd, FileName)); err != nil || exists {
-		t.Fatalf("local config exists = %v, err = %v; generated agent identity must stay out of .termbridge.yaml", exists, err)
+	configContent := string(configData)
+	for _, want := range []string{"agent:", "device_id:", "device_name:"} {
+		if !strings.Contains(configContent, want) {
+			t.Fatalf("local config missing %q: %s", want, configContent)
+		}
+	}
+	if strings.Contains(configContent, "auth:") {
+		t.Fatalf("local config unexpectedly contains auth block: %s", configContent)
 	}
 
 	reloaded, secondBootstrap, err := EnsureLocalIdentity(updated)
@@ -337,10 +424,13 @@ func TestEnsureLocalIdentityWritesCredentialsToDeviceJSON(t *testing.T) {
 	}
 }
 
-func TestEnsureLocalIdentityPreservesDeviceJSONAgentFields(t *testing.T) {
+func TestEnsureLocalIdentityMigratesLegacyAgentIdentityIntoLocalConfig(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
-	writeConfig(t, cwd, "agent:\n  server_url: http://127.0.0.1:9010\n")
+	writeDefaultConfig(t, cwd)
+	if err := os.WriteFile(filepath.Join(cwd, FileName), []byte("gate:\n  api:\n    expose_errors: true\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(config) error = %v", err)
+	}
 	stateDir := filepath.Join(cwd, ".termbridge")
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll(state dir) error = %v", err)
@@ -368,22 +458,33 @@ func TestEnsureLocalIdentityPreservesDeviceJSONAgentFields(t *testing.T) {
 	if updated.Agent.DeviceId != "dev-1" || updated.Agent.DeviceName != "local" {
 		t.Fatalf("Agent = %#v", updated.Agent)
 	}
+	if updated.ConfigFile != filepath.Join(cwd, FileName) {
+		t.Fatalf("ConfigFile = %q, want local config path", updated.ConfigFile)
+	}
 
 	data, err := os.ReadFile(identityPath)
 	if err != nil {
 		t.Fatalf("ReadFile(identity) error = %v", err)
 	}
 	content := string(data)
-	for _, want := range []string{"\"auth\":", "\"username\": \"admin\"", "\"password\":", "\"agent\":", "\"device_id\": \"dev-1\"", "\"device_name\": \"local\""} {
+	for _, want := range []string{"\"auth\":", "\"username\": \"admin\"", "\"password\":"} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("identity json missing %q: %s", want, content)
 		}
 	}
-	if strings.Index(content, "\"auth\"") > strings.Index(content, "\"agent\"") {
-		t.Fatalf("auth appears after agent: %s", content)
+	if strings.Contains(content, "\"agent\":") {
+		t.Fatalf("identity json still contains agent block: %s", content)
 	}
-	if strings.Index(content, "\"username\"") > strings.Index(content, "\"password\"") {
-		t.Fatalf("username appears after password: %s", content)
+
+	configData, err := os.ReadFile(filepath.Join(cwd, FileName))
+	if err != nil {
+		t.Fatalf("ReadFile(config) error = %v", err)
+	}
+	configContent := string(configData)
+	for _, want := range []string{"gate:", "expose_errors: true", "agent:", "device_id: dev-1", "device_name: local"} {
+		if !strings.Contains(configContent, want) {
+			t.Fatalf("local config missing %q: %s", want, configContent)
+		}
 	}
 }
 
@@ -418,7 +519,26 @@ func isolateHome(t *testing.T) string {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	clearTermBridgeEnv(t)
 	return home
+}
+
+func clearTermBridgeEnv(t *testing.T) {
+	t.Helper()
+	for _, key := range configKeys() {
+		name := envNameForKey(key)
+		previous, existed := os.LookupEnv(name)
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatalf("Unsetenv(%s) error = %v", name, err)
+		}
+		t.Cleanup(func() {
+			if existed {
+				_ = os.Setenv(name, previous)
+				return
+			}
+			_ = os.Unsetenv(name)
+		})
+	}
 }
 
 func writeConfig(t *testing.T, dir string, content string) {
@@ -426,6 +546,13 @@ func writeConfig(t *testing.T, dir string, content string) {
 	writeDefaultConfig(t, dir)
 	if err := os.WriteFile(filepath.Join(dir, FileName), []byte(content), 0o644); err != nil {
 		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+}
+
+func writeDotEnv(t *testing.T, dir string, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, EnvFileName), []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile(.env) error = %v", err)
 	}
 }
 

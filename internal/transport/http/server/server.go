@@ -5,8 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"os/exec"
-	"strconv"
+	"net/url"
 	"strings"
 	"time"
 
@@ -15,10 +14,7 @@ import (
 )
 
 type Config struct {
-	Host              string
-	Port              int
-	Open              bool
-	Dev               bool
+	ServerUrl         string
 	Logger            *slog.Logger
 	RequestBodyLimit  int
 	ResponseBodyLimit int
@@ -46,16 +42,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Listen() (net.Listener, Info, error) {
-	addr := net.JoinHostPort(s.config.Host, strconv.Itoa(s.config.Port))
-	listener, err := net.Listen("tcp", addr)
+	parsed, err := url.Parse(s.config.ServerUrl)
+	if err != nil || parsed.Host == "" {
+		return nil, Info{}, apperrors.Runtime("parse backend server url", err)
+	}
+	listener, err := net.Listen("tcp", parsed.Host)
 	if err != nil {
 		return nil, Info{}, apperrors.Runtime("listen backend server", err)
 	}
-	info := Info{Url: "http://" + listener.Addr().String()}
-	if s.config.Open {
-		go openBrowser(info.Url)
-	}
-	return listener, info, nil
+	return listener, Info{Url: strings.TrimRight(s.config.ServerUrl, "/")}, nil
 }
 
 func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
@@ -82,31 +77,18 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 }
 
 func normalizeConfig(config Config) Config {
-	if strings.TrimSpace(config.Host) == "" {
-		config.Host = "127.0.0.1"
+	if strings.TrimSpace(config.ServerUrl) == "" {
+		config.ServerUrl = "http://127.0.0.1:9010"
 	}
-	if config.Port == 0 {
-		config.Port = 9010
-	}
+	config.ServerUrl = strings.TrimRight(strings.TrimSpace(config.ServerUrl), "/")
 	if config.Logger == nil {
 		panic("http server logger is required")
 	}
 	if config.RequestBodyLimit <= 0 {
-		config.RequestBodyLimit = 4096
+		config.RequestBodyLimit = 0
 	}
 	if config.ResponseBodyLimit <= 0 {
-		config.ResponseBodyLimit = 4096
+		config.ResponseBodyLimit = 0
 	}
 	return config
-}
-
-func openBrowser(url string) {
-	commands := [][]string{{"open", url}, {"xdg-open", url}, {"rundll32", "url.dll,FileProtocolHandler", url}}
-	for _, command := range commands {
-		if _, err := exec.LookPath(command[0]); err != nil {
-			continue
-		}
-		_ = exec.Command(command[0], command[1:]...).Start()
-		return
-	}
 }

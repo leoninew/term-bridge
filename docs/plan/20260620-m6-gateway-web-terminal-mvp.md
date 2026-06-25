@@ -102,7 +102,7 @@ M6 采用严格模式 / strict。本计划覆盖 Gateway Web Terminal MVP，不�
    - `/api/gateway/health`
    - auth endpoints
    - `/api/gateway/devices`
-   - `/api/gateway/agent/tunnel`
+   - `/api/agent/tunnel`
 3. Agent tunnel hello 成功后注册 device online。
 4. Agent disconnect 后标记 offline 并清理 active routes。
 5. Gateway 保留 shallow cache：device id/name、online/offline、connected_at、last_seen、workspace/session snapshot。

@@ -51,7 +51,7 @@ Review status: Accepted
 - 内部实现仍按后端优先、前端随后切换的顺序推进，保证每一步有清晰验证点。
 - 后端先补齐 Gate mutation，再切前端主路径。
 - Browser-facing API 采用 canonical `/api/devices/:deviceId/...`。
-- `/api/gateway/agent/tunnel` 可作为 Agent tunnel 内部传输入口继续存在；它不是 localapi，也不是前端产品路由。
+- `/api/agent/tunnel` 可作为 Agent tunnel 内部传输入口继续存在；它不是 localapi，也不是前端产品路由。
 - 不迁移旧 state 数据；新 store 不扫描旧 root workspace/session。
 - offline readonly history 是必做项，但语义是 Gate 已缓存的只读 snapshot/stale history，不是 Gate 接管 runtime authoritative history。
 
@@ -274,7 +274,7 @@ Review status: Accepted
    - `/api/devices`
    - `/api/devices/...`
 2. Browser-facing 新代码只使用 canonical `/api/devices/...`。
-3. Agent tunnel 内部入口可继续使用 `/api/gateway/agent/tunnel`，因为它不是 localapi，也不是 Browser 工作台 API。
+3. Agent tunnel 内部入口可继续使用 `/api/agent/tunnel`，因为它不是 localapi，也不是 Browser 工作台 API。
 4. 在 gateway handler 中抽取 device route dispatcher：
    - `handleDeviceWorkspaceTree`
    - `handleDeviceWorkspaceOrder`

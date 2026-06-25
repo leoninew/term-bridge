@@ -322,7 +322,7 @@ POST /api/gateway/devices/{device_id}/sessions
 ### Agent tunnel endpoint
 
 ```text
-GET /api/gateway/agent/tunnel
+GET /api/agent/tunnel
 ```
 
 需要 Agent auth。M6 可复用临时 admin/admin 派生的 basic credential 或专用 gateway agent secret；为避免扩展正式 auth，Spec 倾向使用同一临时凭据，但在 Plan 中需明确传输方式。

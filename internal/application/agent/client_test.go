@@ -14,10 +14,10 @@ import (
 )
 
 func TestTunnelUrl(t *testing.T) {
-	if got := tunnelUrl("http://127.0.0.1:8080"); got != "ws://127.0.0.1:8080/api/gateway/agent/tunnel" {
+	if got := tunnelUrl("http://127.0.0.1:8080"); got != "ws://127.0.0.1:8080/api/agent/tunnel" {
 		t.Fatalf("tunnelUrl(http) = %q", got)
 	}
-	if got := tunnelUrl("https://example.com/base/"); got != "wss://example.com/base/api/gateway/agent/tunnel" {
+	if got := tunnelUrl("https://example.com/base/"); got != "wss://example.com/base/api/agent/tunnel" {
 		t.Fatalf("tunnelUrl(https) = %q", got)
 	}
 }
@@ -56,7 +56,7 @@ func TestClientRunSendsHello(t *testing.T) {
 	}))
 	defer server.Close()
 	ctx, cancel := context.WithCancel(context.Background())
-	client := New(Config{ServerUrl: server.URL, Username: "admin", Password: "admin", DeviceId: "dev-1", DeviceName: "local", StateDir: stateDir})
+	client := New(Config{ConnectUrl: server.URL, Username: "admin", Password: "admin", DeviceId: "dev-1", DeviceName: "local", StateDir: stateDir})
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- client.Run(ctx)

@@ -71,7 +71,7 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, input
 	req, _ := http.NewRequest(http.MethodGet, serverUrl, nil)
 	req.SetBasicAuth("admin", "admin")
 	requestHeader.Set("Authorization", req.Header.Get("Authorization"))
-	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/api/gateway/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
+	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
 	if err != nil {
 		t.Errorf("Dial() error = %v", err)
 		return

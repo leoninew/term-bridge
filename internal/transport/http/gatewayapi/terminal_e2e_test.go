@@ -3,6 +3,7 @@ package gatewayapi
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -31,7 +32,7 @@ func TestGatewayAgentTerminalAttachE2E(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	errCh := make(chan error, 1)
-	client := agentapp.New(agentapp.Config{ServerUrl: server.URL, Username: "admin", Password: "admin", DeviceId: device.Id, DeviceName: device.Name, StateDir: stateDir, Runtime: runtime})
+	client := agentapp.New(agentapp.Config{ConnectUrl: server.URL, Username: "admin", Password: "admin", DeviceId: device.Id, DeviceName: device.Name, StateDir: stateDir, Runtime: runtime, Logger: slog.Default()})
 	go func() {
 		errCh <- client.Run(ctx)
 	}()

@@ -113,7 +113,7 @@ func (h *Handler) Handler() http.Handler {
 	mux.HandleFunc("/api/me", h.auth.Middleware(http.HandlerFunc(h.handleMe), h.writeUnauthorized).ServeHTTP)
 	mux.HandleFunc("/api/devices", h.auth.Middleware(http.HandlerFunc(h.handleDevices), h.writeUnauthorized).ServeHTTP)
 	mux.HandleFunc("/api/devices/", h.auth.Middleware(http.HandlerFunc(h.handleDevice), h.writeUnauthorized).ServeHTTP)
-	mux.HandleFunc("/api/gateway/agent/tunnel", h.handleAgentTunnel)
+	mux.HandleFunc("/api/agent/tunnel", h.handleAgentTunnel)
 	mux.HandleFunc("/api", h.writeNotFound)
 	mux.HandleFunc("/api/", h.writeNotFound)
 	return mux

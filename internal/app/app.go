@@ -127,7 +127,7 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	case CommandSession:
 		return runSessionList(cfg, options.Stdout)
 	case CommandServe:
-		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "serve_host", cfg.Serve.Host, "serve_port", cfg.Serve.Port, "serve_dev", cfg.Serve.Dev, "agent_server_url", cfg.Agent.ServerUrl, "agent_device_id", cfg.Agent.DeviceId, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.ConfigFile)
+		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "gate_listen_url", cfg.Gate.ListenUrl, "agent_connect_url", cfg.Agent.ConnectUrl, "agent_device_id", cfg.Agent.DeviceId, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.ConfigFile)
 		return runServe(ctx, cfg, bootstrap, logger, options)
 	default:
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("missing command")
@@ -247,9 +247,9 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		fmt.Fprintf(stdout, "Password: %s\n", bootstrap.Password)
 	}
 	registry := newWebTerminalRegistry(cfg, logger)
-	gatewayHandler := gatewayapi.New(gatewayapi.Config{Username: cfg.Auth.Username, Password: cfg.Auth.Password, AllowedOrigins: cfg.Web.AllowedOrigins, DebugErrors: cfg.Web.Error.Debug, Logger: logger.Slog})
-	server := httpserver.New(httpserver.Config{Host: cfg.Serve.Host, Port: cfg.Serve.Port, Open: cfg.Serve.Open, Dev: cfg.Serve.Dev, Logger: logger.Slog, RequestBodyLimit: cfg.LogRequestBodyLimit, ResponseBodyLimit: cfg.LogResponseBodyLimit}, gatewayHandler)
-	client := agent.New(agent.Config{ServerUrl: cfg.Agent.ServerUrl, Username: cfg.Auth.Username, Password: cfg.Auth.Password, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})
+	gatewayHandler := gatewayapi.New(gatewayapi.Config{Username: cfg.Auth.Username, Password: cfg.Auth.Password, AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog})
+	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Gate.ListenUrl, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
+	client := agent.New(agent.Config{ConnectUrl: cfg.Agent.ConnectUrl, Username: cfg.Auth.Username, Password: cfg.Auth.Password, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})
 
 	serveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -259,9 +259,6 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 	go func() {
 		err := runBackendServer(serveCtx, server, func(info httpserver.Info) {
 			fmt.Fprintf(stdout, "TermBridge serve listening on %s\n", info.Url)
-			if cfg.Serve.Dev {
-				fmt.Fprintln(stdout, "Dev mode enabled for unified backend.")
-			}
 			close(backendReady)
 		})
 		errCh <- normalizeServeError(err)
@@ -280,7 +277,7 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		return Result{Cwd: cfg.Cwd}, nil
 	}
 
-	fmt.Fprintf(stdout, "TermBridge agent connector targeting %s\n", cfg.Agent.ServerUrl)
+	fmt.Fprintf(stdout, "TermBridge agent connector targeting %s\n", cfg.Agent.ConnectUrl)
 	go func() {
 		errCh <- normalizeServeError(runAgentClient(serveCtx, client))
 	}()
@@ -307,13 +304,12 @@ func normalizeServeError(err error) error {
 
 func newWebTerminalRegistry(cfg config.Config, logger *logging.Logger) *terminalapp.Registry {
 	return terminalapp.NewRegistry(terminalapp.Config{
-		Cwd:         cfg.Cwd,
-		Store:       state.NewDeviceStore(cfg.Runtime.StateDir, cfg.Agent.DeviceId),
-		LogDir:      cfg.LogDir,
-		History:     cfg.History,
-		Manager:     gopty.NewManager(),
-		Logger:      logger,
-		EnvDenylist: cfg.Web.EnvDenylist,
+		Cwd:     cfg.Cwd,
+		Store:   state.NewDeviceStore(cfg.Runtime.StateDir, cfg.Agent.DeviceId),
+		LogDir:  cfg.LogDir,
+		History: cfg.History,
+		Manager: gopty.NewManager(),
+		Logger:  logger,
 	})
 }
 

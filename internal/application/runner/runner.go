@@ -81,7 +81,7 @@ func (r CommandRunner) Run(ctx context.Context, spec process.ProcessSpec, stream
 		return Result{}, apperrors.Runtime("prepare terminal", err)
 	}
 	defer func() {
-		if err := terminal.Restore(); err != nil && r.Logger != nil {
+		if err := terminal.Restore(); err != nil {
 			r.Logger.Warn("restore terminal", "error", err)
 		}
 	}()
@@ -160,17 +160,17 @@ func (r CommandRunner) Run(ctx context.Context, spec process.ProcessSpec, stream
 func (r CommandRunner) handleInterrupt(stderr io.Writer, session termpty.Session, mode process.StopMode) (process.StopMode, <-chan time.Time) {
 	if mode == process.StopNone {
 		_, _ = fmt.Fprintln(stderr, "termbridge: interrupting command; press Ctrl+C again to force stop")
-		if err := session.Interrupt(); err != nil && r.Logger != nil {
+		if err := session.Interrupt(); err != nil {
 			r.Logger.Warn("soft interrupt failed", "error", err)
 		}
 		r.notifyStopping(process.StopInterrupt, "interrupt_requested")
 		return process.StopInterrupt, time.After(r.InterruptGrace)
 	}
 	_, _ = fmt.Fprintln(stderr, "termbridge: forcing command stop")
-	if err := session.Close(); err != nil && r.Logger != nil {
+	if err := session.Close(); err != nil {
 		r.Logger.Warn("close PTY after interrupt", "error", err)
 	}
-	if err := session.KillTree(); err != nil && r.Logger != nil {
+	if err := session.KillTree(); err != nil {
 		r.Logger.Warn("kill process tree after interrupt", "error", err)
 	}
 	r.notifyStopping(process.StopKill, "force_stop_requested")
@@ -181,14 +181,14 @@ func (r CommandRunner) escalate(stderr io.Writer, session termpty.Session, mode 
 	switch mode {
 	case process.StopInterrupt:
 		_, _ = fmt.Fprintln(stderr, "termbridge: command did not stop; closing PTY")
-		if err := session.Close(); err != nil && r.Logger != nil {
+		if err := session.Close(); err != nil {
 			r.Logger.Warn("close PTY after interrupt timeout", "error", err)
 		}
 		r.notifyStopping(process.StopClose, "interrupt_timeout")
 		return process.StopClose, time.After(r.InterruptGrace)
 	case process.StopClose:
 		_, _ = fmt.Fprintln(stderr, "termbridge: command did not exit after close; killing process")
-		if err := session.KillTree(); err != nil && r.Logger != nil {
+		if err := session.KillTree(); err != nil {
 			r.Logger.Warn("kill process tree after close timeout", "error", err)
 		}
 		r.notifyStopping(process.StopKill, "close_timeout")
@@ -207,13 +207,11 @@ func (r CommandRunner) notifyStopping(mode process.StopMode, reason string) {
 func (r CommandRunner) waitOutput(done <-chan error) {
 	select {
 	case err := <-done:
-		if err != nil && r.Logger != nil {
+		if err != nil {
 			r.Logger.Debug("PTY output relay ended", "error", err)
 		}
 	case <-time.After(500 * time.Millisecond):
-		if r.Logger != nil {
-			r.Logger.Debug("PTY output relay did not finish before timeout")
-		}
+		r.Logger.Debug("PTY output relay did not finish before timeout")
 	}
 }
 

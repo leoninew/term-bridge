@@ -17,7 +17,7 @@ import (
 )
 
 type Config struct {
-	ServerUrl  string
+	ConnectUrl string
 	Username   string
 	Password   string
 	DeviceId   string
@@ -39,15 +39,11 @@ func New(config Config) *Client {
 }
 
 func (c *Client) logInfo(message string, attrs ...any) {
-	if c.config.Logger != nil {
-		c.config.Logger.Info(message, attrs...)
-	}
+	c.config.Logger.Info(message, attrs...)
 }
 
 func (c *Client) logWarn(message string, attrs ...any) {
-	if c.config.Logger != nil {
-		c.config.Logger.Warn(message, attrs...)
-	}
+	c.config.Logger.Warn(message, attrs...)
 }
 
 func (c *Client) Run(ctx context.Context) error {
@@ -56,7 +52,7 @@ func (c *Client) Run(ctx context.Context) error {
 		return err
 	}
 	c.device = device
-	conn, _, err := websocket.Dial(ctx, tunnelUrl(c.config.ServerUrl), &websocket.DialOptions{HTTPHeader: basicAuthHeader(c.config.Username, c.config.Password)})
+	conn, _, err := websocket.Dial(ctx, tunnelUrl(c.config.ConnectUrl), &websocket.DialOptions{HTTPHeader: basicAuthHeader(c.config.Username, c.config.Password)})
 	if err != nil {
 		return err
 	}
@@ -397,7 +393,7 @@ func tunnelUrl(serverUrl string) string {
 	} else {
 		parsed.Scheme = "ws"
 	}
-	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/api/gateway/agent/tunnel"
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/api/agent/tunnel"
 	parsed.RawQuery = ""
 	return parsed.String()
 }
