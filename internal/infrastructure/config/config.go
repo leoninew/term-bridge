@@ -37,7 +37,12 @@ type Config struct {
 	Gate       GateConfig
 	Agent      AgentConfig
 	Auth       AuthConfig
+	JWT        JWTConfig
 	ConfigFile string
+}
+
+type JWTConfig struct {
+	SecretKey string `json:"secret_key"`
 }
 
 type LogHTTPConfig struct {
@@ -214,6 +219,9 @@ func Load(options Options) (Config, error) {
 			DeviceId:   strings.TrimSpace(v.GetString("agent.device_id")),
 			DeviceName: strings.TrimSpace(v.GetString("agent.device_name")),
 		},
+		JWT: JWTConfig{
+			SecretKey: strings.TrimSpace(v.GetString("jwt.secret_key")),
+		},
 		ConfigFile: configFile,
 	}
 
@@ -233,6 +241,9 @@ func Load(options Options) (Config, error) {
 	normalizeAgentConfig(&cfg)
 	if err := validateAgent(cfg.Agent); err != nil {
 		return Config{}, err
+	}
+	if cfg.JWT.SecretKey == "" {
+		return Config{}, apperrors.Config("invalid jwt.secret_key", fmt.Errorf("JWT secret key is required"))
 	}
 	if err := ensureLogDir(cfg.LogDir); err != nil {
 		return Config{}, err
@@ -433,6 +444,7 @@ func configKeys() []string {
 		"agent.connect_url",
 		"agent.device_id",
 		"agent.device_name",
+		"jwt.secret_key",
 	}
 }
 

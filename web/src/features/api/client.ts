@@ -5,6 +5,8 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios'
 import type { ApiErrorResp } from '../../protocol/terminal'
+import { useGatewayStore } from '../../store/gateway'
+import { router } from '../../router'
 
 export const requestIdHeader = 'X-Request-ID'
 
@@ -42,6 +44,12 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   ensureRequestId(config)
+  const gateway = useGatewayStore()
+  if (gateway.token) {
+    const headers = AxiosHeaders.from(config.headers)
+    headers.set('Authorization', `Bearer ${gateway.token}`)
+    config.headers = headers
+  }
   return config
 })
 
@@ -50,6 +58,13 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     if (!error.response) {
       return Promise.reject(error)
+    }
+    if (error.response.status === 401) {
+      const gateway = useGatewayStore()
+      gateway.clearToken()
+      if (router.currentRoute.value.name !== 'login') {
+        router.push({ name: 'login' })
+      }
     }
     return Promise.reject(errorFromResponse(error.response))
   },

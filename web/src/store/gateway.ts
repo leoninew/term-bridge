@@ -1,8 +1,17 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { authLogin, authMe, listDevices, type DeviceSummary } from '../features/gateway/api'
+import {
+  authLogin,
+  authMe,
+  listDevices,
+  type DeviceSummary,
+  type TokenResp,
+} from '../features/gateway/api'
+
+const TOKEN_KEY = 'termbridge_gateway_token'
 
 export const useGatewayStore = defineStore('gateway', () => {
+  const token = ref<string | null>(localStorage.getItem(TOKEN_KEY))
   const authInitialized = ref(false)
   const authenticated = ref(false)
   const loggingIn = ref(false)
@@ -10,6 +19,16 @@ export const useGatewayStore = defineStore('gateway', () => {
   const passwordInput = ref('')
   const devices = ref<DeviceSummary[]>([])
   const selectedDeviceId = ref('')
+
+  function setToken(newToken: string) {
+    token.value = newToken
+    localStorage.setItem(TOKEN_KEY, newToken)
+  }
+
+  function clearToken() {
+    token.value = null
+    localStorage.removeItem(TOKEN_KEY)
+  }
 
   async function initializeAuth() {
     try {
@@ -33,7 +52,8 @@ export const useGatewayStore = defineStore('gateway', () => {
     }
     loggingIn.value = true
     try {
-      await authLogin(usernameInput.value, passwordInput.value)
+      const response: TokenResp = await authLogin(usernameInput.value, passwordInput.value)
+      setToken(response.access_token)
       authenticated.value = true
       await loadDevices()
     } finally {
@@ -58,6 +78,7 @@ export const useGatewayStore = defineStore('gateway', () => {
   }
 
   return {
+    token,
     authInitialized,
     authenticated,
     loggingIn,
@@ -65,6 +86,8 @@ export const useGatewayStore = defineStore('gateway', () => {
     passwordInput,
     devices,
     selectedDeviceId,
+    setToken,
+    clearToken,
     initializeAuth,
     login,
     loadDevices,

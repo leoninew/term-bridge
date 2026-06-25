@@ -1,98 +1,71 @@
 package auth
 
 import (
-	"crypto/rand"
 	"crypto/subtle"
-	"encoding/hex"
 	"net/http"
-	"strings"
-	"sync"
-	"time"
 )
-
-const CookieName = "termbridge_gateway_session"
 
 type Credentials struct {
 	Username string
 	Password string
 }
 
-type Manager struct {
-	username string
-	password string
-	mu       sync.Mutex
-	sessions map[string]time.Time
-	now      func() time.Time
+type Auther struct {
+	credentials Credentials
+	tokens      TokenService
 }
 
-func NewManager(credentials Credentials) *Manager {
-	return &Manager{
-		username: strings.TrimSpace(credentials.Username),
-		password: strings.TrimSpace(credentials.Password),
-		sessions: map[string]time.Time{},
-		now:      time.Now,
-	}
+func NewAuther(credentials Credentials, tokens TokenService) *Auther {
+	return &Auther{credentials: credentials, tokens: tokens}
 }
 
-func (m *Manager) Username() string {
-	return m.username
-}
-
-func (m *Manager) ValidCredentials(username string, password string) bool {
-	if m.username == "" || m.password == "" {
+func (a *Auther) ValidCredentials(username string, password string) bool {
+	if a.credentials.Username == "" || a.credentials.Password == "" {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(username), []byte(m.username)) == 1 &&
-		subtle.ConstantTimeCompare([]byte(password), []byte(m.password)) == 1
+	return subtle.ConstantTimeCompare([]byte(username), []byte(a.credentials.Username)) == 1 &&
+		subtle.ConstantTimeCompare([]byte(password), []byte(a.credentials.Password)) == 1
 }
 
-func (m *Manager) Login(w http.ResponseWriter, username string, password string) bool {
-	if !m.ValidCredentials(username, password) {
+func (a *Auther) Username() string {
+	return a.credentials.Username
+}
+
+func (a *Auther) Authenticated(r *http.Request) bool {
+	token := extractBearerToken(r)
+	if token == "" {
 		return false
 	}
-	sessionId := randomSessionId()
-	m.mu.Lock()
-	m.sessions[sessionId] = m.now().UTC()
-	m.mu.Unlock()
-	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: sessionId, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
-	return true
+	_, err := a.tokens.Verify(token)
+	return err == nil
 }
 
-func (m *Manager) Logout(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie(CookieName)
-	if err == nil {
-		m.mu.Lock()
-		delete(m.sessions, cookie.Value)
-		m.mu.Unlock()
+func (a *Auther) SignToken(username string) (string, error) {
+	return a.tokens.Sign(username)
+}
+
+func (a *Auther) Verify(token string) (Claims, error) {
+	return a.tokens.Verify(token)
+}
+
+func (a *Auther) UsernameFromRequest(r *http.Request) string {
+	token := extractBearerToken(r)
+	if token == "" {
+		return ""
 	}
-	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
-}
-
-func (m *Manager) Authenticated(r *http.Request) bool {
-	cookie, err := r.Cookie(CookieName)
-	if err != nil || cookie.Value == "" {
-		return false
+	claims, err := a.tokens.Verify(token)
+	if err != nil {
+		return ""
 	}
-	m.mu.Lock()
-	_, ok := m.sessions[cookie.Value]
-	m.mu.Unlock()
-	return ok
+	return claims.Sub
 }
 
-func (m *Manager) Middleware(next http.Handler, unauthorized http.HandlerFunc) http.Handler {
+func (a *Auther) Middleware(next http.Handler, unauthorized http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !m.Authenticated(r) {
+		if !a.Authenticated(r) {
 			unauthorized(w, r)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-func randomSessionId() string {
-	var data [32]byte
-	if _, err := rand.Read(data[:]); err != nil {
-		panic(err)
-	}
-	return hex.EncodeToString(data[:])
 }

@@ -67,8 +67,14 @@ func TestDevicesEndpointReturnsRegisteredDevices(t *testing.T) {
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d", loginResponse.Code)
 	}
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.Unmarshal(loginResponse.Body.Bytes(), &tokenResp); err != nil {
+		t.Fatalf("decode token response: %v", err)
+	}
 	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
-	request.AddCookie(loginResponse.Result().Cookies()[0])
+	request.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {

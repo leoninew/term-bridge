@@ -336,6 +336,7 @@ func writeDefaultConfig(t *testing.T, dir string) {
 	if err := os.WriteFile(filepath.Join(dir, ".termbridge.default.yaml"), content, 0o644); err != nil {
 		t.Fatalf("WriteFile(default config) error = %v", err)
 	}
+	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "test-secret-key-for-tests")
 }
 
 func isolateHome(t *testing.T) string {

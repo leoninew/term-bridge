@@ -164,7 +164,12 @@
     if (!session) {
       return null
     }
-    return terminalWsUrl(gateway.selectedDeviceId, session.workspace_id, session.id)
+    return terminalWsUrl(
+      gateway.selectedDeviceId,
+      session.workspace_id,
+      session.id,
+      gateway.token ?? undefined,
+    )
   })
 
   async function refresh() {
@@ -200,16 +205,17 @@
   async function logout() {
     try {
       await authLogout()
-      gateway.authenticated = false
-      gateway.passwordInput = ''
-      gateway.devices = []
-      gateway.selectedDeviceId = ''
-      workspaceSessions.reset()
-      workbench.resetForSourceChange()
-      await router.replace({ name: 'login' })
-    } catch (err) {
-      notifications.notifyError(t('gateway.logoutFailed'), err)
+    } catch {
+      // ignore logout API errors — clear local state anyway
     }
+    gateway.clearToken()
+    gateway.authenticated = false
+    gateway.passwordInput = ''
+    gateway.devices = []
+    gateway.selectedDeviceId = ''
+    workspaceSessions.reset()
+    workbench.resetForSourceChange()
+    await router.replace({ name: 'login' })
   }
 
   async function startSession() {

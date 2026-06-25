@@ -38,9 +38,9 @@ func TestGatewayAgentTerminalAttachE2E(t *testing.T) {
 	}()
 	waitForRoute(t, gateway, device.Id)
 
-	cookie := loginCookie(t, gateway)
+	token := loginToken(t, gateway)
 	header := http.Header{}
-	header.Set("Cookie", cookie.Name+"="+cookie.Value)
+	header.Set("Authorization", "Bearer "+token)
 	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/"+device.Id+"/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		t.Fatalf("browser Dial() error = %v", err)

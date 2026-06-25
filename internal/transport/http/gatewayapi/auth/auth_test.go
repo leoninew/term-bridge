@@ -6,76 +6,71 @@ import (
 	"testing"
 )
 
-func testManager() *Manager {
-	return NewManager(Credentials{Username: "admin", Password: "admin"})
-}
-
 func TestValidCredentials(t *testing.T) {
-	manager := testManager()
-	if !manager.ValidCredentials("admin", "admin") {
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	if !a.ValidCredentials("admin", "admin") {
 		t.Fatal("admin/admin rejected")
 	}
-	if manager.ValidCredentials("admin", "wrong") {
+	if a.ValidCredentials("admin", "wrong") {
 		t.Fatal("wrong password accepted")
 	}
-	if manager.ValidCredentials("wrong", "admin") {
+	if a.ValidCredentials("wrong", "admin") {
 		t.Fatal("wrong username accepted")
 	}
 }
 
-func TestLoginSetsCookieAndAuthenticates(t *testing.T) {
-	manager := testManager()
-	response := httptest.NewRecorder()
-	if !manager.Login(response, "admin", "admin") {
-		t.Fatal("Login() = false, want true")
+func TestSignAndVerify(t *testing.T) {
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	token, err := a.SignToken("admin")
+	if err != nil {
+		t.Fatalf("SignToken() error = %v", err)
 	}
-	cookies := response.Result().Cookies()
-	if len(cookies) != 1 || cookies[0].Name != CookieName || cookies[0].Value == "" || !cookies[0].HttpOnly {
-		t.Fatalf("cookies = %#v", cookies)
+	claims, err := a.Verify(token)
+	if err != nil {
+		t.Fatalf("Verify() error = %v", err)
 	}
+	if claims.Sub != "admin" {
+		t.Fatalf("claims.Sub = %q, want admin", claims.Sub)
+	}
+}
+
+func TestVerifyRejectsInvalidToken(t *testing.T) {
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	if _, err := a.Verify("invalid.token.here"); err == nil {
+		t.Fatal("expected error for invalid token")
+	}
+}
+
+func TestVerifyRejectsWrongSecret(t *testing.T) {
+	a1 := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("secret-1"))
+	a2 := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("secret-2"))
+	token, _ := a1.SignToken("admin")
+	if _, err := a2.Verify(token); err == nil {
+		t.Fatal("expected error for wrong secret")
+	}
+}
+
+func TestAuthenticatedRequest(t *testing.T) {
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	token, _ := a.SignToken("admin")
 	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
-	request.AddCookie(cookies[0])
-	if !manager.Authenticated(request) {
+	request.Header.Set("Authorization", "Bearer "+token)
+	if !a.Authenticated(request) {
 		t.Fatal("Authenticated() = false, want true")
 	}
 }
 
-func TestLoginRejectsBadPassword(t *testing.T) {
-	manager := testManager()
-	response := httptest.NewRecorder()
-	if manager.Login(response, "admin", "bad") {
-		t.Fatal("Login() = true, want false")
-	}
-	if got := response.Result().Cookies(); len(got) != 0 {
-		t.Fatalf("cookies = %#v, want none", got)
-	}
-}
-
-func TestLogoutClearsSession(t *testing.T) {
-	manager := testManager()
-	loginResponse := httptest.NewRecorder()
-	if !manager.Login(loginResponse, "admin", "admin") {
-		t.Fatal("Login() = false")
-	}
-	cookie := loginResponse.Result().Cookies()[0]
-	request := httptest.NewRequest(http.MethodPost, "/api/logout", nil)
-	request.AddCookie(cookie)
-	logoutResponse := httptest.NewRecorder()
-	manager.Logout(logoutResponse, request)
-	requestAfterLogout := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
-	requestAfterLogout.AddCookie(cookie)
-	if manager.Authenticated(requestAfterLogout) {
-		t.Fatal("Authenticated() = true after logout")
-	}
-	clearCookie := logoutResponse.Result().Cookies()[0]
-	if clearCookie.Name != CookieName || clearCookie.MaxAge != -1 {
-		t.Fatalf("clear cookie = %#v", clearCookie)
+func TestAuthenticatedRejectsMissingToken(t *testing.T) {
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
+	if a.Authenticated(request) {
+		t.Fatal("Authenticated() = true, want false")
 	}
 }
 
 func TestMiddlewareRejectsUnauthenticated(t *testing.T) {
-	manager := testManager()
-	handler := manager.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}), func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -84,5 +79,23 @@ func TestMiddlewareRejectsUnauthenticated(t *testing.T) {
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/devices", nil))
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", response.Code)
+	}
+}
+
+func TestUsernameFromRequest(t *testing.T) {
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	token, _ := a.SignToken("admin")
+	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	if got := a.UsernameFromRequest(request); got != "admin" {
+		t.Fatalf("UsernameFromRequest() = %q, want admin", got)
+	}
+}
+
+func TestUsernameFromRequestWithoutToken(t *testing.T) {
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
+	if got := a.UsernameFromRequest(request); got != "" {
+		t.Fatalf("UsernameFromRequest() = %q, want empty", got)
 	}
 }

@@ -18,6 +18,11 @@ export type AuthLoginReq = {
   password: string
 }
 
+export type TokenResp = {
+  access_token: string
+  token_type: string
+}
+
 export async function authMe(): Promise<AuthMeResp> {
   try {
     const response = await apiClient.get<AuthMeResp>('/api/me')
@@ -30,9 +35,10 @@ export async function authMe(): Promise<AuthMeResp> {
   }
 }
 
-export async function authLogin(username: string, password: string): Promise<void> {
+export async function authLogin(username: string, password: string): Promise<TokenResp> {
   const request: AuthLoginReq = { username, password }
-  await apiClient.post('/api/login', request)
+  const response = await apiClient.post<TokenResp>('/api/login', request)
+  return response.data
 }
 
 export async function authLogout(): Promise<void> {

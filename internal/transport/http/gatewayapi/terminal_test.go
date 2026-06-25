@@ -26,9 +26,9 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 		runTerminalAgent(t, ctx, server.URL, inputCh)
 	}()
 	waitForRoute(t, gateway, "dev-1")
-	cookie := loginCookie(t, gateway)
+	token := loginToken(t, gateway)
 	header := http.Header{}
-	header.Set("Cookie", cookie.Name+"="+cookie.Value)
+	header.Set("Authorization", "Bearer "+token)
 	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		t.Fatalf("browser Dial() error = %v", err)
@@ -118,9 +118,9 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, input
 
 func TestRouteUnavailable(t *testing.T) {
 	gateway := New(testGatewayConfig())
-	cookie := loginCookie(t, gateway)
+	token := loginToken(t, gateway)
 	request := httptest.NewRequest(http.MethodGet, "/api/devices/missing/workspaces/ws-1/sessions", nil)
-	request.AddCookie(cookie)
+	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, request)
 	body := assertAPIError(t, response, http.StatusServiceUnavailable, errorCodeDeviceOffline)

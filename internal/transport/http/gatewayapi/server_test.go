@@ -10,7 +10,7 @@ import (
 )
 
 func testGatewayConfig() Config {
-	return Config{Username: "admin", Password: "admin", Logger: slog.Default()}
+	return Config{Username: "admin", Password: "admin", JWTSecret: "test-secret", Logger: slog.Default()}
 }
 
 func TestHealth(t *testing.T) {
@@ -39,13 +39,19 @@ func TestAuthEndpoints(t *testing.T) {
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d, want 200; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
-	cookies := loginResponse.Result().Cookies()
-	if len(cookies) != 1 {
-		t.Fatalf("cookies = %#v", cookies)
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
+	}
+	if err := json.Unmarshal(loginResponse.Body.Bytes(), &tokenResp); err != nil {
+		t.Fatalf("decode token response: %v", err)
+	}
+	if tokenResp.AccessToken == "" {
+		t.Fatal("access_token is empty")
 	}
 
 	meRequest := httptest.NewRequest(http.MethodGet, "/api/me", nil)
-	meRequest.AddCookie(cookies[0])
+	meRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	meResponse := httptest.NewRecorder()
 	server.ServeHTTP(meResponse, meRequest)
 	if meResponse.Code != http.StatusOK {
@@ -53,19 +59,19 @@ func TestAuthEndpoints(t *testing.T) {
 	}
 
 	logoutRequest := httptest.NewRequest(http.MethodPost, "/api/logout", nil)
-	logoutRequest.AddCookie(cookies[0])
+	logoutRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	logoutResponse := httptest.NewRecorder()
 	server.ServeHTTP(logoutResponse, logoutRequest)
 	if logoutResponse.Code != http.StatusOK {
 		t.Fatalf("logout status = %d, want 200", logoutResponse.Code)
 	}
 
-	devicesRequestAfterLogout := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
-	devicesRequestAfterLogout.AddCookie(cookies[0])
-	devicesResponseAfterLogout := httptest.NewRecorder()
-	server.ServeHTTP(devicesResponseAfterLogout, devicesRequestAfterLogout)
-	if devicesResponseAfterLogout.Code != http.StatusUnauthorized {
-		t.Fatalf("post-logout devices status = %d, want 401", devicesResponseAfterLogout.Code)
+	devicesRequestAfterExpired := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
+	devicesRequestAfterExpired.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
+	devicesResponseAfterExpired := httptest.NewRecorder()
+	server.ServeHTTP(devicesResponseAfterExpired, devicesRequestAfterExpired)
+	if devicesResponseAfterExpired.Code != http.StatusOK {
+		t.Fatalf("devices with valid token status = %d, want 200", devicesResponseAfterExpired.Code)
 	}
 }
 

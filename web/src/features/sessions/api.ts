@@ -106,6 +106,15 @@ export async function rerunSession(
   return response.data
 }
 
-export function terminalWsUrl(deviceId: string, workspaceId: string, sessionId: string): string {
-  return devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/ws`)
+export function terminalWsUrl(
+  deviceId: string,
+  workspaceId: string,
+  sessionId: string,
+  token?: string,
+): string {
+  const path = devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/ws`)
+  if (token) {
+    return `${path}?token=${encodeURIComponent(token)}`
+  }
+  return path
 }

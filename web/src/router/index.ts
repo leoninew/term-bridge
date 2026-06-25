@@ -1,4 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useGatewayStore } from '../store/gateway'
+
+const protectedRoutes = ['sessions', 'settings']
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -29,4 +32,14 @@ export const router = createRouter({
       component: () => import('../views/HelpView.vue'),
     },
   ],
+})
+
+router.beforeEach((to) => {
+  const gateway = useGatewayStore()
+  if (protectedRoutes.includes(to.name as string) && !gateway.token) {
+    return { name: 'login' }
+  }
+  if (to.name === 'login' && gateway.token) {
+    return { name: 'sessions' }
+  }
 })

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AxiosHeaders, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
+import { createPinia, setActivePinia } from 'pinia'
 import {
   ApiClientError,
   ApiContractMismatchError,
@@ -8,6 +9,25 @@ import {
   errorFromResponse,
   requestIdHeader,
 } from './client'
+
+vi.mock('../../router', () => ({
+  router: {
+    currentRoute: { value: { name: 'sessions' } },
+    push: vi.fn(),
+  },
+}))
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  globalThis.localStorage = {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+    length: 0,
+    key: vi.fn(),
+  }
+})
 
 function requestConfig(headers?: Record<string, string>): InternalAxiosRequestConfig {
   return {

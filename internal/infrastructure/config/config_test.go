@@ -520,6 +520,7 @@ func isolateHome(t *testing.T) string {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	clearTermBridgeEnv(t)
+	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "test-secret-key-for-tests")
 	return home
 }
 

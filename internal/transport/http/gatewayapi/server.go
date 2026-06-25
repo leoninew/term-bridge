@@ -20,6 +20,7 @@ import (
 type Config struct {
 	Username       string
 	Password       string
+	JWTSecret      string
 	AllowedOrigins []string
 	DebugErrors    bool
 	Logger         *slog.Logger
@@ -27,7 +28,7 @@ type Config struct {
 
 type Handler struct {
 	config             Config
-	auth               *auth.Manager
+	auth               *auth.Auther
 	registry           *DeviceRegistry
 	routes             map[string]*agentRoute
 	routeMu            sync.Mutex
@@ -96,7 +97,7 @@ func New(config Config) *Handler {
 	config = normalizeConfig(config)
 	return &Handler{
 		config:             config,
-		auth:               auth.NewManager(auth.Credentials{Username: config.Username, Password: config.Password}),
+		auth:               auth.NewAuther(auth.Credentials{Username: config.Username, Password: config.Password}, auth.NewTokenService(config.JWTSecret)),
 		registry:           NewDeviceRegistry(),
 		routes:             map[string]*agentRoute{},
 		writers:            map[string]tunnel.StreamId{},
@@ -143,11 +144,16 @@ func (s *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !s.decodeJSONRequest(w, r, &request) {
 		return
 	}
-	if !s.auth.Login(w, request.Username, request.Password) {
+	if !s.auth.ValidCredentials(request.Username, request.Password) {
 		s.writeUnauthorized(w, r)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	token, err := s.auth.SignToken(request.Username)
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, "Failed to sign token", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"access_token": token, "token_type": "bearer"})
 }
 
 func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +161,6 @@ func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	s.auth.Logout(w, r)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -164,7 +169,7 @@ func (s *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "username": s.auth.Username()})
+	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "username": s.auth.UsernameFromRequest(r)})
 }
 
 func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {

@@ -3,6 +3,7 @@ package gatewayapi
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -44,7 +45,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 		})
 	}()
 	waitForRoute(t, gateway, "dev-1")
-	cookie := loginCookie(t, gateway)
+	token := loginToken(t, gateway)
 	for _, tc := range []struct {
 		path string
 		want string
@@ -55,7 +56,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 	} {
 		request := httptest.NewRequest(http.MethodGet, tc.path, nil)
 		request.Header.Set(requestIdHeader, "req_test_relay")
-		request.AddCookie(cookie)
+		request.Header.Set("Authorization", "Bearer "+token)
 		response := httptest.NewRecorder()
 		gateway.ServeHTTP(response, request)
 		if response.Code != http.StatusOK {
@@ -73,18 +74,20 @@ func rawResponse(raw string) tunnel.ResponseResp {
 	return tunnel.ResponseResp{OK: true, Result: []byte(raw)}
 }
 
-func loginCookie(t *testing.T, gateway *Handler) *http.Cookie {
+func loginToken(t *testing.T, gateway *Handler) string {
 	t.Helper()
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("login status = %d; body=%s", response.Code, response.Body.String())
 	}
-	cookies := response.Result().Cookies()
-	if len(cookies) != 1 {
-		t.Fatalf("cookies = %#v", cookies)
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
 	}
-	return cookies[0]
+	if err := json.Unmarshal(response.Body.Bytes(), &tokenResp); err != nil {
+		t.Fatalf("decode token response: %v", err)
+	}
+	return tokenResp.AccessToken
 }
 
 func waitForRoute(t *testing.T, gateway *Handler, deviceId string) {
