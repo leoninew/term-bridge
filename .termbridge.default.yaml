@@ -27,12 +27,16 @@ history:
 runtime:
   state_dir: .termbridge
 
+# Web 静态资源目录；为空时只提供 API，便于本地 Vite 开发。
+web:
+  static_dir: ""
+
 # Gate
 gate:
   listen_url: http://127.0.0.1:9010
   browser:
     allowed_origins:
-      - http://localhost:9011
+      - http://127.0.0.1:9011
   api:
     expose_errors: false
 

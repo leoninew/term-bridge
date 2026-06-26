@@ -4,11 +4,86 @@ import (
 	"bytes"
 	"encoding/json"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestServerServesStaticFilesWithSPAFallbackAndKeepsAPIRoutes(t *testing.T) {
+	staticDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("<html>app</html>"), 0o644); err != nil {
+		t.Fatalf("WriteFile(index) error = %v", err)
+	}
+	assetsDir := filepath.Join(staticDir, "assets")
+	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(assets) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(assetsDir, "app.js"), []byte("console.log('app')"), 0o644); err != nil {
+		t.Fatalf("WriteFile(asset) error = %v", err)
+	}
+	apiHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/health" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"gateway"}`))
+	})
+	server := New(Config{StaticDir: staticDir, Logger: slog.Default()}, apiHandler)
+
+	cases := []struct {
+		path string
+		want string
+	}{
+		{path: "/", want: "<html>app</html>"},
+		{path: "/sessions", want: "<html>app</html>"},
+		{path: "/settings", want: "<html>app</html>"},
+		{path: "/assets/app.js", want: "console.log('app')"},
+		{path: "/api/health", want: `{"status":"gateway"}`},
+	}
+	for _, tc := range cases {
+		response := httptest.NewRecorder()
+		server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, tc.path, nil))
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), tc.want) {
+			t.Fatalf("GET %s = %d %q, want body containing %q", tc.path, response.Code, response.Body.String(), tc.want)
+		}
+	}
+
+	apiResponse := httptest.NewRecorder()
+	server.ServeHTTP(apiResponse, httptest.NewRequest(http.MethodGet, "/api/missing", nil))
+	if apiResponse.Code != http.StatusNotFound || strings.Contains(apiResponse.Body.String(), "<html>app</html>") {
+		t.Fatalf("/api/missing = %d %q, want API 404 without SPA fallback", apiResponse.Code, apiResponse.Body.String())
+	}
+}
+
+func TestServerListenRejectsInvalidStaticDir(t *testing.T) {
+	server := New(Config{ServerUrl: "http://127.0.0.1:0", StaticDir: filepath.Join(t.TempDir(), "missing"), Logger: slog.Default()}, http.NotFoundHandler())
+	listener, _, err := server.Listen()
+	if err == nil {
+		_ = listener.Close()
+		t.Fatal("Listen() error = nil, want invalid static dir error")
+	}
+}
+
+func TestServerListenAcceptsStaticDirWithIndex(t *testing.T) {
+	staticDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("ok"), 0o644); err != nil {
+		t.Fatalf("WriteFile(index) error = %v", err)
+	}
+	server := New(Config{ServerUrl: "http://127.0.0.1:0", StaticDir: staticDir, Logger: slog.Default()}, http.NotFoundHandler())
+	listener, _, err := server.Listen()
+	if err != nil {
+		t.Fatalf("Listen() error = %v", err)
+	}
+	defer listener.Close()
+	if _, ok := listener.Addr().(*net.TCPAddr); !ok {
+		t.Fatalf("listener addr = %T, want TCP", listener.Addr())
+	}
+}
 
 func TestServerLogsUnifiedBackendRequests(t *testing.T) {
 	var logBuffer bytes.Buffer

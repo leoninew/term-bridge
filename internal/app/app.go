@@ -248,7 +248,7 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 	}
 	registry := newWebTerminalRegistry(cfg, logger)
 	gatewayHandler := gatewayapi.New(gatewayapi.Config{Username: cfg.Auth.Username, Password: cfg.Auth.Password, JWTSecret: cfg.JWT.SecretKey, AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog})
-	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Gate.ListenUrl, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
+	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Gate.ListenUrl, StaticDir: cfg.Web.StaticDir, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
 	client := agent.New(agent.Config{ConnectUrl: cfg.Agent.ConnectUrl, Username: cfg.Auth.Username, Password: cfg.Auth.Password, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})
 
 	serveCtx, cancel := context.WithCancel(ctx)

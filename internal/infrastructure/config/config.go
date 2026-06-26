@@ -3,7 +3,6 @@ package config
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -23,6 +22,9 @@ const (
 	FileName        = ".termbridge.yaml"
 	EnvFileName     = ".env"
 	EnvPrefix       = "TERMBRIDGE"
+
+	DefaultAuthUsername = "admin"
+	DefaultAuthPassword = "admin"
 )
 
 type Config struct {
@@ -34,6 +36,7 @@ type Config struct {
 	LogHTTP    LogHTTPConfig
 	History    HistoryConfig
 	Runtime    RuntimeConfig
+	Web        WebConfig
 	Gate       GateConfig
 	Agent      AgentConfig
 	Auth       AuthConfig
@@ -58,6 +61,10 @@ type HistoryConfig struct {
 
 type RuntimeConfig struct {
 	StateDir string
+}
+
+type WebConfig struct {
+	StaticDir string
 }
 
 type GateConfig struct {
@@ -90,57 +97,6 @@ type BootstrapResult struct {
 	Generated  bool
 	Username   string
 	Password   string
-}
-
-// LocalIdentityFileName is the JSON file stored in state_dir for local login credentials.
-const LocalIdentityFileName = "device.json"
-
-type LocalIdentity struct {
-	Auth AuthConfig `json:"auth"`
-}
-
-type AgentIdentityConfig struct {
-	DeviceId   string `json:"device_id"`
-	DeviceName string `json:"device_name"`
-}
-
-// loadLocalIdentityFromFile reads local auth from device.json. Legacy agent fields
-// are returned separately so EnsureLocalIdentity can migrate them into .termbridge.yaml.
-// Returns zero values if the file does not exist.
-func loadLocalIdentityFromFile(path string) (LocalIdentity, AgentIdentityConfig, bool, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return LocalIdentity{}, AgentIdentityConfig{}, false, nil
-		}
-		return LocalIdentity{}, AgentIdentityConfig{}, false, err
-	}
-	var file struct {
-		Auth  AuthConfig           `json:"auth"`
-		Agent *AgentIdentityConfig `json:"agent"`
-	}
-	if err := json.Unmarshal(data, &file); err != nil {
-		return LocalIdentity{}, AgentIdentityConfig{}, false, err
-	}
-	legacyAgent := AgentIdentityConfig{}
-	hasLegacyAgent := file.Agent != nil
-	if file.Agent != nil {
-		legacyAgent = *file.Agent
-	}
-	return LocalIdentity{Auth: file.Auth}, legacyAgent, hasLegacyAgent, nil
-}
-
-// saveLocalIdentityToFile writes only local auth credentials to state_dir/device.json.
-func saveLocalIdentityToFile(stateDir string, identity LocalIdentity) error {
-	if err := os.MkdirAll(stateDir, 0o755); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(identity, "", "  ")
-	if err != nil {
-		return err
-	}
-	data = append(data, '\n')
-	return os.WriteFile(filepath.Join(stateDir, LocalIdentityFileName), data, 0o600)
 }
 
 type Options struct {
@@ -188,6 +144,10 @@ func Load(options Options) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	staticDir, err := resolveOptionalDir(cwd, v.GetString("web.static_dir"))
+	if err != nil {
+		return Config{}, apperrors.Config("invalid web.static_dir", err)
+	}
 
 	cfg := Config{
 		Cwd:       cwd,
@@ -205,6 +165,7 @@ func Load(options Options) (Config, error) {
 			MaxLineBytes: v.GetInt("history.max_line_bytes"),
 		},
 		Runtime: RuntimeConfig{StateDir: stateDir},
+		Web:     WebConfig{StaticDir: staticDir},
 		Gate: GateConfig{
 			ListenUrl: strings.TrimSpace(v.GetString("gate.listen_url")),
 			Browser: GateBrowserConfig{
@@ -218,6 +179,10 @@ func Load(options Options) (Config, error) {
 			ConnectUrl: strings.TrimSpace(v.GetString("agent.connect_url")),
 			DeviceId:   strings.TrimSpace(v.GetString("agent.device_id")),
 			DeviceName: strings.TrimSpace(v.GetString("agent.device_name")),
+		},
+		Auth: AuthConfig{
+			Username: DefaultAuthUsername,
+			Password: DefaultAuthPassword,
 		},
 		JWT: JWTConfig{
 			SecretKey: strings.TrimSpace(v.GetString("jwt.secret_key")),
@@ -253,65 +218,28 @@ func Load(options Options) (Config, error) {
 }
 
 func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
-	identityPath := filepath.Join(cfg.Runtime.StateDir, LocalIdentityFileName)
-	identity, legacyAgent, hasLegacyAgent, err := loadLocalIdentityFromFile(identityPath)
-	if err != nil {
-		return Config{}, BootstrapResult{}, apperrors.Config("load local identity", err)
-	}
-
-	identityChanged := hasLegacyAgent
-	generatedPassword := ""
-	username := strings.TrimSpace(identity.Auth.Username)
-	if username == "" {
-		username = currentUsername()
-		identity.Auth.Username = username
-		identityChanged = true
-	}
-	password := strings.TrimSpace(identity.Auth.Password)
-	if password == "" {
-		generated, err := randomHex(24)
-		if err != nil {
-			return Config{}, BootstrapResult{}, apperrors.Config("generate auth password", err)
-		}
-		password = generated
-		generatedPassword = generated
-		identity.Auth.Password = password
-		identityChanged = true
-	}
-	if identityChanged {
-		if err := saveLocalIdentityToFile(cfg.Runtime.StateDir, identity); err != nil {
-			return Config{}, BootstrapResult{}, apperrors.Config("save local identity", err)
-		}
-	}
-
-	updated, err := ensureAgentIdentityInConfig(cfg, legacyAgent)
+	updated, err := ensureAgentIdentityInConfig(cfg)
 	if err != nil {
 		return Config{}, BootstrapResult{}, err
 	}
-	updated.Auth = AuthConfig{Username: username, Password: password}
-	return updated, BootstrapResult{ConfigFile: identityPath, Generated: generatedPassword != "", Username: username, Password: generatedPassword}, nil
+	updated.Auth = AuthConfig{Username: DefaultAuthUsername, Password: DefaultAuthPassword}
+	return updated, BootstrapResult{ConfigFile: updated.ConfigFile}, nil
 }
 
-func ensureAgentIdentityInConfig(cfg Config, legacyAgent AgentIdentityConfig) (Config, error) {
+func ensureAgentIdentityInConfig(cfg Config) (Config, error) {
 	changed := false
 	deviceId := strings.TrimSpace(cfg.Agent.DeviceId)
 	if deviceId == "" {
-		deviceId = strings.TrimSpace(legacyAgent.DeviceId)
-		if deviceId == "" {
-			generated, err := randomHex(16)
-			if err != nil {
-				return Config{}, apperrors.Config("generate device id", err)
-			}
-			deviceId = generated
+		generated, err := randomHex(16)
+		if err != nil {
+			return Config{}, apperrors.Config("generate device id", err)
 		}
+		deviceId = generated
 		changed = true
 	}
 	deviceName := strings.TrimSpace(cfg.Agent.DeviceName)
 	if deviceName == "" {
-		deviceName = strings.TrimSpace(legacyAgent.DeviceName)
-		if deviceName == "" {
-			deviceName = defaultDeviceName()
-		}
+		deviceName = defaultDeviceName()
 		changed = true
 	}
 	cfg.Agent.DeviceId = deviceId
@@ -438,6 +366,7 @@ func configKeys() []string {
 		"history.max_bytes",
 		"history.max_line_bytes",
 		"runtime.state_dir",
+		"web.static_dir",
 		"gate.listen_url",
 		"gate.browser.allowed_origins",
 		"gate.api.expose_errors",
@@ -465,7 +394,7 @@ func resolveLogDir(cwd string, path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", apperrors.Config("invalid log dir", fmt.Errorf("empty path"))
 	}
-	if filepath.IsAbs(path) {
+	if isConfigAbsPath(path) {
 		return filepath.Clean(path), nil
 	}
 	return filepath.Join(cwd, path), nil
@@ -475,10 +404,25 @@ func resolveStateDir(cwd string, path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", apperrors.Config("invalid runtime state dir", fmt.Errorf("empty path"))
 	}
-	if filepath.IsAbs(path) {
+	if isConfigAbsPath(path) {
 		return filepath.Clean(path), nil
 	}
 	return filepath.Join(cwd, path), nil
+}
+
+func resolveOptionalDir(cwd string, path string) (string, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", nil
+	}
+	if isConfigAbsPath(path) {
+		return filepath.Clean(path), nil
+	}
+	return filepath.Join(cwd, path), nil
+}
+
+func isConfigAbsPath(path string) bool {
+	return filepath.IsAbs(path) || strings.HasPrefix(path, "/")
 }
 
 func getStringSlice(v *viper.Viper, key string) []string {

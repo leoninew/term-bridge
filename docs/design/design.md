@@ -1,6 +1,6 @@
 # TermBridge-go 产品设计
 
-最后修改时间: 2026-06-26 14:05:34
+最后修改时间: 2026-06-26 21:02:12
 
 ## 1. 项目定位
 
@@ -172,13 +172,15 @@ workspace、session、tab、terminal 都必须属于当前 selected device。切
 - 基础 Browser auth。
 - workspace/session mutation。
 - terminal attach、history 和 resize hardening。
+- 已具备镜像内前后端一体的基础交付面：同一运行单元可以提供 Browser 页面与后端服务。
+- 本地开发已收口为 loopback-only 的前后端分离模式。
 
 当前仍需要收口的能力：
 
 - `/sessions` device selector 状态表达。
 - device 切换隔离的验证闭环。
 - 真实 TUI、interrupt、backpressure、long-running 场景补证。
-- Remote Gate / Local Agent 的部署、身份、凭据、授权和安全边界。
+- Remote Gate / Local Agent 的真实跨网络部署验证、身份、凭据、授权和安全边界。
 
 ---
 
@@ -194,7 +196,7 @@ Browser
   -> PTY / Process
 ```
 
-这是当前主要产品形态。用户在本机启动 `termbridge serve`，Browser 访问本机 `/sessions`，本机 device 出现在工作台中。
+这是当前主要产品形态。用户在本机启动 `termbridge serve`，Browser 访问本机 `/sessions`，本机 device 出现在工作台中。开发环境保持前后端分离，交付镜像中则由同一运行单元承载 Browser 页面与后端服务。
 
 ### 远端 Gate 接入
 
@@ -206,10 +208,11 @@ Browser
   -> PTY / Process
 ```
 
-这是 M7 的目标形态。Gate 可以部署到远端，本地 Agent 主动连接远端 Gate，Browser 从其他设备访问本地 runtime。
+这是 M7 的目标形态。当前 Cloud Gate PoC 已完成镜像交付面的基础验证，但尚未验证 Remote Gate + separate Local Agent 的真实跨网络路径；M7 仍需要补齐本地 Agent 主动连接远端 Gate、Browser 从其他设备访问本地 runtime 的完整验证。
 
 远端形态的产品重点不是改变 terminal 的使用方式，而是补齐：
 
+- PoC 临时认证向正式用户系统和 device 绑定模型迁移。
 - secure pairing。
 - device credential。
 - token rotation。

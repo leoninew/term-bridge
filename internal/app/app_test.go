@@ -121,7 +121,7 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	configContent := "gate:\n  listen_url: http://127.0.0.1:9090\n  browser:\n    allowed_origins:\n      - http://localhost:9011\n  api:\n    expose_errors: true\nagent:\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\n"
+	configContent := "gate:\n  listen_url: http://127.0.0.1:9090\n  browser:\n    allowed_origins:\n      - http://127.0.0.1:9011\n  api:\n    expose_errors: true\nagent:\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\n"
 	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
 		t.Fatalf("WriteFile(config) error = %v", err)
 	}

@@ -35,9 +35,9 @@ test:
 
 # Build web frontend and termbridge binary
 build:
-    cd web && yarn build
     mkdir -p bin
     go build -o bin/termbridge ./cmd/termbridge
+    docker build -f Dockerfile.cn -t termbridge .
 
 # --- Local development ---
 
@@ -45,7 +45,7 @@ build:
 exec *args:
     go run cmd/termbridge/main.go exec -- {{args}}
 
-# Start web frontend on localhost:9011, proxying to serve backend
+# Start web frontend on 127.0.0.1:9011, proxying to serve backend
 web:
     cd web && yarn dev
 

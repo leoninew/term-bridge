@@ -1,0 +1,13 @@
+.git
+.claude
+.pomelo-pw
+.env
+.termbridge/
+.termbridge.yaml
+logs/
+bin/
+web/node_modules/
+web/dist/
+node_modules/
+coverage/
+*.log

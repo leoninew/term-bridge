@@ -139,7 +139,11 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
     workspaceTree.value = orderWorkspaceSessions(previousTree, workspaceId, sessionIds)
     try {
       const orderedSessions = await updateSessionOrder(deviceId, workspaceId, sessionIds)
-      workspaceTree.value = replaceWorkspaceSessions(workspaceTree.value, workspaceId, orderedSessions)
+      workspaceTree.value = replaceWorkspaceSessions(
+        workspaceTree.value,
+        workspaceId,
+        orderedSessions,
+      )
     } catch (err) {
       workspaceTree.value = previousTree
       throw err

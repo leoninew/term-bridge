@@ -6,6 +6,9 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -15,6 +18,7 @@ import (
 
 type Config struct {
 	ServerUrl         string
+	StaticDir         string
 	Logger            *slog.Logger
 	RequestBodyLimit  int
 	ResponseBodyLimit int
@@ -34,6 +38,9 @@ func New(config Config, apiHandler http.Handler) *Server {
 	mux := http.NewServeMux()
 	mux.Handle("/api", apiHandler)
 	mux.Handle("/api/", apiHandler)
+	if config.StaticDir != "" {
+		mux.Handle("/", staticHandler(config.StaticDir))
+	}
 	return &Server{config: config, server: &http.Server{Handler: requestlog.Middleware(config.Logger, requestlog.Config{RequestBodyLimit: config.RequestBodyLimit, ResponseBodyLimit: config.ResponseBodyLimit})(mux)}}
 }
 
@@ -42,6 +49,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Listen() (net.Listener, Info, error) {
+	if err := validateStaticDir(s.config.StaticDir); err != nil {
+		return nil, Info{}, apperrors.Runtime("validate static web directory", err)
+	}
 	parsed, err := url.Parse(s.config.ServerUrl)
 	if err != nil || parsed.Host == "" {
 		return nil, Info{}, apperrors.Runtime("parse backend server url", err)
@@ -81,6 +91,7 @@ func normalizeConfig(config Config) Config {
 		config.ServerUrl = "http://127.0.0.1:9010"
 	}
 	config.ServerUrl = strings.TrimRight(strings.TrimSpace(config.ServerUrl), "/")
+	config.StaticDir = strings.TrimSpace(config.StaticDir)
 	if config.Logger == nil {
 		panic("http server logger is required")
 	}
@@ -91,4 +102,52 @@ func normalizeConfig(config Config) Config {
 		config.ResponseBodyLimit = 0
 	}
 	return config
+}
+
+func validateStaticDir(staticDir string) error {
+	if staticDir == "" {
+		return nil
+	}
+	info, err := os.Stat(staticDir)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return os.ErrInvalid
+	}
+	indexPath := filepath.Join(staticDir, "index.html")
+	indexInfo, err := os.Stat(indexPath)
+	if err != nil {
+		return err
+	}
+	if indexInfo.IsDir() {
+		return os.ErrInvalid
+	}
+	return nil
+}
+
+func staticHandler(staticDir string) http.Handler {
+	fileServer := http.FileServer(http.Dir(staticDir))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.NotFound(w, r)
+			return
+		}
+		urlPath := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+		if urlPath == "." {
+			urlPath = ""
+		}
+		if urlPath != "" {
+			fullPath := filepath.Join(staticDir, filepath.FromSlash(urlPath))
+			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+			if path.Ext(urlPath) != "" {
+				http.NotFound(w, r)
+				return
+			}
+		}
+		http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
+	})
 }

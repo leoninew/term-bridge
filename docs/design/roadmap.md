@@ -1,6 +1,6 @@
 # TermBridge-go 产品路线图
 
-最后修改时间: 2026-06-26 13:58:55
+最后修改时间: 2026-06-26 21:02:12
 
 ## 1. 产品目标
 
@@ -45,7 +45,8 @@ Release package
 - `/sessions` device workbench 还需要完成状态表达与验证闭环。
 - Device 切换隔离已有实现基础，但还缺面向用户路径的验证结论。
 - Claude Code / Codex TUI 启动、Ctrl+C 退出和进程出现/消失已有人工 smoke 观察；backpressure、long-running、压力场景等 runtime 风险仍需补证。
-- Remote Gate / Local Agent 形态还需要完成部署、身份、凭据、授权、重连和安全边界设计。
+- Cloud Gate 镜像交付面已完成 PoC，支持镜像内前后端一体交付。
+- Remote Gate / Local Agent 形态仍需要完成真实跨网络路径验证、身份、凭据、授权、重连和安全边界设计。
 
 ---
 
@@ -62,8 +63,8 @@ Release package
 | M5 | Runtime Hardening | 部分完成 | 代码 hardening 推进中，真实场景验证仍需补证。 |
 | M6 | Gateway Web Terminal MVP | 完成工程链路 | Gate / Agent / Browser workbench 打通。 |
 | M6.1 | Serve Entry Consolidation | 完成 | 统一入口为 `termbridge serve`。 |
-| M6.2 | Unified Device Workbench Closeout | 当前主线 | 收口 `/sessions` 统一 device workbench。 |
-| M7 | Multi-device Beta | 未开始 | 多设备远程访问进入可测试 beta。 |
+| M6.2 | Unified Device Workbench Closeout | 当前主线 | 收口 `/sessions` 统一 device workbench；Cloud Gate 镜像交付面已完成 PoC。 |
+| M7 | Multi-device Beta | 未开始 | 多设备远程访问进入可测试 beta；仍需真实 Remote Gate + Local Agent 验证和正式安全模型。 |
 | M8 | Security / Packaging / Release | 未开始 | 安全模型、发布包、安装升级和发布文档。 |
 
 ---
@@ -96,6 +97,21 @@ Device selector
 | Device 默认选择 | 基本具备，待验证 | 单 device 直达工作台；多 device 由用户明确选择。 |
 | Device 切换隔离 | 实现基础已具备，待验证 | 切换 device 不产生 workspace、session、tab、terminal 状态污染。 |
 | Device-scoped 操作验证 | 待补 | 证明主要 workspace / session / terminal 操作都命中 selected device。 |
+
+### Cloud Gate / container PoC 进度
+
+已完成：
+
+- 镜像交付面已打通，支持将 Browser workbench 与后端服务放入同一交付单元。
+- 本地开发仍保持前后端分离，交付镜像采用前后端一体形态。
+- PoC 认证与 device 上报链路已收口到当前最小可验证形态。
+
+尚未完成：
+
+- 容器运行态 smoke 未作为本轮验证项执行。
+- 真实 HTTPS 反向代理与 WebSocket upgrade 未做部署验证。
+- Remote Gate + separate Local Agent 的真实跨网络路径未验证。
+- 用户系统、用户-device 绑定、pairing、credential rotation 仍属于 M7/M8 前置设计。
 
 ### 阶段验收
 
@@ -154,7 +170,7 @@ Browser
 
 | 工作包 | 产品结果 |
 | --- | --- |
-| Remote Gate 部署基线 | Gate 可以作为远端服务安全地承载 Browser API、Agent tunnel 和 terminal relay。 |
+| Remote Gate 部署基线 | 镜像交付面已具备；仍需真实 HTTPS reverse proxy、WebSocket upgrade、runtime smoke 和远端服务安全边界验证。 |
 | Device trust / pairing | 用户可以把本地 Agent 可信地绑定到自己的 Gate 账号或访问主体。 |
 | Agent outbound tunnel | 本地 Agent 不需要入站端口，也能稳定连接远端 Gate。 |
 | Remote terminal path | 远端链路下 attach、input、output、resize、interrupt、history 与本地路径保持一致。 |
@@ -167,7 +183,7 @@ Browser
 
 1. M6.2 P0 完成。
 2. M5 关键补证形成结论。
-3. Remote Gate 部署与安全边界设计完成。
+3. Remote Gate 真实部署验证与安全边界设计完成。
 4. Device credential / pairing / rotation 策略明确。
 5. Terminal websocket auth 与 route unavailable 策略明确。
 
@@ -187,7 +203,7 @@ Browser
 
 ### Beta 验收
 
-- Remote Gate 可以通过 HTTPS 对 Browser 和 Agent 提供服务。
+- Remote Gate 可以通过 HTTPS 对 Browser 和 Agent 提供服务，并已完成真实 reverse proxy / WebSocket upgrade 验证。
 - 至少两个设备可以访问同一个 Gate。
 - Agent 不需要入站端口。
 - Browser 能区分多个 device。

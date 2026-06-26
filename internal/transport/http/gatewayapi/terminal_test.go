@@ -3,6 +3,7 @@ package gatewayapi
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -114,6 +115,49 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, input
 			return
 		}
 	}
+}
+
+func TestAgentDisconnectSendsStructuredTerminalError(t *testing.T) {
+	gateway := New(testGatewayConfig())
+	server := httptest.NewServer(gateway)
+	defer server.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	inputCh := make(chan []byte, 1)
+	agentDone := make(chan struct{})
+	go func() {
+		defer close(agentDone)
+		runTerminalAgent(t, ctx, server.URL, inputCh)
+	}()
+	waitForRoute(t, gateway, "dev-1")
+	token := loginToken(t, gateway)
+	header := http.Header{}
+	header.Set("Authorization", "Bearer "+token)
+	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	if err != nil {
+		t.Fatalf("browser Dial() error = %v", err)
+	}
+	defer browser.Close(websocket.StatusNormalClosure, "")
+	if _, _, err := browser.Read(ctx); err != nil {
+		t.Fatalf("initial output Read() error = %v", err)
+	}
+	cancel()
+	_, data, err := browser.Read(context.Background())
+	if err != nil {
+		t.Fatalf("terminal error Read() error = %v", err)
+	}
+	var message struct {
+		Type    string `json:"type"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(data, &message); err != nil {
+		t.Fatalf("terminal error is not JSON: %v; data=%q", err, data)
+	}
+	if message.Type != "error" || message.Code != "device_disconnected" || message.Message == "" {
+		t.Fatalf("terminal error = %#v", message)
+	}
+	<-agentDone
 }
 
 func TestRouteUnavailable(t *testing.T) {

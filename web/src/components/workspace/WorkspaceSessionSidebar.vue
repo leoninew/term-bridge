@@ -180,7 +180,7 @@
               :key="session.value"
               role="button"
               tabindex="0"
-              class="group flex h-7 w-full min-w-0 cursor-move items-center gap-1 rounded-md border px-1 py-0.5 text-left transition"
+              class="group flex h-7 w-full min-w-0 cursor-pointer items-center gap-1 rounded-md border px-1 py-0.5 text-left transition"
               :class="
                 isActiveSessionSelection(session.session.id)
                   ? 'border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text-strong)]'

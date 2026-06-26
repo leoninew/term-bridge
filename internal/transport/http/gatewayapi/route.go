@@ -120,7 +120,7 @@ func (r *agentRoute) closeTerminals(reason string) {
 	r.terms = map[tunnel.StreamId]*terminalRelay{}
 	r.mu.Unlock()
 	for _, term := range terms {
-		_ = term.browser.Write(context.Background(), websocket.MessageText, []byte(reason))
+		_ = writeTerminalControl(term.browser, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "device_disconnected", Message: reason})
 		_ = term.browser.Close(websocket.StatusGoingAway, reason)
 		closeOnce(term.done)
 	}
