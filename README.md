@@ -10,9 +10,8 @@ Browser -> Gate -> Agent -> Runtime -> PTY / Process
 
 ## 设计文档
 
-- [主设计文档](docs/design/design.md) - 项目背景、愿景、架构设计、技术路线
-- [统一 Gate / Device 模型](docs/design/20260623-unified-gate-device-model.md) - 当前 Browser / Gate / Agent / Runtime 收口方式
-- [Roadmap / Design 与当前实现差距备忘](docs/design/20260624-roadmap-design-implementation-gap-memo.md) - 当前实现状态与后续建议
+- [架构设计](docs/design/design.md) - 当前产品模型、目标架构、组件职责、运行链路和安全边界
+- [产品路线图](docs/design/roadmap.md) - 当前阶段、后续优先级、验收门和发布路线
 
 ## 用户视角
 

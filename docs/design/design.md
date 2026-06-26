@@ -1,345 +1,364 @@
-# TermBridge-go 设计文档
+# TermBridge-go 架构设计
 
-最后修改时间: 2026-06-24 22:57:53
+最后修改时间: 2026-06-26 12:07:02
 
-## 背景
+## 1. 产品定位
 
-### 历史架构问题
+TermBridge-go 是面向本地与远程工作流的 **Workspace Runtime Platform**。
 
-原 TermBridge（目录 ../TermBridge）使用 Python 实现，基于 `ttyd + tmux` 架构：
+它提供一套统一能力：
 
-```text
-Browser
-    ↓
-ttyd
-    ↓
-tmux Session
-    ↓
-Process
-```
+- 在本地工作目录中启动 Claude Code、Codex、Shell 或其他 CLI agent。
+- 将运行中的 workspace / session / terminal 暴露给 Browser workbench。
+- 通过 Gate / Agent 模型支持本地 self-connected 与后续云端接入。
+- 保持命令运行、终端流、历史记录和设备连接的统一资源模型。
 
-这种架构存在以下问题：
+核心用户价值：
 
-1. **状态分层过多**：Workspace → tmux Session → PTY → Process，双层状态模型导致状态同步复杂
-2. **依赖外部组件**：ttyd 和 tmux 是外部进程，TermBridge 无法完全控制其生命周期
-3. **扩展性受限**：tmux 模型限制了云端跨设备访问的能力
-4. **平台绑定**：tmux 在 Windows 上需要 Cygwin，增加了部署复杂度
-
-### 架构决策
-
-TermBridge-go 选择移除 ttyd 和 tmux，由 TermBridge 自主管理运行时：
-
-**核心对象从：**
-
-```text
-tmux Session
-```
-
-**变为：**
-
-```text
-Workspace
-```
-
-**技术原则：**
-
-1. **TermBridge 自主管理运行时**：不依赖 ttyd、tmux 等外部会话管理组件，所有运行时状态由 TermBridge 管理
-2. **TermBridge 自主管理 Workspace / Session 状态**：不存在 Workspace → tmux Session 的双层外部状态模型；当前统一为 Workspace → Session → PTY → Process，其中 Session 是 TermBridge 自主管理的运行记录和 attach 单元
-3. **Agent 主动连接 Gate**：支持 NAT 穿透、家庭宽带、企业网络
+1. 用户可以用 CLI 快速启动工作 session。
+2. 用户可以在 Browser 中管理 workspace、session 和 terminal。
+3. 用户可以在多设备场景中访问同一套 runtime 能力。
+4. Runtime ownership 清晰，Gateway 只做控制面和 relay，不直接运行用户命令。
 
 ---
 
-## 愿景
-
-### 目标架构
-
-```text
-┌─────────────────────┐
-│ Browser             │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ TermBridge Gate     │
-│                     │
-│ Auth                │
-│ Device Registry     │
-│ Workspace/Session   │
-│ Routing / Relay     │
-└─────────┬───────────┘
-          │ WSS
-          ▼
-┌─────────────────────┐
-│ TermBridge Agent    │
-│                     │
-│ Workspace Manager   │
-│ Session Manager     │
-│ PTY / Process       │
-│ History Manager     │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ Workspace / Session │
-│                     │
-│ Claude Code         │
-│ Codex               │
-│ Shell               │
-└─────────────────────┘
-```
-
-### 核心运行时链路
-
-```text
-termbridge CLI invocation
-  ↓
-TermBridge runtime
-  ↓
-PTY abstraction
-  ↓
-go-pty
-  ↓
-Windows ConPTY
-  ↓
-user command
-```
-
-### 统一资源模型
+## 2. 核心资源模型
 
 ```text
 User
-    ↓
-Device (MacBook / Home-PC / VPS)
-    ↓
-Workspace (Project / Working directory)
-    ↓
-Session (Claude / Codex / Shell command run)
-    ↓
-Terminal
+  -> Device
+    -> Workspace
+      -> Session
+        -> Terminal
 ```
 
-Session 是 TermBridge runtime 管理的命令运行记录和 attach 单元，不是 tmux session；PTY / Process lifecycle 仍归本地 runtime 所有。
+### User
 
-### 技术路线
+用户身份与访问授权主体。当前用于 Browser auth，后续承载多设备绑定、权限和审计。
 
-#### Phase 1：Runtime 重构（核心阶段）
+### Device
 
-目标：同时移除 ttyd 和 tmux
+运行 Agent 与 local runtime 的机器，例如 Home-PC、Laptop、VPS。
 
-架构：
+Device 是 Browser workbench 的第一层选择对象。所有 workspace、session、terminal 操作都必须落到具体 device。
 
-```text
-Browser
-    ↓
-xterm.js
-    ↓
-WebSocket
-    ↓
-TermBridge Agent
-    ↓
-PTY
-    ↓
-Claude Code / Codex
-```
+### Workspace
 
-交付内容：
+一个项目目录或工作目录。Workspace 组织同一目录下的 session，并承载排序、展示和后续恢复能力。
 
-- **PTY Manager**：PTY 创建、销毁、Resize、Attach、Detach
-- **Process Manager**：Claude Code、Codex、Shell 生命周期管理
-- **Workspace Manager**：Workspace 创建、销毁、恢复、状态同步
-- **Terminal History**：替代 tmux buffer，支持历史缓存、滚动回放、断线恢复
+### Session
 
-#### Phase 2：Workspace 模型完善
+一次命令运行记录和 attach 单元。Session 保存命令、cwd、状态、退出码、历史记录等 metadata。
 
-架构：
+Session 不拥有独立于 runtime 的进程生命周期；真实 PTY / Process lifecycle 归 runtime 管理。
 
-```text
-Workspace
-    ↓
-Session
-    ↓
-PTY
-    ↓
-Process
-```
+### Terminal
 
-交付内容：
-
-- **Workspace Metadata**：
-
-```json
-{
-  "id": "workspace-001",
-  "name": "project-a",
-  "path": "D:\\project",
-  "updated_at": "2026-06-24T00:00:00Z"
-}
-```
-
-- **Session Metadata / History**：命令、cwd、lifecycle state、attachment state、exit code、history path。
-- **Workspace Recovery**：
-
-```text
-Browser关闭
-    ↓
-Workspace继续运行
-    ↓
-重新打开
-    ↓
-恢复连接
-```
-
-- **Multi Attach**：支持 PC、Laptop、Phone 同时查看同一个 Workspace
-
-#### Phase 3：Gate 架构
-
-目标：实现跨设备访问
-
-架构：
-
-```text
-Browser
-    ↓
-Gate
-    ↓
-Agent
-    ↓
-Workspace
-```
-
-交付内容：
-
-- **User**：用户
-- **Device**：MacBook、Home-PC、VPS
-- **Workspace**：项目目录 / 工作区
-- **Session**：Claude、Codex、Shell 等命令运行记录和 attach 单元
-- **Device Registry**：设备注册中心
-- **Workspace / Session Registry**：Workspace 与 Session 路由中心
-- **Reverse Tunnel**：Agent ──WSS──► Gate 长连接
-
-### 核心收益
-
-#### 性能
-
-移除 iframe、ttyd、tmux，终端链路缩短为：
-
-```text
-Browser
-    ↓
-WebSocket
-    ↓
-PTY
-```
-
-接近 VSCode Terminal 架构。
-
-#### 架构
-
-统一运行时状态模型：
-
-```text
-Workspace
-    ↓
-Session
-    ↓
-PTY
-    ↓
-Process
-```
-
-这里的 Session 是 TermBridge 自主管理的运行记录、history 和 attach 单元，不是 tmux session，也不拥有独立于 runtime 的进程生命周期。
-
-#### 云端扩展
-
-天然支持：
-
-```text
-用户
-    ↓
-设备
-    ↓
-Workspace
-```
-
-资源模型。
-
-#### 产品定位
-
-TermBridge 从第一天开始就是：
-
-```text
-Workspace Runtime Platform
-```
-
-而不是：
-
-```text
-ttyd + tmux 的封装工具
-```
-
-这样后续无论接 Claude Code、Codex、Gemini CLI 还是自定义 Agent，都不会受到 tmux 模型的限制。
+Browser 与 PTY 之间的交互通道。Terminal 负责输入、输出、resize、attach、detach 和 bounded history replay。
 
 ---
 
-## 技术决策记录
+## 3. 目标运行架构
 
-### 当前已确认决策
+```text
+Browser /sessions
+  -> Gateway Browser API
+  -> Device route
+  -> Agent tunnel
+  -> Runtime adapter
+  -> Workspace / Session / Terminal runtime
+  -> PTY / Process
+```
 
-1. **Windows PTY Runtime**: Go
-2. **PTY 技术方向**: github.com/aymanbagabas/go-pty
-3. **底层机制**: Windows ConPTY / Pseudoconsole
-4. **本地交付方向**: CLI first
-5. **GUI 定位**: CLI 容器，不拥有 runtime
-6. **Web 策略**: Gateway 前技术验证，Gateway 后正式产品入口
-7. **命令执行入口**: 命令执行入口为 `termbridge [options] exec -- <command...>`
-8. **统一工作台入口**: 前端以 `/sessions` 作为统一 device/workspace/session workbench
-9. **Browser API 方向**: 当前产品路径收敛到 `/api/devices/:deviceId/...` device-scoped API
+本地使用和云端接入共享同一条产品路径。
 
-### 设计原则
+### 本地 self-connected 形态
 
-1. **CLI 是本地唯一一等入口**：本地阶段标准使用方式为 `termbridge [options] exec -- <command...>`
-2. **显式 exec 子命令承载命令运行**：用户命令统一放在 `exec --` 之后，避免 TermBridge 选项与用户命令参数混淆
-3. **GUI 是 CLI 容器，不是另一套 Agent**：GUI 不能直接创建 PTY、拥有 Process lifecycle、维护 Workspace state
-4. **Web 技术验证前置，正式 Web 放到 Gateway**：本地 Web/workbench 可以作为辅助产品面存在，但不改变 CLI-first 与 runtime ownership 边界
-5. **Go + go-pty 必须被 abstraction 隔离**：业务层不直接依赖 go-pty.Pty
-6. **Ctrl+C 是停止当前命令，不是 detach**：必须区分 interrupt foreground process / close session / kill process tree
-7. **先 CLI Runtime，后本地产品面，再 Gateway**：不在 CLI runtime 稳定前提前建设复杂 Gateway
-8. **Serve 是远程能力统一入口**：Gateway service 和 Agent connector 对外不再作为两个模式暴露，统一通过 `termbridge serve` 启动
-9. **统一 Device workbench 是长期产品面**：本地 self-connected Gate 和云端 Gate 都通过同一套 device-scoped Browser API 暴露 workspace/session/terminal 能力
+```text
+Browser
+  -> Local Gate
+  -> Local Agent
+  -> Local Runtime
+  -> PTY / Process
+```
 
-### 当前 serve / Gateway 边界
+本地开发和日常使用由 `termbridge serve` 启动统一后端。Agent 连接本机 Gate，Browser 通过 `/sessions` 使用同一套 device-scoped API。
 
-M6.1 后远程访问入口收口为：
+### 云端接入形态
+
+```text
+Browser
+  -> Cloud Gate
+  -> Local Agent
+  -> Local Runtime
+  -> PTY / Process
+```
+
+云端接入时，Gate 部署位置变化，但 Browser workbench、Device、Workspace、Session 和 Terminal 模型不变。
+
+---
+
+## 4. 入口与产品表面
+
+### CLI 入口
+
+```text
+termbridge [options] exec -- <command...>
+```
+
+CLI 是本地命令运行的一等入口。
+
+示例：
+
+```text
+termbridge exec -- claude
+termbridge exec -- codex
+termbridge exec -- pwsh
+termbridge --cwd D:\project exec -- npm run dev
+```
+
+### Service 入口
 
 ```text
 termbridge serve
-  ├─ Gateway service
-  │   ├─ Browser API / terminal WebSocket
-  │   ├─ Auth
-  │   ├─ Device registry
-  │   ├─ Routing
-  │   └─ Relay
-  └─ Agent connector
-      ├─ outbound tunnel
-      ├─ device identity
-      └─ local runtime adapter
-          ↓
-        Workspace / Session / History / Terminal attach
-          ↓
-        PTY / Process
 ```
 
-边界：
+`serve` 启动：
 
-1. `termbridge serve` 启动后同时具备 Gateway service 和 Agent connector 能力。
-2. Agent connector 连接哪个 Gateway 由配置决定，不通过 CLI 参数或环境变量作为正式入口传递。
-3. Gateway service 不拥有 PTY / Process lifecycle，不直接运行用户命令。
-4. Agent connector 通过本地 runtime adapter 访问 workspace、session、history 和 terminal stream。
-5. 前端只有一套，`/sessions` 是统一 session workbench；local self-connected Gate 和云端 Gate 的差异应由 device、connection state 和配置表达。
+```text
+Gateway service
+Agent connector
+Runtime registry / adapter
+Browser API
+Agent tunnel endpoint
+```
 
-### 后续仍需决策
+### Browser 入口
 
-1. `Ctrl+C` 升级策略在真实 Claude Code / Codex 交互中的具体行为：是否第一次 soft interrupt，第二次 hard stop，或使用超时自动升级
-2. GUI 容器调用 CLI 的具体方式：spawn CLI、local IPC，还是复用同一 Go runtime package
-3. Web terminal spike 中暴露的大量输出、backpressure、history 刷盘等问题如何在 M5 hardening 中处理
-4. Session / Workspace 在本地 CLI 阶段的持久化边界：哪些 metadata 作为产品能力，哪些 live runtime 仅存在于当前进程内
+```text
+/sessions
+/settings
+/help
+```
+
+`/sessions` 是统一工作台，承载：
+
+- device 选择
+- workspace tree
+- session list
+- create / edit / close / delete / rerun
+- reorder
+- history
+- terminal attach
+
+---
+
+## 5. Browser API 结构
+
+Browser 产品 API 使用 device-scoped 路径：
+
+```text
+/api/me
+/api/login
+/api/logout
+/api/devices
+/api/devices/:deviceId/workspaces
+/api/devices/:deviceId/workspaces/tree
+/api/devices/:deviceId/workspaces/order
+/api/devices/:deviceId/workspaces/:workspaceId
+/api/devices/:deviceId/workspaces/:workspaceId/sessions
+/api/devices/:deviceId/workspaces/:workspaceId/sessions/:sessionId
+/api/devices/:deviceId/workspaces/:workspaceId/sessions/:sessionId/history
+/api/devices/:deviceId/workspaces/:workspaceId/sessions/:sessionId/ws
+```
+
+Agent 内部传输入口：
+
+```text
+/api/agent/tunnel
+```
+
+---
+
+## 6. 组件职责
+
+| 组件 | 职责 |
+| --- | --- |
+| CLI | 解析命令，启动本地 command runner，处理 cwd/env/stdin/stdout/exit code。 |
+| Runtime | 管理 workspace、session、history、terminal stream、PTY 和 process lifecycle。 |
+| PTY abstraction | 隔离具体 PTY backend，向业务层提供 start/read/write/resize/interrupt/close 能力。 |
+| Agent connector | 主动连接 Gate，注册 device，接收 tunnel request，调用 local runtime adapter。 |
+| Gateway service | 提供 Browser API、auth、device registry、routing、pending request、terminal relay。 |
+| Browser workbench | 提供 `/sessions` UI，管理 device/workspace/session/terminal 用户操作。 |
+| Config | 描述 Gate listen URL、Agent connect URL、device identity、auth、runtime state dir。 |
+
+---
+
+## 7. Runtime ownership
+
+PTY / Process lifecycle 的唯一 owner 是 local runtime。
+
+```text
+Runtime
+  -> PTY
+  -> Process
+```
+
+Gateway 只维护：
+
+```text
+Device registry
+Route table
+Tunnel connection
+Pending request
+Terminal relay
+```
+
+Agent connector 是 Gateway 与 local runtime 之间的 adapter：
+
+```text
+Gateway request
+  -> Agent tunnel frame
+  -> Runtime adapter method
+  -> Runtime / PTY / Process
+```
+
+---
+
+## 8. Terminal 链路
+
+```text
+Browser xterm.js
+  -> terminal websocket
+  -> Gateway terminal relay
+  -> tunnel frame
+  -> Agent terminal stream
+  -> Runtime terminal session
+  -> PTY
+```
+
+Terminal 链路必须支持：
+
+- attach
+- input
+- output
+- resize
+- bounded history replay
+- close / detach
+- device disconnect / reconnect
+- error propagation
+- browser-side diagnostics
+
+当前 resize 策略：
+
+- Browser 测量 xterm 可用尺寸。
+- 前端使用 one-cell safety margin 避免边界抖动。
+- Browser local grid 与后端 PTY 使用同一个安全尺寸。
+- Gateway / Agent attach 时传递初始 cols / rows。
+- PTY resize 失败不推进成功状态，允许后续重试。
+
+---
+
+## 9. State 与 lifecycle
+
+### Device state
+
+```text
+online
+offline
+last_seen
+connected_at
+```
+
+Device state 用于 Browser workbench 的 device selector、route availability 和 reconnect 反馈。
+
+### Session lifecycle
+
+```text
+running
+stopped
+failed
+```
+
+Session lifecycle 用于：
+
+- terminal attach 判断
+- close / delete / rerun 操作
+- history 展示
+- tab 状态同步
+
+### Attachment state
+
+```text
+unattached
+attached
+detached
+reattaching
+```
+
+Attachment state 用于表达 Browser terminal 与 runtime terminal stream 之间的连接关系。
+
+---
+
+## 10. 配置模型
+
+关键配置：
+
+```yaml
+runtime:
+  state_dir: .termbridge
+
+gate:
+  listen_url: http://127.0.0.1:9010
+  browser:
+    allowed_origins:
+      - http://localhost:9011
+  api:
+    expose_errors: false
+
+agent:
+  connect_url: ""
+  device_id: ""
+  device_name: ""
+```
+
+配置语义：
+
+- `gate.listen_url`：Gate 监听地址。
+- `agent.connect_url`：Agent 连接目标；为空时使用 `gate.listen_url`。
+- `agent.device_id` / `agent.device_name`：当前设备身份。
+- `runtime.state_dir`：workspace/session/history/device state 存储根目录。
+
+---
+
+## 11. 安全边界
+
+### Browser auth
+
+Browser API 使用登录态 / Bearer token 保护。
+
+### Device identity
+
+Device 是 Agent 连接 Gate 后注册出来的运行主体。后续产品化需要正式 credential、pairing 和 rotation。
+
+### Terminal authorization
+
+Terminal websocket 必须与 Browser auth、device route、workspace/session ownership 保持一致。
+
+### Sensitive data
+
+命令、cwd、history、terminal output 可能包含敏感信息。后续 audit、日志和 remote access 设计必须包含脱敏与访问边界。
+
+---
+
+## 12. 架构质量要求
+
+1. API 必须 device-scoped，避免跨 device 状态污染。
+2. Gateway relay 失败必须可观测，并向 Browser 返回结构化错误。
+3. Runtime 状态只在真实操作成功后推进。
+4. Resize、close、delete、rerun 等状态变更必须可重试或明确失败。
+5. Browser workbench 切换 device 时必须隔离 workspace/session/tab/terminal 状态。
+6. Terminal output 必须有 backpressure 或 bounded queue 策略。
+7. History 必须 bounded，截断行为可观测。
+8. Auth、device identity、terminal websocket 必须形成一致边界。
+9. 每个进入下一阶段的 milestone 必须有验证记录。
