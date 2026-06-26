@@ -1,6 +1,12 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { SessionSummary, WorkspaceSummary, WorkspaceTreeSummary } from '../protocol/terminal'
+import type {
+  SessionSummary,
+  WorkspaceSummary,
+  WorkspaceTreeSession,
+  WorkspaceTreeSummary,
+} from '../protocol/terminal'
+import { updateSessionOrder } from '../features/sessions/api'
 import { listWorkspaceTree, updateWorkspaceOrder } from '../features/workspaces/api'
 
 export type RemovedSessionSummary = Pick<SessionSummary, 'id' | 'workspace_id'>
@@ -128,6 +134,18 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
     }
   }
 
+  async function reorderSessions(deviceId: string, workspaceId: string, sessionIds: string[]) {
+    const previousTree = workspaceTree.value
+    workspaceTree.value = orderWorkspaceSessions(previousTree, workspaceId, sessionIds)
+    try {
+      const orderedSessions = await updateSessionOrder(deviceId, workspaceId, sessionIds)
+      workspaceTree.value = replaceWorkspaceSessions(workspaceTree.value, workspaceId, orderedSessions)
+    } catch (err) {
+      workspaceTree.value = previousTree
+      throw err
+    }
+  }
+
   return {
     workspaceTree,
     loading,
@@ -144,6 +162,7 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
     removeSession,
     removeWorkspace,
     reorderWorkspaces,
+    reorderSessions,
   }
 })
 
@@ -172,7 +191,6 @@ function workspaceSummaryFromTree(workspace: WorkspaceTreeSummary): WorkspaceSum
     id: workspace.id,
     name: workspace.name,
     path: workspace.path,
-    sort_order: workspace.sort_order,
     updated_at: workspace.updated_at,
   }
 }
@@ -184,4 +202,35 @@ function orderWorkspaceTree(tree: WorkspaceTreeSummary[], workspaceIds: string[]
     const rightOrder = order.get(right.id) ?? Number.MAX_SAFE_INTEGER
     return leftOrder - rightOrder
   })
+}
+
+function orderWorkspaceSessions(
+  tree: WorkspaceTreeSummary[],
+  workspaceId: string,
+  sessionIds: string[],
+) {
+  return tree.map((workspace) => {
+    if (workspace.id !== workspaceId) {
+      return workspace
+    }
+    const order = new Map(sessionIds.map((sessionId, index) => [sessionId, index]))
+    return {
+      ...workspace,
+      children: [...workspace.children].sort((left, right) => {
+        const leftOrder = order.get(left.id) ?? Number.MAX_SAFE_INTEGER
+        const rightOrder = order.get(right.id) ?? Number.MAX_SAFE_INTEGER
+        return leftOrder - rightOrder
+      }),
+    }
+  })
+}
+
+function replaceWorkspaceSessions(
+  tree: WorkspaceTreeSummary[],
+  workspaceId: string,
+  sessions: WorkspaceTreeSession[],
+) {
+  return tree.map((workspace) =>
+    workspace.id === workspaceId ? { ...workspace, children: sessions } : workspace,
+  )
 }

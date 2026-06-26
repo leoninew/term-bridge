@@ -12,6 +12,7 @@ type RuntimeAccess interface {
 	UpdateWorkspaceOrder(ctx context.Context, workspaceIds []string) ([]terminalapp.WorkspaceSummary, error)
 	DeleteWorkspace(ctx context.Context, workspaceId string) error
 	ListSessionsByWorkspaceId(ctx context.Context, workspaceId string) ([]terminalapp.WorkspaceSessionSummary, error)
+	UpdateSessionOrder(ctx context.Context, workspaceId string, sessionIds []string) ([]terminalapp.WorkspaceSessionSummary, error)
 	CreateSession(ctx context.Context, request terminalapp.CreateSessionReq) (terminalapp.CreateSessionResp, error)
 	RerunSession(ctx context.Context, workspaceId string, sessionId string, request terminalapp.RerunSessionReq) (terminalapp.CreateSessionResp, error)
 	GetSession(ctx context.Context, workspaceId string, sessionId string) (terminalapp.SessionSummary, error)
@@ -66,6 +67,13 @@ func (a WebTerminalAccess) ListSessionsByWorkspaceId(ctx context.Context, worksp
 		return nil, err
 	}
 	return a.Registry.ListSessionsByWorkspaceId(workspaceId)
+}
+
+func (a WebTerminalAccess) UpdateSessionOrder(ctx context.Context, workspaceId string, sessionIds []string) ([]terminalapp.WorkspaceSessionSummary, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return a.Registry.UpdateSessionOrder(workspaceId, sessionIds)
 }
 
 func (a WebTerminalAccess) CreateSession(ctx context.Context, request terminalapp.CreateSessionReq) (terminalapp.CreateSessionResp, error) {

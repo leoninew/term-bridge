@@ -165,13 +165,22 @@
             </span>
           </div>
 
-          <template v-if="workspaceExpanded(workspace.value)">
+          <VueDraggable
+            v-if="workspaceExpanded(workspace.value)"
+            v-model="workspace.children"
+            tag="div"
+            class="flex flex-col"
+            item-key="value"
+            :animation="150"
+            :disabled="Boolean(normalizedSearchQuery)"
+            @end="reorderDraggedSessions(workspace)"
+          >
             <div
               v-for="session in workspace.children"
               :key="session.value"
               role="button"
               tabindex="0"
-              class="group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-left transition"
+              class="group flex h-7 w-full min-w-0 cursor-move items-center gap-1 rounded-md border px-1 py-0.5 text-left transition"
               :class="
                 isActiveSessionSelection(session.session.id)
                   ? 'border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text-strong)]'
@@ -278,7 +287,7 @@
                 <Trash2 v-else class="size-3.5" />
               </button>
             </div>
-          </template>
+          </VueDraggable>
         </div>
       </VueDraggable>
     </div>
@@ -471,6 +480,7 @@
     removeWorkspace: [workspace: WorkspaceSummary]
     unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
     reorderWorkspaces: [workspaceIds: string[]]
+    reorderSessions: [workspaceId: string, sessionIds: string[]]
     selectDevice: [deviceId: string]
     logout: []
   }>()
@@ -570,6 +580,17 @@
     emit(
       'reorderWorkspaces',
       draggableTreeItems.value.map((item) => item.workspace.id),
+    )
+  }
+
+  function reorderDraggedSessions(workspace: WorkspaceTreeItem) {
+    if (normalizedSearchQuery.value) {
+      return
+    }
+    emit(
+      'reorderSessions',
+      workspace.workspace.id,
+      workspace.children.map((item) => item.session.id),
     )
   }
 

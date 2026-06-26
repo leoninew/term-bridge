@@ -6,6 +6,7 @@ import { useWorkspaceSessionsStore } from './workspaceSessions'
 const mocks = vi.hoisted(() => ({
   listWorkspaceTree: vi.fn(),
   updateWorkspaceOrder: vi.fn(),
+  updateSessionOrder: vi.fn(),
 }))
 
 vi.mock('../features/workspaces/api', () => ({
@@ -13,12 +14,15 @@ vi.mock('../features/workspaces/api', () => ({
   updateWorkspaceOrder: mocks.updateWorkspaceOrder,
 }))
 
+vi.mock('../features/sessions/api', () => ({
+  updateSessionOrder: mocks.updateSessionOrder,
+}))
+
 const workspaceTree: WorkspaceTreeSummary[] = [
   {
     id: 'workspace-1',
     name: 'Workspace One',
     path: '/work/one',
-    sort_order: 1,
     updated_at: '2026-06-24T00:00:00Z',
     children: [
       {
@@ -29,13 +33,20 @@ const workspaceTree: WorkspaceTreeSummary[] = [
         lifecycle_state: 'running',
         updated_at: '2026-06-24T00:00:00Z',
       },
+      {
+        id: 'session-2',
+        name: 'Build',
+        command: 'npm run build',
+        cwd: '/work/one',
+        lifecycle_state: 'stopped',
+        updated_at: '2026-06-24T00:00:01Z',
+      },
     ],
   },
   {
     id: 'workspace-2',
     name: 'Workspace Two',
     path: '/work/two',
-    sort_order: 2,
     updated_at: '2026-06-24T00:00:00Z',
     children: [],
   },
@@ -57,14 +68,12 @@ describe('useWorkspaceSessionsStore', () => {
         id: 'workspace-1',
         name: 'Workspace One',
         path: '/work/one',
-        sort_order: 1,
         updated_at: '2026-06-24T00:00:00Z',
       },
       {
         id: 'workspace-2',
         name: 'Workspace Two',
         path: '/work/two',
-        sort_order: 2,
         updated_at: '2026-06-24T00:00:00Z',
       },
     ])
@@ -78,6 +87,15 @@ describe('useWorkspaceSessionsStore', () => {
         lifecycle_state: 'running',
         updated_at: '2026-06-24T00:00:00Z',
       },
+      {
+        id: 'session-2',
+        workspace_id: 'workspace-1',
+        name: 'Build',
+        command: 'npm run build',
+        cwd: '/work/one',
+        lifecycle_state: 'stopped',
+        updated_at: '2026-06-24T00:00:01Z',
+      },
     ])
     expect(store.sessionById('workspace-1', 'session-1')?.workspace_id).toBe('workspace-1')
   })
@@ -89,7 +107,7 @@ describe('useWorkspaceSessionsStore', () => {
 
     expect(
       store.upsertSession({
-        id: 'session-2',
+        id: 'session-3',
         workspace_id: 'workspace-1',
         name: 'New Shell',
         command: 'zsh',
@@ -98,11 +116,11 @@ describe('useWorkspaceSessionsStore', () => {
         updated_at: '2026-06-24T00:00:01Z',
       }),
     ).toBe(true)
-    expect(store.sessionById('workspace-1', 'session-2')?.name).toBe('New Shell')
+    expect(store.sessionById('workspace-1', 'session-3')?.name).toBe('New Shell')
 
-    store.removeSession('workspace-1', 'session-2')
+    store.removeSession('workspace-1', 'session-3')
 
-    expect(store.sessionById('workspace-1', 'session-2')).toBeNull()
+    expect(store.sessionById('workspace-1', 'session-3')).toBeNull()
     expect(
       store.upsertSession({
         id: 'session-3',
@@ -123,6 +141,7 @@ describe('useWorkspaceSessionsStore', () => {
 
     expect(store.removeWorkspace('workspace-1')).toEqual([
       { id: 'session-1', workspace_id: 'workspace-1' },
+      { id: 'session-2', workspace_id: 'workspace-1' },
     ])
     expect(store.workspaceById('workspace-1')).toBeNull()
   })
@@ -140,6 +159,44 @@ describe('useWorkspaceSessionsStore', () => {
     expect(store.workspaceTree.map((workspace) => workspace.id)).toEqual([
       'workspace-1',
       'workspace-2',
+    ])
+  })
+
+  it('reorders sessions within one workspace', async () => {
+    const store = useWorkspaceSessionsStore()
+
+    store.applyWorkspaceTree(workspaceTree)
+    mocks.updateSessionOrder.mockResolvedValueOnce([
+      workspaceTree[0].children[1],
+      workspaceTree[0].children[0],
+    ])
+
+    await store.reorderSessions('device-1', 'workspace-1', ['session-2', 'session-1'])
+
+    expect(mocks.updateSessionOrder).toHaveBeenCalledWith('device-1', 'workspace-1', [
+      'session-2',
+      'session-1',
+    ])
+    expect(store.workspaceTree[0].children.map((session) => session.id)).toEqual([
+      'session-2',
+      'session-1',
+    ])
+    expect(store.workspaceTree[1].children).toEqual([])
+  })
+
+  it('rolls back optimistic session reorder when the API fails', async () => {
+    const store = useWorkspaceSessionsStore()
+    const error = new Error('failed')
+
+    store.applyWorkspaceTree(workspaceTree)
+    mocks.updateSessionOrder.mockRejectedValueOnce(error)
+
+    await expect(
+      store.reorderSessions('device-1', 'workspace-1', ['session-2', 'session-1']),
+    ).rejects.toThrow(error)
+    expect(store.workspaceTree[0].children.map((session) => session.id)).toEqual([
+      'session-1',
+      'session-2',
     ])
   })
 })

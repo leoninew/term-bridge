@@ -65,12 +65,18 @@ type SessionNode struct {
 	UpdatedAt  time.Time     `json:"updated_at"`
 }
 
+type WorkspaceIndex struct {
+	SchemaVersion int       `json:"schema_version"`
+	WorkspaceIds  []string  `json:"workspace_ids"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
 type Workspace struct {
 	SchemaVersion int           `json:"schema_version"`
 	Id            string        `json:"workspace_id"`
 	Name          string        `json:"name"`
 	Path          string        `json:"path"`
-	SortOrder     int           `json:"sort_order"`
+	SessionIds    []string      `json:"session_ids"`
 	Children      []SessionNode `json:"children"`
 	CreatedAt     time.Time     `json:"created_at"`
 	UpdatedAt     time.Time     `json:"updated_at"`

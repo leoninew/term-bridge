@@ -171,6 +171,15 @@ func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.Reques
 			return nil, err
 		}
 		return c.config.Runtime.ListSessionsByWorkspaceId(ctx, params.WorkspaceId)
+	case "session_order":
+		var params struct {
+			WorkspaceId string   `json:"workspace_id"`
+			SessionIds  []string `json:"session_ids"`
+		}
+		if err := decodeRequestParams(request.Params, &params); err != nil {
+			return nil, err
+		}
+		return c.config.Runtime.UpdateSessionOrder(ctx, params.WorkspaceId, params.SessionIds)
 	case "create_session":
 		var params terminalapp.CreateSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {

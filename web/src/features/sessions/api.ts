@@ -7,6 +7,7 @@ import type {
   RerunSessionReq,
   SessionSummary,
   UpdateSessionReq,
+  WorkspaceTreeSession,
 } from '../../protocol/terminal'
 
 export type ApiResult<T> = {
@@ -105,6 +106,18 @@ export async function rerunSession(
     request,
   )
   return response.data
+}
+
+export async function updateSessionOrder(
+  deviceId: string,
+  workspaceId: string,
+  sessionIds: string[],
+): Promise<WorkspaceTreeSession[]> {
+  const response = await apiClient.patch<WorkspaceTreeSession[] | null>(
+    devicePath(deviceId, `${workspaceSessionPath(workspaceId)}/order`),
+    { session_ids: sessionIds },
+  )
+  return response.data ?? []
 }
 
 export function terminalWsUrl(

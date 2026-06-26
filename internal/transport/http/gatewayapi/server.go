@@ -258,6 +258,16 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 		}
 		return
 	}
+	if len(parts) == 1 && parts[0] == "order" && r.Method == http.MethodPatch {
+		var request struct {
+			SessionIds []string `json:"session_ids"`
+		}
+		if !s.decodeJSONRequest(w, r, &request) {
+			return
+		}
+		s.handleJSONRelay(w, r, route, deviceId, "session_order", map[string]any{"workspace_id": workspaceId, "session_ids": request.SessionIds}, "")
+		return
+	}
 	sessionId := parts[0]
 	if sessionId == "" {
 		s.writeNotFound(w, r)

@@ -13,6 +13,7 @@ import (
 
 	"termbridge-go/internal/domain/process"
 	"termbridge-go/internal/domain/session"
+	"termbridge-go/internal/domain/workspace"
 	"termbridge-go/internal/infrastructure/config"
 	"termbridge-go/internal/infrastructure/logging"
 	termpty "termbridge-go/internal/infrastructure/pty"
@@ -368,11 +369,47 @@ func TestWorkspaceTreeAndOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateWorkspaceOrder() error = %v", err)
 	}
-	if len(workspaces) != 1 || workspaces[0].SortOrder != 1 {
+	if len(workspaces) != 1 || workspaces[0].Id != response.WorkspaceId {
 		t.Fatalf("workspaces = %#v", workspaces)
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
 	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
+}
+
+func TestRegistryOrdersWorkspaceSessions(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	store := state.NewStore(root)
+	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	ws := workspace.Workspace{SchemaVersion: workspace.SchemaVersion, Id: "workspace", Name: "Workspace", Path: cwd, CreatedAt: now, UpdatedAt: now}
+	if err := store.SaveWorkspace(ws); err != nil {
+		t.Fatalf("SaveWorkspace() error = %v", err)
+	}
+	first := session.Session{SchemaVersion: session.SchemaVersion, Id: "session-1", WorkspaceId: ws.Id, Name: "First", LaunchCwd: cwd, Command: session.CommandRecord{Command: "go", Args: []string{"version"}}, CreatedAt: now, UpdatedAt: now}
+	second := session.Session{SchemaVersion: session.SchemaVersion, Id: "session-2", WorkspaceId: ws.Id, Name: "Second", LaunchCwd: cwd, Command: session.CommandRecord{Command: "go", Args: []string{"version"}}, CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)}
+	for _, sess := range []session.Session{first, second} {
+		if err := store.SaveSession(sess); err != nil {
+			t.Fatalf("SaveSession() error = %v", err)
+		}
+		if err := store.SaveState(ws.Id, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, UpdatedAt: now}); err != nil {
+			t.Fatalf("SaveState() error = %v", err)
+		}
+	}
+	registry := NewRegistry(Config{Logger: &logging.Logger{Slog: slog.Default()}, Cwd: cwd, Store: store, LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: newFakeSession()}})
+	ordered, err := registry.UpdateSessionOrder(ws.Id, []string{second.Id, first.Id})
+	if err != nil {
+		t.Fatalf("UpdateSessionOrder() error = %v", err)
+	}
+	if len(ordered) != 2 || ordered[0].Id != second.Id || ordered[1].Id != first.Id {
+		t.Fatalf("ordered = %#v", ordered)
+	}
+	tree, err := registry.WorkspaceTree()
+	if err != nil {
+		t.Fatalf("WorkspaceTree() error = %v", err)
+	}
+	if len(tree) != 1 || len(tree[0].Children) != 2 || tree[0].Children[0].Id != second.Id || tree[0].Children[1].Id != first.Id {
+		t.Fatalf("tree = %#v", tree)
+	}
 }
 
 func TestDeleteWorkspaceProtectsRunningSessions(t *testing.T) {

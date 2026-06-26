@@ -47,7 +47,7 @@ function terminalOptions(theme: AppTheme = 'dark') {
   return {
     cursorBlink: true,
     fontFamily: 'Cascadia Mono, Consolas, monospace',
-    fontSize: 12,
+    fontSize: 13,
     scrollback: 5000,
     theme: xtermThemeFor(theme),
   }

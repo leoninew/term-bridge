@@ -105,11 +105,14 @@ type UpdateWorkspaceOrderReq struct {
 	WorkspaceIds []string `json:"workspace_ids"`
 }
 
+type UpdateSessionOrderReq struct {
+	SessionIds []string `json:"session_ids"`
+}
+
 type WorkspaceTreeNode struct {
 	Id        string                    `json:"id"`
 	Name      string                    `json:"name"`
 	Path      string                    `json:"path"`
-	SortOrder int                       `json:"sort_order"`
 	UpdatedAt time.Time                 `json:"updated_at"`
 	Children  []WorkspaceSessionSummary `json:"children"`
 }
@@ -124,7 +127,6 @@ type WorkspaceSummary struct {
 	Id        string    `json:"id"`
 	Name      string    `json:"name"`
 	Path      string    `json:"path"`
-	SortOrder int       `json:"sort_order"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -544,7 +546,6 @@ func (r *Registry) WorkspaceTree() ([]WorkspaceTreeNode, error) {
 			Id:        ws.Id,
 			Name:      ws.Name,
 			Path:      ws.Path,
-			SortOrder: ws.SortOrder,
 			UpdatedAt: ws.UpdatedAt,
 			Children:  r.workspaceSessionSummariesFromViews(views),
 		})
@@ -567,6 +568,26 @@ func (r *Registry) ListSessionsByWorkspaceId(workspaceId string) ([]WorkspaceSes
 			return nil, apperrors.NotFound("workspace not found", err)
 		}
 		return nil, apperrors.Runtime("list workspace sessions", err)
+	}
+	return r.workspaceSessionSummariesFromViews(views), nil
+}
+
+func (r *Registry) UpdateSessionOrder(workspaceId string, sessionIds []string) ([]WorkspaceSessionSummary, error) {
+	if len(sessionIds) == 0 {
+		return nil, apperrors.Usage("session_ids is required")
+	}
+	views, _, err := r.store.UpdateSessionOrder(workspaceId, sessionIds, time.Now().UTC())
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			if strings.Contains(err.Error(), "session_id") {
+				return nil, apperrors.NotFound("session not found", err)
+			}
+			return nil, apperrors.NotFound("workspace not found", err)
+		}
+		if strings.Contains(err.Error(), "duplicate session_id") {
+			return nil, apperrors.Usage(err.Error())
+		}
+		return nil, apperrors.Runtime("update session order", err)
 	}
 	return r.workspaceSessionSummariesFromViews(views), nil
 }
@@ -745,6 +766,12 @@ func (r *Registry) sessionView(workspaceId string, sessionId string) (session.Vi
 }
 
 func (r *Registry) summariesFromViews(views []session.View) []SessionSummary {
+	summaries := r.sessionSummariesFromViews(views)
+	sort.Slice(summaries, func(i, j int) bool { return summaries[i].UpdatedAt.After(summaries[j].UpdatedAt) })
+	return summaries
+}
+
+func (r *Registry) sessionSummariesFromViews(views []session.View) []SessionSummary {
 	recoverer := session.Recoverer{Store: r.store}
 	out := make([]SessionSummary, 0, len(views))
 	for _, view := range views {
@@ -756,12 +783,11 @@ func (r *Registry) summariesFromViews(views []session.View) []SessionSummary {
 		}
 		out = append(out, r.summaryFromView(view))
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].UpdatedAt.After(out[j].UpdatedAt) })
 	return out
 }
 
 func (r *Registry) workspaceSessionSummariesFromViews(views []session.View) []WorkspaceSessionSummary {
-	summaries := r.summariesFromViews(views)
+	summaries := r.sessionSummariesFromViews(views)
 	out := make([]WorkspaceSessionSummary, 0, len(summaries))
 	for _, summary := range summaries {
 		out = append(out, WorkspaceSessionSummary{
@@ -779,7 +805,7 @@ func (r *Registry) workspaceSessionSummariesFromViews(views []session.View) []Wo
 }
 
 func summaryFromWorkspace(ws workspace.Workspace) WorkspaceSummary {
-	return WorkspaceSummary{Id: ws.Id, Name: ws.Name, Path: ws.Path, SortOrder: ws.SortOrder, UpdatedAt: ws.UpdatedAt}
+	return WorkspaceSummary{Id: ws.Id, Name: ws.Name, Path: ws.Path, UpdatedAt: ws.UpdatedAt}
 }
 
 func (r *Registry) summaryFromView(view session.View) SessionSummary {

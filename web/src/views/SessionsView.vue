@@ -33,6 +33,7 @@
           @remove-workspace="dialogs.openRemoveWorkspaceDialog"
           @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
           @reorder-workspaces="reorderWorkspaces"
+          @reorder-sessions="reorderSessions"
           @logout="logout"
         />
       </SplitterPanel>
@@ -362,6 +363,15 @@
       await workspaceSessions.reorderWorkspaces(gateway.selectedDeviceId, workspaceIds)
     } catch (err) {
       notifications.notifyError(t('toast.updateWorkspaceOrderFailed'), err)
+      await refresh()
+    }
+  }
+
+  async function reorderSessions(workspaceId: string, sessionIds: string[]) {
+    try {
+      await workspaceSessions.reorderSessions(gateway.selectedDeviceId, workspaceId, sessionIds)
+    } catch (err) {
+      notifications.notifyError(t('toast.updateSessionOrderFailed'), err)
       await refresh()
     }
   }

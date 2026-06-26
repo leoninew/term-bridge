@@ -48,6 +48,10 @@ func (s Store) WorkspaceRoot() string {
 	return filepath.Join(s.Root, "workspaces")
 }
 
+func (s Store) workspaceIndexPath() string {
+	return filepath.Join(s.WorkspaceRoot(), "index.json")
+}
+
 func (s Store) WorkspaceDir(workspaceId string) string {
 	return filepath.Join(s.WorkspaceRoot(), workspaceId)
 }
@@ -58,7 +62,17 @@ func (s Store) SessionDir(workspaceId string, sessionId string) string {
 
 func (s Store) SaveWorkspace(value workspace.Workspace) error {
 	path := filepath.Join(s.WorkspaceDir(value.Id), "workspace.json")
-	return writeJSON(path, value)
+	_, statErr := os.Stat(path)
+	if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+		return statErr
+	}
+	if err := writeJSON(path, value); err != nil {
+		return err
+	}
+	if errors.Is(statErr, os.ErrNotExist) {
+		return s.appendWorkspaceId(value.Id, value.UpdatedAt)
+	}
+	return nil
 }
 
 func (s Store) LoadWorkspace(workspaceId string) (workspace.Workspace, error) {
@@ -128,6 +142,7 @@ func (s Store) DeleteSession(workspaceId string, sessionId string) error {
 	}
 	ws.UpdatedAt = time.Now().UTC()
 	removeSessionNode(&ws, sessionId)
+	removeString(&ws.SessionIds, sessionId)
 	if err := s.SaveWorkspace(ws); err != nil {
 		return err
 	}
@@ -135,7 +150,10 @@ func (s Store) DeleteSession(workspaceId string, sessionId string) error {
 }
 
 func (s Store) DeleteWorkspace(workspaceId string) error {
-	return os.RemoveAll(s.WorkspaceDir(workspaceId))
+	if err := os.RemoveAll(s.WorkspaceDir(workspaceId)); err != nil {
+		return err
+	}
+	return s.removeWorkspaceId(workspaceId, time.Now().UTC())
 }
 
 func (s Store) SaveState(workspaceId string, sessionId string, value session.StateRecord) error {
@@ -228,7 +246,11 @@ func (s Store) ListWorkspaces() ([]workspace.Workspace, []Warning, error) {
 		}
 		values = append(values, value)
 	}
-	sortWorkspaces(values)
+	index, err := s.loadWorkspaceIndex()
+	if err != nil {
+		warnings = append(warnings, Warning{Path: s.workspaceIndexPath(), Err: err})
+	}
+	sortWorkspaces(values, index.WorkspaceIds)
 	return values, warnings, nil
 }
 
@@ -263,35 +285,39 @@ func (s Store) UpdateWorkspaceOrder(workspaceIds []string, now time.Time) ([]wor
 	if err != nil {
 		return nil, err
 	}
-	byId := make(map[string]workspace.Workspace, len(workspaces))
-	for _, ws := range workspaces {
-		byId[ws.Id] = ws
+	ordered, err := completeOrderedIds(workspaceIds, workspaces, func(ws workspace.Workspace) string { return ws.Id }, "workspace_id")
+	if err != nil {
+		return nil, err
 	}
-	seen := map[string]bool{}
-	for _, id := range workspaceIds {
-		if seen[id] {
-			return nil, fmt.Errorf("duplicate workspace_id %q", id)
-		}
-		seen[id] = true
-		ws, ok := byId[id]
-		if !ok {
-			return nil, os.ErrNotExist
-		}
-		ws.SortOrder = len(seen)
-		ws.UpdatedAt = now.UTC()
-		if err := s.SaveWorkspace(ws); err != nil {
-			return nil, err
-		}
-		byId[id] = ws
+	if err := s.saveWorkspaceIndex(workspace.WorkspaceIndex{SchemaVersion: workspace.SchemaVersion, WorkspaceIds: ordered, UpdatedAt: now.UTC()}); err != nil {
+		return nil, err
 	}
 	updated, _, err := s.ListWorkspaces()
 	return updated, err
 }
 
+func (s Store) UpdateSessionOrder(workspaceId string, sessionIds []string, now time.Time) ([]session.View, []Warning, error) {
+	ws, err := s.LoadWorkspace(workspaceId)
+	if err != nil {
+		return nil, nil, err
+	}
+	ordered, err := completeOrderedIds(sessionIds, ws.Children, func(child workspace.SessionNode) string { return child.Id }, "session_id")
+	if err != nil {
+		return nil, nil, err
+	}
+	ws.SessionIds = ordered
+	ws.UpdatedAt = now.UTC()
+	if err := s.SaveWorkspace(ws); err != nil {
+		return nil, nil, err
+	}
+	return s.listSessionsInWorkspace(ws)
+}
+
 func (s Store) listSessionsInWorkspace(ws workspace.Workspace) ([]session.View, []Warning, error) {
 	var views []session.View
 	var warnings []Warning
-	for _, child := range ws.Children {
+	children := orderSessionNodes(ws.Children, ws.SessionIds)
+	for _, child := range children {
 		sess := sessionFromWorkspaceNode(ws, child)
 		stateRecord, err := sessionStateFromWorkspace(child.State)
 		if err != nil {
@@ -443,7 +469,13 @@ func upsertSessionNode(ws *workspace.Workspace, child workspace.SessionNode) {
 			return
 		}
 	}
+	if len(ws.SessionIds) == 0 {
+		for _, existing := range ws.Children {
+			ws.SessionIds = append(ws.SessionIds, existing.Id)
+		}
+	}
 	ws.Children = append(ws.Children, child)
+	ws.SessionIds = append(ws.SessionIds, child.Id)
 }
 
 func removeSessionNode(ws *workspace.Workspace, sessionId string) {
@@ -509,18 +541,68 @@ func replaceFile(tmpName string, path string) error {
 	}
 }
 
-func sortWorkspaces(values []workspace.Workspace) {
+func (s Store) loadWorkspaceIndex() (workspace.WorkspaceIndex, error) {
+	var index workspace.WorkspaceIndex
+	err := readJSON(s.workspaceIndexPath(), &index)
+	if errors.Is(err, os.ErrNotExist) {
+		return workspace.WorkspaceIndex{}, nil
+	}
+	return index, err
+}
+
+func (s Store) saveWorkspaceIndex(index workspace.WorkspaceIndex) error {
+	return writeJSON(s.workspaceIndexPath(), index)
+}
+
+func (s Store) appendWorkspaceId(workspaceId string, now time.Time) error {
+	index, err := s.loadWorkspaceIndex()
+	if err != nil {
+		return err
+	}
+	if containsString(index.WorkspaceIds, workspaceId) {
+		return nil
+	}
+	if len(index.WorkspaceIds) == 0 {
+		workspaces, _, err := s.ListWorkspaces()
+		if err != nil {
+			return err
+		}
+		for _, ws := range workspaces {
+			index.WorkspaceIds = append(index.WorkspaceIds, ws.Id)
+		}
+	} else {
+		index.WorkspaceIds = append(index.WorkspaceIds, workspaceId)
+	}
+	index.SchemaVersion = workspace.SchemaVersion
+	index.UpdatedAt = now.UTC()
+	return s.saveWorkspaceIndex(index)
+}
+
+func (s Store) removeWorkspaceId(workspaceId string, now time.Time) error {
+	index, err := s.loadWorkspaceIndex()
+	if err != nil {
+		return err
+	}
+	if !removeString(&index.WorkspaceIds, workspaceId) {
+		return nil
+	}
+	index.SchemaVersion = workspace.SchemaVersion
+	index.UpdatedAt = now.UTC()
+	return s.saveWorkspaceIndex(index)
+}
+
+func sortWorkspaces(values []workspace.Workspace, workspaceIds []string) {
+	order := orderMap(workspaceIds)
 	sort.SliceStable(values, func(i, j int) bool {
 		left := values[i]
 		right := values[j]
-		if left.SortOrder != right.SortOrder {
-			if left.SortOrder == 0 {
-				return false
-			}
-			if right.SortOrder == 0 {
-				return true
-			}
-			return left.SortOrder < right.SortOrder
+		leftOrder, leftOrdered := order[left.Id]
+		rightOrder, rightOrdered := order[right.Id]
+		if leftOrdered != rightOrdered {
+			return leftOrdered
+		}
+		if leftOrdered && leftOrder != rightOrder {
+			return leftOrder < rightOrder
 		}
 		if !left.CreatedAt.Equal(right.CreatedAt) {
 			return left.CreatedAt.Before(right.CreatedAt)
@@ -530,6 +612,86 @@ func sortWorkspaces(values []workspace.Workspace) {
 		}
 		return left.Id < right.Id
 	})
+}
+
+func orderSessionNodes(children []workspace.SessionNode, sessionIds []string) []workspace.SessionNode {
+	ordered := append([]workspace.SessionNode(nil), children...)
+	order := orderMap(sessionIds)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		left := ordered[i]
+		right := ordered[j]
+		leftOrder, leftOrdered := order[left.Id]
+		rightOrder, rightOrdered := order[right.Id]
+		if leftOrdered != rightOrdered {
+			return leftOrdered
+		}
+		if leftOrdered && leftOrder != rightOrder {
+			return leftOrder < rightOrder
+		}
+		if !left.CreatedAt.Equal(right.CreatedAt) {
+			return left.CreatedAt.Before(right.CreatedAt)
+		}
+		if left.Name != right.Name {
+			return left.Name < right.Name
+		}
+		return left.Id < right.Id
+	})
+	return ordered
+}
+
+func completeOrderedIds[T any](ids []string, values []T, idFor func(T) string, label string) ([]string, error) {
+	byId := make(map[string]bool, len(values))
+	for _, value := range values {
+		byId[idFor(value)] = true
+	}
+	seen := map[string]bool{}
+	ordered := make([]string, 0, len(values))
+	for _, id := range ids {
+		if seen[id] {
+			return nil, fmt.Errorf("duplicate %s %q", label, id)
+		}
+		if !byId[id] {
+			return nil, fmt.Errorf("%s %q: %w", label, id, os.ErrNotExist)
+		}
+		seen[id] = true
+		ordered = append(ordered, id)
+	}
+	for _, value := range values {
+		id := idFor(value)
+		if !seen[id] {
+			ordered = append(ordered, id)
+		}
+	}
+	return ordered, nil
+}
+
+func orderMap(ids []string) map[string]int {
+	order := make(map[string]int, len(ids))
+	for index, id := range ids {
+		if _, exists := order[id]; !exists {
+			order[id] = index
+		}
+	}
+	return order
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(values *[]string, target string) bool {
+	for index, value := range *values {
+		if value == target {
+			*values = append((*values)[:index], (*values)[index+1:]...)
+			return true
+		}
+	}
+	return false
 }
 
 func readJSON(path string, value any) error {

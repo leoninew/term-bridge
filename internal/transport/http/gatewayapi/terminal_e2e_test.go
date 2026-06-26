@@ -203,6 +203,10 @@ func (r *fakeRuntimeAccess) ListSessionsByWorkspaceId(context.Context, string) (
 	return []terminalapp.WorkspaceSessionSummary{{Id: "sess-1", Name: "Session", Command: "fake-tui", LifecycleState: session.StateRunning}}, nil
 }
 
+func (r *fakeRuntimeAccess) UpdateSessionOrder(context.Context, string, []string) ([]terminalapp.WorkspaceSessionSummary, error) {
+	return r.ListSessionsByWorkspaceId(context.Background(), "ws-1")
+}
+
 func (r *fakeRuntimeAccess) CreateSession(context.Context, terminalapp.CreateSessionReq) (terminalapp.CreateSessionResp, error) {
 	return terminalapp.CreateSessionResp{SessionId: "sess-1", WorkspaceId: "ws-1", State: string(session.StateRunning)}, nil
 }

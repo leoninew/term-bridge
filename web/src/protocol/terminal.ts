@@ -66,7 +66,6 @@ export type WorkspaceSummary = {
   id: string
   name: string
   path: string
-  sort_order: number
   updated_at: string
 }
 

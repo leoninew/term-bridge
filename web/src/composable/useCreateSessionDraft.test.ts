@@ -32,7 +32,6 @@ describe('useCreateSessionDraft', () => {
         id: 'workspace-1',
         name: 'Workspace One',
         path: '/work/one',
-        sort_order: 1,
         updated_at: '2026-06-24T00:00:00Z',
       },
       'New Session',
