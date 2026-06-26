@@ -21,6 +21,7 @@ type SessionRuntime struct {
 	history  *history.Writer
 
 	mu         sync.Mutex
+	resizeMu   sync.Mutex
 	clients    map[string]*Client
 	attachment AttachmentState
 	closed     bool
@@ -134,16 +135,24 @@ func (r *SessionRuntime) resize(cols int, rows int) error {
 		return err
 	}
 	size := process.TerminalSize{Cols: cols, Rows: rows}
+	r.resizeMu.Lock()
+	defer r.resizeMu.Unlock()
 	r.mu.Lock()
 	previous := r.current
 	if r.current == size {
 		r.mu.Unlock()
 		return nil
 	}
-	r.current = size
 	r.mu.Unlock()
 	r.registry.logger.Info("terminal pty resize", "session_id", r.session.Id, "previous_cols", previous.Cols, "previous_rows", previous.Rows, "cols", size.Cols, "rows", size.Rows)
-	return r.pty.Resize(size)
+	if err := r.pty.Resize(size); err != nil {
+		r.registry.logger.Warn("terminal pty resize failed", "session_id", r.session.Id, "previous_cols", previous.Cols, "previous_rows", previous.Rows, "cols", size.Cols, "rows", size.Rows, "error", err)
+		return err
+	}
+	r.mu.Lock()
+	r.current = size
+	r.mu.Unlock()
+	return nil
 }
 
 func (r *SessionRuntime) detachClient(id string, reason string) {

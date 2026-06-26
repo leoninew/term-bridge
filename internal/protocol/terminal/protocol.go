@@ -24,9 +24,9 @@ const (
 	MaxJSONMessageBytes = 16 * 1024
 	MaxBinaryFrameBytes = 1024 * 1024
 	MinCols             = 1
-	MaxCols             = 10000
+	MaxCols             = 1000
 	MinRows             = 1
-	MaxRows             = 10000
+	MaxRows             = 1000
 	MaxPingNonceBytes   = 256
 )
 

@@ -12,7 +12,7 @@
       direction="horizontal"
       class="flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
     >
-      <SplitterPanel id="workspace-sidebar" :default-size="22" :min-size="16" :max-size="35">
+      <SplitterPanel id="workspace-sidebar" :default-size="20" :min-size="15" :max-size="25">
         <WorkspaceSessionSidebar
           :workspace-tree="workspaceSessions.workspaceTree"
           :active-session-id="workbench.activeSessionId"

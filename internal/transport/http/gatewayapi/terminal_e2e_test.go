@@ -3,6 +3,7 @@ package gatewayapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -41,13 +42,14 @@ func TestGatewayAgentTerminalAttachE2E(t *testing.T) {
 	token := loginToken(t, gateway)
 	header := http.Header{}
 	header.Set("Authorization", "Bearer "+token)
-	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/"+device.Id+"/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/"+device.Id+"/workspaces/ws-1/sessions/sess-1/ws?cols=144&rows=44", &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		t.Fatalf("browser Dial() error = %v", err)
 	}
 	defer browser.Close(websocket.StatusNormalClosure, "")
 
 	stream := runtime.waitAttach(t, "sess-1")
+	stream.waitResize(t, 144, 44)
 	stream.sendBinary("POMELO_M6_ATTACH_READY\r\n")
 	messageType, output, err := browser.Read(ctx)
 	if err != nil {
@@ -94,6 +96,61 @@ func TestGatewayAgentTerminalAttachE2E(t *testing.T) {
 	}
 }
 
+func TestGatewayAgentTerminalAttachResizeErrorReturnsControlError(t *testing.T) {
+	gateway := New(testGatewayConfig())
+	server := httptest.NewServer(gateway)
+	defer server.Close()
+
+	runtime := newFakeRuntimeAccess()
+	runtime.newStream = func() *fakeTerminalStream {
+		stream := newFakeTerminalStream()
+		stream.resizeErrs = []error{errors.New("resize failed")}
+		return stream
+	}
+	stateDir := t.TempDir()
+	device := writeGatewayE2EDevice(t, stateDir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errCh := make(chan error, 1)
+	client := agentapp.New(agentapp.Config{ConnectUrl: server.URL, Username: "admin", Password: "admin", DeviceId: device.Id, DeviceName: device.Name, StateDir: stateDir, Runtime: runtime, Logger: slog.Default()})
+	go func() {
+		errCh <- client.Run(ctx)
+	}()
+	waitForRoute(t, gateway, device.Id)
+
+	token := loginToken(t, gateway)
+	header := http.Header{}
+	header.Set("Authorization", "Bearer "+token)
+	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/"+device.Id+"/workspaces/ws-1/sessions/sess-1/ws?cols=144&rows=44", &websocket.DialOptions{HTTPHeader: header})
+	if err != nil {
+		t.Fatalf("browser Dial() error = %v", err)
+	}
+	defer browser.Close(websocket.StatusNormalClosure, "")
+
+	stream := runtime.waitAttach(t, "sess-1")
+	stream.waitResize(t, 144, 44)
+	readCtx, cancelRead := context.WithTimeout(ctx, 2*time.Second)
+	defer cancelRead()
+	messageType, data, err := browser.Read(readCtx)
+	if err != nil {
+		t.Fatalf("browser Read() error = %v", err)
+	}
+	if messageType != websocket.MessageText || !strings.Contains(string(data), "terminal_stream_error") || !strings.Contains(string(data), "resize failed") {
+		t.Fatalf("terminal error type=%v data=%q, want resize failure control error", messageType, data)
+	}
+
+	cancel()
+	select {
+	case err := <-errCh:
+		if err != nil && !strings.Contains(err.Error(), "context canceled") && !strings.Contains(err.Error(), "closed network connection") {
+			t.Fatalf("client Run() error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for agent client to stop")
+	}
+}
+
 func writeGatewayE2EDevice(t *testing.T, stateDir string) agentapp.Device {
 	t.Helper()
 	device := agentapp.Device{Id: "gateway-e2e-device", Name: "gateway-e2e", CreatedAt: time.Now().UTC()}
@@ -111,9 +168,10 @@ func writeGatewayE2EDevice(t *testing.T, stateDir string) agentapp.Device {
 }
 
 type fakeRuntimeAccess struct {
-	mu      sync.Mutex
-	streams map[string]*fakeTerminalStream
-	attach  chan attachedStream
+	mu        sync.Mutex
+	streams   map[string]*fakeTerminalStream
+	attach    chan attachedStream
+	newStream func() *fakeTerminalStream
 }
 
 type attachedStream struct {
@@ -122,7 +180,7 @@ type attachedStream struct {
 }
 
 func newFakeRuntimeAccess() *fakeRuntimeAccess {
-	return &fakeRuntimeAccess{streams: map[string]*fakeTerminalStream{}, attach: make(chan attachedStream, 1)}
+	return &fakeRuntimeAccess{streams: map[string]*fakeTerminalStream{}, attach: make(chan attachedStream, 1), newStream: newFakeTerminalStream}
 }
 
 func (r *fakeRuntimeAccess) ListWorkspaces(context.Context) ([]terminalapp.WorkspaceSummary, error) {
@@ -174,7 +232,7 @@ func (r *fakeRuntimeAccess) ReadHistory(context.Context, string, string) ([]byte
 }
 
 func (r *fakeRuntimeAccess) Attach(_ context.Context, workspaceId string, sessionId string) (agentapp.TerminalStream, error) {
-	stream := newFakeTerminalStream()
+	stream := r.newStream()
 	r.mu.Lock()
 	r.streams[sessionId] = stream
 	r.mu.Unlock()
@@ -197,10 +255,11 @@ func (r *fakeRuntimeAccess) waitAttach(t *testing.T, sessionId string) *fakeTerm
 }
 
 type fakeTerminalStream struct {
-	outbound chan terminalapp.Outbound
-	input    chan []byte
-	resize   chan terminalResize
-	detach   chan string
+	outbound   chan terminalapp.Outbound
+	input      chan []byte
+	resize     chan terminalResize
+	resizeErrs []error
+	detach     chan string
 }
 
 type terminalResize struct {
@@ -223,6 +282,11 @@ func (s *fakeTerminalStream) WriteInput(data []byte) error {
 
 func (s *fakeTerminalStream) Resize(cols int, rows int) error {
 	s.resize <- terminalResize{cols: cols, rows: rows}
+	if len(s.resizeErrs) > 0 {
+		err := s.resizeErrs[0]
+		s.resizeErrs = s.resizeErrs[1:]
+		return err
+	}
 	return nil
 }
 

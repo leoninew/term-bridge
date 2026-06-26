@@ -363,7 +363,6 @@
                         :class="themeStore.theme === item.value ? 'opacity-100' : 'opacity-0'"
                         class="size-4 text-blue-500"
                       />
-                      <component :is="item.icon" class="size-4 text-[var(--color-text-subtle)]" />
                       {{ item.label }}
                     </DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
@@ -371,10 +370,10 @@
               </DropdownMenuPortal>
             </DropdownMenuSub>
             <DropdownMenuItem
-              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-red-600 outline-none hover:bg-red-500/10 focus:bg-red-500/10 dark:text-red-100"
+              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
               @select="emit('logout')"
             >
-              <LogOut class="size-4 text-red-300" />
+              <LogOut class="size-4 text-[var(--color-text-subtle)]" />
               {{ t('gateway.logout') }}
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -397,7 +396,6 @@
     Languages,
     Loader2,
     LogOut,
-    Moon,
     Pencil,
     Plus,
     RotateCcw,
@@ -502,7 +500,6 @@
     themes.map((value) => ({
       value,
       label: t(`theme.${value}`),
-      icon: value === 'light' ? Sun : Moon,
     })),
   )
 
@@ -623,23 +620,13 @@
   }
 
   function workspaceMatchesSearch(workspace: WorkspaceSummary) {
-    const haystack = [workspace.id, workspace.name, workspace.path].join(' ').toLowerCase()
-    return haystack.includes(normalizedSearchQuery.value)
+    return workspace.name.toLowerCase().includes(normalizedSearchQuery.value)
   }
 
   function sessionMatchesSearch(session: SessionSummary, workspace: WorkspaceSummary) {
-    const haystack = [
-      session.id,
-      session.name,
-      session.command,
-      session.cwd,
-      session.lifecycle_state,
-      session.attachment_state ?? '',
-      workspace.name,
-      workspace.path,
-    ]
-      .join(' ')
-      .toLowerCase()
-    return haystack.includes(normalizedSearchQuery.value)
+    return (
+      session.name.toLowerCase().includes(normalizedSearchQuery.value) ||
+      workspace.name.toLowerCase().includes(normalizedSearchQuery.value)
+    )
   }
 </script>

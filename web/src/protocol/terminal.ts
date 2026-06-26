@@ -1,4 +1,28 @@
 export const terminalSubprotocol = 'termbridge.terminal.v1'
+export const minTerminalCols = 1
+export const maxTerminalCols = 1000
+export const minTerminalRows = 1
+export const maxTerminalRows = 1000
+export const terminalFitSafetyMargin = 1
+
+export type TerminalSize = {
+  cols: number
+  rows: number
+}
+
+export function clampTerminalSize(size: TerminalSize): TerminalSize {
+  return {
+    cols: Math.max(minTerminalCols, Math.min(maxTerminalCols, size.cols)),
+    rows: Math.max(minTerminalRows, Math.min(maxTerminalRows, size.rows)),
+  }
+}
+
+export function fitSafeTerminalSize(size: TerminalSize): TerminalSize {
+  return clampTerminalSize({
+    cols: size.cols - terminalFitSafetyMargin,
+    rows: size.rows - terminalFitSafetyMargin,
+  })
+}
 
 export type LifecycleState = 'running' | 'stopped' | 'failed'
 export type AttachmentState = 'unattached' | 'attached' | 'detached' | 'reattaching'

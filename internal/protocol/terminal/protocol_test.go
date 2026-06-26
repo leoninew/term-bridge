@@ -26,21 +26,31 @@ func TestDecodeClientRejectsUnknownType(t *testing.T) {
 }
 
 func TestDecodeClientAcceptsLargeResize(t *testing.T) {
-	message, err := DecodeClient([]byte(`{"type":"resize","cols":1200,"rows":600}`))
+	message, err := DecodeClient([]byte(`{"type":"resize","cols":1000,"rows":600}`))
 	if err != nil {
 		t.Fatalf("DecodeClient() error = %v", err)
 	}
-	if message.Cols != 1200 || message.Rows != 600 {
+	if message.Cols != 1000 || message.Rows != 600 {
 		t.Fatalf("message = %#v", message)
 	}
 }
 
 func TestDecodeClientRejectsResizeOutOfRange(t *testing.T) {
-	_, err := DecodeClient([]byte(`{"type":"resize","cols":10001,"rows":32}`))
+	_, err := DecodeClient([]byte(`{"type":"resize","cols":1001,"rows":32}`))
 	if err == nil {
 		t.Fatal("DecodeClient() error = nil, want error")
 	}
 	if !strings.Contains(err.Error(), "cols out of range") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestDecodeClientRejectsRowsOutOfRange(t *testing.T) {
+	_, err := DecodeClient([]byte(`{"type":"resize","cols":120,"rows":1001}`))
+	if err == nil {
+		t.Fatal("DecodeClient() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "rows out of range") {
 		t.Fatalf("error = %v", err)
 	}
 }

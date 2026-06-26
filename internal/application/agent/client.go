@@ -13,6 +13,7 @@ import (
 	"github.com/coder/websocket"
 
 	terminalapp "termbridge-go/internal/application/terminal"
+	terminalproto "termbridge-go/internal/protocol/terminal"
 	"termbridge-go/internal/protocol/tunnel"
 )
 
@@ -39,11 +40,15 @@ func New(config Config) *Client {
 }
 
 func (c *Client) logInfo(message string, attrs ...any) {
-	c.config.Logger.Info(message, attrs...)
+	if c.config.Logger != nil {
+		c.config.Logger.Info(message, attrs...)
+	}
 }
 
 func (c *Client) logWarn(message string, attrs ...any) {
-	c.config.Logger.Warn(message, attrs...)
+	if c.config.Logger != nil {
+		c.config.Logger.Warn(message, attrs...)
+	}
 }
 
 func (c *Client) Run(ctx context.Context) error {
@@ -287,7 +292,16 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 		c.logInfo("agent terminal detached", attrs...)
 	}()
 	if payload.Cols > 0 && payload.Rows > 0 {
-		_ = stream.Resize(payload.Cols, payload.Rows)
+		if err := terminalproto.ValidateSize(payload.Cols, payload.Rows); err != nil {
+			c.logWarn("agent terminal attach resize invalid", append(attrs, "cols", payload.Cols, "rows", payload.Rows, "error", err)...)
+			_ = writeTerminalError(ctx, conn, writeMu, frame.StreamId, err.Error())
+			return
+		}
+		if err := stream.Resize(payload.Cols, payload.Rows); err != nil {
+			c.logWarn("agent terminal attach resize failed", append(attrs, "cols", payload.Cols, "rows", payload.Rows, "error", err)...)
+			_ = writeTerminalError(ctx, conn, writeMu, frame.StreamId, err.Error())
+			return
+		}
 	}
 	inbound := make(chan tunnel.Frame, 16)
 	c.addTerminal(frame.StreamId, inbound)
@@ -300,13 +314,25 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 			switch inboundFrame.Type {
 			case tunnel.FrameTerminalInput:
 				input, err := tunnel.DecodePayload[tunnel.TerminalDataPayload](inboundFrame)
-				if err == nil {
-					_ = stream.WriteInput(input.Data)
+				if err != nil {
+					c.logWarn("agent terminal input decode failed", append(attrs, "error", err)...)
+					continue
+				}
+				if err := stream.WriteInput(input.Data); err != nil {
+					c.logWarn("agent terminal input write failed", append(attrs, "bytes", len(input.Data), "error", err)...)
 				}
 			case tunnel.FrameTerminalResize:
 				resize, err := tunnel.DecodePayload[tunnel.TerminalResizePayload](inboundFrame)
-				if err == nil {
-					_ = stream.Resize(resize.Cols, resize.Rows)
+				if err != nil {
+					c.logWarn("agent terminal resize decode failed", append(attrs, "error", err)...)
+					continue
+				}
+				if err := terminalproto.ValidateSize(resize.Cols, resize.Rows); err != nil {
+					c.logWarn("agent terminal resize invalid", append(attrs, "cols", resize.Cols, "rows", resize.Rows, "error", err)...)
+					continue
+				}
+				if err := stream.Resize(resize.Cols, resize.Rows); err != nil {
+					c.logWarn("agent terminal resize failed", append(attrs, "cols", resize.Cols, "rows", resize.Rows, "error", err)...)
 				}
 			case tunnel.FrameClose:
 				return
@@ -334,6 +360,7 @@ func (c *Client) dispatchTerminal(frame tunnel.Frame) bool {
 	select {
 	case ch <- frame:
 	default:
+		c.logWarn("agent terminal frame dropped", "stream_id", frame.StreamId, "type", frame.Type)
 	}
 	return true
 }

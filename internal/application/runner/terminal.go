@@ -70,15 +70,20 @@ func watchResize(ctx context.Context, fd int, initial process.TerminalSize, sess
 				continue
 			}
 			next := process.TerminalSize{Cols: cols, Rows: rows}.OrDefault()
-			if next == last {
-				continue
-			}
-			if err := session.Resize(next); err != nil {
-				logger.Warn("resize PTY", "error", err)
-			}
-			last = next
+			last = resizeIfChanged(next, last, session, logger)
 		}
 	}
+}
+
+func resizeIfChanged(next process.TerminalSize, last process.TerminalSize, session termpty.Session, logger Logger) process.TerminalSize {
+	if next == last {
+		return last
+	}
+	if err := session.Resize(next); err != nil {
+		logger.Warn("resize PTY", "cols", next.Cols, "rows", next.Rows, "error", err)
+		return last
+	}
+	return next
 }
 
 type fdProvider interface {

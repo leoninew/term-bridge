@@ -13,6 +13,10 @@ export function logTerminalDiagnostic(event: string, details: DiagnosticDetails 
   console.info(prefix, event, details)
 }
 
+export function logTerminalDiagnosticError(event: string, details: DiagnosticDetails = {}) {
+  console.error(prefix, event, details)
+}
+
 export function logTerminalDiagnosticSample(
   event: string,
   details: DiagnosticDetails,

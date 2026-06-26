@@ -29,6 +29,7 @@ export default tseslint.config(
         TextEncoder: 'readonly',
         Uint8Array: 'readonly',
         URL: 'readonly',
+        URLSearchParams: 'readonly',
         Blob: 'readonly',
         ArrayBuffer: 'readonly',
         HTMLElement: 'readonly',

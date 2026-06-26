@@ -3,6 +3,7 @@ package gatewayapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -422,10 +423,28 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 		return
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
-	term := &terminalRelay{sessionId: sessionId, browser: conn, done: make(chan struct{})}
+	cols, rows, hasAttachSize, sizeErr := terminalAttachSizeFromQuery(r)
+	if sizeErr != nil {
+		s.config.Logger.Warn("terminal attach size invalid", "workspace_id", workspaceId, "session_id", sessionId, "error", sizeErr)
+		if err := writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: sizeErr.Error()}); err != nil {
+			s.config.Logger.Warn("terminal attach size error write failed", "workspace_id", workspaceId, "session_id", sessionId, "error", err)
+		}
+		return
+	}
+	term := &terminalRelay{sessionId: sessionId, browser: conn, done: make(chan struct{}), logger: s.config.Logger}
 	route.addTerminal(streamId, term)
-	attach, err := tunnel.NewFrame(streamId, tunnel.FrameTerminalAttach, tunnel.TerminalAttachReq{WorkspaceId: workspaceId, SessionId: sessionId, RequestId: s.requestIdFor(w, r)})
-	if err != nil || route.writeFrame(r.Context(), attach) != nil {
+	attachReq := tunnel.TerminalAttachReq{WorkspaceId: workspaceId, SessionId: sessionId, RequestId: s.requestIdFor(w, r)}
+	if hasAttachSize {
+		attachReq.Cols = cols
+		attachReq.Rows = rows
+	}
+	attach, err := tunnel.NewFrame(streamId, tunnel.FrameTerminalAttach, attachReq)
+	if err != nil {
+		s.config.Logger.Warn("terminal attach frame build failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
+		return
+	}
+	if err := route.writeFrame(r.Context(), attach); err != nil {
+		s.config.Logger.Warn("terminal attach frame write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
 		return
 	}
 	go func() {
@@ -433,7 +452,9 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 			messageType, data, err := conn.Read(r.Context())
 			if err != nil {
 				closeFrame, _ := tunnel.NewFrame(streamId, tunnel.FrameClose, nil)
-				_ = route.writeFrame(context.Background(), closeFrame)
+				if err := route.writeFrame(context.Background(), closeFrame); err != nil {
+					s.config.Logger.Warn("terminal close frame write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
+				}
 				closeOnce(term.done)
 				return
 			}
@@ -441,30 +462,72 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 			case websocket.MessageText:
 				message, err := terminalproto.DecodeClient(data)
 				if err != nil {
-					_ = writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: err.Error()})
+					s.config.Logger.Warn("terminal control decode failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
+					if writeErr := writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: err.Error()}); writeErr != nil {
+						s.config.Logger.Warn("terminal control error write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", writeErr)
+					}
 					continue
 				}
 				switch message.Type {
 				case terminalproto.TypeHello:
 					continue
 				case terminalproto.TypeResize:
-					resize, _ := tunnel.NewFrame(streamId, tunnel.FrameTerminalResize, tunnel.TerminalResizePayload{Cols: message.Cols, Rows: message.Rows})
-					_ = route.writeFrame(r.Context(), resize)
+					resize, err := tunnel.NewFrame(streamId, tunnel.FrameTerminalResize, tunnel.TerminalResizePayload{Cols: message.Cols, Rows: message.Rows})
+					if err != nil {
+						s.config.Logger.Warn("terminal resize frame build failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "cols", message.Cols, "rows", message.Rows, "error", err)
+						continue
+					}
+					if err := route.writeFrame(r.Context(), resize); err != nil {
+						s.config.Logger.Warn("terminal resize frame write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "cols", message.Cols, "rows", message.Rows, "error", err)
+					}
 				case terminalproto.TypeDetach:
 					closeFrame, _ := tunnel.NewFrame(streamId, tunnel.FrameClose, nil)
-					_ = route.writeFrame(context.Background(), closeFrame)
+					if err := route.writeFrame(context.Background(), closeFrame); err != nil {
+						s.config.Logger.Warn("terminal close frame write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
+					}
 					closeOnce(term.done)
 					return
 				case terminalproto.TypePing:
-					_ = writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypePong, Nonce: message.Nonce})
+					if err := writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypePong, Nonce: message.Nonce}); err != nil {
+						s.config.Logger.Warn("terminal pong write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
+					}
 				}
 			case websocket.MessageBinary:
-				input, _ := tunnel.NewFrame(streamId, tunnel.FrameTerminalInput, tunnel.TerminalDataPayload{Data: data})
-				_ = route.writeFrame(r.Context(), input)
+				input, err := tunnel.NewFrame(streamId, tunnel.FrameTerminalInput, tunnel.TerminalDataPayload{Data: data})
+				if err != nil {
+					s.config.Logger.Warn("terminal input frame build failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "bytes", len(data), "error", err)
+					continue
+				}
+				if err := route.writeFrame(r.Context(), input); err != nil {
+					s.config.Logger.Warn("terminal input frame write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "bytes", len(data), "error", err)
+				}
 			}
 		}
 	}()
 	<-term.done
+}
+
+func terminalAttachSizeFromQuery(r *http.Request) (int, int, bool, error) {
+	colsRaw := strings.TrimSpace(r.URL.Query().Get("cols"))
+	rowsRaw := strings.TrimSpace(r.URL.Query().Get("rows"))
+	if colsRaw == "" && rowsRaw == "" {
+		return 0, 0, false, nil
+	}
+	if colsRaw == "" || rowsRaw == "" {
+		return 0, 0, false, fmt.Errorf("terminal attach size requires both cols and rows")
+	}
+	cols, err := strconv.Atoi(colsRaw)
+	if err != nil {
+		return 0, 0, false, fmt.Errorf("invalid terminal attach cols: %w", err)
+	}
+	rows, err := strconv.Atoi(rowsRaw)
+	if err != nil {
+		return 0, 0, false, fmt.Errorf("invalid terminal attach rows: %w", err)
+	}
+	if err := terminalproto.ValidateSize(cols, rows); err != nil {
+		return 0, 0, false, err
+	}
+	return cols, rows, true, nil
 }
 
 func writeTerminalControl(conn *websocket.Conn, message terminalproto.ServerMessage) error {

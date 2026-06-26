@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"strings"
@@ -23,6 +24,25 @@ func TestRunReturnsUserExitCode(t *testing.T) {
 	}
 	if result.ExitCode != 7 {
 		t.Fatalf("ExitCode = %d, want 7", result.ExitCode)
+	}
+}
+
+func TestResizeIfChangedRetriesAfterFailure(t *testing.T) {
+	session := newFakePTYSession("", termpty.Result{ExitCode: 0})
+	session.resizeErrs = []error{errors.New("resize failed")}
+	last := process.TerminalSize{Cols: 80, Rows: 25}
+	next := process.TerminalSize{Cols: 120, Rows: 32}
+
+	last = resizeIfChanged(next, last, session, slog.Default())
+	if last != (process.TerminalSize{Cols: 80, Rows: 25}) {
+		t.Fatalf("last after failure = %#v, want original size", last)
+	}
+	last = resizeIfChanged(next, last, session, slog.Default())
+	if last != next {
+		t.Fatalf("last after retry = %#v, want %#v", last, next)
+	}
+	if len(session.resizes) != 2 || session.resizes[0] != next || session.resizes[1] != next {
+		t.Fatalf("resizes = %#v, want two attempts to %#v", session.resizes, next)
 	}
 }
 
@@ -79,6 +99,8 @@ type fakePTYSession struct {
 	output     *bytes.Reader
 	input      bytes.Buffer
 	result     termpty.Result
+	resizes    []process.TerminalSize
+	resizeErrs []error
 	interrupts int
 	closes     int
 	kills      int
@@ -88,13 +110,21 @@ func newFakePTYSession(output string, result termpty.Result) *fakePTYSession {
 	return &fakePTYSession{output: bytes.NewReader([]byte(output)), result: result}
 }
 
-func (s *fakePTYSession) Read(p []byte) (int, error)        { return s.output.Read(p) }
-func (s *fakePTYSession) Write(p []byte) (int, error)       { return s.input.Write(p) }
-func (s *fakePTYSession) Resize(process.TerminalSize) error { return nil }
-func (s *fakePTYSession) Interrupt() error                  { s.interrupts++; return nil }
-func (s *fakePTYSession) Close() error                      { s.closes++; return nil }
-func (s *fakePTYSession) KillTree() error                   { s.kills++; return nil }
-func (s *fakePTYSession) Wait() termpty.Result              { return s.result }
+func (s *fakePTYSession) Read(p []byte) (int, error)  { return s.output.Read(p) }
+func (s *fakePTYSession) Write(p []byte) (int, error) { return s.input.Write(p) }
+func (s *fakePTYSession) Resize(size process.TerminalSize) error {
+	s.resizes = append(s.resizes, size)
+	if len(s.resizeErrs) > 0 {
+		err := s.resizeErrs[0]
+		s.resizeErrs = s.resizeErrs[1:]
+		return err
+	}
+	return nil
+}
+func (s *fakePTYSession) Interrupt() error     { s.interrupts++; return nil }
+func (s *fakePTYSession) Close() error         { s.closes++; return nil }
+func (s *fakePTYSession) KillTree() error      { s.kills++; return nil }
+func (s *fakePTYSession) Wait() termpty.Result { return s.result }
 
 func containsString(values []string, want string) bool {
 	for _, value := range values {

@@ -1,5 +1,6 @@
 import type { AxiosResponse } from 'axios'
 import { apiClient } from '../api/client'
+import { clampTerminalSize } from '../../protocol/terminal'
 import type {
   CreateSessionReq,
   CreateSessionResp,
@@ -111,10 +112,18 @@ export function terminalWsUrl(
   workspaceId: string,
   sessionId: string,
   token?: string,
+  size?: { cols: number; rows: number } | null,
 ): string {
   const path = devicePath(deviceId, `${workspaceSessionPath(workspaceId, sessionId)}/ws`)
+  const params = new URLSearchParams()
   if (token) {
-    return `${path}?token=${encodeURIComponent(token)}`
+    params.set('token', token)
   }
-  return path
+  if (size) {
+    const clamped = clampTerminalSize(size)
+    params.set('cols', String(clamped.cols))
+    params.set('rows', String(clamped.rows))
+  }
+  const query = params.toString()
+  return query ? `${path}?${query}` : path
 }

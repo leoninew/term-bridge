@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/coder/websocket"
 
+	terminalproto "termbridge-go/internal/protocol/terminal"
 	"termbridge-go/internal/protocol/tunnel"
 )
 
@@ -28,6 +30,7 @@ type terminalRelay struct {
 	sessionId string
 	browser   *websocket.Conn
 	done      chan struct{}
+	logger    *slog.Logger
 }
 
 func newAgentRoute(deviceId string, conn *websocket.Conn) *agentRoute {
@@ -128,11 +131,28 @@ func (t *terminalRelay) dispatch(frame tunnel.Frame) bool {
 	case tunnel.FrameTerminalOutput:
 		payload, err := tunnel.DecodePayload[tunnel.TerminalDataPayload](frame)
 		if err != nil {
+			if t.logger != nil {
+				t.logger.Warn("terminal output decode failed", "session_id", t.sessionId, "stream_id", frame.StreamId, "error", err)
+			}
 			return true
 		}
-		_ = t.browser.Write(context.Background(), websocket.MessageBinary, payload.Data)
+		if err := t.browser.Write(context.Background(), websocket.MessageBinary, payload.Data); err != nil && t.logger != nil {
+			t.logger.Warn("terminal websocket output write failed", "session_id", t.sessionId, "stream_id", frame.StreamId, "error", err)
+		}
 		return true
-	case tunnel.FrameTerminalClosed, tunnel.FrameError, tunnel.FrameClose:
+	case tunnel.FrameError:
+		message := "terminal stream error"
+		if payload, err := tunnel.DecodePayload[tunnel.ErrorPayload](frame); err == nil && payload.Message != "" {
+			message = payload.Message
+		}
+		if t.logger != nil {
+			t.logger.Warn("terminal stream error", "session_id", t.sessionId, "stream_id", frame.StreamId, "message", message)
+		}
+		_ = writeTerminalControl(t.browser, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "terminal_stream_error", Message: message})
+		_ = t.browser.Close(websocket.StatusNormalClosure, "terminal closed")
+		closeOnce(t.done)
+		return true
+	case tunnel.FrameTerminalClosed, tunnel.FrameClose:
 		_ = t.browser.Close(websocket.StatusNormalClosure, "terminal closed")
 		closeOnce(t.done)
 		return true

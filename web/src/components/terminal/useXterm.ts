@@ -3,6 +3,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { logTerminalDiagnostic, logTerminalDiagnosticSample } from './diagnostics'
+import { fitSafeTerminalSize } from '../../protocol/terminal'
 import type { AppTheme } from '../../store/theme'
 
 type ResizeCallback = (cols: number, rows: number) => void
@@ -58,8 +59,8 @@ export function measureXtermSize(element: HTMLElement): { cols: number; rows: nu
   terminal.loadAddon(fitAddon)
   try {
     terminal.open(element)
-    fitAddon.fit()
-    if (terminal.cols < 1 || terminal.rows < 1) {
+    const dimensions = fitAddon.proposeDimensions()
+    if (!dimensions || dimensions.cols < 1 || dimensions.rows < 1) {
       logTerminalDiagnostic('xterm.measure.invalid-size', {
         source: 'measure',
         clientWidth: element.clientWidth,
@@ -67,14 +68,20 @@ export function measureXtermSize(element: HTMLElement): { cols: number; rows: nu
       })
       return null
     }
+    const measuredCols = dimensions.cols
+    const measuredRows = dimensions.rows
+    const size = fitSafeTerminalSize({ cols: measuredCols, rows: measuredRows })
+    terminal.resize(size.cols, size.rows)
     logTerminalDiagnostic('xterm.measure', {
       source: 'measure',
       clientWidth: element.clientWidth,
       clientHeight: element.clientHeight,
-      cols: terminal.cols,
-      rows: terminal.rows,
+      measuredCols,
+      measuredRows,
+      cols: size.cols,
+      rows: size.rows,
     })
-    return { cols: terminal.cols, rows: terminal.rows }
+    return size
   } finally {
     terminal.dispose()
   }
@@ -112,22 +119,30 @@ export function createXterm(
   }
 
   function emitResize() {
-    fitAddon.fit()
-    if (terminal.cols < 1 || terminal.rows < 1) {
+    const dimensions = fitAddon.proposeDimensions()
+    if (!dimensions || dimensions.cols < 1 || dimensions.rows < 1) {
       logTerminalDiagnostic('xterm.fit.invalid-size', diagnosticDetails())
       return
     }
-    if (terminal.cols !== lastCols || terminal.rows !== lastRows) {
+    const measuredCols = dimensions.cols
+    const measuredRows = dimensions.rows
+    const size = fitSafeTerminalSize({ cols: measuredCols, rows: measuredRows })
+    if (terminal.cols !== size.cols || terminal.rows !== size.rows) {
+      terminal.resize(size.cols, size.rows)
+    }
+    if (size.cols !== lastCols || size.rows !== lastRows) {
       logTerminalDiagnostic('xterm.resize', {
         ...diagnosticDetails(),
         previousCols: lastCols,
         previousRows: lastRows,
-        cols: terminal.cols,
-        rows: terminal.rows,
+        measuredCols,
+        measuredRows,
+        cols: size.cols,
+        rows: size.rows,
       })
-      lastCols = terminal.cols
-      lastRows = terminal.rows
-      onResize(terminal.cols, terminal.rows)
+      lastCols = size.cols
+      lastRows = size.rows
+      onResize(size.cols, size.rows)
     }
   }
 

@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -128,6 +129,33 @@ func TestRuntimeInitialSizeMatchesCreatedPTYSize(t *testing.T) {
 	}
 	if len(fake.resizes) != 1 || fake.resizes[0] != (process.TerminalSize{Cols: 121, Rows: 32}) {
 		t.Fatalf("resizes = %#v, want 121x32", fake.resizes)
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
+}
+
+func TestRuntimeRetriesResizeAfterFailure(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	fake.resizeErrs = []error{errors.New("resize failed")}
+	registry := NewRegistry(Config{Logger: &logging.Logger{Slog: slog.Default()}, Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}, Cols: 120, Rows: 32})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	client, err := registry.Attach(response.WorkspaceId, response.SessionId)
+	if err != nil {
+		t.Fatalf("Attach() error = %v", err)
+	}
+	if err := client.Resize(121, 32); err == nil {
+		t.Fatal("Resize() error = nil, want failure")
+	}
+	if err := client.Resize(121, 32); err != nil {
+		t.Fatalf("Resize() retry error = %v", err)
+	}
+	if len(fake.resizes) != 2 || fake.resizes[0] != (process.TerminalSize{Cols: 121, Rows: 32}) || fake.resizes[1] != (process.TerminalSize{Cols: 121, Rows: 32}) {
+		t.Fatalf("resizes = %#v, want two attempts to 121x32", fake.resizes)
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
 	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
@@ -623,6 +651,7 @@ type fakeSession struct {
 	closeSignal chan struct{}
 	written     []byte
 	resizes     []process.TerminalSize
+	resizeErrs  []error
 	closed      bool
 }
 
@@ -645,6 +674,11 @@ func (s *fakeSession) Write(p []byte) (int, error) {
 
 func (s *fakeSession) Resize(size process.TerminalSize) error {
 	s.resizes = append(s.resizes, size)
+	if len(s.resizeErrs) > 0 {
+		err := s.resizeErrs[0]
+		s.resizeErrs = s.resizeErrs[1:]
+		return err
+	}
 	return nil
 }
 func (s *fakeSession) Interrupt() error { return nil }

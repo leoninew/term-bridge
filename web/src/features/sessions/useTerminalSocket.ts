@@ -9,6 +9,7 @@ import {
 import {
   diagnosticWebSocketPath,
   logTerminalDiagnostic,
+  logTerminalDiagnosticError,
   logTerminalDiagnosticSample,
 } from '../../components/terminal/diagnostics'
 
@@ -55,7 +56,7 @@ export function useTerminalSocket(
           onControl(message)
         } catch (err) {
           error.value = err instanceof Error ? err.message : String(err)
-          logTerminalDiagnostic('socket.control.decode-error', {
+          logTerminalDiagnosticError('socket.control.decode-error', {
             path: diagnosticWebSocketPath(wsUrl),
             message: error.value,
           })
@@ -80,7 +81,7 @@ export function useTerminalSocket(
     next.onerror = () => {
       status.value = 'error'
       error.value = 'websocket error'
-      logTerminalDiagnostic('socket.error', { path: diagnosticWebSocketPath(wsUrl) })
+      logTerminalDiagnosticError('socket.error', { path: diagnosticWebSocketPath(wsUrl) })
       onError(error.value)
     }
     next.onclose = (event) => {

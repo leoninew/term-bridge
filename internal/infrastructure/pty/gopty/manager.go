@@ -3,6 +3,7 @@ package gopty
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -16,10 +17,12 @@ import (
 	termpty "termbridge-go/internal/infrastructure/pty"
 )
 
-type Manager struct{}
+type Manager struct {
+	newPTY func() (gopty.Pty, error)
+}
 
 func NewManager() Manager {
-	return Manager{}
+	return Manager{newPTY: gopty.New}
 }
 
 func (m Manager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.Session, error) {
@@ -27,12 +30,19 @@ func (m Manager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.S
 		return nil, err
 	}
 
-	pt, err := gopty.New()
+	newPTY := m.newPTY
+	if newPTY == nil {
+		newPTY = gopty.New
+	}
+	pt, err := newPTY()
 	if err != nil {
 		return nil, err
 	}
 	if size := spec.InitialSize.OrDefault(); size.IsValid() {
-		_ = pt.Resize(size.Cols, size.Rows)
+		if err := pt.Resize(size.Cols, size.Rows); err != nil {
+			_ = pt.Close()
+			return nil, fmt.Errorf("resize initial pty to %dx%d: %w", size.Cols, size.Rows, err)
+		}
 	}
 
 	// Use context.Background() to prevent the process from being killed

@@ -1,6 +1,7 @@
 import type { Ref } from 'vue'
 import { logTerminalDiagnostic } from '../components/terminal/diagnostics'
 import { measureXtermSize } from '../components/terminal/useXterm'
+import { fitSafeTerminalSize } from '../protocol/terminal'
 
 export function useTerminalSize(workbench: Ref<HTMLElement | null>) {
   function measureInitialTerminalSize(): { cols: number; rows: number } {
@@ -8,10 +9,16 @@ export function useTerminalSize(workbench: Ref<HTMLElement | null>) {
     if (measured) {
       return measured
     }
-    const cols = Math.max(80, Math.min(10000, Math.floor((window.innerWidth - 360) / 9)))
-    const rows = Math.max(24, Math.min(10000, Math.floor((window.innerHeight - 180) / 18)))
-    logTerminalDiagnostic('xterm.measure.fallback', { cols, rows })
-    return { cols, rows }
+    const measuredCols = Math.max(80, Math.floor((window.innerWidth - 360) / 9))
+    const measuredRows = Math.max(24, Math.floor((window.innerHeight - 180) / 18))
+    const size = fitSafeTerminalSize({ cols: measuredCols, rows: measuredRows })
+    logTerminalDiagnostic('xterm.measure.fallback', {
+      measuredCols,
+      measuredRows,
+      cols: size.cols,
+      rows: size.rows,
+    })
+    return size
   }
 
   function measureCreateSessionWorkbench(): { cols: number; rows: number } | null {

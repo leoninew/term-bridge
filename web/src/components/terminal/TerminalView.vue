@@ -8,7 +8,8 @@
 
 <script setup lang="ts">
   import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-  import type { ServerControlMessage } from '../../protocol/terminal'
+  import { clampTerminalSize, type ServerControlMessage } from '../../protocol/terminal'
+  import { logTerminalDiagnostic, logTerminalDiagnosticError } from './diagnostics'
   import { createXterm } from './useXterm'
   import { useTerminalSocket } from '../../features/sessions/useTerminalSocket'
   import { useThemeStore } from '../../store/theme'
@@ -27,6 +28,7 @@
   const themeStore = useThemeStore()
   const replaying = ref(false)
   let xterm: ReturnType<typeof createXterm> | null = null
+  let lastTerminalSize: { cols: number; rows: number } | null = null
 
   const socket = useTerminalSocket(
     (data) => xterm?.write(data),
@@ -42,6 +44,11 @@
         replaying.value = false
       }
       if (message.type === 'error') {
+        logTerminalDiagnosticError('socket.control.error', {
+          sessionId: props.sessionId,
+          code: message.code,
+          message: message.message,
+        })
         xterm?.terminal.writeln(
           `\r\n[termbridge:${message.code}] ${safeTerminalText(message.message)}`,
         )
@@ -59,6 +66,17 @@
     }
     const url = new URL(props.wsUrl, window.location.href)
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    if (lastTerminalSize) {
+      url.searchParams.set('cols', String(lastTerminalSize.cols))
+      url.searchParams.set('rows', String(lastTerminalSize.rows))
+    } else {
+      logTerminalDiagnosticError('socket.attach-size.missing', { sessionId: props.sessionId })
+    }
+    logTerminalDiagnostic('socket.attach-size', {
+      sessionId: props.sessionId,
+      cols: lastTerminalSize?.cols,
+      rows: lastTerminalSize?.rows,
+    })
     socket.connect(url.toString())
   }
 
@@ -75,7 +93,14 @@
     xterm = createXterm(
       (data) => socket.sendInput(data),
       (data) => socket.sendBinary(data),
-      (cols, rows) => socket.sendControl({ type: 'resize', cols, rows }),
+      (cols, rows) => {
+        lastTerminalSize = clampTerminalSize({ cols, rows })
+        socket.sendControl({
+          type: 'resize',
+          cols: lastTerminalSize.cols,
+          rows: lastTerminalSize.rows,
+        })
+      },
       { source: 'live', sessionId: props.sessionId },
       themeStore.theme,
     )
