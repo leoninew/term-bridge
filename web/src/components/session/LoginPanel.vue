@@ -16,6 +16,7 @@
           :value="username"
           class="mt-1 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-[var(--color-text)] outline-none"
           autocomplete="username"
+          type="email"
           @input="emit('update:username', ($event.target as HTMLInputElement).value)"
         />
       </label>
@@ -32,27 +33,46 @@
       <button
         type="submit"
         class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50 hover:bg-blue-500 disabled:opacity-60"
-        :disabled="loggingIn"
+        :disabled="loggingIn || googleLoggingIn"
       >
         {{ loggingIn ? t('gateway.signingIn') : t('gateway.signIn') }}
       </button>
+      <button
+        type="button"
+        class="mt-2 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-text)] hover:bg-[var(--color-control-hover)] disabled:opacity-60"
+        :disabled="loggingIn || googleLoggingIn"
+        @click="emit('google')"
+      >
+        {{ googleLoggingIn ? t('gateway.signingIn') : t('gateway.continueWithGoogle') }}
+      </button>
+      <div class="mt-3 flex justify-between text-xs text-[var(--color-text-muted)]">
+        <RouterLink class="hover:text-[var(--color-text)]" :to="{ name: 'register' }">
+          {{ t('gateway.register') }}
+        </RouterLink>
+        <RouterLink class="hover:text-[var(--color-text)]" :to="{ name: 'forgot-password' }">
+          {{ t('gateway.forgotPassword') }}
+        </RouterLink>
+      </div>
     </form>
   </section>
 </template>
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n'
+  import { RouterLink } from 'vue-router'
 
   defineProps<{
     username: string
     password: string
     loggingIn: boolean
+    googleLoggingIn: boolean
   }>()
 
   const emit = defineEmits<{
     'update:username': [value: string]
     'update:password': [value: string]
     submit: []
+    google: []
   }>()
 
   const { t } = useI18n()

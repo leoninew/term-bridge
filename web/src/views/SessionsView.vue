@@ -210,10 +210,7 @@
       // ignore logout API errors — clear local state anyway
     }
     gateway.clearToken()
-    gateway.authenticated = false
     gateway.passwordInput = ''
-    gateway.devices = []
-    gateway.selectedDeviceId = ''
     workspaceSessions.reset()
     workbench.resetForSourceChange()
     await router.replace({ name: 'login' })
@@ -563,11 +560,7 @@
 
   onMounted(async () => {
     try {
-      await gateway.initializeAuth()
-      if (!gateway.authenticated) {
-        await router.replace({ name: 'login' })
-        return
-      }
+      await gateway.loadDevices()
       await selectDevice()
     } catch (err) {
       notifications.notifyError(t('toast.refreshFailed'), err)

@@ -1,7 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useGatewayStore } from '../store/gateway'
 
-const protectedRoutes = ['sessions', 'settings']
+const skipAuthGuardRoutes = [
+  'home',
+  'login',
+  'register',
+  'verify-email',
+  'forgot-password',
+  'google-callback',
+  'reset-password',
+]
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -9,12 +17,37 @@ export const router = createRouter({
     {
       path: '/',
       name: 'home',
-      redirect: { name: 'sessions' },
+      component: () => import('../views/HomeView.vue'),
     },
     {
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginView.vue'),
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('../views/RegisterView.vue'),
+    },
+    {
+      path: '/verify-email',
+      name: 'verify-email',
+      component: () => import('../views/VerifyEmailView.vue'),
+    },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('../views/ForgotPasswordView.vue'),
+    },
+    {
+      path: '/auth/google/callback',
+      name: 'google-callback',
+      component: () => import('../views/GoogleCallbackView.vue'),
+    },
+    {
+      path: '/reset-password',
+      name: 'reset-password',
+      component: () => import('../views/ResetPasswordView.vue'),
     },
     {
       path: '/sessions',
@@ -34,12 +67,16 @@ export const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const gateway = useGatewayStore()
-  if (protectedRoutes.includes(to.name as string) && !gateway.token) {
-    return { name: 'login' }
+  const routeName = to.name as string
+
+  if (skipAuthGuardRoutes.includes(routeName)) {
+    return
   }
-  if (to.name === 'login' && gateway.token) {
-    return { name: 'sessions' }
+
+  await gateway.initializeAuth()
+  if (!gateway.authenticated) {
+    return { name: 'login' }
   }
 })
