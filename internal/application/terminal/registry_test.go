@@ -458,6 +458,33 @@ func TestCloseSessionReturnsStoppedSummary(t *testing.T) {
 	}
 }
 
+func TestCloseSessionMissingRuntimeWarnsAndReturnsStoppedSummary(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Logger: &logging.Logger{Slog: slog.Default()}, Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: config.HistoryConfig{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	response, err := registry.CreateSession(context.Background(), CreateSessionReq{Name: "Go version", Command: []string{"go", "version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	registry.removeRuntime(response.SessionId)
+
+	summary, err := registry.CloseSession(response.WorkspaceId, response.SessionId, "test_close")
+	if err != nil {
+		t.Fatalf("CloseSession() error = %v", err)
+	}
+	if summary.Id != response.SessionId || summary.LifecycleState != session.StateStopped {
+		t.Fatalf("summary = %#v, want stopped session %s", summary, response.SessionId)
+	}
+	stateRecord, err := state.NewStore(root).LoadState(response.WorkspaceId, response.SessionId)
+	if err != nil {
+		t.Fatalf("LoadState() error = %v", err)
+	}
+	if stateRecord.State != session.StateStopped || stateRecord.Reason != "missing_pty_on_close" {
+		t.Fatalf("state = %#v, want stopped missing_pty_on_close", stateRecord)
+	}
+}
+
 func TestRerunSessionArchivesHistoryAndReusesSessionId(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()

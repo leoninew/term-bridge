@@ -511,12 +511,29 @@ func (r *Registry) CloseSession(workspaceId string, sessionId string, reason str
 	runtime := r.runtimes[sessionId]
 	r.mu.Unlock()
 	if runtime == nil || runtime.session.WorkspaceId != workspaceId {
-		return SessionSummary{}, apperrors.Runtime("session not closable", fmt.Errorf("live PTY handle not found for %s/%s", workspaceId, sessionId))
+		return r.closeMissingRuntimeSession(workspaceId, sessionId, reason)
 	}
 	if err := runtime.closeSession(reason); err != nil {
 		return SessionSummary{}, err
 	}
 	return r.GetSession(workspaceId, sessionId)
+}
+
+func (r *Registry) closeMissingRuntimeSession(workspaceId string, sessionId string, reason string) (SessionSummary, error) {
+	view, err := r.sessionView(workspaceId, sessionId)
+	if err != nil {
+		return SessionSummary{}, err
+	}
+	r.logger.Warn("close session missing live PTY handle", "workspace_id", workspaceId, "session_id", sessionId, "reason", reason)
+	if !session.Terminal(view.State.State) {
+		now := time.Now().UTC()
+		stateRecord := session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "missing_pty_on_close", UpdatedAt: now}
+		if err := r.store.SaveState(workspaceId, sessionId, stateRecord); err != nil {
+			return SessionSummary{}, apperrors.Runtime("save missing PTY close state", err)
+		}
+		view.State = stateRecord
+	}
+	return r.summaryFromView(view), nil
 }
 
 func (r *Registry) ListWorkspaces() ([]WorkspaceSummary, error) {
