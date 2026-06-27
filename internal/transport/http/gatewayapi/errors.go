@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -105,7 +106,7 @@ func (h *Handler) logAPIError(r *http.Request, status int, code string, requestI
 		"request_id", requestId,
 		"method", r.Method,
 		"path", r.URL.Path,
-		"query", r.URL.RawQuery,
+		"query", redactQuery(r.URL.Query()),
 		"status", status,
 		"code", code,
 	}
@@ -125,11 +126,28 @@ func newRequestId() string {
 
 func containsSensitiveTerm(value string) bool {
 	lower := strings.ToLower(value)
-	terms := []string{"authorization", "cookie", "credential", "password", "secret", "token", "connection string", "apikey", "api_key"}
+	terms := []string{"authorization", "code", "cookie", "credential", "password", "secret", "token", "connection string", "apikey", "api_key"}
 	for _, term := range terms {
 		if strings.Contains(lower, term) {
 			return true
 		}
 	}
 	return false
+}
+
+func redactQuery(values url.Values) string {
+	if len(values) == 0 {
+		return ""
+	}
+	redacted := url.Values{}
+	for key, value := range values {
+		copied := append([]string(nil), value...)
+		if containsSensitiveTerm(key) {
+			for index := range copied {
+				copied[index] = "[REDACTED]"
+			}
+		}
+		redacted[key] = copied
+	}
+	return redacted.Encode()
 }

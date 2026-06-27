@@ -11,27 +11,36 @@ import (
 	"time"
 )
 
-const tokenExpiry = 24 * time.Hour
-
 type Claims struct {
-	Sub string `json:"sub"`
-	Exp int64  `json:"exp"`
+	Sub      string `json:"sub"`
+	Email    string `json:"email,omitempty"`
+	Provider string `json:"provider,omitempty"`
+	Iat      int64  `json:"iat"`
+	Exp      int64  `json:"exp"`
 }
 
 type TokenService struct {
 	secret []byte
+	ttl    time.Duration
 }
 
-func NewTokenService(secret string) TokenService {
-	return TokenService{secret: []byte(secret)}
+func NewTokenService(secret string, ttl ...time.Duration) TokenService {
+	duration := 24 * time.Hour
+	if len(ttl) > 0 && ttl[0] > 0 {
+		duration = ttl[0]
+	}
+	return TokenService{secret: []byte(secret), ttl: duration}
 }
 
-func (s TokenService) Sign(username string) (string, error) {
-	claims, err := json.Marshal(Claims{Sub: username, Exp: time.Now().Add(tokenExpiry).Unix()})
+func (s TokenService) Sign(claims Claims) (string, error) {
+	now := time.Now().UTC()
+	claims.Iat = now.Unix()
+	claims.Exp = now.Add(s.ttl).Unix()
+	payload, err := json.Marshal(claims)
 	if err != nil {
 		return "", err
 	}
-	return s.signJWT(claims), nil
+	return s.signJWT(payload), nil
 }
 
 func (s TokenService) Verify(token string) (Claims, error) {
@@ -71,10 +80,12 @@ func (s TokenService) jwtSignature(signed string) string {
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
-func extractBearerToken(r *http.Request) string {
+func ExtractBearerToken(r *http.Request) string {
 	header := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 	if header != "" {
 		return header
 	}
 	return r.URL.Query().Get("token")
 }
+
+func extractBearerToken(r *http.Request) string { return ExtractBearerToken(r) }

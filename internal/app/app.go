@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"termbridge-go/internal/application/agent"
+	authapp "termbridge-go/internal/application/auth"
 	"termbridge-go/internal/application/runner"
 	terminalapp "termbridge-go/internal/application/terminal"
 	"termbridge-go/internal/domain/identity"
@@ -19,12 +20,16 @@ import (
 	"termbridge-go/internal/domain/session"
 	"termbridge-go/internal/domain/workspace"
 	"termbridge-go/internal/infrastructure/config"
+	"termbridge-go/internal/infrastructure/database"
+	"termbridge-go/internal/infrastructure/email"
 	apperrors "termbridge-go/internal/infrastructure/errors"
 	"termbridge-go/internal/infrastructure/history"
 	"termbridge-go/internal/infrastructure/logging"
 	"termbridge-go/internal/infrastructure/pty/gopty"
+	authrepo "termbridge-go/internal/infrastructure/repository/auth"
 	"termbridge-go/internal/infrastructure/repository/state"
 	"termbridge-go/internal/transport/http/gatewayapi"
+	gatewayauth "termbridge-go/internal/transport/http/gatewayapi/auth"
 	httpserver "termbridge-go/internal/transport/http/server"
 )
 
@@ -247,9 +252,20 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		fmt.Fprintf(stdout, "Password: %s\n", bootstrap.Password)
 	}
 	registry := newWebTerminalRegistry(cfg, logger)
-	gatewayHandler := gatewayapi.New(gatewayapi.Config{Username: cfg.Auth.Username, Password: cfg.Auth.Password, JWTSecret: cfg.JWT.SecretKey, AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog})
+	db, err := database.Open(ctx, cfg.Database)
+	if err != nil {
+		return Result{Cwd: cfg.Cwd}, err
+	}
+	defer db.Close()
+	if err := database.Migrate(ctx, db.DB, db.Driver); err != nil {
+		return Result{Cwd: cfg.Cwd}, err
+	}
+	repo := authrepo.New(db.DB, db.Driver)
+	tokens := gatewayauth.NewTokenService(cfg.JWT.SecretKey, cfg.Auth.JWTTTL)
+	authService := authapp.New(repo, tokens, cfg.Auth, config.Mode(cfg), email.NewResendSender(cfg.Resend), authapp.NewOAuthGoogleClient(cfg.Auth.Google))
+	gatewayHandler := gatewayapi.New(gatewayapi.Config{AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService})
 	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Gate.ListenUrl, StaticDir: cfg.Web.StaticDir, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
-	client := agent.New(agent.Config{ConnectUrl: cfg.Agent.ConnectUrl, Username: cfg.Auth.Username, Password: cfg.Auth.Password, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})
+	client := agent.New(agent.Config{ConnectUrl: cfg.Agent.ConnectUrl, Username: cfg.Auth.LocalAdmin.Username, Password: cfg.Auth.LocalAdmin.Password, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})
 
 	serveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()

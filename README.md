@@ -30,19 +30,19 @@ User -> Device -> Workspace -> Session -> Terminal
 - 本地开发采用前后端分离。
 - 镜像交付采用前后端一体：Go 服务提供后端 API 和已构建的前端静态资源。
 
-Cloud Gate PoC 阶段仍是验证态，不是生产发布态。当前 Browser login 与 Agent tunnel 暂时固定为 `admin/admin`；正式用户系统、device 绑定、pairing、credential rotation 后续再补。
+Cloud Gate PoC 阶段仍是验证态，不是生产发布态。Browser login 已切到 `/api/auth/*` 用户系统；本地模式仍支持配置里的 `admin/admin` shortcut，远程 Gate 模式要求配置 Google OAuth 与 Resend。device 绑定、pairing、credential rotation 后续再补。
 
 ## 开发依赖
 
 - Go 1.25+
 - Node.js / Yarn
-- [just](https://github.com/casey/just)
+- [Task](https://taskfile.dev/)
 - [Air](https://github.com/air-verse/air)
 
 安装依赖：
 
 ```bash
-just install
+task install
 ```
 
 ## 本地开发
@@ -50,13 +50,13 @@ just install
 启动后端：
 
 ```bash
-just serve
+task serve
 ```
 
 启动前端开发服务：
 
 ```bash
-just web
+task web
 ```
 
 默认本地开发地址：
@@ -71,19 +71,19 @@ Frontend: http://127.0.0.1:9011
 运行测试：
 
 ```bash
-just test
+task test
 ```
 
 运行完整检查：
 
 ```bash
-just check
+task check
 ```
 
 构建本地二进制和镜像：
 
 ```bash
-just build
+task build
 ```
 
 ## 配置
@@ -114,13 +114,28 @@ TERMBRIDGE_RUNTIME__STATE_DIR=.termbridge
 TERMBRIDGE_WEB__STATIC_DIR=/opt/termbridge/web/dist
 ```
 
+用户系统相关配置：
+
+```dotenv
+TERMBRIDGE_DATABASE__DRIVER=sqlite
+TERMBRIDGE_DATABASE__SQLITE__PATH=.termbridge/termbridge.db
+TERMBRIDGE_AUTH__LOCAL_ADMIN__USERNAME=admin
+TERMBRIDGE_AUTH__LOCAL_ADMIN__PASSWORD=admin
+TERMBRIDGE_AUTH__GOOGLE__CLIENT_ID=
+TERMBRIDGE_AUTH__GOOGLE__CLIENT_SECRET=
+TERMBRIDGE_AUTH__GOOGLE__REDIRECT_URL=
+TERMBRIDGE_RESEND__API_KEY=
+TERMBRIDGE_RESEND__FROM_EMAIL=
+```
+
+`agent.connect_url` 与 `gate.listen_url` 规范化后一致时为本地模式；本地模式支持 `auth.local_admin` shortcut。两者不一致时为远程 Gate 模式，启动时会要求 Google OAuth 与 Resend 配置齐全。
+
 `agent.device_id` 和 `agent.device_name` 为空时，`termbridge serve` 会生成并写入 `.termbridge.yaml`，随后由 Agent 上报给 Gate。
 
 ## 当前边界
 
 当前还不是完整生产版本，仍未完成：
 
-- 正式用户系统。
 - 用户与 device 绑定。
 - secure pairing。
 - device credential / rotation。

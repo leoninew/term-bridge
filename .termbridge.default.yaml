@@ -37,6 +37,7 @@ gate:
   browser:
     allowed_origins:
       - http://127.0.0.1:9011
+      - http://localhost:9011
   api:
     expose_errors: false
 
@@ -45,3 +46,35 @@ agent:
   connect_url: ""
   device_id: ""
   device_name: ""
+
+# Database
+database:
+  driver: sqlite
+  sqlite:
+    path: .termbridge/termbridge.db
+  mysql:
+    dsn: ""
+
+# Auth
+auth:
+  jwt_ttl: 24h
+  local_admin:
+    username: admin
+    password: admin
+  password:
+    min_length: 8
+    max_length: 128
+  code:
+    length: 6
+    ttl: 2m
+    resend_cooldown: 1m
+    max_attempts: 3
+  google:
+    client_id: ""
+    client_secret: ""
+    redirect_url: ""
+
+# Resend
+resend:
+  api_key: ""
+  from_email: ""

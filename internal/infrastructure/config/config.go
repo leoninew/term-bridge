@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 	"github.com/subosito/gotenv"
@@ -39,13 +40,67 @@ type Config struct {
 	Web        WebConfig
 	Gate       GateConfig
 	Agent      AgentConfig
+	Database   DatabaseConfig
 	Auth       AuthConfig
 	JWT        JWTConfig
+	Resend     ResendConfig
 	ConfigFile string
 }
 
 type JWTConfig struct {
 	SecretKey string `json:"secret_key"`
+}
+
+type DatabaseConfig struct {
+	Driver string
+	SQLite SQLiteConfig
+	MySQL  MySQLConfig
+}
+
+type SQLiteConfig struct {
+	Path string
+}
+
+type MySQLConfig struct {
+	DSN string
+}
+
+type AuthConfig struct {
+	Username       string
+	Password       string
+	LocalAdmin     LocalAdminConfig
+	JWTTTL         time.Duration
+	PasswordPolicy PasswordPolicy
+	Code           CodePolicy
+	Google         GoogleConfig
+}
+
+type LocalAdminConfig struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type PasswordPolicy struct {
+	MinLength int
+	MaxLength int
+}
+
+type CodePolicy struct {
+	Length         int
+	TTL            time.Duration
+	ResendCooldown time.Duration
+	MaxAttempts    int
+}
+
+type GoogleConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+}
+
+type ResendConfig struct {
+	APIKey    string
+	FromEmail string
 }
 
 type LogHTTPConfig struct {
@@ -85,11 +140,6 @@ type AgentConfig struct {
 	ConnectUrl string
 	DeviceId   string
 	DeviceName string
-}
-
-type AuthConfig struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
 }
 
 type BootstrapResult struct {
@@ -148,6 +198,10 @@ func Load(options Options) (Config, error) {
 	if err != nil {
 		return Config{}, apperrors.Config("invalid web.static_dir", err)
 	}
+	database, err := loadDatabaseConfig(cwd, v)
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
 		Cwd:       cwd,
@@ -164,8 +218,9 @@ func Load(options Options) (Config, error) {
 			MaxBytes:     v.GetInt64("history.max_bytes"),
 			MaxLineBytes: v.GetInt("history.max_line_bytes"),
 		},
-		Runtime: RuntimeConfig{StateDir: stateDir},
-		Web:     WebConfig{StaticDir: staticDir},
+		Runtime:  RuntimeConfig{StateDir: stateDir},
+		Web:      WebConfig{StaticDir: staticDir},
+		Database: database,
 		Gate: GateConfig{
 			ListenUrl: strings.TrimSpace(v.GetString("gate.listen_url")),
 			Browser: GateBrowserConfig{
@@ -181,11 +236,35 @@ func Load(options Options) (Config, error) {
 			DeviceName: strings.TrimSpace(v.GetString("agent.device_name")),
 		},
 		Auth: AuthConfig{
-			Username: DefaultAuthUsername,
-			Password: DefaultAuthPassword,
+			Username: strings.TrimSpace(v.GetString("auth.local_admin.username")),
+			Password: strings.TrimSpace(v.GetString("auth.local_admin.password")),
+			LocalAdmin: LocalAdminConfig{
+				Username: strings.TrimSpace(v.GetString("auth.local_admin.username")),
+				Password: strings.TrimSpace(v.GetString("auth.local_admin.password")),
+			},
+			JWTTTL: v.GetDuration("auth.jwt_ttl"),
+			PasswordPolicy: PasswordPolicy{
+				MinLength: v.GetInt("auth.password.min_length"),
+				MaxLength: v.GetInt("auth.password.max_length"),
+			},
+			Code: CodePolicy{
+				Length:         v.GetInt("auth.code.length"),
+				TTL:            v.GetDuration("auth.code.ttl"),
+				ResendCooldown: v.GetDuration("auth.code.resend_cooldown"),
+				MaxAttempts:    v.GetInt("auth.code.max_attempts"),
+			},
+			Google: GoogleConfig{
+				ClientID:     strings.TrimSpace(v.GetString("auth.google.client_id")),
+				ClientSecret: strings.TrimSpace(v.GetString("auth.google.client_secret")),
+				RedirectURL:  strings.TrimSpace(v.GetString("auth.google.redirect_url")),
+			},
 		},
 		JWT: JWTConfig{
 			SecretKey: strings.TrimSpace(v.GetString("jwt.secret_key")),
+		},
+		Resend: ResendConfig{
+			APIKey:    strings.TrimSpace(v.GetString("resend.api_key")),
+			FromEmail: strings.TrimSpace(v.GetString("resend.from_email")),
 		},
 		ConfigFile: configFile,
 	}
@@ -210,6 +289,12 @@ func Load(options Options) (Config, error) {
 	if cfg.JWT.SecretKey == "" {
 		return Config{}, apperrors.Config("invalid jwt.secret_key", fmt.Errorf("JWT secret key is required"))
 	}
+	if err := validateAuth(cfg.Auth); err != nil {
+		return Config{}, err
+	}
+	if err := validateModeRequirements(cfg); err != nil {
+		return Config{}, err
+	}
 	if err := ensureLogDir(cfg.LogDir); err != nil {
 		return Config{}, err
 	}
@@ -222,8 +307,97 @@ func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
 	if err != nil {
 		return Config{}, BootstrapResult{}, err
 	}
-	updated.Auth = AuthConfig{Username: DefaultAuthUsername, Password: DefaultAuthPassword}
 	return updated, BootstrapResult{ConfigFile: updated.ConfigFile}, nil
+}
+
+func IsLocalMode(cfg Config) bool {
+	return normalizeModeURL(cfg.Agent.ConnectUrl) == normalizeModeURL(cfg.Gate.ListenUrl)
+}
+
+func Mode(cfg Config) string {
+	if IsLocalMode(cfg) {
+		return "local"
+	}
+	return "remote"
+}
+
+func loadDatabaseConfig(cwd string, v *viper.Viper) (DatabaseConfig, error) {
+	driver := strings.ToLower(strings.TrimSpace(v.GetString("database.driver")))
+	cfg := DatabaseConfig{
+		Driver: driver,
+		SQLite: SQLiteConfig{Path: strings.TrimSpace(v.GetString("database.sqlite.path"))},
+		MySQL:  MySQLConfig{DSN: strings.TrimSpace(v.GetString("database.mysql.dsn"))},
+	}
+	if cfg.Driver == "" {
+		return DatabaseConfig{}, apperrors.Config("invalid database.driver", fmt.Errorf("empty driver"))
+	}
+	switch cfg.Driver {
+	case "sqlite":
+		if cfg.SQLite.Path == "" {
+			return DatabaseConfig{}, apperrors.Config("invalid database.sqlite.path", fmt.Errorf("empty path"))
+		}
+		if !isConfigAbsPath(cfg.SQLite.Path) {
+			cfg.SQLite.Path = filepath.Join(cwd, cfg.SQLite.Path)
+		}
+	case "mysql":
+		if cfg.MySQL.DSN == "" {
+			return DatabaseConfig{}, apperrors.Config("invalid database.mysql.dsn", fmt.Errorf("empty DSN"))
+		}
+	default:
+		return DatabaseConfig{}, apperrors.Config("invalid database.driver", fmt.Errorf("must be sqlite or mysql"))
+	}
+	return cfg, nil
+}
+
+func validateAuth(cfg AuthConfig) error {
+	if cfg.JWTTTL <= 0 {
+		return apperrors.Config("invalid auth.jwt_ttl", fmt.Errorf("must be positive"))
+	}
+	if cfg.PasswordPolicy.MinLength < 1 || cfg.PasswordPolicy.MaxLength < cfg.PasswordPolicy.MinLength {
+		return apperrors.Config("invalid auth.password", fmt.Errorf("invalid length range"))
+	}
+	if cfg.Code.Length != 6 {
+		return apperrors.Config("invalid auth.code.length", fmt.Errorf("must be 6"))
+	}
+	if cfg.Code.TTL <= 0 || cfg.Code.ResendCooldown <= 0 || cfg.Code.MaxAttempts < 1 {
+		return apperrors.Config("invalid auth.code", fmt.Errorf("ttl, resend cooldown and max attempts must be positive"))
+	}
+	return nil
+}
+
+func validateModeRequirements(cfg Config) error {
+	if IsLocalMode(cfg) {
+		return nil
+	}
+	missing := []string{}
+	if cfg.Auth.Google.ClientID == "" {
+		missing = append(missing, envNameForKey("auth.google.client_id"))
+	}
+	if cfg.Auth.Google.ClientSecret == "" {
+		missing = append(missing, envNameForKey("auth.google.client_secret"))
+	}
+	if cfg.Auth.Google.RedirectURL == "" {
+		missing = append(missing, envNameForKey("auth.google.redirect_url"))
+	}
+	if cfg.Resend.APIKey == "" {
+		missing = append(missing, envNameForKey("resend.api_key"))
+	}
+	if cfg.Resend.FromEmail == "" {
+		missing = append(missing, envNameForKey("resend.from_email"))
+	}
+	if len(missing) > 0 {
+		return apperrors.Config("remote gate missing required auth configuration", errors.New(strings.Join(missing, ", ")))
+	}
+	return nil
+}
+
+func normalizeModeURL(value string) string {
+	parsed, err := url.Parse(strings.TrimRight(strings.TrimSpace(value), "/"))
+	if err != nil {
+		return strings.TrimRight(strings.TrimSpace(value), "/")
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/")
+	return parsed.String()
 }
 
 func ensureAgentIdentityInConfig(cfg Config) (Config, error) {
@@ -373,7 +547,24 @@ func configKeys() []string {
 		"agent.connect_url",
 		"agent.device_id",
 		"agent.device_name",
+		"database.driver",
+		"database.sqlite.path",
+		"database.mysql.dsn",
+		"auth.local_admin.username",
+		"auth.local_admin.password",
+		"auth.jwt_ttl",
+		"auth.password.min_length",
+		"auth.password.max_length",
+		"auth.code.length",
+		"auth.code.ttl",
+		"auth.code.resend_cooldown",
+		"auth.code.max_attempts",
+		"auth.google.client_id",
+		"auth.google.client_secret",
+		"auth.google.redirect_url",
 		"jwt.secret_key",
+		"resend.api_key",
+		"resend.from_email",
 	}
 }
 

@@ -63,7 +63,7 @@ func TestDevicesEndpointReturnsRegisteredDevices(t *testing.T) {
 	gateway := New(testGatewayConfig())
 	gateway.registry.Register("dev-1", "local", time.Now().UTC())
 	loginResponse := httptest.NewRecorder()
-	gateway.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/login", stringsReader(`{"username":"admin","password":"admin"}`)))
+	gateway.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", stringsReader(`{"username":"admin","password":"admin"}`)))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d", loginResponse.Code)
 	}

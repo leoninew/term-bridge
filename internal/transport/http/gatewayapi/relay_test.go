@@ -77,7 +77,7 @@ func rawResponse(raw string) tunnel.ResponseResp {
 func loginToken(t *testing.T, gateway *Handler) string {
 	t.Helper()
 	response := httptest.NewRecorder()
-	gateway.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
+	gateway.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("login status = %d; body=%s", response.Code, response.Body.String())
 	}

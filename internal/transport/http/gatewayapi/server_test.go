@@ -35,7 +35,7 @@ func TestAuthEndpoints(t *testing.T) {
 	assertAPIError(t, devicesResponse, http.StatusUnauthorized, errorCodeUnauthorized)
 
 	loginResponse := httptest.NewRecorder()
-	server.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
+	server.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d, want 200; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
@@ -50,7 +50,7 @@ func TestAuthEndpoints(t *testing.T) {
 		t.Fatal("access_token is empty")
 	}
 
-	meRequest := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	meRequest := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
 	meRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	meResponse := httptest.NewRecorder()
 	server.ServeHTTP(meResponse, meRequest)
@@ -58,7 +58,7 @@ func TestAuthEndpoints(t *testing.T) {
 		t.Fatalf("me status = %d, want 200; body=%s", meResponse.Code, meResponse.Body.String())
 	}
 
-	logoutRequest := httptest.NewRequest(http.MethodPost, "/api/logout", nil)
+	logoutRequest := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
 	logoutRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	logoutResponse := httptest.NewRecorder()
 	server.ServeHTTP(logoutResponse, logoutRequest)
@@ -78,14 +78,14 @@ func TestAuthEndpoints(t *testing.T) {
 func TestLoginRejectsBadPassword(t *testing.T) {
 	server := New(testGatewayConfig())
 	response := httptest.NewRecorder()
-	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewBufferString(`{"username":"admin","password":"bad"}`)))
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"bad"}`)))
 	assertAPIError(t, response, http.StatusUnauthorized, errorCodeUnauthorized)
 }
 
 func TestLoginRejectsInvalidJSON(t *testing.T) {
 	server := New(testGatewayConfig())
 	response := httptest.NewRecorder()
-	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewBufferString(`{"username"`)))
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username"`)))
 	assertAPIError(t, response, http.StatusBadRequest, errorCodeBadRequest)
 }
 

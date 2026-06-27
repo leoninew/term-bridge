@@ -154,6 +154,7 @@ func TestLoadNormalizesZeroOrNegativeLogBodyLimit(t *testing.T) {
 
 func TestLoadReadsLocalConfigFile(t *testing.T) {
 	isolateHome(t)
+	configureRemoteAuth(t)
 	cwd := t.TempDir()
 	configPath := filepath.Join(cwd, FileName)
 	logDir := filepath.Join(cwd, "configured-logs")
@@ -211,6 +212,7 @@ func TestLoadReadsLocalConfigFile(t *testing.T) {
 
 func TestLoadDotEnvOverridesLocalConfigFile(t *testing.T) {
 	isolateHome(t)
+	configureRemoteAuth(t)
 	cwd := t.TempDir()
 	logDir := filepath.Join(cwd, "dotenv-logs")
 	stateDir := filepath.Join(cwd, "dotenv-state")
@@ -255,6 +257,7 @@ func TestLoadDotEnvOverridesLocalConfigFile(t *testing.T) {
 
 func TestLoadOSEnvOverridesDotEnv(t *testing.T) {
 	isolateHome(t)
+	configureRemoteAuth(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
 	writeDotEnv(t, cwd, "TERMBRIDGE_GATE__LISTEN_URL=http://127.0.0.1:8080\nTERMBRIDGE_AGENT__CONNECT_URL=http://127.0.0.1:8080\nTERMBRIDGE_GATE__API__EXPOSE_ERRORS=false\n")
@@ -468,6 +471,15 @@ func clearTermBridgeEnv(t *testing.T) {
 			_ = os.Unsetenv(name)
 		})
 	}
+}
+
+func configureRemoteAuth(t *testing.T) {
+	t.Helper()
+	t.Setenv("TERMBRIDGE_AUTH__GOOGLE__CLIENT_ID", "google-client-id")
+	t.Setenv("TERMBRIDGE_AUTH__GOOGLE__CLIENT_SECRET", "google-client-secret")
+	t.Setenv("TERMBRIDGE_AUTH__GOOGLE__REDIRECT_URL", "https://gate.example.com/oauth/callback")
+	t.Setenv("TERMBRIDGE_RESEND__API_KEY", "resend-key")
+	t.Setenv("TERMBRIDGE_RESEND__FROM_EMAIL", "noreply@example.com")
 }
 
 func writeConfig(t *testing.T, dir string, content string) {

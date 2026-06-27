@@ -27,9 +27,7 @@ func (a *Auther) ValidCredentials(username string, password string) bool {
 		subtle.ConstantTimeCompare([]byte(password), []byte(a.credentials.Password)) == 1
 }
 
-func (a *Auther) Username() string {
-	return a.credentials.Username
-}
+func (a *Auther) Username() string { return a.credentials.Username }
 
 func (a *Auther) Authenticated(r *http.Request) bool {
 	token := extractBearerToken(r)
@@ -41,12 +39,10 @@ func (a *Auther) Authenticated(r *http.Request) bool {
 }
 
 func (a *Auther) SignToken(username string) (string, error) {
-	return a.tokens.Sign(username)
+	return a.tokens.Sign(Claims{Sub: username})
 }
 
-func (a *Auther) Verify(token string) (Claims, error) {
-	return a.tokens.Verify(token)
-}
+func (a *Auther) Verify(token string) (Claims, error) { return a.tokens.Verify(token) }
 
 func (a *Auther) UsernameFromRequest(r *http.Request) string {
 	token := extractBearerToken(r)

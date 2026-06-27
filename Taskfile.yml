@@ -1,0 +1,67 @@
+version: '3'
+
+silent: false
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  install:
+    desc: Install web and Go dependencies
+    cmds:
+      - cd web && yarn install
+      - go mod download
+      - go mod tidy
+
+  clean:
+    desc: Remove build outputs
+    cmds:
+      - cmd: rm -rf web/dist bin
+        platforms: [linux, darwin]
+      - cmd: pwsh -NoProfile -Command "Remove-Item -Recurse -Force web/dist, bin -ErrorAction SilentlyContinue"
+        platforms: [windows]
+
+  check:
+    desc: Run frontend and backend checks
+    cmds:
+      - cd web && yarn typecheck
+      - cd web && yarn lint
+      - cd web && yarn format:check
+      - cd web && yarn test
+      - go fmt ./cmd/... ./internal/...
+      - go vet ./cmd/... ./internal/...
+      - go test ./cmd/... ./internal/...
+
+  test:
+    desc: Run frontend and backend unit tests
+    cmds:
+      - cd web && yarn test
+      - go test ./cmd/... ./internal/...
+
+  build:
+    desc: Build web frontend and termbridge image
+    cmds:
+      - cmd: mkdir -p bin
+        platforms: [linux, darwin]
+      - cmd: pwsh -NoProfile -Command "New-Item -ItemType Directory -Force bin | Out-Null"
+        platforms: [windows]
+      - go build -o bin/termbridge ./cmd/termbridge
+      - docker build -f Dockerfile.cn -t termbridge .
+
+  exec:
+    desc: Run local command through termbridge exec
+    cmds:
+      - go run cmd/termbridge/main.go exec -- {{.CLI_ARGS}}
+
+  web:
+    desc: Start web frontend on 127.0.0.1:9011, proxying to serve backend
+    dir: web
+    cmds:
+      - yarn dev
+
+  serve:
+    desc: Start unified backend with Air hot reload
+    cmds:
+      - air -c .air.toml

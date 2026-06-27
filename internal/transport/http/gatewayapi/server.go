@@ -3,6 +3,7 @@ package gatewayapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,7 +14,8 @@ import (
 
 	"github.com/coder/websocket"
 
-	"termbridge-go/internal/protocol/terminal"
+	authapp "termbridge-go/internal/application/auth"
+	terminalproto "termbridge-go/internal/protocol/terminal"
 	"termbridge-go/internal/protocol/tunnel"
 	"termbridge-go/internal/transport/http/gatewayapi/auth"
 )
@@ -25,11 +27,13 @@ type Config struct {
 	AllowedOrigins []string
 	DebugErrors    bool
 	Logger         *slog.Logger
+	AuthService    *authapp.Service
 }
 
 type Handler struct {
 	config             Config
 	auth               *auth.Auther
+	authService        *authapp.Service
 	registry           *DeviceRegistry
 	routes             map[string]*agentRoute
 	routeMu            sync.Mutex
@@ -53,77 +57,70 @@ type DeviceRegistry struct {
 	devices map[string]DeviceSummary
 }
 
-func NewDeviceRegistry() *DeviceRegistry {
-	return &DeviceRegistry{devices: map[string]DeviceSummary{}}
-}
-
+func NewDeviceRegistry() *DeviceRegistry { return &DeviceRegistry{devices: map[string]DeviceSummary{}} }
 func (r *DeviceRegistry) Register(id string, name string, now time.Time) DeviceSummary {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	device := r.devices[id]
-	if device.ConnectedAt.IsZero() {
-		device.ConnectedAt = now
+	d := r.devices[id]
+	if d.ConnectedAt.IsZero() {
+		d.ConnectedAt = now
 	}
-	device.Id = id
-	device.Name = name
-	device.Online = true
-	device.LastSeen = now
-	r.devices[id] = device
-	return device
+	d.Id = id
+	d.Name = name
+	d.Online = true
+	d.LastSeen = now
+	r.devices[id] = d
+	return d
 }
-
 func (r *DeviceRegistry) MarkOffline(id string, now time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	device, ok := r.devices[id]
+	d, ok := r.devices[id]
 	if !ok {
 		return
 	}
-	device.Online = false
-	device.LastSeen = now
-	r.devices[id] = device
+	d.Online = false
+	d.LastSeen = now
+	r.devices[id] = d
 }
-
 func (r *DeviceRegistry) List() []DeviceSummary {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	devices := make([]DeviceSummary, 0, len(r.devices))
-	for _, device := range r.devices {
-		devices = append(devices, device)
+	out := make([]DeviceSummary, 0, len(r.devices))
+	for _, d := range r.devices {
+		out = append(out, d)
 	}
-	return devices
+	return out
 }
 
 func New(config Config) *Handler {
 	config = normalizeConfig(config)
-	return &Handler{
-		config:             config,
-		auth:               auth.NewAuther(auth.Credentials{Username: config.Username, Password: config.Password}, auth.NewTokenService(config.JWTSecret)),
-		registry:           NewDeviceRegistry(),
-		routes:             map[string]*agentRoute{},
-		writers:            map[string]tunnel.StreamId{},
-		workspaceTreeCache: map[string]json.RawMessage{},
-		historyCache:       map[string]map[string]string{},
-	}
+	return &Handler{config: config, auth: auth.NewAuther(auth.Credentials{Username: config.Username, Password: config.Password}, auth.NewTokenService(config.JWTSecret)), authService: config.AuthService, registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, writers: map[string]tunnel.StreamId{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
 }
 
 func (h *Handler) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/health", h.handleHealth)
-	mux.HandleFunc("/api/login", h.handleLogin)
-	mux.HandleFunc("/api/logout", h.auth.Middleware(http.HandlerFunc(h.handleLogout), h.writeUnauthorized).ServeHTTP)
-	mux.HandleFunc("/api/me", h.auth.Middleware(http.HandlerFunc(h.handleMe), h.writeUnauthorized).ServeHTTP)
-	mux.HandleFunc("/api/devices", h.auth.Middleware(http.HandlerFunc(h.handleDevices), h.writeUnauthorized).ServeHTTP)
-	mux.HandleFunc("/api/devices/", h.auth.Middleware(http.HandlerFunc(h.handleDevice), h.writeUnauthorized).ServeHTTP)
+	mux.HandleFunc("/api/auth/login", h.handleAuthLogin)
+	mux.HandleFunc("/api/auth/logout", h.authMiddleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
+	mux.HandleFunc("/api/auth/me", h.authMiddleware(http.HandlerFunc(h.handleAuthMe)).ServeHTTP)
+	mux.HandleFunc("/api/auth/register", h.handleRegister)
+	mux.HandleFunc("/api/auth/email/verify", h.handleVerifyEmail)
+	mux.HandleFunc("/api/auth/email/verification/resend", h.handleResendVerification)
+	mux.HandleFunc("/api/auth/password/change", h.authMiddleware(http.HandlerFunc(h.handleChangePassword)).ServeHTTP)
+	mux.HandleFunc("/api/auth/password-reset/request", h.handlePasswordResetRequest)
+	mux.HandleFunc("/api/auth/password-reset/confirm", h.handlePasswordResetConfirm)
+	mux.HandleFunc("/api/auth/google", h.handleGoogleAuth)
+	mux.HandleFunc("/api/auth/google/callback", h.handleGoogleCallback)
+	mux.HandleFunc("/api/devices", h.authMiddleware(http.HandlerFunc(h.handleDevices)).ServeHTTP)
+	mux.HandleFunc("/api/devices/", h.authMiddleware(http.HandlerFunc(h.handleDevice)).ServeHTTP)
 	mux.HandleFunc("/api/agent/tunnel", h.handleAgentTunnel)
 	mux.HandleFunc("/api", h.writeNotFound)
 	mux.HandleFunc("/api/", h.writeNotFound)
 	return mux
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.Handler().ServeHTTP(w, r)
-}
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { h.Handler().ServeHTTP(w, r) }
 
 func (s *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -133,23 +130,37 @@ func (s *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (s *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	var request struct {
+	var req struct {
+		Email    string `json:"email"`
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if !s.decodeJSONRequest(w, r, &request) {
+	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
-	if !s.auth.ValidCredentials(request.Username, request.Password) {
+	login := req.Email
+	if login == "" {
+		login = req.Username
+	}
+	if s.authService != nil {
+		result, err := s.authService.Login(r.Context(), login, req.Password)
+		if err != nil {
+			s.writeAuthError(w, r, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"access_token": result.Token, "token_type": "bearer"})
+		return
+	}
+	if !s.auth.ValidCredentials(login, req.Password) {
 		s.writeUnauthorized(w, r)
 		return
 	}
-	token, err := s.auth.SignToken(request.Username)
+	token, err := s.auth.SignToken(login)
 	if err != nil {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, "Failed to sign token", err)
 		return
@@ -165,12 +176,229 @@ func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-func (s *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
+	if s.authService != nil {
+		claims, ok := s.claimsFromRequest(r)
+		if !ok {
+			s.writeUnauthorized(w, r)
+			return
+		}
+		user, err := s.authService.UserFromClaims(r.Context(), claims)
+		if err != nil {
+			s.writeUnauthorized(w, r)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "user": user, "capabilities": s.authService.Capabilities()})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "username": s.auth.UsernameFromRequest(r)})
+}
+
+func (s *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	if s.authService == nil {
+		s.writeNotFound(w, r)
+		return
+	}
+	if err := s.authService.Register(r.Context(), req.Email, req.Password); err != nil {
+		s.writeAuthError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
+}
+func (s *Handler) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	var req struct {
+		Email string `json:"email"`
+		Code  string `json:"code"`
+	}
+	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	if s.authService == nil {
+		s.writeNotFound(w, r)
+		return
+	}
+	if err := s.authService.VerifyEmail(r.Context(), req.Email, req.Code); err != nil {
+		s.writeAuthError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+func (s *Handler) handleResendVerification(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	var req struct {
+		Email string `json:"email"`
+	}
+	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	if s.authService == nil {
+		s.writeNotFound(w, r)
+		return
+	}
+	if err := s.authService.ResendVerification(r.Context(), req.Email); err != nil {
+		s.writeAuthError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
+}
+func (s *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	claims, _ := s.claimsFromRequest(r)
+	if err := s.authService.ChangePassword(r.Context(), claims.Sub, req.CurrentPassword, req.NewPassword); err != nil {
+		s.writeAuthError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+func (s *Handler) handlePasswordResetRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	var req struct {
+		Email string `json:"email"`
+	}
+	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	if s.authService != nil {
+		_ = s.authService.RequestPasswordReset(r.Context(), req.Email)
+	}
+	writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
+}
+func (s *Handler) handlePasswordResetConfirm(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	var req struct {
+		Email       string `json:"email"`
+		Code        string `json:"code"`
+		NewPassword string `json:"new_password"`
+	}
+	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	if s.authService == nil {
+		s.writeNotFound(w, r)
+		return
+	}
+	if err := s.authService.ConfirmPasswordReset(r.Context(), req.Email, req.Code, req.NewPassword); err != nil {
+		s.writeAuthError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+func (s *Handler) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	if s.authService == nil {
+		s.writeNotFound(w, r)
+		return
+	}
+	url, err := s.authService.GoogleAuthURL(r.Context())
+	if err != nil {
+		s.writeAuthError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"auth_url": url})
+}
+func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	var req struct {
+		Code  string `json:"code"`
+		State string `json:"state"`
+	}
+	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	if s.authService == nil {
+		s.writeNotFound(w, r)
+		return
+	}
+	result, err := s.authService.GoogleCallback(r.Context(), req.Code, req.State)
+	if err != nil {
+		s.writeAuthError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"access_token": result.Token, "token_type": "bearer"})
+}
+
+func (s *Handler) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.authService != nil {
+			if _, ok := s.claimsFromRequest(r); !ok {
+				s.writeUnauthorized(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
+		s.auth.Middleware(next, s.writeUnauthorized).ServeHTTP(w, r)
+	})
+}
+func (s *Handler) claimsFromRequest(r *http.Request) (auth.Claims, bool) {
+	token := auth.ExtractBearerToken(r)
+	if token == "" || s.authService == nil {
+		return auth.Claims{}, false
+	}
+	claims, err := s.authService.VerifyToken(token)
+	return claims, err == nil
+}
+func (s *Handler) writeAuthError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, authapp.ErrInvalidCredentials):
+		s.writeUnauthorized(w, r)
+	case errors.Is(err, authapp.ErrEmailNotVerified):
+		s.writeAPIError(w, r, http.StatusForbidden, "email_not_verified", "Email is not verified.", nil)
+	case errors.Is(err, authapp.ErrEmailAlreadyUsed):
+		s.writeAPIError(w, r, http.StatusConflict, "email_already_used", "Email is already used.", nil)
+	case errors.Is(err, authapp.ErrCodeInvalid):
+		s.writeAPIError(w, r, http.StatusBadRequest, "code_invalid", "Code is invalid or expired.", nil)
+	case errors.Is(err, authapp.ErrCodeCooldown):
+		s.writeAPIError(w, r, http.StatusTooManyRequests, "code_cooldown", "Please wait before requesting another code.", nil)
+	case errors.Is(err, authapp.ErrProviderUnsupported):
+		s.writeAPIError(w, r, http.StatusBadRequest, "provider_unsupported", "Provider is unsupported for this operation.", nil)
+	default:
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+	}
 }
 
 func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
@@ -184,7 +412,6 @@ func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, s.registry.List())
 }
-
 func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/devices/"), "/")
 	parts := strings.Split(path, "/")
@@ -211,7 +438,6 @@ func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 		s.writeNotFound(w, r)
 	}
 }
-
 func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, parts []string) {
 	if len(parts) == 2 && r.Method == http.MethodGet {
 		s.handleJSONRelay(w, r, route, deviceId, "workspaces", nil, "")
@@ -241,7 +467,6 @@ func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, r
 	}
 	s.writeNotFound(w, r)
 }
-
 func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, workspaceId string, parts []string) {
 	if len(parts) == 0 {
 		switch r.Method {
@@ -332,7 +557,6 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 		s.writeNotFound(w, r)
 	}
 }
-
 func workspaceSessionParams(workspaceId string, request json.RawMessage) map[string]any {
 	var params map[string]any
 	if err := json.Unmarshal(request, &params); err != nil || params == nil {
@@ -341,11 +565,9 @@ func workspaceSessionParams(workspaceId string, request json.RawMessage) map[str
 	params["workspace_id"] = workspaceId
 	return params
 }
-
 func (s *Handler) handleJSONRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, method string, params any, cacheKind string) {
 	s.handleJSONRelayWithStatus(w, r, route, deviceId, method, params, cacheKind, http.StatusOK)
 }
-
 func (s *Handler) handleJSONRelayWithStatus(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, method string, params any, cacheKind string, status int) {
 	if route == nil {
 		if cached, ok := s.cachedJSON(deviceId, cacheKind); ok {
@@ -370,7 +592,6 @@ func (s *Handler) handleJSONRelayWithStatus(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(status)
 	_, _ = w.Write(result)
 }
-
 func (s *Handler) handleNoContentRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, method string, params any) {
 	if route == nil {
 		s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeDeviceOffline, errorMessageDeviceOffline, nil)
@@ -382,7 +603,6 @@ func (s *Handler) handleNoContentRelay(w http.ResponseWriter, r *http.Request, r
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
 func (s *Handler) handleHistoryRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, workspaceId string, sessionId string) {
 	if route == nil {
 		if cached, ok := s.cachedHistory(deviceId, workspaceId, sessionId); ok {
@@ -436,9 +656,7 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 	cols, rows, hasAttachSize, sizeErr := terminalAttachSizeFromQuery(r)
 	if sizeErr != nil {
 		s.config.Logger.Warn("terminal attach size invalid", "workspace_id", workspaceId, "session_id", sessionId, "error", sizeErr)
-		if err := writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: sizeErr.Error()}); err != nil {
-			s.config.Logger.Warn("terminal attach size error write failed", "workspace_id", workspaceId, "session_id", sessionId, "error", err)
-		}
+		_ = writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: sizeErr.Error()})
 		return
 	}
 	term := &terminalRelay{sessionId: sessionId, browser: conn, done: make(chan struct{}), logger: s.config.Logger}
@@ -450,11 +668,9 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 	}
 	attach, err := tunnel.NewFrame(streamId, tunnel.FrameTerminalAttach, attachReq)
 	if err != nil {
-		s.config.Logger.Warn("terminal attach frame build failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
 		return
 	}
 	if err := route.writeFrame(r.Context(), attach); err != nil {
-		s.config.Logger.Warn("terminal attach frame write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
 		return
 	}
 	go func() {
@@ -462,9 +678,7 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 			messageType, data, err := conn.Read(r.Context())
 			if err != nil {
 				closeFrame, _ := tunnel.NewFrame(streamId, tunnel.FrameClose, nil)
-				if err := route.writeFrame(context.Background(), closeFrame); err != nil {
-					s.config.Logger.Warn("terminal close frame write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
-				}
+				_ = route.writeFrame(context.Background(), closeFrame)
 				closeOnce(term.done)
 				return
 			}
@@ -472,10 +686,7 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 			case websocket.MessageText:
 				message, err := terminalproto.DecodeClient(data)
 				if err != nil {
-					s.config.Logger.Warn("terminal control decode failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
-					if writeErr := writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: err.Error()}); writeErr != nil {
-						s.config.Logger.Warn("terminal control error write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", writeErr)
-					}
+					_ = writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: err.Error()})
 					continue
 				}
 				switch message.Type {
@@ -483,40 +694,27 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 					continue
 				case terminalproto.TypeResize:
 					resize, err := tunnel.NewFrame(streamId, tunnel.FrameTerminalResize, tunnel.TerminalResizePayload{Cols: message.Cols, Rows: message.Rows})
-					if err != nil {
-						s.config.Logger.Warn("terminal resize frame build failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "cols", message.Cols, "rows", message.Rows, "error", err)
-						continue
-					}
-					if err := route.writeFrame(r.Context(), resize); err != nil {
-						s.config.Logger.Warn("terminal resize frame write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "cols", message.Cols, "rows", message.Rows, "error", err)
+					if err == nil {
+						_ = route.writeFrame(r.Context(), resize)
 					}
 				case terminalproto.TypeDetach:
 					closeFrame, _ := tunnel.NewFrame(streamId, tunnel.FrameClose, nil)
-					if err := route.writeFrame(context.Background(), closeFrame); err != nil {
-						s.config.Logger.Warn("terminal close frame write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
-					}
+					_ = route.writeFrame(context.Background(), closeFrame)
 					closeOnce(term.done)
 					return
 				case terminalproto.TypePing:
-					if err := writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypePong, Nonce: message.Nonce}); err != nil {
-						s.config.Logger.Warn("terminal pong write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
-					}
+					_ = writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypePong, Nonce: message.Nonce})
 				}
 			case websocket.MessageBinary:
 				input, err := tunnel.NewFrame(streamId, tunnel.FrameTerminalInput, tunnel.TerminalDataPayload{Data: data})
-				if err != nil {
-					s.config.Logger.Warn("terminal input frame build failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "bytes", len(data), "error", err)
-					continue
-				}
-				if err := route.writeFrame(r.Context(), input); err != nil {
-					s.config.Logger.Warn("terminal input frame write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "bytes", len(data), "error", err)
+				if err == nil {
+					_ = route.writeFrame(r.Context(), input)
 				}
 			}
 		}
 	}()
 	<-term.done
 }
-
 func terminalAttachSizeFromQuery(r *http.Request) (int, int, bool, error) {
 	colsRaw := strings.TrimSpace(r.URL.Query().Get("cols"))
 	rowsRaw := strings.TrimSpace(r.URL.Query().Get("rows"))
@@ -539,7 +737,6 @@ func terminalAttachSizeFromQuery(r *http.Request) (int, int, bool, error) {
 	}
 	return cols, rows, true, nil
 }
-
 func writeTerminalControl(conn *websocket.Conn, message terminalproto.ServerMessage) error {
 	data, err := terminalproto.EncodeServer(message)
 	if err != nil {
@@ -554,7 +751,15 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username, password, ok := r.BasicAuth()
-	if !ok || !s.auth.ValidCredentials(username, password) {
+	valid := false
+	if ok {
+		if s.authService != nil {
+			valid = s.authService.VerifyBasic(r.Context(), username, password)
+		} else {
+			valid = s.auth.ValidCredentials(username, password)
+		}
+	}
+	if !valid {
 		w.Header().Set("WWW-Authenticate", `Basic realm="termbridge-gateway"`)
 		s.writeUnauthorized(w, r)
 		return
@@ -608,14 +813,12 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 		}
 		if frame.Type == tunnel.FramePing {
 			pong, err := tunnel.NewFrame(tunnel.ControlStreamId, tunnel.FramePong, nil)
-			if err != nil {
-				continue
+			if err == nil {
+				_ = route.writeFrame(r.Context(), pong)
 			}
-			_ = route.writeFrame(r.Context(), pong)
 		}
 	}
 }
-
 func (s *Handler) setRoute(deviceId string, route *agentRoute) {
 	s.routeMu.Lock()
 	old := s.routes[deviceId]
@@ -626,7 +829,6 @@ func (s *Handler) setRoute(deviceId string, route *agentRoute) {
 		_ = old.conn.Close(websocket.StatusGoingAway, "device reconnected")
 	}
 }
-
 func (s *Handler) clearRoute(deviceId string, route *agentRoute) {
 	s.routeMu.Lock()
 	if s.routes[deviceId] == route {
@@ -634,13 +836,11 @@ func (s *Handler) clearRoute(deviceId string, route *agentRoute) {
 	}
 	s.routeMu.Unlock()
 }
-
 func (s *Handler) routeFor(deviceId string) *agentRoute {
 	s.routeMu.Lock()
 	defer s.routeMu.Unlock()
 	return s.routes[deviceId]
 }
-
 func (s *Handler) cachedJSON(deviceId string, kind string) (json.RawMessage, bool) {
 	if kind == "" {
 		return nil, false
@@ -649,60 +849,52 @@ func (s *Handler) cachedJSON(deviceId string, kind string) (json.RawMessage, boo
 	defer s.cacheMu.Unlock()
 	switch kind {
 	case "workspace_tree":
-		value, ok := s.workspaceTreeCache[deviceId]
-		return append(json.RawMessage(nil), value...), ok
+		v, ok := s.workspaceTreeCache[deviceId]
+		return append(json.RawMessage(nil), v...), ok
 	default:
 		return nil, false
 	}
 }
-
 func (s *Handler) storeJSONCache(deviceId string, kind string, value json.RawMessage) {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
-	switch kind {
-	case "workspace_tree":
+	if kind == "workspace_tree" {
 		s.workspaceTreeCache[deviceId] = append(json.RawMessage(nil), value...)
 	}
 }
-
 func (s *Handler) cachedHistory(deviceId string, workspaceId string, sessionId string) (string, bool) {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
-	bySession := s.historyCache[deviceId]
-	if bySession == nil {
+	by := s.historyCache[deviceId]
+	if by == nil {
 		return "", false
 	}
-	value, ok := bySession[sessionScopeKey(workspaceId, sessionId)]
-	return value, ok
+	v, ok := by[sessionScopeKey(workspaceId, sessionId)]
+	return v, ok
 }
-
 func (s *Handler) storeHistoryCache(deviceId string, workspaceId string, sessionId string, value string) {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
-	bySession := s.historyCache[deviceId]
-	if bySession == nil {
-		bySession = map[string]string{}
-		s.historyCache[deviceId] = bySession
+	by := s.historyCache[deviceId]
+	if by == nil {
+		by = map[string]string{}
+		s.historyCache[deviceId] = by
 	}
-	bySession[sessionScopeKey(workspaceId, sessionId)] = value
+	by[sessionScopeKey(workspaceId, sessionId)] = value
 }
-
 func sessionScopeKey(workspaceId string, sessionId string) string {
 	return workspaceId + "/" + sessionId
 }
-
 func (s *Handler) originPatterns(r *http.Request) []string {
 	patterns := []string{"http://" + r.Host, "https://" + r.Host}
 	patterns = append(patterns, s.config.AllowedOrigins...)
 	return patterns
 }
-
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }
-
 func normalizeConfig(config Config) Config {
 	if config.Logger == nil {
 		panic("gateway api logger is required")
