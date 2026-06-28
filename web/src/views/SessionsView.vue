@@ -561,7 +561,9 @@
   onMounted(async () => {
     try {
       await gateway.loadDevices()
-      await selectDevice()
+      if (gateway.selectedDeviceId) {
+        await selectDevice()
+      }
     } catch (err) {
       notifications.notifyError(t('toast.refreshFailed'), err)
     }

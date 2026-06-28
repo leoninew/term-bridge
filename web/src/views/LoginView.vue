@@ -18,27 +18,39 @@
 <script setup lang="ts">
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { useRouter } from 'vue-router'
+  import { useRoute, useRouter } from 'vue-router'
   import { ToastProvider } from 'reka-ui'
   import LoginPanel from '../components/session/LoginPanel.vue'
   import ToastHost from '../components/session/ToastHost.vue'
   import { authGoogleURL } from '../features/gateway/api'
+  import { writeStorageValue } from '../store/storage'
   import { useGatewayStore } from '../store/gateway'
   import { useNotificationsStore } from '../store/notifications'
 
   const { t } = useI18n()
+  const route = useRoute()
   const router = useRouter()
   const gateway = useGatewayStore()
   const notifications = useNotificationsStore()
   const googleLoggingIn = ref(false)
+  const OAUTH_REDIRECT_KEY = 'termbridge.oauth_redirect'
 
   async function login() {
     try {
       await gateway.login()
-      await router.replace({ name: 'sessions' })
+      await router.replace(redirectAfterLogin())
     } catch (err) {
       notifications.notifyError(t('gateway.loginFailed'), err)
     }
+  }
+
+  function redirectAfterLogin() {
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+    return safeRedirect(redirect) || { name: 'sessions' }
+  }
+
+  function safeRedirect(value: string | null) {
+    return value && value.startsWith('/') && !value.startsWith('//') ? value : ''
   }
 
   async function loginWithGoogle() {
@@ -47,6 +59,12 @@
     }
     googleLoggingIn.value = true
     try {
+      const redirect = safeRedirect(
+        typeof route.query.redirect === 'string' ? route.query.redirect : '',
+      )
+      if (redirect) {
+        writeStorageValue(OAUTH_REDIRECT_KEY, redirect)
+      }
       window.location.href = await authGoogleURL()
     } catch (err) {
       googleLoggingIn.value = false

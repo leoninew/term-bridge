@@ -1,12 +1,16 @@
 package gatewayapi
 
 import (
+	"bytes"
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,20 +18,29 @@ import (
 
 	"github.com/coder/websocket"
 
+	agentapp "termbridge-go/internal/application/agent"
 	authapp "termbridge-go/internal/application/auth"
+	devicerepo "termbridge-go/internal/infrastructure/repository/device"
 	terminalproto "termbridge-go/internal/protocol/terminal"
 	"termbridge-go/internal/protocol/tunnel"
 	"termbridge-go/internal/transport/http/gatewayapi/auth"
 )
 
 type Config struct {
-	Username       string
-	Password       string
-	JWTSecret      string
-	AllowedOrigins []string
-	DebugErrors    bool
-	Logger         *slog.Logger
-	AuthService    *authapp.Service
+	Username                 string
+	Password                 string
+	JWTSecret                string
+	AllowedOrigins           []string
+	DebugErrors              bool
+	Logger                   *slog.Logger
+	AuthService              *authapp.Service
+	AgentTunnelAudience      string
+	DevicePublicKeys         map[string]ed25519.PublicKey
+	DeviceRepository         *devicerepo.Repository
+	CloudGateURL             string
+	CloudCallbackBaseURL     string
+	CloudBindingAttemptStore *authapp.CloudBindingAttemptStore
+	LocalDevice              agentapp.Device
 }
 
 type Handler struct {
@@ -48,6 +61,7 @@ type DeviceSummary struct {
 	Id          string    `json:"id"`
 	Name        string    `json:"name"`
 	Online      bool      `json:"online"`
+	Status      string    `json:"status"`
 	ConnectedAt time.Time `json:"connected_at"`
 	LastSeen    time.Time `json:"last_seen"`
 }
@@ -68,6 +82,7 @@ func (r *DeviceRegistry) Register(id string, name string, now time.Time) DeviceS
 	d.Id = id
 	d.Name = name
 	d.Online = true
+	d.Status = "online"
 	d.LastSeen = now
 	r.devices[id] = d
 	return d
@@ -80,6 +95,7 @@ func (r *DeviceRegistry) MarkOffline(id string, now time.Time) {
 		return
 	}
 	d.Online = false
+	d.Status = "offline"
 	d.LastSeen = now
 	r.devices[id] = d
 }
@@ -88,9 +104,33 @@ func (r *DeviceRegistry) List() []DeviceSummary {
 	defer r.mu.Unlock()
 	out := make([]DeviceSummary, 0, len(r.devices))
 	for _, d := range r.devices {
-		out = append(out, d)
+		out = append(out, normalizeDeviceStatus(d))
 	}
 	return out
+}
+
+func (r *DeviceRegistry) Get(id string) (DeviceSummary, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	d, ok := r.devices[id]
+	return normalizeDeviceStatus(d), ok
+}
+
+func (r *DeviceRegistry) Delete(id string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.devices, id)
+}
+
+func normalizeDeviceStatus(d DeviceSummary) DeviceSummary {
+	if d.Status == "" {
+		if d.Online {
+			d.Status = "online"
+		} else {
+			d.Status = "offline"
+		}
+	}
+	return d
 }
 
 func New(config Config) *Handler {
@@ -104,6 +144,8 @@ func (h *Handler) Handler() http.Handler {
 	mux.HandleFunc("/api/auth/login", h.handleAuthLogin)
 	mux.HandleFunc("/api/auth/logout", h.authMiddleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
 	mux.HandleFunc("/api/auth/me", h.authMiddleware(http.HandlerFunc(h.handleAuthMe)).ServeHTTP)
+	mux.HandleFunc("/api/auth/setup/status", h.handleSetupStatus)
+	mux.HandleFunc("/api/auth/setup/complete", h.handleSetupComplete)
 	mux.HandleFunc("/api/auth/register", h.handleRegister)
 	mux.HandleFunc("/api/auth/email/verify", h.handleVerifyEmail)
 	mux.HandleFunc("/api/auth/email/verification/resend", h.handleResendVerification)
@@ -112,6 +154,10 @@ func (h *Handler) Handler() http.Handler {
 	mux.HandleFunc("/api/auth/password-reset/confirm", h.handlePasswordResetConfirm)
 	mux.HandleFunc("/api/auth/google", h.handleGoogleAuth)
 	mux.HandleFunc("/api/auth/google/callback", h.handleGoogleCallback)
+	mux.HandleFunc("/api/cloud-binding/start", h.authMiddleware(http.HandlerFunc(h.handleCloudBindingStart)).ServeHTTP)
+	mux.HandleFunc("/api/cloud-binding/callback", h.handleCloudBindingCallback)
+	mux.HandleFunc("/api/device-bindings/authorize", h.handleDeviceBindingAuthorize)
+	mux.HandleFunc("/api/device-bindings/exchange", h.handleDeviceBindingExchange)
 	mux.HandleFunc("/api/devices", h.authMiddleware(http.HandlerFunc(h.handleDevices)).ServeHTTP)
 	mux.HandleFunc("/api/devices/", h.authMiddleware(http.HandlerFunc(h.handleDevice)).ServeHTTP)
 	mux.HandleFunc("/api/agent/tunnel", h.handleAgentTunnel)
@@ -196,6 +242,46 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "username": s.auth.UsernameFromRequest(r)})
+}
+
+func (s *Handler) handleSetupStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	if s.authService == nil {
+		s.writeNotFound(w, r)
+		return
+	}
+	available, err := s.authService.HasAvailableSetupToken()
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"available": available})
+}
+
+func (s *Handler) handleSetupComplete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if s.authService == nil {
+		s.writeNotFound(w, r)
+		return
+	}
+	var req struct {
+		SetupToken string `json:"setup_token"`
+	}
+	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	result, err := s.authService.CompleteLocalSetup(r.Context(), req.SetupToken)
+	if err != nil {
+		s.writeAuthError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"access_token": result.Token, "token_type": "bearer"})
 }
 
 func (s *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
@@ -401,6 +487,143 @@ func (s *Handler) writeAuthError(w http.ResponseWriter, r *http.Request, err err
 	}
 }
 
+func (s *Handler) handleCloudBindingStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	claims, ok := s.claimsFromRequest(r)
+	if !ok || claims.Provider != authapp.ProviderLocalAccess {
+		s.writeUnauthorized(w, r)
+		return
+	}
+	if s.config.CloudBindingAttemptStore == nil || strings.TrimSpace(s.config.CloudGateURL) == "" || strings.TrimSpace(s.config.CloudCallbackBaseURL) == "" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud binding is not configured.", nil)
+		return
+	}
+	callbackURL, err := localCloudBindingCallbackURL(s.config.CloudCallbackBaseURL)
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud callback base URL is invalid.", err)
+		return
+	}
+	state, err := s.config.CloudBindingAttemptStore.Create(callbackURL, authapp.CloudBindingAttemptTTL)
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+		return
+	}
+	authorizeURL, err := cloudAuthorizeURL(s.config.CloudGateURL, callbackURL, state)
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud Gate URL is invalid.", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"authorize_url": authorizeURL})
+}
+
+func (s *Handler) handleDeviceBindingAuthorize(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	claims, ok := s.claimsFromRequest(r)
+	if !ok || claims.Provider == authapp.ProviderLocalAccess || claims.Provider == authapp.ProviderLocalAdmin {
+		s.writeUnauthorized(w, r)
+		return
+	}
+	if s.config.DeviceRepository == nil {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Device binding is not configured.", nil)
+		return
+	}
+	callbackURL := strings.TrimSpace(r.URL.Query().Get("callback"))
+	state := strings.TrimSpace(r.URL.Query().Get("state"))
+	if callbackURL == "" || state == "" || !isLoopbackCallback(callbackURL) {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Binding callback is invalid.", nil)
+		return
+	}
+	code, err := s.config.DeviceRepository.CreateBindingCode(r.Context(), claims.Sub, time.Now().UTC().Add(devicerepo.BindingCodeTTL))
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+		return
+	}
+	redirectURL, err := appendBindingCallback(callbackURL, code, state)
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Binding callback is invalid.", err)
+		return
+	}
+	if r.Header.Get("X-TermBridge-Authorize-Mode") == "json" {
+		writeJSON(w, http.StatusOK, map[string]string{"redirect_url": redirectURL})
+		return
+	}
+	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+func (s *Handler) handleCloudBindingCallback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	if s.config.CloudBindingAttemptStore == nil {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud binding is not configured.", nil)
+		return
+	}
+	state := strings.TrimSpace(r.URL.Query().Get("state"))
+	code := strings.TrimSpace(r.URL.Query().Get("code"))
+	if state == "" || code == "" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, errorMessageBadRequest, nil)
+		return
+	}
+	ok, err := s.config.CloudBindingAttemptStore.Complete(state)
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+		return
+	}
+	if !ok {
+		s.writeUnauthorized(w, r)
+		return
+	}
+	if err := s.exchangeCloudBinding(r.Context(), code); err != nil {
+		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, "Cloud binding exchange failed.", err)
+		return
+	}
+	http.Redirect(w, r, "/connect?status=success", http.StatusFound)
+}
+
+func (s *Handler) handleDeviceBindingExchange(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if s.config.DeviceRepository == nil {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Device binding is not configured.", nil)
+		return
+	}
+	var req struct {
+		Code   string `json:"code"`
+		Device struct {
+			ID        string `json:"id"`
+			Name      string `json:"name"`
+			PublicKey string `json:"public_key"`
+		} `json:"device"`
+	}
+	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	userID, ok, err := s.config.DeviceRepository.UseBindingCode(r.Context(), req.Code)
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+		return
+	}
+	if !ok {
+		s.writeUnauthorized(w, r)
+		return
+	}
+	device := devicerepo.Device{ID: req.Device.ID, Name: req.Device.Name, PublicKey: req.Device.PublicKey}
+	if err := s.config.DeviceRepository.UpsertDeviceBinding(r.Context(), userID, device); err != nil {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Device binding request is invalid.", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"accepted": true, "device": s.deviceSummary(device)})
+}
+
 func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/api/devices" {
 		s.writeNotFound(w, r)
@@ -410,11 +633,20 @@ func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.registry.List())
+	devices, err := s.devicesForRequest(r)
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, devices)
 }
 func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/devices/"), "/")
 	parts := strings.Split(path, "/")
+	if len(parts) == 1 && parts[0] != "" && r.Method == http.MethodDelete {
+		s.handleDeleteDevice(w, r, parts[0])
+		return
+	}
 	if len(parts) < 2 || parts[0] == "" {
 		s.writeNotFound(w, r)
 		return
@@ -557,6 +789,33 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 		s.writeNotFound(w, r)
 	}
 }
+func (s *Handler) handleDeleteDevice(w http.ResponseWriter, r *http.Request, deviceID string) {
+	claims, ok := s.claimsFromRequest(r)
+	if !ok || claims.Provider == authapp.ProviderLocalAccess || claims.Provider == authapp.ProviderLocalAdmin {
+		s.writeUnauthorized(w, r)
+		return
+	}
+	if s.config.DeviceRepository == nil {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Device binding is not configured.", nil)
+		return
+	}
+	owns, err := s.config.DeviceRepository.UserOwnsDevice(r.Context(), claims.Sub, deviceID)
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+		return
+	}
+	if !owns {
+		s.writeNotFound(w, r)
+		return
+	}
+	if err := s.config.DeviceRepository.DeleteUserDevice(r.Context(), claims.Sub, deviceID); err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+		return
+	}
+	s.disconnectDevice(deviceID, "device deleted")
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func workspaceSessionParams(workspaceId string, request json.RawMessage) map[string]any {
 	var params map[string]any
 	if err := json.Unmarshal(request, &params); err != nil || params == nil {
@@ -750,17 +1009,8 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	username, password, ok := r.BasicAuth()
-	valid := false
-	if ok {
-		if s.authService != nil {
-			valid = s.authService.VerifyBasic(r.Context(), username, password)
-		} else {
-			valid = s.auth.ValidCredentials(username, password)
-		}
-	}
+	deviceID, valid := s.verifyAgentTunnelRequest(r)
 	if !valid {
-		w.Header().Set("WWW-Authenticate", `Basic realm="termbridge-gateway"`)
 		s.writeUnauthorized(w, r)
 		return
 	}
@@ -782,6 +1032,10 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 	hello, err := tunnel.DecodePayload[tunnel.HelloPayload](frame)
 	if err != nil || hello.DeviceId == "" || hello.DeviceName == "" {
 		_ = conn.Close(websocket.StatusPolicyViolation, "invalid hello")
+		return
+	}
+	if deviceID != "" && hello.DeviceId != deviceID {
+		_ = conn.Close(websocket.StatusPolicyViolation, "device signature mismatch")
 		return
 	}
 	s.registry.Register(hello.DeviceId, hello.DeviceName, time.Now().UTC())
@@ -819,6 +1073,172 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+func (s *Handler) verifyAgentTunnelRequest(r *http.Request) (string, bool) {
+	if len(s.config.DevicePublicKeys) > 0 || s.config.DeviceRepository != nil {
+		deviceID := strings.TrimSpace(r.Header.Get(agentapp.HeaderDeviceID))
+		publicKey := s.config.DevicePublicKeys[deviceID]
+		if len(publicKey) == 0 && s.config.DeviceRepository != nil {
+			publicKeyText, err := s.config.DeviceRepository.PublicKey(r.Context(), deviceID)
+			if err == nil {
+				publicKey, _ = base64.StdEncoding.DecodeString(publicKeyText)
+			}
+		}
+		if len(publicKey) == 0 {
+			return "", false
+		}
+		verifiedDeviceID, err := agentapp.VerifySignedRequest(r, s.configAudience(), publicKey, time.Now())
+		return verifiedDeviceID, err == nil
+	}
+	username, password, ok := r.BasicAuth()
+	if !ok {
+		return "", false
+	}
+	if s.authService != nil {
+		return "", s.authService.VerifyBasic(r.Context(), username, password)
+	}
+	return "", s.auth.ValidCredentials(username, password)
+}
+
+func (s *Handler) configAudience() string {
+	if strings.TrimSpace(s.config.AgentTunnelAudience) != "" {
+		return s.config.AgentTunnelAudience
+	}
+	return "termbridge-gateway"
+}
+
+func (s *Handler) devicesForRequest(r *http.Request) ([]DeviceSummary, error) {
+	if s.authService == nil {
+		return s.registry.List(), nil
+	}
+	claims, ok := s.claimsFromRequest(r)
+	if !ok {
+		return nil, nil
+	}
+	if claims.Provider == authapp.ProviderLocalAccess {
+		deviceID := strings.TrimPrefix(claims.Sub, "local:")
+		if deviceID == "" {
+			return []DeviceSummary{}, nil
+		}
+		if runtimeDevice, ok := s.registry.Get(deviceID); ok {
+			return []DeviceSummary{runtimeDevice}, nil
+		}
+		name := s.config.LocalDevice.Name
+		if name == "" {
+			name = deviceID
+		}
+		return []DeviceSummary{{Id: deviceID, Name: name, Online: false, Status: "offline"}}, nil
+	}
+	if s.config.DeviceRepository == nil {
+		return s.registry.List(), nil
+	}
+	devices, err := s.config.DeviceRepository.ListDevicesForUser(r.Context(), claims.Sub)
+	if err != nil {
+		return nil, err
+	}
+	summaries := make([]DeviceSummary, 0, len(devices))
+	for _, device := range devices {
+		summaries = append(summaries, s.deviceSummary(device))
+	}
+	return summaries, nil
+}
+
+func (s *Handler) deviceSummary(device devicerepo.Device) DeviceSummary {
+	if runtimeDevice, ok := s.registry.Get(device.ID); ok {
+		if runtimeDevice.Name == "" {
+			runtimeDevice.Name = device.Name
+		}
+		return normalizeDeviceStatus(runtimeDevice)
+	}
+	return DeviceSummary{Id: device.ID, Name: device.Name, Online: false, Status: "offline", LastSeen: device.UpdatedAt}
+}
+
+func (s *Handler) exchangeCloudBinding(ctx context.Context, code string) error {
+	if strings.TrimSpace(s.config.CloudGateURL) == "" {
+		return fmt.Errorf("cloud gate URL is required")
+	}
+	device := s.config.LocalDevice
+	if strings.TrimSpace(device.Id) == "" || strings.TrimSpace(device.PublicKey) == "" {
+		return fmt.Errorf("local device identity is incomplete")
+	}
+	body, err := json.Marshal(map[string]any{"code": code, "device": map[string]string{"id": device.Id, "name": device.Name, "public_key": device.PublicKey}})
+	if err != nil {
+		return err
+	}
+	exchangeURL := strings.TrimRight(s.config.CloudGateURL, "/") + "/api/device-bindings/exchange"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, exchangeURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("cloud exchange status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func cloudAuthorizeURL(cloudGateURL string, callbackURL string, state string) (string, error) {
+	parsed, err := url.Parse(strings.TrimRight(strings.TrimSpace(cloudGateURL), "/") + "/device-bindings/authorize")
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("invalid cloud gate URL")
+	}
+	query := parsed.Query()
+	query.Set("callback", callbackURL)
+	query.Set("state", state)
+	parsed.RawQuery = query.Encode()
+	return parsed.String(), nil
+}
+
+func localCloudBindingCallbackURL(callbackBaseURL string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(callbackBaseURL))
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("invalid callback base URL")
+	}
+	parsed.Path = "/api/cloud-binding/callback"
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
+}
+
+func appendBindingCallback(callbackURL string, code string, state string) (string, error) {
+	parsed, err := url.Parse(callbackURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("invalid callback URL")
+	}
+	query := parsed.Query()
+	query.Set("code", code)
+	query.Set("state", state)
+	parsed.RawQuery = query.Encode()
+	return parsed.String(), nil
+}
+
+func isLoopbackCallback(callbackURL string) bool {
+	parsed, err := url.Parse(callbackURL)
+	if err != nil || parsed.Scheme == "" {
+		return false
+	}
+	host := strings.ToLower(parsed.Hostname())
+	return host == "127.0.0.1" || host == "localhost" || host == "::1"
+}
+
+func (s *Handler) disconnectDevice(deviceId string, reason string) {
+	s.routeMu.Lock()
+	route := s.routes[deviceId]
+	delete(s.routes, deviceId)
+	s.routeMu.Unlock()
+	if route != nil {
+		route.closeTerminals(reason)
+		if route.conn != nil {
+			_ = route.conn.Close(websocket.StatusGoingAway, reason)
+		}
+	}
+	s.registry.MarkOffline(deviceId, time.Now().UTC())
+}
+
 func (s *Handler) setRoute(deviceId string, route *agentRoute) {
 	s.routeMu.Lock()
 	old := s.routes[deviceId]

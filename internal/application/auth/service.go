@@ -27,6 +27,7 @@ import (
 
 const (
 	ProviderLocalAdmin       = "local_admin"
+	ProviderLocalAccess      = "local_access"
 	PurposeEmailVerification = "email_verification"
 	PurposePasswordReset     = "password_reset"
 )
@@ -65,12 +66,15 @@ type GoogleClient interface {
 }
 
 type Service struct {
-	repo   *authrepo.Repository
-	tokens jwtauth.TokenService
-	cfg    config.AuthConfig
-	mode   string
-	sender EmailSender
-	google GoogleClient
+	repo       *authrepo.Repository
+	tokens     jwtauth.TokenService
+	cfg        config.AuthConfig
+	mode       string
+	sender     EmailSender
+	google     GoogleClient
+	setupStore *SetupTokenStore
+	deviceID   string
+	deviceName string
 }
 
 type UserView struct {
@@ -97,6 +101,13 @@ func New(repo *authrepo.Repository, tokens jwtauth.TokenService, cfg config.Auth
 	return &Service{repo: repo, tokens: tokens, cfg: cfg, mode: mode, sender: sender, google: google}
 }
 
+func (s *Service) WithLocalSetup(store *SetupTokenStore, deviceID string, deviceName string) *Service {
+	s.setupStore = store
+	s.deviceID = strings.TrimSpace(deviceID)
+	s.deviceName = strings.TrimSpace(deviceName)
+	return s
+}
+
 func (s *Service) Capabilities() Capabilities {
 	providers := []string{"email"}
 	if s.google != nil {
@@ -104,6 +115,9 @@ func (s *Service) Capabilities() Capabilities {
 	}
 	if s.mode == "local" && s.cfg.LocalAdmin.Username != "" && s.cfg.LocalAdmin.Password != "" {
 		providers = append(providers, ProviderLocalAdmin)
+	}
+	if s.mode == "local" && s.setupStore != nil {
+		providers = append(providers, ProviderLocalAccess)
 	}
 	mail := s.sender != nil
 	return Capabilities{Mode: s.mode, Providers: providers, PasswordResetEnabled: mail, EmailVerificationEnabled: mail}
@@ -183,6 +197,31 @@ func (s *Service) Login(ctx context.Context, email, password string) (AuthResult
 func (s *Service) VerifyBasic(ctx context.Context, username, password string) bool {
 	_, err := s.Login(ctx, username, password)
 	return err == nil
+}
+
+func (s *Service) CompleteLocalSetup(ctx context.Context, token string) (AuthResult, error) {
+	if s.mode != "local" || s.setupStore == nil || s.deviceID == "" {
+		return AuthResult{}, ErrInvalidCredentials
+	}
+	ok, err := s.setupStore.Use(token)
+	if err != nil {
+		return AuthResult{}, err
+	}
+	if !ok {
+		return AuthResult{}, ErrInvalidCredentials
+	}
+	name := s.deviceName
+	if name == "" {
+		name = "Local device"
+	}
+	return s.sign(UserView{ID: "local:" + s.deviceID, DisplayName: name, Provider: ProviderLocalAccess, EmailVerified: true})
+}
+
+func (s *Service) HasAvailableSetupToken() (bool, error) {
+	if s.mode != "local" || s.setupStore == nil {
+		return false, nil
+	}
+	return s.setupStore.Available()
 }
 
 func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
@@ -301,6 +340,13 @@ func (s *Service) GoogleCallback(ctx context.Context, code, state string) (AuthR
 func (s *Service) UserFromClaims(ctx context.Context, claims jwtauth.Claims) (UserView, error) {
 	if claims.Provider == ProviderLocalAdmin && claims.Sub == "local-admin" {
 		return UserView{ID: "local-admin", DisplayName: s.cfg.LocalAdmin.Username, Provider: ProviderLocalAdmin, EmailVerified: true}, nil
+	}
+	if claims.Provider == ProviderLocalAccess && strings.HasPrefix(claims.Sub, "local:") {
+		name := s.deviceName
+		if name == "" {
+			name = "Local device"
+		}
+		return UserView{ID: claims.Sub, DisplayName: name, Provider: ProviderLocalAccess, EmailVerified: true}, nil
 	}
 	user, err := s.repo.FindUserByID(ctx, claims.Sub)
 	if err != nil {

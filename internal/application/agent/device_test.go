@@ -17,12 +17,22 @@ func TestLoadOrCreateDeviceCreatesConfigIdentity(t *testing.T) {
 	if device.Id != "dev-1" || device.Name != "host-a" || !device.CreatedAt.Equal(now) || !device.UpdatedAt.Equal(now) {
 		t.Fatalf("device = %#v", device)
 	}
-	if _, err := os.Stat(filepath.Join(stateDir, "devices", "dev-1", DeviceFileName)); err != nil {
+	deviceDir := filepath.Join(stateDir, "devices", "dev-1")
+	if _, err := os.Stat(filepath.Join(deviceDir, DeviceFileName)); err != nil {
 		t.Fatalf("device file missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(deviceDir, PrivateKeyFileName)); err != nil {
+		t.Fatalf("private key file missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(deviceDir, PublicKeyFileName)); err != nil {
+		t.Fatalf("public key file missing: %v", err)
+	}
+	if device.SchemaVersion != DeviceSchemaVersion || device.PublicKey == "" {
+		t.Fatalf("device key metadata missing: %#v", device)
 	}
 }
 
-func TestLoadOrCreateDeviceUpdatesConfiguredName(t *testing.T) {
+func TestLoadOrCreateDeviceUpdatesConfiguredNameAndKeepsKey(t *testing.T) {
 	stateDir := t.TempDir()
 	createdAt := time.Date(2026, 6, 20, 1, 2, 3, 0, time.UTC)
 	updatedAt := createdAt.Add(time.Hour)
@@ -34,7 +44,7 @@ func TestLoadOrCreateDeviceUpdatesConfiguredName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second LoadOrCreateDevice() error = %v", err)
 	}
-	if second.Id != first.Id || second.Name != "custom" || !second.CreatedAt.Equal(first.CreatedAt) || !second.UpdatedAt.Equal(updatedAt) {
+	if second.Id != first.Id || second.Name != "custom" || second.PublicKey != first.PublicKey || !second.CreatedAt.Equal(first.CreatedAt) || !second.UpdatedAt.Equal(updatedAt) {
 		t.Fatalf("second = %#v, first = %#v", second, first)
 	}
 }

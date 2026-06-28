@@ -26,12 +26,13 @@ func TestServerServesStaticFilesWithSPAFallbackAndKeepsAPIRoutes(t *testing.T) {
 		t.Fatalf("WriteFile(asset) error = %v", err)
 	}
 	apiHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/health" {
+		switch r.URL.Path {
+		case "/api/health":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"gateway"}`))
+		default:
 			http.NotFound(w, r)
-			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"gateway"}`))
 	})
 	server := New(Config{StaticDir: staticDir, Logger: slog.Default()}, apiHandler)
 

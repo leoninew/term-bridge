@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { readStorageValue, removeStorageValue, writeStorageValue } from './storage'
 import {
   authLogin,
   authMe,
+  authSetupStatus,
   listDevices,
   type AuthCapabilities,
   type DeviceSummary,
@@ -16,8 +18,12 @@ type InitializeAuthOptions = {
   force?: boolean
 }
 
+type CheckSetupStatusOptions = {
+  force?: boolean
+}
+
 export const useGatewayStore = defineStore('gateway', () => {
-  const token = ref<string | null>(localStorage.getItem(TOKEN_KEY))
+  const token = ref<string | null>(readStorageValue(TOKEN_KEY))
   const authInitialized = ref(false)
   const authenticated = ref(false)
   const loggingIn = ref(false)
@@ -25,20 +31,21 @@ export const useGatewayStore = defineStore('gateway', () => {
   const passwordInput = ref('')
   const user = ref<UserInfo | null>(null)
   const capabilities = ref<AuthCapabilities | null>(null)
+  const setupAvailable = ref<boolean | null>(null)
   const devices = ref<DeviceSummary[]>([])
   const selectedDeviceId = ref('')
   let initializedToken: string | null | undefined
 
   function setToken(newToken: string) {
     token.value = newToken
-    localStorage.setItem(TOKEN_KEY, newToken)
+    writeStorageValue(TOKEN_KEY, newToken)
     resetAuthState()
     resetDeviceState()
   }
 
   function clearToken() {
     token.value = null
-    localStorage.removeItem(TOKEN_KEY)
+    removeStorageValue(TOKEN_KEY)
     resetAuthState()
     resetDeviceState()
   }
@@ -87,16 +94,32 @@ export const useGatewayStore = defineStore('gateway', () => {
     }
   }
 
+  async function checkSetupStatus(options: CheckSetupStatusOptions = {}) {
+    if (!options.force && setupAvailable.value !== null) {
+      return setupAvailable.value
+    }
+    try {
+      const response = await authSetupStatus()
+      setupAvailable.value = response.available
+      return setupAvailable.value
+    } catch {
+      setupAvailable.value = false
+      return false
+    }
+  }
+
   async function loadDevices() {
     devices.value = await listDevices()
-    if (devices.value.some((device) => device.id === selectedDeviceId.value)) {
+    if (devices.value.some((device) => device.id === selectedDeviceId.value && device.online)) {
       return
     }
-    selectedDeviceId.value = devices.value.length === 1 ? devices.value[0].id : ''
+    const onlineDevices = devices.value.filter((device) => device.online)
+    selectedDeviceId.value = onlineDevices.length === 1 ? onlineDevices[0].id : ''
   }
 
   function selectDeviceId(deviceId: string) {
-    if (deviceId === selectedDeviceId.value) {
+    const device = devices.value.find((candidate) => candidate.id === deviceId)
+    if (!device?.online || deviceId === selectedDeviceId.value) {
       return false
     }
     selectedDeviceId.value = deviceId
@@ -108,6 +131,7 @@ export const useGatewayStore = defineStore('gateway', () => {
     authenticated.value = false
     user.value = null
     capabilities.value = null
+    setupAvailable.value = null
     initializedToken = undefined
   }
 
@@ -125,12 +149,14 @@ export const useGatewayStore = defineStore('gateway', () => {
     passwordInput,
     user,
     capabilities,
+    setupAvailable,
     devices,
     selectedDeviceId,
     setToken,
     clearToken,
     initializeAuth,
     login,
+    checkSetupStatus,
     loadDevices,
     selectDeviceId,
   }

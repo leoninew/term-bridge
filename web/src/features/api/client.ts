@@ -63,7 +63,7 @@ apiClient.interceptors.response.use(
       const gateway = useGatewayStore()
       gateway.clearToken()
       if (router.currentRoute.value.name !== 'login') {
-        router.push({ name: 'login' })
+        router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
       }
     }
     return Promise.reject(errorFromResponse(error.response))

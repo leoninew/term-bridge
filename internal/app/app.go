@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,7 @@ import (
 	"termbridge-go/internal/infrastructure/logging"
 	"termbridge-go/internal/infrastructure/pty/gopty"
 	authrepo "termbridge-go/internal/infrastructure/repository/auth"
+	devicerepo "termbridge-go/internal/infrastructure/repository/device"
 	"termbridge-go/internal/infrastructure/repository/state"
 	"termbridge-go/internal/transport/http/gatewayapi"
 	gatewayauth "termbridge-go/internal/transport/http/gatewayapi/auth"
@@ -132,7 +134,7 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	case CommandSession:
 		return runSessionList(cfg, options.Stdout)
 	case CommandServe:
-		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "gate_listen_url", cfg.Gate.ListenUrl, "agent_connect_url", cfg.Agent.ConnectUrl, "agent_device_id", cfg.Agent.DeviceId, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.ConfigFile)
+		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "agent_listen_url", cfg.Agent.ListenUrl, "agent_connect_url", cfg.Agent.ConnectUrl, "agent_device_id", cfg.Agent.DeviceId, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.ConfigFile)
 		return runServe(ctx, cfg, bootstrap, logger, options)
 	default:
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("missing command")
@@ -251,6 +253,19 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		fmt.Fprintf(stdout, "Username: %s\n", bootstrap.Username)
 		fmt.Fprintf(stdout, "Password: %s\n", bootstrap.Password)
 	}
+	device, err := agent.LoadOrCreateDevice(agent.DeviceOptions{StateDir: cfg.Runtime.StateDir, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName})
+	if err != nil {
+		return Result{Cwd: cfg.Cwd}, err
+	}
+	setupStore := authapp.NewSetupTokenStore(cfg.Runtime.StateDir)
+	setupToken := ""
+	if config.IsLocalMode(cfg) {
+		setupToken, err = setupStore.Create(authapp.SetupTokenTTL)
+		if err != nil {
+			return Result{Cwd: cfg.Cwd}, err
+		}
+		fmt.Fprintf(stdout, "TermBridge local setup URL: %s/setup?token=%s\n", localSetupBaseURL(cfg), setupToken)
+	}
 	registry := newWebTerminalRegistry(cfg, logger)
 	db, err := database.Open(ctx, cfg.Database)
 	if err != nil {
@@ -262,9 +277,13 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 	}
 	repo := authrepo.New(db.DB, db.Driver)
 	tokens := gatewayauth.NewTokenService(cfg.JWT.SecretKey, cfg.Auth.JWTTTL)
-	authService := authapp.New(repo, tokens, cfg.Auth, config.Mode(cfg), email.NewResendSender(cfg.Resend), authapp.NewOAuthGoogleClient(cfg.Auth.Google))
-	gatewayHandler := gatewayapi.New(gatewayapi.Config{AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService})
-	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Gate.ListenUrl, StaticDir: cfg.Web.StaticDir, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
+	authService := authapp.New(repo, tokens, cfg.Auth, config.Mode(cfg), email.NewResendSender(cfg.Resend), authapp.NewOAuthGoogleClient(cfg.Auth.Google)).WithLocalSetup(setupStore, device.Id, device.Name)
+	publicKey, err := agent.LoadDevicePublicKey(cfg.Runtime.StateDir, device.Id)
+	if err != nil {
+		return Result{Cwd: cfg.Cwd}, err
+	}
+	gatewayHandler := gatewayapi.New(gatewayapi.Config{AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService, AgentTunnelAudience: cfg.Agent.ConnectUrl, DevicePublicKeys: map[string]ed25519.PublicKey{device.Id: publicKey}, DeviceRepository: devicerepo.New(db.DB, db.Driver), CloudGateURL: cfg.Cloud.GateUrl, CloudCallbackBaseURL: cfg.Cloud.CallbackBaseUrl, CloudBindingAttemptStore: authapp.NewCloudBindingAttemptStore(cfg.Runtime.StateDir), LocalDevice: device})
+	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Agent.ListenUrl, StaticDir: cfg.Web.StaticDir, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
 	client := agent.New(agent.Config{ConnectUrl: cfg.Agent.ConnectUrl, Username: cfg.Auth.LocalAdmin.Username, Password: cfg.Auth.LocalAdmin.Password, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: agent.WebTerminalAccess{Registry: registry}, Logger: logger.Slog})
 
 	serveCtx, cancel := context.WithCancel(ctx)
@@ -309,6 +328,13 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		cancel()
 		return Result{Cwd: cfg.Cwd}, nil
 	}
+}
+
+func localSetupBaseURL(cfg config.Config) string {
+	if strings.TrimSpace(cfg.Agent.PublicUrl) != "" {
+		return strings.TrimRight(cfg.Agent.PublicUrl, "/")
+	}
+	return strings.TrimRight(cfg.Agent.ListenUrl, "/")
 }
 
 func normalizeServeError(err error) error {

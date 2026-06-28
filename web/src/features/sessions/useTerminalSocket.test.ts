@@ -51,7 +51,7 @@ describe('useTerminalSocket', () => {
   beforeEach(() => {
     FakeWebSocket.instances = []
     vi.stubGlobal('WebSocket', FakeWebSocket)
-    vi.stubGlobal('window', { location: { href: 'http://127.0.0.1:9011/' } })
+    vi.stubGlobal('window', { location: { href: 'http://127.0.0.1:9031/' } })
     vi.spyOn(console, 'info').mockImplementation(() => {})
   })
 

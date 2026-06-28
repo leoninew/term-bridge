@@ -26,6 +26,7 @@ const (
 
 	DefaultAuthUsername = "admin"
 	DefaultAuthPassword = "admin"
+	DefaultListenURL    = "http://127.0.0.1:9030"
 )
 
 type Config struct {
@@ -40,6 +41,7 @@ type Config struct {
 	Web        WebConfig
 	Gate       GateConfig
 	Agent      AgentConfig
+	Cloud      CloudConfig
 	Database   DatabaseConfig
 	Auth       AuthConfig
 	JWT        JWTConfig
@@ -123,9 +125,8 @@ type WebConfig struct {
 }
 
 type GateConfig struct {
-	ListenUrl string
-	Browser   GateBrowserConfig
-	API       GateAPIConfig
+	Browser GateBrowserConfig
+	API     GateAPIConfig
 }
 
 type GateBrowserConfig struct {
@@ -137,9 +138,16 @@ type GateAPIConfig struct {
 }
 
 type AgentConfig struct {
+	ListenUrl  string
+	PublicUrl  string
 	ConnectUrl string
 	DeviceId   string
 	DeviceName string
+}
+
+type CloudConfig struct {
+	GateUrl         string
+	CallbackBaseUrl string
 }
 
 type BootstrapResult struct {
@@ -222,7 +230,6 @@ func Load(options Options) (Config, error) {
 		Web:      WebConfig{StaticDir: staticDir},
 		Database: database,
 		Gate: GateConfig{
-			ListenUrl: strings.TrimSpace(v.GetString("gate.listen_url")),
 			Browser: GateBrowserConfig{
 				AllowedOrigins: getStringSlice(v, "gate.browser.allowed_origins"),
 			},
@@ -231,9 +238,15 @@ func Load(options Options) (Config, error) {
 			},
 		},
 		Agent: AgentConfig{
+			ListenUrl:  strings.TrimSpace(v.GetString("agent.listen_url")),
+			PublicUrl:  strings.TrimSpace(v.GetString("agent.public_url")),
 			ConnectUrl: strings.TrimSpace(v.GetString("agent.connect_url")),
 			DeviceId:   strings.TrimSpace(v.GetString("agent.device_id")),
 			DeviceName: strings.TrimSpace(v.GetString("agent.device_name")),
+		},
+		Cloud: CloudConfig{
+			GateUrl:         strings.TrimSpace(v.GetString("cloud.gate_url")),
+			CallbackBaseUrl: strings.TrimSpace(v.GetString("cloud.callback_base_url")),
 		},
 		Auth: AuthConfig{
 			Username: strings.TrimSpace(v.GetString("auth.local_admin.username")),
@@ -279,11 +292,15 @@ func Load(options Options) (Config, error) {
 	if err := validateHistory(cfg.History); err != nil {
 		return Config{}, err
 	}
+	normalizeAgentConfig(&cfg)
 	if err := validateGate(cfg.Gate); err != nil {
 		return Config{}, err
 	}
-	normalizeAgentConfig(&cfg)
 	if err := validateAgent(cfg.Agent); err != nil {
+		return Config{}, err
+	}
+	normalizeCloudConfig(&cfg)
+	if err := validateCloud(cfg.Cloud); err != nil {
 		return Config{}, err
 	}
 	if cfg.JWT.SecretKey == "" {
@@ -311,7 +328,7 @@ func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
 }
 
 func IsLocalMode(cfg Config) bool {
-	return normalizeModeURL(cfg.Agent.ConnectUrl) == normalizeModeURL(cfg.Gate.ListenUrl)
+	return normalizeModeURL(cfg.Agent.ConnectUrl) == normalizeModeURL(cfg.Agent.ListenUrl)
 }
 
 func Mode(cfg Config) string {
@@ -541,12 +558,15 @@ func configKeys() []string {
 		"history.max_line_bytes",
 		"runtime.state_dir",
 		"web.static_dir",
-		"gate.listen_url",
 		"gate.browser.allowed_origins",
 		"gate.api.expose_errors",
+		"agent.listen_url",
+		"agent.public_url",
 		"agent.connect_url",
 		"agent.device_id",
 		"agent.device_name",
+		"cloud.gate_url",
+		"cloud.callback_base_url",
 		"database.driver",
 		"database.sqlite.path",
 		"database.mysql.dsn",
@@ -675,19 +695,48 @@ func validateHistory(cfg HistoryConfig) error {
 }
 
 func validateGate(cfg GateConfig) error {
-	return validateHTTPURL("gate.listen_url", cfg.ListenUrl, true)
+	return nil
 }
 
 func normalizeAgentConfig(cfg *Config) {
+	cfg.Agent.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.ListenUrl), "/")
+	cfg.Agent.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.PublicUrl), "/")
 	if strings.TrimSpace(cfg.Agent.ConnectUrl) == "" {
-		cfg.Agent.ConnectUrl = cfg.Gate.ListenUrl
+		cfg.Agent.ConnectUrl = cfg.Agent.ListenUrl
 		return
 	}
 	cfg.Agent.ConnectUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.ConnectUrl), "/")
 }
 
+func normalizeCloudConfig(cfg *Config) {
+	cfg.Cloud.GateUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.GateUrl), "/")
+	cfg.Cloud.CallbackBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.CallbackBaseUrl), "/")
+}
+
 func validateAgent(cfg AgentConfig) error {
+	if err := validateHTTPURL("agent.listen_url", cfg.ListenUrl, true); err != nil {
+		return err
+	}
+	if cfg.PublicUrl != "" {
+		if err := validateHTTPURL("agent.public_url", cfg.PublicUrl, false); err != nil {
+			return err
+		}
+	}
 	return validateHTTPURL("agent.connect_url", cfg.ConnectUrl, false)
+}
+
+func validateCloud(cfg CloudConfig) error {
+	if cfg.GateUrl != "" {
+		if err := validateHTTPURL("cloud.gate_url", cfg.GateUrl, false); err != nil {
+			return err
+		}
+	}
+	if cfg.CallbackBaseUrl != "" {
+		if err := validateHTTPURL("cloud.callback_base_url", cfg.CallbackBaseUrl, false); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func validateHTTPURL(key string, value string, requirePort bool) error {

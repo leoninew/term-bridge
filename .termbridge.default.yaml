@@ -27,25 +27,55 @@ history:
 runtime:
   state_dir: .termbridge
 
-# Web 静态资源目录；为空时只提供 API，便于本地 Vite 开发。
+# Web 前端配置。
 web:
+  # Web 静态资源目录；为空时只提供 API，便于本地 Vite 开发。
   static_dir: ""
 
-# Gate
+# Gate API 行为配置
 gate:
-  listen_url: http://127.0.0.1:9010
   browser:
+    # 允许访问 Gate API 的浏览器前端 Origin。
+    # 本地开发默认允许 Vite dev server；生产部署时应改为实际 Web origin。
     allowed_origins:
-      - http://127.0.0.1:9011
-      - http://localhost:9011
+      - http://127.0.0.1:9031
+      - http://localhost:9031
   api:
+    # 是否在 API 错误响应中暴露内部错误细节。
+    # 仅建议本地调试打开；生产保持 false。
     expose_errors: false
 
-# Agent
+# 本机 Agent / serve 配置
 agent:
+  # 本机 termbridge serve 暴露的后端 API 地址。
+  # 本地模式下，agent.connect_url 留空时会默认等于此地址。
+  listen_url: http://127.0.0.1:9030
+
+  # 浏览器访问本机 Agent 前端的地址，用于生成本地 setup 链接。
+  # 本地开发指向 Vite dev server；内置静态资源部署时指向浏览器访问该 Agent 的地址。
+  # 该字段不表达云端 Gate 的公网发布地址。
+  public_url: http://localhost:9031
+
+  # Agent tunnel 要连接的 Gate 地址。
+  # 为空表示使用 agent.listen_url，即本地模式；指向远程 Gate 时为远程/Cloud 模式。
   connect_url: ""
+
+  # 当前设备 ID。通常保持为空，由 termbridge serve 首次启动时自动生成并写入 .termbridge.yaml。
   device_id: ""
+
+  # 当前设备显示名。为空时使用本机 hostname 自动生成；可手动设置为更友好的名称。
   device_name: ""
+
+# Cloud binding 配置
+cloud:
+  # 固定 Cloud Gate 的外部访问地址。
+  # 本地 /connect 会跳转到该地址完成云端账号授权；为空则禁用 Cloud binding。
+  gate_url: ""
+
+  # Cloud 授权完成后回调本机的可访问地址基准。
+  # 实现会使用该 URL 的 scheme/host/port，并回调到 /api/cloud-binding/callback。
+  # 默认值对应本机 serve 地址；如果浏览器/Cloud 无法访问 127.0.0.1，需要改成可访问的本机地址。
+  callback_base_url: http://127.0.0.1:9030
 
 # Database
 database:

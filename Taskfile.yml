@@ -56,7 +56,7 @@ tasks:
       - go run cmd/termbridge/main.go exec -- {{.CLI_ARGS}}
 
   web:
-    desc: Start web frontend on 127.0.0.1:9011, proxying to serve backend
+    desc: Start web frontend on localhost:9031, proxying to serve backend
     dir: web
     cmds:
       - yarn dev

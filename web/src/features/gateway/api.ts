@@ -4,6 +4,7 @@ export type DeviceSummary = {
   id: string
   name: string
   online: boolean
+  status: 'online' | 'offline'
   connected_at: string
   last_seen: string
 }
@@ -32,6 +33,10 @@ export type AuthMeResp = {
 export type TokenResp = {
   access_token: string
   token_type: string
+}
+
+export type SetupStatusResp = {
+  available: boolean
 }
 
 export async function authMe(): Promise<AuthMeResp> {
@@ -101,6 +106,35 @@ export async function authGoogleURL(): Promise<string> {
 export async function authGoogleCallback(code: string, state: string): Promise<TokenResp> {
   const response = await apiClient.post<TokenResp>('/api/auth/google/callback', { code, state })
   return response.data
+}
+
+export async function authSetupComplete(setupToken: string): Promise<TokenResp> {
+  const response = await apiClient.post<TokenResp>('/api/auth/setup/complete', {
+    setup_token: setupToken,
+  })
+  return response.data
+}
+
+export async function authSetupStatus(): Promise<SetupStatusResp> {
+  const response = await apiClient.get<SetupStatusResp>('/api/auth/setup/status')
+  return response.data
+}
+
+export async function cloudBindingStart(): Promise<string> {
+  const response = await apiClient.post<{ authorize_url: string }>('/api/cloud-binding/start')
+  return response.data.authorize_url
+}
+
+export async function cloudBindingAuthorize(callback: string, state: string): Promise<string> {
+  const response = await apiClient.get<{ redirect_url: string }>('/api/device-bindings/authorize', {
+    headers: { 'X-TermBridge-Authorize-Mode': 'json' },
+    params: { callback, state },
+  })
+  return response.data.redirect_url
+}
+
+export async function deleteDevice(deviceId: string): Promise<void> {
+  await apiClient.delete(`/api/devices/${encodeURIComponent(deviceId)}`)
 }
 
 export async function listDevices(): Promise<DeviceSummary[]> {

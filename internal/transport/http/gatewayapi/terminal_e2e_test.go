@@ -2,13 +2,11 @@ package gatewayapi
 
 import (
 	"context"
-	"encoding/json"
+	"crypto/ed25519"
 	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -29,6 +27,12 @@ func TestGatewayAgentTerminalAttachE2E(t *testing.T) {
 	runtime := newFakeRuntimeAccess()
 	stateDir := t.TempDir()
 	device := writeGatewayE2EDevice(t, stateDir)
+	publicKey, err := agentapp.LoadDevicePublicKey(stateDir, device.Id)
+	if err != nil {
+		t.Fatalf("LoadDevicePublicKey() error = %v", err)
+	}
+	gateway.config.AgentTunnelAudience = server.URL
+	gateway.config.DevicePublicKeys = map[string]ed25519.PublicKey{device.Id: publicKey}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -109,6 +113,12 @@ func TestGatewayAgentTerminalAttachResizeErrorReturnsControlError(t *testing.T) 
 	}
 	stateDir := t.TempDir()
 	device := writeGatewayE2EDevice(t, stateDir)
+	publicKey, err := agentapp.LoadDevicePublicKey(stateDir, device.Id)
+	if err != nil {
+		t.Fatalf("LoadDevicePublicKey() error = %v", err)
+	}
+	gateway.config.AgentTunnelAudience = server.URL
+	gateway.config.DevicePublicKeys = map[string]ed25519.PublicKey{device.Id: publicKey}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -153,16 +163,9 @@ func TestGatewayAgentTerminalAttachResizeErrorReturnsControlError(t *testing.T) 
 
 func writeGatewayE2EDevice(t *testing.T, stateDir string) agentapp.Device {
 	t.Helper()
-	device := agentapp.Device{Id: "gateway-e2e-device", Name: "gateway-e2e", CreatedAt: time.Now().UTC()}
-	data, err := json.MarshalIndent(device, "", "  ")
+	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir, DeviceId: "gateway-e2e-device", DeviceName: "gateway-e2e", Now: func() time.Time { return time.Now().UTC() }})
 	if err != nil {
-		t.Fatalf("MarshalIndent() error = %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(stateDir, "devices", device.Id), 0o755); err != nil {
-		t.Fatalf("MkdirAll(device) error = %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(stateDir, "devices", device.Id, agentapp.DeviceFileName), append(data, '\n'), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
+		t.Fatalf("LoadOrCreateDevice() error = %v", err)
 	}
 	return device
 }

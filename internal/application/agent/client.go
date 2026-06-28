@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/coder/websocket"
 
@@ -57,7 +58,11 @@ func (c *Client) Run(ctx context.Context) error {
 		return err
 	}
 	c.device = device
-	conn, _, err := websocket.Dial(ctx, tunnelUrl(c.config.ConnectUrl), &websocket.DialOptions{HTTPHeader: basicAuthHeader(c.config.Username, c.config.Password)})
+	header, err := c.tunnelHeader(device)
+	if err != nil {
+		return err
+	}
+	conn, _, err := websocket.Dial(ctx, tunnelUrl(c.config.ConnectUrl), &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		return err
 	}
@@ -409,6 +414,14 @@ func outboundData(outbound terminalapp.Outbound) []byte {
 		return outbound.Binary
 	}
 	return []byte(outbound.Text.Message)
+}
+
+func (c *Client) tunnelHeader(device Device) (http.Header, error) {
+	privateKey, err := LoadDevicePrivateKey(c.config.StateDir, device.Id)
+	if err != nil {
+		return nil, err
+	}
+	return SignedTunnelHeader(http.MethodGet, "/api/agent/tunnel", c.config.ConnectUrl, device.Id, privateKey, time.Now(), "")
 }
 
 func (c *Client) Config() Config {

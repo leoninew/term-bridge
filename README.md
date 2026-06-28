@@ -62,8 +62,8 @@ task web
 默认本地开发地址：
 
 ```text
-Backend: http://127.0.0.1:9010
-Frontend: http://127.0.0.1:9011
+Backend: http://127.0.0.1:9030
+Frontend: http://localhost:9031
 ```
 
 ## 常用命令
@@ -105,13 +105,23 @@ task build
 TERMBRIDGE_ + 配置 key 大写，并将 . 转为 __
 ```
 
-示例：
+本地开发示例：
 
 ```dotenv
-TERMBRIDGE_GATE__LISTEN_URL=http://127.0.0.1:9010
-TERMBRIDGE_GATE__BROWSER__ALLOWED_ORIGINS=http://127.0.0.1:9011
+TERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:9030
+TERMBRIDGE_GATE__BROWSER__ALLOWED_ORIGINS=http://localhost:9031
 TERMBRIDGE_RUNTIME__STATE_DIR=.termbridge
+TERMBRIDGE_WEB__STATIC_DIR=
+TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost:9031
+```
+
+镜像内置静态资源示例：
+
+```dotenv
+TERMBRIDGE_AGENT__LISTEN_URL=http://0.0.0.0:80
 TERMBRIDGE_WEB__STATIC_DIR=/opt/termbridge/web/dist
+TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost
+TERMBRIDGE_RUNTIME__STATE_DIR=/var/lib/termbridge
 ```
 
 用户系统相关配置：
@@ -128,7 +138,7 @@ TERMBRIDGE_RESEND__API_KEY=
 TERMBRIDGE_RESEND__FROM_EMAIL=
 ```
 
-`agent.connect_url` 与 `gate.listen_url` 规范化后一致时为本地模式；本地模式支持 `auth.local_admin` shortcut。两者不一致时为远程 Gate 模式，启动时会要求 Google OAuth 与 Resend 配置齐全。
+`agent.connect_url` 与 `agent.listen_url` 规范化后一致时为本地模式；本地模式支持 `auth.local_admin` shortcut。两者不一致时为远程 Gate 模式，启动时会要求 Google OAuth 与 Resend 配置齐全。
 
 `agent.device_id` 和 `agent.device_name` 为空时，`termbridge serve` 会生成并写入 `.termbridge.yaml`，随后由 Agent 上报给 Gate。
 

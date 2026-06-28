@@ -2,7 +2,7 @@ name: m6-gateway-web-terminal
 描述: Verify Gateway login, online device discovery, workspace/session relay, and optional terminal attach when an existing running session is available.
 
 variables:
-  base_url: "http://localhost:9011"
+  base_url: "http://localhost:9031"
   username: "admin"
   password: "admin"
 

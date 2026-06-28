@@ -2,7 +2,9 @@ package gatewayapi
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,20 +13,34 @@ import (
 
 	"github.com/coder/websocket"
 
+	agentapp "termbridge-go/internal/application/agent"
 	"termbridge-go/internal/protocol/tunnel"
 )
 
 func TestAgentTunnelRegistersDevice(t *testing.T) {
-	gateway := New(testGatewayConfig())
+	stateDir := t.TempDir()
+	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir, DeviceId: "dev-1", DeviceName: "local"})
+	if err != nil {
+		t.Fatalf("LoadOrCreateDevice() error = %v", err)
+	}
+	privateKey, err := agentapp.LoadDevicePrivateKey(stateDir, device.Id)
+	if err != nil {
+		t.Fatalf("LoadDevicePrivateKey() error = %v", err)
+	}
+	publicKey, err := agentapp.LoadDevicePublicKey(stateDir, device.Id)
+	if err != nil {
+		t.Fatalf("LoadDevicePublicKey() error = %v", err)
+	}
+	gateway := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AgentTunnelAudience: "test-audience", DevicePublicKeys: map[string]ed25519.PublicKey{device.Id: publicKey}})
 	server := httptest.NewServer(gateway)
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	requestHeader := http.Header{}
-	req, _ := http.NewRequest(http.MethodGet, server.URL, nil)
-	req.SetBasicAuth("admin", "admin")
-	requestHeader.Set("Authorization", req.Header.Get("Authorization"))
+	requestHeader, err := agentapp.SignedTunnelHeader(http.MethodGet, "/api/agent/tunnel", "test-audience", device.Id, privateKey, time.Now(), "test-nonce")
+	if err != nil {
+		t.Fatalf("SignedTunnelHeader() error = %v", err)
+	}
 	conn, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
 	if err != nil {
 		t.Fatalf("Dial() error = %v", err)

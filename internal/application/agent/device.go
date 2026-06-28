@@ -1,7 +1,11 @@
 package agent
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,13 +13,20 @@ import (
 	"time"
 )
 
-const DeviceFileName = "device.json"
+const (
+	DeviceSchemaVersion = 1
+	DeviceFileName      = "device.json"
+	PrivateKeyFileName  = "private_key.pem"
+	PublicKeyFileName   = "public_key.pem"
+)
 
 type Device struct {
-	Id        string    `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	SchemaVersion int       `json:"schema_version"`
+	Id            string    `json:"id"`
+	Name          string    `json:"name"`
+	PublicKey     string    `json:"public_key"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type DeviceOptions struct {
@@ -41,16 +52,23 @@ func LoadOrCreateDevice(options DeviceOptions) (Device, error) {
 		options.Now = time.Now
 	}
 	now := options.Now().UTC()
-	path := filepath.Join(options.StateDir, "devices", safeDeviceSegment(deviceId), DeviceFileName)
+	deviceDir := filepath.Join(options.StateDir, "devices", safeDeviceSegment(deviceId))
+	keys, err := loadOrCreateDeviceKeys(deviceDir)
+	if err != nil {
+		return Device{}, err
+	}
+	path := filepath.Join(deviceDir, DeviceFileName)
 	device, err := readDevice(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return Device{}, err
 		}
-		device = Device{Id: deviceId, Name: deviceName, CreatedAt: now}
+		device = Device{SchemaVersion: DeviceSchemaVersion, Id: deviceId, Name: deviceName, CreatedAt: now}
 	}
+	device.SchemaVersion = DeviceSchemaVersion
 	device.Id = deviceId
 	device.Name = deviceName
+	device.PublicKey = keys.PublicKeyBase64
 	if device.CreatedAt.IsZero() {
 		device.CreatedAt = now
 	}
@@ -61,6 +79,75 @@ func LoadOrCreateDevice(options DeviceOptions) (Device, error) {
 	return device, nil
 }
 
+type deviceKeys struct {
+	PrivateKey      ed25519.PrivateKey
+	PublicKey       ed25519.PublicKey
+	PublicKeyBase64 string
+}
+
+func loadOrCreateDeviceKeys(deviceDir string) (deviceKeys, error) {
+	privatePath := filepath.Join(deviceDir, PrivateKeyFileName)
+	publicPath := filepath.Join(deviceDir, PublicKeyFileName)
+	privateKey, err := readPrivateKey(privatePath)
+	if err == nil {
+		publicKey := privateKey.Public().(ed25519.PublicKey)
+		if err := ensurePublicKeyFile(publicPath, publicKey); err != nil {
+			return deviceKeys{}, err
+		}
+		return deviceKeys{PrivateKey: privateKey, PublicKey: publicKey, PublicKeyBase64: base64.StdEncoding.EncodeToString(publicKey)}, nil
+	}
+	if !os.IsNotExist(err) {
+		return deviceKeys{}, err
+	}
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return deviceKeys{}, fmt.Errorf("generate device key: %w", err)
+	}
+	if err := writePEMFile(privatePath, "ED25519 PRIVATE KEY", privateKey, 0o600); err != nil {
+		return deviceKeys{}, err
+	}
+	if err := ensurePublicKeyFile(publicPath, publicKey); err != nil {
+		return deviceKeys{}, err
+	}
+	return deviceKeys{PrivateKey: privateKey, PublicKey: publicKey, PublicKeyBase64: base64.StdEncoding.EncodeToString(publicKey)}, nil
+}
+
+func ensurePublicKeyFile(path string, publicKey ed25519.PublicKey) error {
+	return writePEMFile(path, "ED25519 PUBLIC KEY", publicKey, 0o644)
+}
+
+func LoadDevicePrivateKey(stateDir string, deviceID string) (ed25519.PrivateKey, error) {
+	return readPrivateKey(filepath.Join(stateDir, "devices", safeDeviceSegment(deviceID), PrivateKeyFileName))
+}
+
+func LoadDevicePublicKey(stateDir string, deviceID string) (ed25519.PublicKey, error) {
+	privateKey, err := LoadDevicePrivateKey(stateDir, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	return privateKey.Public().(ed25519.PublicKey), nil
+}
+
+func readPrivateKey(path string) (ed25519.PrivateKey, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode(data)
+	if block == nil || block.Type != "ED25519 PRIVATE KEY" {
+		return nil, fmt.Errorf("read device private key: invalid PEM")
+	}
+	if len(block.Bytes) != ed25519.PrivateKeySize {
+		return nil, fmt.Errorf("read device private key: invalid length")
+	}
+	return ed25519.PrivateKey(append([]byte(nil), block.Bytes...)), nil
+}
+
+func writePEMFile(path string, blockType string, data []byte, perm os.FileMode) error {
+	encoded := pem.EncodeToMemory(&pem.Block{Type: blockType, Bytes: data})
+	return writeFileAtomic(path, encoded, perm)
+}
+
 func readDevice(path string) (Device, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -69,6 +156,9 @@ func readDevice(path string) (Device, error) {
 	var device Device
 	if err := json.Unmarshal(data, &device); err != nil {
 		return Device{}, fmt.Errorf("read device identity: %w", err)
+	}
+	if device.SchemaVersion != 0 && device.SchemaVersion != DeviceSchemaVersion {
+		return Device{}, fmt.Errorf("read device identity: unsupported schema_version %d", device.SchemaVersion)
 	}
 	if strings.TrimSpace(device.Id) == "" {
 		return Device{}, fmt.Errorf("read device identity: missing id")
@@ -83,15 +173,42 @@ func readDevice(path string) (Device, error) {
 }
 
 func writeDevice(path string, device Device) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
 	data, err := json.MarshalIndent(device, "", "  ")
 	if err != nil {
 		return err
 	}
 	data = append(data, '\n')
-	return os.WriteFile(path, data, 0o644)
+	return writeFileAtomic(path, data, 0o644)
+}
+
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		_ = os.Remove(tmpName)
+		return err
+	}
+	return nil
 }
 
 func safeDeviceSegment(value string) string {

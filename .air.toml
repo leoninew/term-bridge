@@ -1,12 +1,12 @@
 root = "."
-tmp_dir = "tmp/air/serve"
+tmp_dir = "bin/air/serve"
 
 [build]
-cmd = "go build -o ./tmp/air/serve/termbridge.exe ./cmd/termbridge"
-entrypoint = "./tmp/air/serve/termbridge.exe"
+cmd = "go build -o bin/air/serve/termbridge.exe ./cmd/termbridge"
+entrypoint = "bin/air/serve/termbridge.exe"
 args_bin = ["serve"]
 include_ext = ["go", "yaml", "yml", "toml"]
-exclude_dir = [".git", ".termbridge", "bin", "docs", "logs", "tmp", "vendor", "web"]
+exclude_dir = [".git", ".termbridge", "bin", "docs", "logs", "vendor", "web"]
 exclude_file = []
 exclude_regex = ["_test.go"]
 exclude_unchanged = false

@@ -25,9 +25,17 @@ func TestTunnelUrl(t *testing.T) {
 func TestClientRunSendsHello(t *testing.T) {
 	stateDir := t.TempDir()
 	helloCh := make(chan tunnel.HelloPayload, 1)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		username, password, ok := r.BasicAuth()
-		if !ok || username != "admin" || password != "admin" {
+	device, err := LoadOrCreateDevice(DeviceOptions{StateDir: stateDir, DeviceId: "dev-1", DeviceName: "local"})
+	if err != nil {
+		t.Fatalf("LoadOrCreateDevice() error = %v", err)
+	}
+	publicKey, err := LoadDevicePublicKey(stateDir, device.Id)
+	if err != nil {
+		t.Fatalf("LoadDevicePublicKey() error = %v", err)
+	}
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := VerifySignedRequest(r, server.URL, publicKey, time.Now()); err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}

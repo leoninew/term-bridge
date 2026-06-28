@@ -88,7 +88,7 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 
 func normalizeConfig(config Config) Config {
 	if strings.TrimSpace(config.ServerUrl) == "" {
-		config.ServerUrl = "http://127.0.0.1:9010"
+		config.ServerUrl = "http://127.0.0.1:9030"
 	}
 	config.ServerUrl = strings.TrimRight(strings.TrimSpace(config.ServerUrl), "/")
 	config.StaticDir = strings.TrimSpace(config.StaticDir)

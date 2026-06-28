@@ -36,12 +36,16 @@
                     :key="device.id"
                     :value="device.id"
                     :text-value="device.name"
+                    :disabled="!device.online"
                     class="relative flex cursor-pointer select-none items-center rounded px-7 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                   >
                     <SelectItemIndicator class="absolute left-2 inline-flex items-center">
                       <Check class="size-4 text-blue-500" />
                     </SelectItemIndicator>
-                    <SelectItemText class="min-w-0 truncate">{{ device.name }}</SelectItemText>
+                    <SelectItemText class="min-w-0 truncate">
+                      {{ device.name }} ·
+                      {{ device.online ? t('gateway.online') : t('gateway.offline') }}
+                    </SelectItemText>
                   </SelectItem>
                 </SelectViewport>
               </SelectContent>
@@ -502,7 +506,7 @@
   const selectedDeviceLabel = computed(
     () => selectedDevice.value?.name ?? deviceSelectPlaceholder.value,
   )
-  const deviceSelectDisabled = computed(() => props.devices.length === 0)
+  const deviceSelectDisabled = computed(() => props.devices.every((device) => !device.online))
   const localeOptions = computed(() =>
     locales.map((value) => ({ value, label: localeLabels[value] })),
   )
@@ -514,8 +518,10 @@
   )
 
   function changeDevice(value: unknown) {
-    if (typeof value === 'string' && value !== props.selectedDeviceId) {
-      emit('selectDevice', value)
+    const device =
+      typeof value === 'string' ? props.devices.find((item) => item.id === value) : null
+    if (device?.online && device.id !== props.selectedDeviceId) {
+      emit('selectDevice', device.id)
     }
   }
 

@@ -121,7 +121,7 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	configContent := "gate:\n  listen_url: http://127.0.0.1:9090\n  browser:\n    allowed_origins:\n      - http://127.0.0.1:9011\n  api:\n    expose_errors: true\nagent:\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\n"
+	configContent := "gate:\n  browser:\n    allowed_origins:\n      - http://127.0.0.1:9031\n  api:\n    expose_errors: true\nagent:\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\n"
 	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
 		t.Fatalf("WriteFile(config) error = %v", err)
 	}
@@ -174,7 +174,7 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 		t.Fatalf("agent config = %#v", gotConfig)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "http://127.0.0.1:9090") || !strings.Contains(out, "TermBridge agent connector targeting http://127.0.0.1:9090") {
+	if !strings.Contains(out, "TermBridge local setup URL: http://localhost:9444/dev/setup?token=") || !strings.Contains(out, "TermBridge agent connector targeting http://127.0.0.1:9090") {
 		t.Fatalf("stdout = %s", out)
 	}
 	if strings.Contains(out, "admin/admin") {

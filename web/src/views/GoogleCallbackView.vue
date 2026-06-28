@@ -16,6 +16,7 @@
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../components/session/ToastHost.vue'
   import { authGoogleCallback } from '../features/gateway/api'
+  import { readStorageValue, removeStorageValue } from '../store/storage'
   import { useGatewayStore } from '../store/gateway'
   import { useNotificationsStore } from '../store/notifications'
 
@@ -24,6 +25,15 @@
   const router = useRouter()
   const gateway = useGatewayStore()
   const notifications = useNotificationsStore()
+  const OAUTH_REDIRECT_KEY = 'termbridge.oauth_redirect'
+
+  function redirectAfterLogin() {
+    const redirect = readStorageValue(OAUTH_REDIRECT_KEY)
+    removeStorageValue(OAUTH_REDIRECT_KEY)
+    return redirect && redirect.startsWith('/') && !redirect.startsWith('//')
+      ? redirect
+      : { name: 'sessions' }
+  }
 
   onMounted(async () => {
     const code = typeof route.query.code === 'string' ? route.query.code : ''
@@ -36,7 +46,7 @@
     try {
       const response = await authGoogleCallback(code, state)
       gateway.setToken(response.access_token)
-      await router.replace({ name: 'sessions' })
+      await router.replace(redirectAfterLogin())
     } catch (err) {
       notifications.notifyError(t('gateway.googleLoginFailed'), err)
       await router.replace({ name: 'login' })
