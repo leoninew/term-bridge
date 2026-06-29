@@ -3,6 +3,8 @@ package app
 import (
 	"bytes"
 	"context"
+	"database/sql"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -56,23 +58,11 @@ func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
 	if gotTerminalOutput != stdout {
 		t.Fatalf("TerminalOutput = %#v, want original stdout", gotTerminalOutput)
 	}
-	if got := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "history.log")); got == "" {
+	if got := globOne(t, filepath.Join(cwd, ".termbridge", "devices", "*", "workspaces", "*", "sessions", "*", "history.log")); got == "" {
 		t.Fatal("history.log was not created")
 	}
-	if got := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "exit.json")); got != "" {
-		t.Fatalf("exit.json was created: %s", got)
-	}
-	workspaceJSON := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "workspace.json"))
-	if workspaceJSON == "" {
-		t.Fatal("workspace.json was not created")
-	}
-	workspaceData, err := os.ReadFile(workspaceJSON)
-	if err != nil {
-		t.Fatalf("ReadFile(workspace.json) error = %v", err)
-	}
-	if !strings.Contains(string(workspaceData), `"exit"`) || !strings.Contains(string(workspaceData), `"exit_code": 7`) {
-		t.Fatalf("workspace.json missing exit aggregate: %s", workspaceData)
-	}
+	assertRuntimeDBCounts(t, cwd, 1, 1, 1)
+	assertSessionExitCode(t, cwd, 7)
 }
 
 func TestRunReturnsRuntimeErrorFromRunnerAndMarksFailed(t *testing.T) {
@@ -102,16 +92,32 @@ func TestRunReturnsRuntimeErrorFromRunnerAndMarksFailed(t *testing.T) {
 	if stateFile != "" {
 		t.Fatalf("state.json was created: %s", stateFile)
 	}
-	workspaceJSON := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "workspace.json"))
-	if workspaceJSON == "" {
-		t.Fatal("workspace.json was not created")
-	}
-	workspaceData, err := os.ReadFile(workspaceJSON)
+	assertRuntimeDBCounts(t, cwd, 1, 1, 1)
+	assertSessionState(t, cwd, "failed")
+}
+
+func TestRunMigrateRunsDatabaseMigrations(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+
+	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandMigrate}, Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}})
 	if err != nil {
-		t.Fatalf("ReadFile(workspace.json) error = %v", err)
+		t.Fatalf("Run(migrate) error = %v", err)
 	}
-	if !strings.Contains(string(workspaceData), `"state": "failed"`) {
-		t.Fatalf("workspace.json missing failed state: %s", workspaceData)
+	if filepath.Clean(result.Cwd) != filepath.Clean(cwd) {
+		t.Fatalf("Result.Cwd = %q, want %q", result.Cwd, cwd)
+	}
+	db := openRuntimeDB(t, cwd)
+	defer db.Close()
+	assertTableCount(t, db, "devices", 0)
+	assertTableCount(t, db, "workspaces", 0)
+	assertTableCount(t, db, "sessions", 0)
+	assertTableCount(t, db, "session_runs", 0)
+	if got := globOne(t, filepath.Join(cwd, ".termbridge", "devices", "*", "private_key.pem")); got != "" {
+		t.Fatalf("migrate created device private key: %s", got)
 	}
 }
 
@@ -212,7 +218,7 @@ func TestRunExecUsesConfiguredStateDirAndHistoryLimits(t *testing.T) {
 	if defaultState != "" {
 		t.Fatalf("default .termbridge state was created despite configured state_dir: %s", defaultState)
 	}
-	historyPath := globOne(t, filepath.Join(configuredStateDir, "workspaces", "*", "sessions", "*", "history.log"))
+	historyPath := globOne(t, filepath.Join(configuredStateDir, "devices", "*", "workspaces", "*", "sessions", "*", "history.log"))
 	if historyPath == "" {
 		t.Fatal("configured state dir history.log was not created")
 	}
@@ -282,4 +288,59 @@ func globOne(t *testing.T, pattern string) string {
 		return ""
 	}
 	return matches[0]
+}
+
+func assertRuntimeDBCounts(t *testing.T, cwd string, wantWorkspaces int, wantSessions int, wantRuns int) {
+	t.Helper()
+	db := openRuntimeDB(t, cwd)
+	defer db.Close()
+	assertTableCount(t, db, "workspaces", wantWorkspaces)
+	assertTableCount(t, db, "sessions", wantSessions)
+	assertTableCount(t, db, "session_runs", wantRuns)
+}
+
+func assertSessionExitCode(t *testing.T, cwd string, want int) {
+	t.Helper()
+	db := openRuntimeDB(t, cwd)
+	defer db.Close()
+	var payload string
+	if err := db.QueryRow(`SELECT exit_json FROM session_runs ORDER BY updated_at DESC LIMIT 1`).Scan(&payload); err != nil {
+		t.Fatalf("query exit_json error = %v", err)
+	}
+	if !strings.Contains(payload, `"exit_code":`+fmt.Sprintf("%d", want)) && !strings.Contains(payload, `"exit_code": `+fmt.Sprintf("%d", want)) {
+		t.Fatalf("exit_json = %s, want exit code %d", payload, want)
+	}
+}
+
+func assertSessionState(t *testing.T, cwd string, want string) {
+	t.Helper()
+	db := openRuntimeDB(t, cwd)
+	defer db.Close()
+	var got string
+	if err := db.QueryRow(`SELECT current_state FROM sessions ORDER BY updated_at DESC LIMIT 1`).Scan(&got); err != nil {
+		t.Fatalf("query current_state error = %v", err)
+	}
+	if got != want {
+		t.Fatalf("current_state = %q, want %q", got, want)
+	}
+}
+
+func assertTableCount(t *testing.T, db *sql.DB, table string, want int) {
+	t.Helper()
+	var got int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&got); err != nil {
+		t.Fatalf("query %s count error = %v", table, err)
+	}
+	if got != want {
+		t.Fatalf("%s count = %d, want %d", table, got, want)
+	}
+}
+
+func openRuntimeDB(t *testing.T, cwd string) *sql.DB {
+	t.Helper()
+	db, err := sql.Open("sqlite", filepath.Join(cwd, ".termbridge", "termbridge.db"))
+	if err != nil {
+		t.Fatalf("Open runtime sqlite error = %v", err)
+	}
+	return db
 }

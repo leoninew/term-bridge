@@ -65,3 +65,8 @@ tasks:
     desc: Start unified backend with Air hot reload
     cmds:
       - air -c .air.toml
+
+  migrate:
+    desc: Run database migrations
+    cmds:
+      - go run cmd/termbridge/main.go migrate

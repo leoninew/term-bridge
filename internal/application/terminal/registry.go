@@ -38,9 +38,37 @@ const (
 
 type AttachmentState string
 
+type RuntimeStore interface {
+	FindWorkspaceByPath(path string) (workspace.Workspace, error)
+	FindWorkspaceById(workspaceId string) (workspace.Workspace, error)
+	SaveWorkspace(workspace.Workspace) error
+	LoadWorkspace(workspaceId string) (workspace.Workspace, error)
+	SaveSession(session.Session) error
+	LoadSession(workspaceId string, sessionId string) (session.Session, error)
+	UpdateSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error)
+	DeleteSession(workspaceId string, sessionId string) error
+	DeleteWorkspace(workspaceId string) error
+	SaveState(workspaceId string, sessionId string, value session.StateRecord) error
+	LoadState(workspaceId string, sessionId string) (session.StateRecord, error)
+	SaveProcess(workspaceId string, sessionId string, value process.Record) error
+	LoadProcess(workspaceId string, sessionId string) (process.Record, error)
+	SaveExit(workspaceId string, sessionId string, value process.ExitRecord) error
+	LoadExit(workspaceId string, sessionId string) (process.ExitRecord, error)
+	HistoryPath(workspaceId string, sessionId string) string
+	ListWorkspaces() ([]workspace.Workspace, []state.Warning, error)
+	ListSessionsByWorkspaceId(workspaceId string) ([]session.View, []state.Warning, error)
+	ListSessions() ([]session.View, []state.Warning, error)
+	UpdateWorkspaceOrder(workspaceIds []string, now time.Time) ([]workspace.Workspace, error)
+	UpdateSessionOrder(workspaceId string, sessionIds []string, now time.Time) ([]session.View, []state.Warning, error)
+}
+
+type sessionRunStarter interface {
+	BeginSessionRun(workspaceId string, sessionId string, size process.TerminalSize) error
+}
+
 type Config struct {
 	Cwd              string
-	Store            state.Store
+	Store            RuntimeStore
 	LogDir           string
 	History          config.HistoryConfig
 	Manager          termpty.Manager
@@ -51,7 +79,7 @@ type Config struct {
 
 type Registry struct {
 	cwd              string
-	store            state.Store
+	store            RuntimeStore
 	logDir           string
 	historyConfig    config.HistoryConfig
 	manager          termpty.Manager
@@ -315,6 +343,12 @@ func (r *Registry) RerunSession(ctx context.Context, workspaceId string, session
 		r.saveSessionFailed(view.Session, "archive_history_failed")
 		return CreateSessionResp{}, apperrors.Runtime("archive history", err)
 	}
+	if starter, ok := r.store.(sessionRunStarter); ok {
+		if err := starter.BeginSessionRun(workspaceId, sessionId, size); err != nil {
+			r.saveSessionFailed(view.Session, "begin_session_run_failed")
+			return CreateSessionResp{}, apperrors.Runtime("begin session run", err)
+		}
+	}
 	if err := r.startClaimedSessionRuntime(ctx, view.Session, command, size); err != nil {
 		r.saveSessionFailed(view.Session, startFailureReason(err))
 		return CreateSessionResp{}, err
@@ -475,6 +509,9 @@ func (r *Registry) archiveCurrentHistory(workspaceId string, sessionId string, a
 		if _, err := os.Stat(archivePath); err == nil {
 			continue
 		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+		if err := os.MkdirAll(filepath.Dir(historyPath), 0o755); err != nil {
 			return "", err
 		}
 		if err := os.Rename(historyPath, archivePath); err != nil {

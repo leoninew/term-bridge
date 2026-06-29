@@ -2,6 +2,7 @@
 CREATE TABLE devices (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  public_key TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -17,16 +18,6 @@ CREATE TABLE user_devices (
   FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
-CREATE TABLE device_keys (
-  id TEXT PRIMARY KEY,
-  device_id TEXT NOT NULL,
-  public_key TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_device_keys_device ON device_keys(device_id, created_at);
-
 CREATE TABLE device_binding_codes (
   code_hash TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
@@ -38,7 +29,5 @@ CREATE TABLE device_binding_codes (
 
 -- +goose Down
 DROP TABLE IF EXISTS device_binding_codes;
-DROP INDEX IF EXISTS idx_device_keys_device;
-DROP TABLE IF EXISTS device_keys;
 DROP TABLE IF EXISTS user_devices;
 DROP TABLE IF EXISTS devices;

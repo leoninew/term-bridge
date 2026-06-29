@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -42,6 +43,7 @@ const (
 	CommandWorkspace CommandKind = "workspace"
 	CommandSession   CommandKind = "session"
 	CommandServe     CommandKind = "serve"
+	CommandMigrate   CommandKind = "migrate"
 )
 
 type Command struct {
@@ -108,7 +110,7 @@ func Run(ctx context.Context, options Options) (Result, error) {
 		return Result{}, err
 	}
 	bootstrap := config.BootstrapResult{}
-	if options.Command.Kind == CommandServe {
+	if options.Command.Kind == CommandExec || options.Command.Kind == CommandWorkspace || options.Command.Kind == CommandSession || options.Command.Kind == CommandServe {
 		cfg, bootstrap, err = config.EnsureLocalIdentity(cfg)
 		if err != nil {
 			return Result{}, err
@@ -130,19 +132,50 @@ func Run(ctx context.Context, options Options) (Result, error) {
 		logger.Info("termbridge exec command parsed", "cwd", cfg.Cwd, "command", strings.Join(cfg.Command, " "), "config", cfg.ConfigFile)
 		return runExec(ctx, cfg, logger, options)
 	case CommandWorkspace:
-		return runWorkspaceList(cfg, options.Stdout)
+		return runWorkspaceList(ctx, cfg, options.Stdout)
 	case CommandSession:
-		return runSessionList(cfg, options.Stdout)
+		return runSessionList(ctx, cfg, options.Stdout)
 	case CommandServe:
 		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "web_mode", cfg.Web.Mode, "agent_listen_url", cfg.Agent.ListenUrl, "agent_connect_url", cfg.Agent.ConnectUrl, "agent_device_id", cfg.Agent.DeviceId, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.ConfigFile)
 		return runServe(ctx, cfg, bootstrap, logger, options)
+	case CommandMigrate:
+		logger.Info("termbridge migrate command parsed", "cwd", cfg.Cwd, "database_driver", cfg.Database.Driver, "config", cfg.ConfigFile)
+		return runMigrate(ctx, cfg)
 	default:
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("missing command")
 	}
 }
 
+func runMigrate(ctx context.Context, cfg config.Config) (Result, error) {
+	db, err := database.Open(ctx, cfg.Database)
+	if err != nil {
+		return Result{Cwd: cfg.Cwd}, err
+	}
+	defer db.Close()
+	if err := database.Migrate(ctx, db.DB, db.Driver); err != nil {
+		return Result{Cwd: cfg.Cwd}, err
+	}
+	return Result{Cwd: cfg.Cwd}, nil
+}
+
 func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, options Options) (Result, error) {
-	store := state.NewStore(cfg.Runtime.StateDir)
+	device, err := agent.LoadOrCreateDevice(agent.DeviceOptions{StateDir: cfg.Runtime.StateDir, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName})
+	if err != nil {
+		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, err
+	}
+	db, err := database.Open(ctx, cfg.Database)
+	if err != nil {
+		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, err
+	}
+	defer db.Close()
+	if err := database.Migrate(ctx, db.DB, db.Driver); err != nil {
+		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, err
+	}
+	deviceRepository := devicerepo.New(db.DB, db.Driver)
+	if _, err := deviceRepository.UpsertLocalDevice(ctx, devicerepo.Device{ID: device.Id, Name: device.Name, PublicKey: device.PublicKey}); err != nil {
+		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("upsert local device", err)
+	}
+	store := state.NewDBStore(db.DB, db.Driver, filepath.Join(cfg.Runtime.StateDir, "devices", device.Id), device.Id)
 	ids := identity.NewUlidGenerator()
 	resolver := workspace.Resolver{Store: store, Ids: ids}
 	ws, err := resolver.Resolve(cfg.Cwd)
@@ -257,7 +290,6 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 	if err != nil {
 		return Result{Cwd: cfg.Cwd}, err
 	}
-	registry := newWebTerminalRegistry(cfg, logger)
 	db, err := database.Open(ctx, cfg.Database)
 	if err != nil {
 		return Result{Cwd: cfg.Cwd}, err
@@ -266,6 +298,11 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 	if err := database.Migrate(ctx, db.DB, db.Driver); err != nil {
 		return Result{Cwd: cfg.Cwd}, err
 	}
+	deviceRepository := devicerepo.New(db.DB, db.Driver)
+	if _, err := deviceRepository.UpsertLocalDevice(ctx, devicerepo.Device{ID: device.Id, Name: device.Name, PublicKey: device.PublicKey}); err != nil {
+		return Result{Cwd: cfg.Cwd}, apperrors.Runtime("upsert local device", err)
+	}
+	registry := newWebTerminalRegistry(cfg, logger, state.NewDBStore(db.DB, db.Driver, filepath.Join(cfg.Runtime.StateDir, "devices", device.Id), device.Id))
 	repo := authrepo.New(db.DB, db.Driver)
 	tokens := gatewayauth.NewTokenService(cfg.JWT.SecretKey, cfg.Auth.JWTTTL)
 	authService := authapp.New(repo, tokens, cfg.Auth, config.Mode(cfg), email.NewResendSender(cfg.Resend), authapp.NewOAuthGoogleClient(cfg.Auth.Google))
@@ -274,9 +311,10 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		return Result{Cwd: cfg.Cwd}, err
 	}
 	runtimeAccess := agent.WebTerminalAccess{Registry: registry}
-	gatewayHandler := gatewayapi.New(gatewayapi.Config{AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService, AgentTunnelAudience: cfg.Agent.ConnectUrl, DevicePublicKeys: map[string]ed25519.PublicKey{device.Id: publicKey}, DeviceRepository: devicerepo.New(db.DB, db.Driver), CloudGateURL: cfg.Cloud.GateUrl, CloudOAuth: gatewayapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectURL: cfg.Cloud.OAuth.RedirectURL, Scopes: cfg.Cloud.OAuth.Scopes}, CloudBindingAttemptStore: authapp.NewCloudBindingAttemptStore(cfg.Runtime.StateDir), LocalDevice: device, WebMode: cfg.Web.Mode})
+	gatewayHandler := gatewayapi.New(gatewayapi.Config{AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService, AgentTunnelAudience: cfg.Agent.ConnectUrl, DevicePublicKeys: map[string]ed25519.PublicKey{device.Id: publicKey}, DeviceRepository: deviceRepository, CloudGateURL: cfg.Cloud.GateUrl, CloudOAuth: gatewayapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectURL: cfg.Cloud.OAuth.RedirectURL, Scopes: cfg.Cloud.OAuth.Scopes}, CloudBindingAttemptStore: authapp.NewCloudBindingAttemptStore(cfg.Runtime.StateDir), LocalDevice: device, WebMode: cfg.Web.Mode})
 	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Agent.ListenUrl, StaticDir: cfg.Web.StaticDir, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
 	client := agent.New(agent.Config{ConnectUrl: cfg.Agent.ConnectUrl, Username: cfg.Auth.LocalAdmin.Username, Password: cfg.Auth.LocalAdmin.Password, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: runtimeAccess, Logger: logger.Slog})
+	client.SetDevice(device)
 
 	serveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -342,10 +380,10 @@ func normalizeServeError(err error) error {
 	return err
 }
 
-func newWebTerminalRegistry(cfg config.Config, logger *logging.Logger) *terminalapp.Registry {
+func newWebTerminalRegistry(cfg config.Config, logger *logging.Logger, store terminalapp.RuntimeStore) *terminalapp.Registry {
 	return terminalapp.NewRegistry(terminalapp.Config{
 		Cwd:     cfg.Cwd,
-		Store:   state.NewDeviceStore(cfg.Runtime.StateDir, cfg.Agent.DeviceId),
+		Store:   store,
 		LogDir:  cfg.LogDir,
 		History: cfg.History,
 		Manager: gopty.NewManager(),
@@ -353,11 +391,15 @@ func newWebTerminalRegistry(cfg config.Config, logger *logging.Logger) *terminal
 	})
 }
 
-func runWorkspaceList(cfg config.Config, stdout io.Writer) (Result, error) {
+func runWorkspaceList(ctx context.Context, cfg config.Config, stdout io.Writer) (Result, error) {
 	if stdout == nil {
 		stdout = io.Discard
 	}
-	store := state.NewStore(cfg.Runtime.StateDir)
+	store, cleanup, err := runtimeStateStore(ctx, cfg)
+	if err != nil {
+		return Result{Cwd: cfg.Cwd}, err
+	}
+	defer cleanup()
 	workspaces, warnings, err := store.ListWorkspaces()
 	if err != nil {
 		return Result{Cwd: cfg.Cwd}, apperrors.Runtime("list workspaces", err)
@@ -380,11 +422,15 @@ func runWorkspaceList(cfg config.Config, stdout io.Writer) (Result, error) {
 	return Result{Cwd: cfg.Cwd}, nil
 }
 
-func runSessionList(cfg config.Config, stdout io.Writer) (Result, error) {
+func runSessionList(ctx context.Context, cfg config.Config, stdout io.Writer) (Result, error) {
 	if stdout == nil {
 		stdout = io.Discard
 	}
-	store := state.NewStore(cfg.Runtime.StateDir)
+	store, cleanup, err := runtimeStateStore(ctx, cfg)
+	if err != nil {
+		return Result{Cwd: cfg.Cwd}, err
+	}
+	defer cleanup()
 	views, warnings, err := store.ListSessions()
 	if err != nil {
 		return Result{Cwd: cfg.Cwd}, apperrors.Runtime("list sessions", err)
@@ -413,6 +459,28 @@ func runSessionList(cfg config.Config, stdout io.Writer) (Result, error) {
 	}
 	_ = w.Flush()
 	return Result{Cwd: cfg.Cwd}, nil
+}
+
+func runtimeStateStore(ctx context.Context, cfg config.Config) (state.DBStore, func(), error) {
+	device, err := agent.LoadOrCreateDevice(agent.DeviceOptions{StateDir: cfg.Runtime.StateDir, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName})
+	if err != nil {
+		return state.DBStore{}, func() {}, err
+	}
+	db, err := database.Open(ctx, cfg.Database)
+	if err != nil {
+		return state.DBStore{}, func() {}, err
+	}
+	cleanup := func() { _ = db.Close() }
+	if err := database.Migrate(ctx, db.DB, db.Driver); err != nil {
+		cleanup()
+		return state.DBStore{}, func() {}, err
+	}
+	deviceRepository := devicerepo.New(db.DB, db.Driver)
+	if _, err := deviceRepository.UpsertLocalDevice(ctx, devicerepo.Device{ID: device.Id, Name: device.Name, PublicKey: device.PublicKey}); err != nil {
+		cleanup()
+		return state.DBStore{}, func() {}, apperrors.Runtime("upsert local device", err)
+	}
+	return state.NewDBStore(db.DB, db.Driver, filepath.Join(cfg.Runtime.StateDir, "devices", device.Id), device.Id), cleanup, nil
 }
 
 func processEnv() []string {

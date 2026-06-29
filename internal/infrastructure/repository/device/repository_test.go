@@ -28,6 +28,13 @@ func TestRepositoryUpsertsListsAndDeletesUserDeviceBindings(t *testing.T) {
 	if len(devices) != 1 || devices[0].ID != "dev-1" || devices[0].PublicKey != "key-1" {
 		t.Fatalf("devices for user-1 = %#v", devices)
 	}
+	publicKey, err := repo.PublicKey(ctx, "dev-1")
+	if err != nil {
+		t.Fatalf("PublicKey(dev-1) error = %v", err)
+	}
+	if publicKey != "key-1" {
+		t.Fatalf("PublicKey(dev-1) = %q, want key-1", publicKey)
+	}
 	owns, err := repo.UserOwnsDevice(ctx, "user-1", "dev-2")
 	if err != nil {
 		t.Fatalf("UserOwnsDevice() error = %v", err)
@@ -48,6 +55,34 @@ func TestRepositoryUpsertsListsAndDeletesUserDeviceBindings(t *testing.T) {
 	}
 	if _, err := repo.PublicKey(ctx, "dev-1"); err == nil {
 		t.Fatal("PublicKey(dev-1) error = nil, want deleted key error")
+	}
+}
+
+func TestRepositoryUpsertsLocalDeviceWithoutUserBinding(t *testing.T) {
+	repo, db := newTestRepository(t)
+	ctx := context.Background()
+
+	stored, err := repo.UpsertLocalDevice(ctx, Device{ID: "dev-local", Name: "local", PublicKey: "key-local"})
+	if err != nil {
+		t.Fatalf("UpsertLocalDevice() error = %v", err)
+	}
+	if stored.ID != "dev-local" || stored.Name != "local" || stored.PublicKey != "key-local" {
+		t.Fatalf("UpsertLocalDevice() = %#v", stored)
+	}
+	var bindingCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM user_devices WHERE device_id=?`, "dev-local").Scan(&bindingCount); err != nil {
+		t.Fatalf("query user_devices count error = %v", err)
+	}
+	if bindingCount != 0 {
+		t.Fatalf("user_devices count for local device = %d, want 0", bindingCount)
+	}
+
+	updated, err := repo.UpsertLocalDevice(ctx, Device{ID: "dev-local", Name: "renamed"})
+	if err != nil {
+		t.Fatalf("UpsertLocalDevice(update) error = %v", err)
+	}
+	if updated.Name != "renamed" || updated.PublicKey != "key-local" {
+		t.Fatalf("UpsertLocalDevice(update) = %#v, want renamed with preserved key", updated)
 	}
 }
 
@@ -90,10 +125,8 @@ func newTestRepository(t *testing.T) (*Repository, *sql.DB) {
 	statements := []string{
 		`PRAGMA foreign_keys = ON`,
 		`CREATE TABLE users (id TEXT PRIMARY KEY, email_normalized TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL DEFAULT '', status TEXT NOT NULL, email_verified_at TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_login_at TEXT NULL)`,
-		`CREATE TABLE devices (id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
+		`CREATE TABLE devices (id TEXT PRIMARY KEY, name TEXT NOT NULL, public_key TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
 		`CREATE TABLE user_devices (user_id TEXT NOT NULL, device_id TEXT NOT NULL, role TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (user_id, device_id), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE)`,
-		`CREATE TABLE device_keys (id TEXT PRIMARY KEY, device_id TEXT NOT NULL, public_key TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE)`,
-		`CREATE INDEX idx_device_keys_device ON device_keys(device_id, created_at)`,
 		`CREATE TABLE device_binding_codes (code_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, used_at TEXT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`,
 	}
 	for _, statement := range statements {

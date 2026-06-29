@@ -19,6 +19,7 @@ const (
 	CommandWorkspace CommandKind = "workspace"
 	CommandSession   CommandKind = "session"
 	CommandServe     CommandKind = "serve"
+	CommandMigrate   CommandKind = "migrate"
 )
 
 type ExecOptions struct {
@@ -152,6 +153,12 @@ func Parse(args []string, output io.Writer) (Options, error) {
 	case "serve":
 		options.Kind = CommandServe
 		return parseServe(options, rest, output)
+	case "migrate":
+		options.Kind = CommandMigrate
+		if len(rest) > 0 {
+			return Options{}, apperrors.Usage("migrate does not accept arguments")
+		}
+		return options, nil
 	default:
 		return Options{}, apperrors.Usage("unknown command: " + command)
 	}
@@ -214,7 +221,7 @@ func parseExec(options Options, args []string, output io.Writer) (Options, error
 
 func isCommand(arg string) bool {
 	switch arg {
-	case "exec", "workspace", "session", "serve":
+	case "exec", "workspace", "session", "serve", "migrate":
 		return true
 	default:
 		return false
@@ -230,6 +237,7 @@ func PrintUsage(w io.Writer) {
 	fmt.Fprintln(w, "  workspace  list workspaces")
 	fmt.Fprintln(w, "  session    list sessions")
 	fmt.Fprintln(w, "  serve      start unified backend service and Agent connector")
+	fmt.Fprintln(w, "  migrate    run database migrations")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
 	fmt.Fprintln(w, "  --cwd <dir>     working directory for TermBridge; defaults to current directory")
@@ -245,6 +253,7 @@ func PrintUsage(w io.Writer) {
 	fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- codex")
 	fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- pwsh")
 	fmt.Fprintln(w, "  termbridge serve")
+	fmt.Fprintln(w, "  termbridge migrate")
 }
 
 func PrintExecUsage(w io.Writer) {

@@ -42,7 +42,7 @@ func TestParseExecCommandWithExplicitCwd(t *testing.T) {
 	}
 }
 
-func TestParseWorkspaceAndSessionCommands(t *testing.T) {
+func TestParseWorkspaceSessionAndMigrateCommands(t *testing.T) {
 	workspace, err := Parse([]string{"workspace"}, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("Parse(workspace) error = %v", err)
@@ -56,6 +56,13 @@ func TestParseWorkspaceAndSessionCommands(t *testing.T) {
 	}
 	if session.Kind != CommandSession {
 		t.Fatalf("session.Kind = %q", session.Kind)
+	}
+	migrate, err := Parse([]string{"migrate"}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("Parse(migrate) error = %v", err)
+	}
+	if migrate.Kind != CommandMigrate {
+		t.Fatalf("migrate.Kind = %q", migrate.Kind)
 	}
 }
 
@@ -206,6 +213,7 @@ func TestRunHelpWritesStdoutOnly(t *testing.T) {
 		"workspace",
 		"session",
 		"serve",
+		"migrate",
 		"termbridge exec -- claude",
 		"termbridge --cwd D:\\project exec -- codex",
 		"termbridge serve",
@@ -311,12 +319,15 @@ func TestRunCommandCreatesLogStateAndReturnsCommandExitCode(t *testing.T) {
 	if len(matches) != 0 {
 		t.Fatalf("exit.json matches = %#v, want none", matches)
 	}
-	workspaceMatches, err := filepath.Glob(filepath.Join(cwd, ".termbridge", "workspaces", "*", "workspace.json"))
+	if _, err := os.Stat(filepath.Join(cwd, ".termbridge", "termbridge.db")); err != nil {
+		t.Fatalf("runtime database missing: %v", err)
+	}
+	historyMatches, err := filepath.Glob(filepath.Join(cwd, ".termbridge", "devices", "*", "workspaces", "*", "sessions", "*", "history.log"))
 	if err != nil {
 		t.Fatalf("Glob() error = %v", err)
 	}
-	if len(workspaceMatches) != 1 {
-		t.Fatalf("workspace.json matches = %#v", workspaceMatches)
+	if len(historyMatches) != 1 {
+		t.Fatalf("history.log matches = %#v", historyMatches)
 	}
 }
 

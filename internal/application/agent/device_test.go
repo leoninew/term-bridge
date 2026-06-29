@@ -18,9 +18,6 @@ func TestLoadOrCreateDeviceCreatesConfigIdentity(t *testing.T) {
 		t.Fatalf("device = %#v", device)
 	}
 	deviceDir := filepath.Join(stateDir, "devices", "dev-1")
-	if _, err := os.Stat(filepath.Join(deviceDir, DeviceFileName)); err != nil {
-		t.Fatalf("device file missing: %v", err)
-	}
 	if _, err := os.Stat(filepath.Join(deviceDir, PrivateKeyFileName)); err != nil {
 		t.Fatalf("private key file missing: %v", err)
 	}
@@ -44,7 +41,7 @@ func TestLoadOrCreateDeviceUpdatesConfiguredNameAndKeepsKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second LoadOrCreateDevice() error = %v", err)
 	}
-	if second.Id != first.Id || second.Name != "custom" || second.PublicKey != first.PublicKey || !second.CreatedAt.Equal(first.CreatedAt) || !second.UpdatedAt.Equal(updatedAt) {
+	if second.Id != first.Id || second.Name != "custom" || second.PublicKey != first.PublicKey || !second.CreatedAt.Equal(updatedAt) || !second.UpdatedAt.Equal(updatedAt) {
 		t.Fatalf("second = %#v, first = %#v", second, first)
 	}
 }
@@ -56,13 +53,13 @@ func TestLoadOrCreateDeviceRejectsMissingConfig(t *testing.T) {
 	}
 }
 
-func TestLoadOrCreateDeviceRejectsBadFile(t *testing.T) {
+func TestLoadOrCreateDeviceRejectsBadPrivateKey(t *testing.T) {
 	stateDir := t.TempDir()
-	path := filepath.Join(stateDir, "devices", "dev-1", DeviceFileName)
+	path := filepath.Join(stateDir, "devices", "dev-1", PrivateKeyFileName)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
-	if err := os.WriteFile(path, []byte("not json"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("not pem"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 	_, err := LoadOrCreateDevice(DeviceOptions{StateDir: stateDir, DeviceId: "dev-1", DeviceName: "local"})

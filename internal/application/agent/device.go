@@ -4,7 +4,6 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -15,7 +14,6 @@ import (
 
 const (
 	DeviceSchemaVersion = 1
-	DeviceFileName      = "device.json"
 	PrivateKeyFileName  = "private_key.pem"
 	PublicKeyFileName   = "public_key.pem"
 )
@@ -57,26 +55,7 @@ func LoadOrCreateDevice(options DeviceOptions) (Device, error) {
 	if err != nil {
 		return Device{}, err
 	}
-	path := filepath.Join(deviceDir, DeviceFileName)
-	device, err := readDevice(path)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return Device{}, err
-		}
-		device = Device{SchemaVersion: DeviceSchemaVersion, Id: deviceId, Name: deviceName, CreatedAt: now}
-	}
-	device.SchemaVersion = DeviceSchemaVersion
-	device.Id = deviceId
-	device.Name = deviceName
-	device.PublicKey = keys.PublicKeyBase64
-	if device.CreatedAt.IsZero() {
-		device.CreatedAt = now
-	}
-	device.UpdatedAt = now
-	if err := writeDevice(path, device); err != nil {
-		return Device{}, err
-	}
-	return device, nil
+	return Device{SchemaVersion: DeviceSchemaVersion, Id: deviceId, Name: deviceName, PublicKey: keys.PublicKeyBase64, CreatedAt: now, UpdatedAt: now}, nil
 }
 
 type deviceKeys struct {
@@ -146,39 +125,6 @@ func readPrivateKey(path string) (ed25519.PrivateKey, error) {
 func writePEMFile(path string, blockType string, data []byte, perm os.FileMode) error {
 	encoded := pem.EncodeToMemory(&pem.Block{Type: blockType, Bytes: data})
 	return writeFileAtomic(path, encoded, perm)
-}
-
-func readDevice(path string) (Device, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Device{}, err
-	}
-	var device Device
-	if err := json.Unmarshal(data, &device); err != nil {
-		return Device{}, fmt.Errorf("read device identity: %w", err)
-	}
-	if device.SchemaVersion != 0 && device.SchemaVersion != DeviceSchemaVersion {
-		return Device{}, fmt.Errorf("read device identity: unsupported schema_version %d", device.SchemaVersion)
-	}
-	if strings.TrimSpace(device.Id) == "" {
-		return Device{}, fmt.Errorf("read device identity: missing id")
-	}
-	if strings.TrimSpace(device.Name) == "" {
-		return Device{}, fmt.Errorf("read device identity: missing name")
-	}
-	if device.CreatedAt.IsZero() {
-		return Device{}, fmt.Errorf("read device identity: missing created_at")
-	}
-	return device, nil
-}
-
-func writeDevice(path string, device Device) error {
-	data, err := json.MarshalIndent(device, "", "  ")
-	if err != nil {
-		return err
-	}
-	data = append(data, '\n')
-	return writeFileAtomic(path, data, 0o644)
 }
 
 func writeFileAtomic(path string, data []byte, perm os.FileMode) error {

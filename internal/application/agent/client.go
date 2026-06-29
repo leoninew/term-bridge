@@ -36,6 +36,10 @@ type Client struct {
 	terms  map[tunnel.StreamId]chan tunnel.Frame
 }
 
+func (c *Client) SetDevice(device Device) {
+	c.device = device
+}
+
 func New(config Config) *Client {
 	return &Client{config: config, terms: map[tunnel.StreamId]chan tunnel.Frame{}}
 }
@@ -53,9 +57,13 @@ func (c *Client) logWarn(message string, attrs ...any) {
 }
 
 func (c *Client) Run(ctx context.Context) error {
-	device, err := LoadOrCreateDevice(DeviceOptions{StateDir: c.config.StateDir, DeviceId: c.config.DeviceId, DeviceName: c.config.DeviceName})
-	if err != nil {
-		return err
+	device := c.device
+	if strings.TrimSpace(device.Id) == "" {
+		loaded, err := LoadOrCreateDevice(DeviceOptions{StateDir: c.config.StateDir, DeviceId: c.config.DeviceId, DeviceName: c.config.DeviceName})
+		if err != nil {
+			return err
+		}
+		device = loaded
 	}
 	c.device = device
 	header, err := c.tunnelHeader(device)
