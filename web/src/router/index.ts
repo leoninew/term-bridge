@@ -9,7 +9,6 @@ const skipAuthGuardRoutes = [
   'forgot-password',
   'google-callback',
   'reset-password',
-  'setup',
 ]
 
 export const router = createRouter({
@@ -51,19 +50,20 @@ export const router = createRouter({
       component: () => import('../views/ResetPasswordView.vue'),
     },
     {
-      path: '/setup',
-      name: 'setup',
-      component: () => import('../views/SetupView.vue'),
-    },
-    {
       path: '/connect',
       name: 'connect',
       component: () => import('../views/ConnectView.vue'),
     },
     {
-      path: '/device-bindings/authorize',
-      name: 'device-binding-authorize',
-      component: () => import('../views/DeviceBindingAuthorizeView.vue'),
+      path: '/oauth2/authorize',
+      alias: '/cloud/connect/authorize',
+      name: 'cloud-connect-authorize',
+      component: () => import('../views/CloudConnectAuthorizeView.vue'),
+    },
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: () => import('../views/DashboardView.vue'),
     },
     {
       path: '/sessions',
@@ -92,10 +92,12 @@ router.beforeEach(async (to) => {
   }
 
   await gateway.initializeAuth()
+  if (gateway.capabilities?.mode === 'local') {
+    return
+  }
   if (!gateway.authenticated) {
-    const setupAvailable = await gateway.checkSetupStatus()
     return {
-      name: setupAvailable ? 'setup' : 'login',
+      name: 'login',
       query: { redirect: to.fullPath },
     }
   }

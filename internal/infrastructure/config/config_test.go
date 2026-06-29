@@ -65,8 +65,20 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Agent.ConnectUrl != "http://127.0.0.1:9030" {
 		t.Fatalf("Agent.ConnectUrl = %q, want listen URL", cfg.Agent.ConnectUrl)
 	}
-	if cfg.Cloud.CallbackBaseUrl != "http://127.0.0.1:9030" {
-		t.Fatalf("Cloud.CallbackBaseUrl = %q, want local callback base URL", cfg.Cloud.CallbackBaseUrl)
+	if cfg.Cloud.GateUrl != "http://termbridge.lvh.me" {
+		t.Fatalf("Cloud.GateUrl = %q, want default Cloud Gate URL", cfg.Cloud.GateUrl)
+	}
+	if cfg.Cloud.OAuth.ClientID != "termbridge-local" {
+		t.Fatalf("Cloud.OAuth.ClientID = %q, want default local OAuth2 client ID", cfg.Cloud.OAuth.ClientID)
+	}
+	if cfg.Cloud.OAuth.ClientSecret != "" {
+		t.Fatalf("Cloud.OAuth.ClientSecret = %q, want empty public-client secret", cfg.Cloud.OAuth.ClientSecret)
+	}
+	if cfg.Cloud.OAuth.RedirectURL != "http://127.0.0.1:9030/cloud/connect/callback" {
+		t.Fatalf("Cloud.OAuth.RedirectURL = %q, want local OAuth2 redirect URL", cfg.Cloud.OAuth.RedirectURL)
+	}
+	if !reflect.DeepEqual(cfg.Cloud.OAuth.Scopes, []string{"openid", "email", "profile"}) {
+		t.Fatalf("Cloud.OAuth.Scopes = %#v", cfg.Cloud.OAuth.Scopes)
 	}
 	if cfg.Agent.DeviceId != "" || cfg.Agent.DeviceName != "" {
 		t.Fatalf("Agent = %#v, want empty identity", cfg.Agent)

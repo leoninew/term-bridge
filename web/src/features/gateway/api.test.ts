@@ -7,7 +7,7 @@ vi.mock('../../router', () => ({
   },
 }))
 
-import { authSetupStatus } from './api'
+import { cloudConnectAuthorize, cloudConnectStartURL } from './api'
 import { apiClient } from '../api/client'
 
 describe('gateway api', () => {
@@ -15,17 +15,30 @@ describe('gateway api', () => {
     vi.restoreAllMocks()
   })
 
-  it('reads local setup status from the gateway', async () => {
-    const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { available: true } })
-
-    await expect(authSetupStatus()).resolves.toEqual({ available: true })
-
-    expect(get).toHaveBeenCalledWith('/api/auth/setup/status')
+  it('uses the product cloud connect start route', () => {
+    expect(cloudConnectStartURL()).toBe('/cloud/connect/start')
   })
 
-  it('returns unavailable setup status', async () => {
-    vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { available: false } })
+  it('uses redirect_uri when authorizing cloud connect', async () => {
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+      data: { redirect_url: 'http://127.0.0.1/callback?code=code-1&state=state-1' },
+    })
 
-    await expect(authSetupStatus()).resolves.toEqual({ available: false })
+    await expect(cloudConnectAuthorize('http://127.0.0.1/callback', 'state-1')).resolves.toBe(
+      'http://127.0.0.1/callback?code=code-1&state=state-1',
+    )
+
+    expect(get).toHaveBeenCalledWith('/api/cloud-connect/authorize', {
+      params: { redirect_uri: 'http://127.0.0.1/callback', state: 'state-1' },
+    })
+  })
+
+  it('lists devices from the gateway', async () => {
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: [] })
+
+    const { listDevices } = await import('./api')
+    await expect(listDevices()).resolves.toEqual([])
+
+    expect(get).toHaveBeenCalledWith('/api/devices')
   })
 })

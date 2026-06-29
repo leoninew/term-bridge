@@ -4,7 +4,6 @@ import { readStorageValue, removeStorageValue, writeStorageValue } from './stora
 import {
   authLogin,
   authMe,
-  authSetupStatus,
   listDevices,
   type AuthCapabilities,
   type DeviceSummary,
@@ -18,10 +17,6 @@ type InitializeAuthOptions = {
   force?: boolean
 }
 
-type CheckSetupStatusOptions = {
-  force?: boolean
-}
-
 export const useGatewayStore = defineStore('gateway', () => {
   const token = ref<string | null>(readStorageValue(TOKEN_KEY))
   const authInitialized = ref(false)
@@ -31,7 +26,6 @@ export const useGatewayStore = defineStore('gateway', () => {
   const passwordInput = ref('')
   const user = ref<UserInfo | null>(null)
   const capabilities = ref<AuthCapabilities | null>(null)
-  const setupAvailable = ref<boolean | null>(null)
   const devices = ref<DeviceSummary[]>([])
   const selectedDeviceId = ref('')
   let initializedToken: string | null | undefined
@@ -51,14 +45,6 @@ export const useGatewayStore = defineStore('gateway', () => {
   }
 
   async function initializeAuth(options: InitializeAuthOptions = {}) {
-    if (!token.value) {
-      authenticated.value = false
-      user.value = null
-      capabilities.value = null
-      authInitialized.value = true
-      initializedToken = null
-      return
-    }
     if (!options.force && authInitialized.value && initializedToken === token.value) {
       return
     }
@@ -94,20 +80,6 @@ export const useGatewayStore = defineStore('gateway', () => {
     }
   }
 
-  async function checkSetupStatus(options: CheckSetupStatusOptions = {}) {
-    if (!options.force && setupAvailable.value !== null) {
-      return setupAvailable.value
-    }
-    try {
-      const response = await authSetupStatus()
-      setupAvailable.value = response.available
-      return setupAvailable.value
-    } catch {
-      setupAvailable.value = false
-      return false
-    }
-  }
-
   async function loadDevices() {
     devices.value = await listDevices()
     if (devices.value.some((device) => device.id === selectedDeviceId.value && device.online)) {
@@ -131,7 +103,6 @@ export const useGatewayStore = defineStore('gateway', () => {
     authenticated.value = false
     user.value = null
     capabilities.value = null
-    setupAvailable.value = null
     initializedToken = undefined
   }
 
@@ -149,14 +120,12 @@ export const useGatewayStore = defineStore('gateway', () => {
     passwordInput,
     user,
     capabilities,
-    setupAvailable,
     devices,
     selectedDeviceId,
     setToken,
     clearToken,
     initializeAuth,
     login,
-    checkSetupStatus,
     loadDevices,
     selectDeviceId,
   }

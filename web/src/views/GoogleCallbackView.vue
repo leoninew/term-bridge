@@ -32,7 +32,7 @@
     removeStorageValue(OAUTH_REDIRECT_KEY)
     return redirect && redirect.startsWith('/') && !redirect.startsWith('//')
       ? redirect
-      : { name: 'sessions' }
+      : { name: 'dashboard' }
   }
 
   onMounted(async () => {

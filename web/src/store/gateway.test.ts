@@ -3,14 +3,14 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useGatewayStore } from './gateway'
 
 const mocks = vi.hoisted(() => ({
-  authSetupStatus: vi.fn(),
+  authMe: vi.fn(),
+  listDevices: vi.fn(),
 }))
 
 vi.mock('../features/gateway/api', () => ({
   authLogin: vi.fn(),
-  authMe: vi.fn(),
-  authSetupStatus: mocks.authSetupStatus,
-  listDevices: vi.fn(),
+  authMe: mocks.authMe,
+  listDevices: mocks.listDevices,
 }))
 
 function storageMock(): Storage {
@@ -34,46 +34,52 @@ describe('gateway store', () => {
     setActivePinia(createPinia())
   })
 
-  it('checks and caches available local setup status without a token', async () => {
-    mocks.authSetupStatus.mockResolvedValueOnce({ available: true })
+  it('loads local mode capabilities without requiring a token', async () => {
+    mocks.authMe.mockResolvedValueOnce({
+      authenticated: false,
+      capabilities: {
+        mode: 'local',
+        providers: [],
+        password_reset_enabled: false,
+        email_verification_enabled: false,
+        account_auth_enabled: false,
+        cloud_connect_enabled: false,
+      },
+    })
     const store = useGatewayStore()
 
-    await expect(store.checkSetupStatus()).resolves.toBe(true)
-    await expect(store.checkSetupStatus()).resolves.toBe(true)
+    await store.initializeAuth()
 
-    expect(store.setupAvailable).toBe(true)
     expect(store.authenticated).toBe(false)
-    expect(mocks.authSetupStatus).toHaveBeenCalledTimes(1)
+    expect(store.capabilities?.mode).toBe('local')
+    expect(mocks.authMe).toHaveBeenCalledTimes(1)
   })
 
-  it('records unavailable local setup status', async () => {
-    mocks.authSetupStatus.mockResolvedValueOnce({ available: false })
+  it('keeps dashboard in no-device state when cloud user has no devices', async () => {
+    mocks.listDevices.mockResolvedValueOnce([])
     const store = useGatewayStore()
 
-    await expect(store.checkSetupStatus()).resolves.toBe(false)
+    await store.loadDevices()
 
-    expect(store.setupAvailable).toBe(false)
+    expect(store.devices).toEqual([])
+    expect(store.selectedDeviceId).toBe('')
   })
 
-  it('falls back to unavailable when setup status cannot be read', async () => {
-    mocks.authSetupStatus.mockRejectedValueOnce(new Error('offline'))
+  it('auto-selects the only online device for dashboard workbench entry', async () => {
+    mocks.listDevices.mockResolvedValueOnce([
+      {
+        id: 'dev-1',
+        name: 'Laptop',
+        online: true,
+        status: 'online',
+        connected_at: '2026-06-28T10:00:00Z',
+        last_seen: '2026-06-28T10:00:00Z',
+      },
+    ])
     const store = useGatewayStore()
 
-    await expect(store.checkSetupStatus()).resolves.toBe(false)
+    await store.loadDevices()
 
-    expect(store.setupAvailable).toBe(false)
-  })
-
-  it('can force refresh cached setup status', async () => {
-    mocks.authSetupStatus
-      .mockResolvedValueOnce({ available: true })
-      .mockResolvedValueOnce({ available: false })
-    const store = useGatewayStore()
-
-    await expect(store.checkSetupStatus()).resolves.toBe(true)
-    await expect(store.checkSetupStatus({ force: true })).resolves.toBe(false)
-
-    expect(store.setupAvailable).toBe(false)
-    expect(mocks.authSetupStatus).toHaveBeenCalledTimes(2)
+    expect(store.selectedDeviceId).toBe('dev-1')
   })
 })

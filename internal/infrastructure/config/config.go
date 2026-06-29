@@ -24,6 +24,9 @@ const (
 	EnvFileName     = ".env"
 	EnvPrefix       = "TERMBRIDGE"
 
+	WebModeLocal = "local"
+	WebModeCloud = "cloud"
+
 	DefaultAuthUsername = "admin"
 	DefaultAuthPassword = "admin"
 	DefaultListenURL    = "http://127.0.0.1:9030"
@@ -122,6 +125,7 @@ type RuntimeConfig struct {
 
 type WebConfig struct {
 	StaticDir string
+	Mode      string
 }
 
 type GateConfig struct {
@@ -146,8 +150,15 @@ type AgentConfig struct {
 }
 
 type CloudConfig struct {
-	GateUrl         string
-	CallbackBaseUrl string
+	GateUrl string
+	OAuth   CloudOAuthConfig
+}
+
+type CloudOAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	Scopes       []string
 }
 
 type BootstrapResult struct {
@@ -226,8 +237,11 @@ func Load(options Options) (Config, error) {
 			MaxBytes:     v.GetInt64("history.max_bytes"),
 			MaxLineBytes: v.GetInt("history.max_line_bytes"),
 		},
-		Runtime:  RuntimeConfig{StateDir: stateDir},
-		Web:      WebConfig{StaticDir: staticDir},
+		Runtime: RuntimeConfig{StateDir: stateDir},
+		Web: WebConfig{
+			StaticDir: staticDir,
+			Mode:      strings.ToLower(strings.TrimSpace(v.GetString("web.mode"))),
+		},
 		Database: database,
 		Gate: GateConfig{
 			Browser: GateBrowserConfig{
@@ -245,8 +259,13 @@ func Load(options Options) (Config, error) {
 			DeviceName: strings.TrimSpace(v.GetString("agent.device_name")),
 		},
 		Cloud: CloudConfig{
-			GateUrl:         strings.TrimSpace(v.GetString("cloud.gate_url")),
-			CallbackBaseUrl: strings.TrimSpace(v.GetString("cloud.callback_base_url")),
+			GateUrl: strings.TrimSpace(v.GetString("cloud.gate_url")),
+			OAuth: CloudOAuthConfig{
+				ClientID:     strings.TrimSpace(v.GetString("cloud.oauth.client_id")),
+				ClientSecret: strings.TrimSpace(v.GetString("cloud.oauth.client_secret")),
+				RedirectURL:  strings.TrimSpace(v.GetString("cloud.oauth.redirect_url")),
+				Scopes:       getStringSlice(v, "cloud.oauth.scopes"),
+			},
 		},
 		Auth: AuthConfig{
 			Username: strings.TrimSpace(v.GetString("auth.local_admin.username")),
@@ -289,6 +308,10 @@ func Load(options Options) (Config, error) {
 		return Config{}, err
 	}
 	normalizeLogBodyLimits(&cfg)
+	normalizeWebConfig(&cfg)
+	if err := validateWeb(cfg.Web); err != nil {
+		return Config{}, err
+	}
 	if err := validateHistory(cfg.History); err != nil {
 		return Config{}, err
 	}
@@ -300,7 +323,7 @@ func Load(options Options) (Config, error) {
 		return Config{}, err
 	}
 	normalizeCloudConfig(&cfg)
-	if err := validateCloud(cfg.Cloud); err != nil {
+	if err := validateCloud(cfg); err != nil {
 		return Config{}, err
 	}
 	if cfg.JWT.SecretKey == "" {
@@ -327,15 +350,20 @@ func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
 	return updated, BootstrapResult{ConfigFile: updated.ConfigFile}, nil
 }
 
-func IsLocalMode(cfg Config) bool {
+func IsSelfConnectedAgent(cfg Config) bool {
 	return normalizeModeURL(cfg.Agent.ConnectUrl) == normalizeModeURL(cfg.Agent.ListenUrl)
 }
 
+func IsLocalMode(cfg Config) bool {
+	return cfg.Web.Mode == WebModeLocal
+}
+
+func IsCloudMode(cfg Config) bool {
+	return cfg.Web.Mode == WebModeCloud
+}
+
 func Mode(cfg Config) string {
-	if IsLocalMode(cfg) {
-		return "local"
-	}
-	return "remote"
+	return cfg.Web.Mode
 }
 
 func loadDatabaseConfig(cwd string, v *viper.Viper) (DatabaseConfig, error) {
@@ -383,7 +411,7 @@ func validateAuth(cfg AuthConfig) error {
 }
 
 func validateModeRequirements(cfg Config) error {
-	if IsLocalMode(cfg) {
+	if !IsCloudMode(cfg) {
 		return nil
 	}
 	missing := []string{}
@@ -558,6 +586,7 @@ func configKeys() []string {
 		"history.max_line_bytes",
 		"runtime.state_dir",
 		"web.static_dir",
+		"web.mode",
 		"gate.browser.allowed_origins",
 		"gate.api.expose_errors",
 		"agent.listen_url",
@@ -566,7 +595,10 @@ func configKeys() []string {
 		"agent.device_id",
 		"agent.device_name",
 		"cloud.gate_url",
-		"cloud.callback_base_url",
+		"cloud.oauth.client_id",
+		"cloud.oauth.client_secret",
+		"cloud.oauth.redirect_url",
+		"cloud.oauth.scopes",
 		"database.driver",
 		"database.sqlite.path",
 		"database.mysql.dsn",
@@ -698,6 +730,22 @@ func validateGate(cfg GateConfig) error {
 	return nil
 }
 
+func normalizeWebConfig(cfg *Config) {
+	cfg.Web.Mode = strings.ToLower(strings.TrimSpace(cfg.Web.Mode))
+	if cfg.Web.Mode == "" {
+		cfg.Web.Mode = WebModeLocal
+	}
+}
+
+func validateWeb(cfg WebConfig) error {
+	switch cfg.Mode {
+	case WebModeLocal, WebModeCloud:
+		return nil
+	default:
+		return apperrors.Config("invalid web.mode", fmt.Errorf("must be local or cloud"))
+	}
+}
+
 func normalizeAgentConfig(cfg *Config) {
 	cfg.Agent.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.ListenUrl), "/")
 	cfg.Agent.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.PublicUrl), "/")
@@ -710,7 +758,12 @@ func normalizeAgentConfig(cfg *Config) {
 
 func normalizeCloudConfig(cfg *Config) {
 	cfg.Cloud.GateUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.GateUrl), "/")
-	cfg.Cloud.CallbackBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.CallbackBaseUrl), "/")
+	cfg.Cloud.OAuth.ClientID = strings.TrimSpace(cfg.Cloud.OAuth.ClientID)
+	cfg.Cloud.OAuth.ClientSecret = strings.TrimSpace(cfg.Cloud.OAuth.ClientSecret)
+	cfg.Cloud.OAuth.RedirectURL = strings.TrimRight(strings.TrimSpace(cfg.Cloud.OAuth.RedirectURL), "/")
+	if len(cfg.Cloud.OAuth.Scopes) == 0 {
+		cfg.Cloud.OAuth.Scopes = []string{"openid", "email", "profile"}
+	}
 }
 
 func validateAgent(cfg AgentConfig) error {
@@ -725,14 +778,14 @@ func validateAgent(cfg AgentConfig) error {
 	return validateHTTPURL("agent.connect_url", cfg.ConnectUrl, false)
 }
 
-func validateCloud(cfg CloudConfig) error {
-	if cfg.GateUrl != "" {
-		if err := validateHTTPURL("cloud.gate_url", cfg.GateUrl, false); err != nil {
+func validateCloud(cfg Config) error {
+	if cfg.Cloud.GateUrl != "" {
+		if err := validateHTTPURL("cloud.gate_url", cfg.Cloud.GateUrl, false); err != nil {
 			return err
 		}
 	}
-	if cfg.CallbackBaseUrl != "" {
-		if err := validateHTTPURL("cloud.callback_base_url", cfg.CallbackBaseUrl, false); err != nil {
+	if cfg.Cloud.OAuth.RedirectURL != "" {
+		if err := validateHTTPURL("cloud.oauth.redirect_url", cfg.Cloud.OAuth.RedirectURL, false); err != nil {
 			return err
 		}
 	}

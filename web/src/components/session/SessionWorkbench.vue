@@ -8,7 +8,7 @@
       @update:model-value="emit('activateTab', String($event))"
     >
       <div
-        class="flex h-11 shrink-0 items-center border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2"
+        class="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2"
       >
         <TabsList as-child>
           <VueDraggable
@@ -60,6 +60,13 @@
             </div>
           </VueDraggable>
         </TabsList>
+        <button
+          type="button"
+          class="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2.5 text-sm text-[var(--color-text)] hover:bg-[var(--color-control-hover)]"
+          @click="emit('openDashboard')"
+        >
+          {{ t('dashboard.title') }}
+        </button>
       </div>
 
       <CreateSessionPanel
@@ -162,6 +169,7 @@
     createWorkbench: [element: HTMLElement | null]
     terminalState: [message: ServerControlMessage]
     terminalError: [message: string]
+    openDashboard: []
   }>()
 
   const { t } = useI18n()

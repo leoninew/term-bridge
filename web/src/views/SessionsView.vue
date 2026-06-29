@@ -8,7 +8,7 @@
     </section>
 
     <SplitterGroup
-      v-else-if="gateway.authenticated"
+      v-else-if="gateway.capabilities?.mode === 'local' || gateway.authenticated"
       direction="horizontal"
       class="flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
     >
@@ -35,6 +35,7 @@
           @reorder-workspaces="reorderWorkspaces"
           @reorder-sessions="reorderSessions"
           @logout="logout"
+          @open-dashboard="openDashboard"
         />
       </SplitterPanel>
 
@@ -72,6 +73,7 @@
           @create-workbench="createSessionWorkbench = $event"
           @terminal-state="handleTerminalState"
           @terminal-error="handleTerminalError"
+          @open-dashboard="openDashboard"
         />
       </SplitterPanel>
     </SplitterGroup>
@@ -201,6 +203,10 @@
     workspaceSessions.reset()
     workbench.resetForSourceChange()
     await refresh()
+  }
+
+  async function openDashboard() {
+    await router.push({ name: 'dashboard' })
   }
 
   async function logout() {

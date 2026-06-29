@@ -1,7 +1,6 @@
 package gatewayapi
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/base64"
@@ -22,87 +21,76 @@ import (
 	gatewayauth "termbridge-go/internal/transport/http/gatewayapi/auth"
 )
 
-func TestCloudBindingStartRequiresLocalAccessAndReturnsAuthorizeURL(t *testing.T) {
-	setupStore := authapp.NewSetupTokenStore(t.TempDir())
-	setupToken, err := setupStore.Create(authapp.SetupTokenTTL)
-	if err != nil {
-		t.Fatalf("Create setup token error = %v", err)
-	}
-	authService := authapp.New(nil, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "local", nil, nil).WithLocalSetup(setupStore, "dev-1", "local")
-	token, err := authService.CompleteLocalSetup(context.Background(), setupToken)
-	if err != nil {
-		t.Fatalf("CompleteLocalSetup() error = %v", err)
-	}
-	gateway := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, CloudBindingAttemptStore: authapp.NewCloudBindingAttemptStore(t.TempDir()), CloudGateURL: "https://cloud.example.test", CloudCallbackBaseURL: "http://127.0.0.1:9030"})
+func TestCloudConnectStartReturnsAuthorizeRedirectInLocalMode(t *testing.T) {
+	authService := authapp.New(nil, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "local", nil, nil)
+	gateway := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, CloudBindingAttemptStore: authapp.NewCloudBindingAttemptStore(t.TempDir()), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: "http://127.0.0.1:9030/cloud/connect/callback", Scopes: []string{"openid", "email", "profile"}}, WebMode: "local"})
 
-	request := httptest.NewRequest(http.MethodPost, "/api/cloud-binding/start", nil)
-	request.Header.Set("Authorization", "Bearer "+token.Token)
+	request := httptest.NewRequest(http.MethodGet, "/cloud/connect/start", nil)
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, request)
-	if response.Code != http.StatusOK {
-		t.Fatalf("cloud binding start status = %d; body=%s", response.Code, response.Body.String())
+	if response.Code != http.StatusFound {
+		t.Fatalf("cloud connect start status = %d; body=%s", response.Code, response.Body.String())
 	}
-	var body struct {
-		AuthorizeURL string `json:"authorize_url"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if !strings.HasPrefix(body.AuthorizeURL, "https://cloud.example.test/device-bindings/authorize?") || !strings.Contains(body.AuthorizeURL, "callback=http%3A%2F%2F127.0.0.1%3A9030%2Fapi%2Fcloud-binding%2Fcallback") || !strings.Contains(body.AuthorizeURL, "state=") {
-		t.Fatalf("authorize_url = %q", body.AuthorizeURL)
+	location := response.Header().Get("Location")
+	if !strings.HasPrefix(location, "https://cloud.example.test/oauth2/authorize?") || !strings.Contains(location, "client_id=termbridge-local") || !strings.Contains(location, "redirect_uri=http%3A%2F%2F127.0.0.1%3A9030%2Fcloud%2Fconnect%2Fcallback") || !strings.Contains(location, "response_type=code") || !strings.Contains(location, "scope=openid+email+profile") || !strings.Contains(location, "state=") {
+		t.Fatalf("Location = %q", location)
 	}
 }
 
-func TestCloudBindingAuthorizeRejectsNonLoopbackCallback(t *testing.T) {
+func TestCloudConnectAuthorizeRejectsNonLoopbackCallback(t *testing.T) {
 	gateway := newCloudGatewayForTest(t)
 	token := cloudUserToken(t, gateway.authService, "user-1", "user-1@example.test")
-	request := httptest.NewRequest(http.MethodGet, "/api/device-bindings/authorize?callback=https://evil.example.test/callback&state=state-1", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/cloud-connect/authorize?redirect_uri=https://evil.example.test/callback&state=state-1", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, request)
 	assertAPIError(t, response, http.StatusBadRequest, errorCodeBadRequest)
 }
 
-func TestCloudBindingAuthorizeAndExchangeCreatesUserDevice(t *testing.T) {
+func TestCloudConnectAuthorizeExchangeAndCurrentDeviceReport(t *testing.T) {
 	gateway := newCloudGatewayForTest(t)
 	token := cloudUserToken(t, gateway.authService, "user-1", "user-1@example.test")
 
-	authorizeRequest := httptest.NewRequest(http.MethodGet, "/api/device-bindings/authorize?callback=http://127.0.0.1:9030/api/cloud-binding/callback&state=state-1", nil)
+	authorizeRequest := httptest.NewRequest(http.MethodGet, "/api/cloud-connect/authorize?redirect_uri=http://127.0.0.1:9030/cloud/connect/callback&state=state-1", nil)
 	authorizeRequest.Header.Set("Authorization", "Bearer "+token)
 	authorizeResponse := httptest.NewRecorder()
 	gateway.ServeHTTP(authorizeResponse, authorizeRequest)
-	if authorizeResponse.Code != http.StatusFound {
+	if authorizeResponse.Code != http.StatusOK {
 		t.Fatalf("authorize status = %d; body=%s", authorizeResponse.Code, authorizeResponse.Body.String())
 	}
-	location := authorizeResponse.Header().Get("Location")
-	if location == "" || !strings.Contains(location, "state=state-1") || !strings.Contains(location, "code=") {
-		t.Fatalf("authorize location = %q", location)
-	}
-
-	jsonAuthorizeRequest := httptest.NewRequest(http.MethodGet, "/api/device-bindings/authorize?callback=http://127.0.0.1:9030/api/cloud-binding/callback&state=state-2", nil)
-	jsonAuthorizeRequest.Header.Set("Authorization", "Bearer "+token)
-	jsonAuthorizeRequest.Header.Set("X-TermBridge-Authorize-Mode", "json")
-	jsonAuthorizeResponse := httptest.NewRecorder()
-	gateway.ServeHTTP(jsonAuthorizeResponse, jsonAuthorizeRequest)
-	if jsonAuthorizeResponse.Code != http.StatusOK {
-		t.Fatalf("json authorize status = %d; body=%s", jsonAuthorizeResponse.Code, jsonAuthorizeResponse.Body.String())
-	}
-	var jsonAuthorizeBody struct {
+	var authorizeBody struct {
 		RedirectURL string `json:"redirect_url"`
 	}
-	if err := json.Unmarshal(jsonAuthorizeResponse.Body.Bytes(), &jsonAuthorizeBody); err != nil {
-		t.Fatalf("decode json authorize response: %v", err)
+	if err := json.Unmarshal(authorizeResponse.Body.Bytes(), &authorizeBody); err != nil {
+		t.Fatalf("decode authorize response: %v", err)
 	}
-	if !strings.Contains(jsonAuthorizeBody.RedirectURL, "state=state-2") || !strings.Contains(jsonAuthorizeBody.RedirectURL, "code=") {
-		t.Fatalf("json authorize redirect_url = %q", jsonAuthorizeBody.RedirectURL)
+	if !strings.Contains(authorizeBody.RedirectURL, "state=state-1") || !strings.Contains(authorizeBody.RedirectURL, "code=") {
+		t.Fatalf("authorize redirect_url = %q", authorizeBody.RedirectURL)
 	}
-	callbackRequest := httptest.NewRequest(http.MethodGet, location, nil)
+	callbackRequest := httptest.NewRequest(http.MethodGet, authorizeBody.RedirectURL, nil)
 	code := callbackRequest.URL.Query().Get("code")
 
 	exchangeResponse := httptest.NewRecorder()
-	gateway.ServeHTTP(exchangeResponse, httptest.NewRequest(http.MethodPost, "/api/device-bindings/exchange", bytes.NewBufferString(`{"code":"`+code+`","device":{"id":"dev-1","name":"local","public_key":"`+base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))+`"}}`)))
+	gateway.ServeHTTP(exchangeResponse, httptest.NewRequest(http.MethodPost, "/api/cloud-connect/exchange", strings.NewReader(`{"code":"`+code+`"}`)))
 	if exchangeResponse.Code != http.StatusOK {
 		t.Fatalf("exchange status = %d; body=%s", exchangeResponse.Code, exchangeResponse.Body.String())
+	}
+	var tokenBody struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.Unmarshal(exchangeResponse.Body.Bytes(), &tokenBody); err != nil {
+		t.Fatalf("decode exchange response: %v", err)
+	}
+	if tokenBody.AccessToken == "" {
+		t.Fatal("exchange response access_token is empty")
+	}
+
+	reportRequest := httptest.NewRequest(http.MethodPost, "/api/devices/current", strings.NewReader(`{"id":"dev-1","name":"local"}`))
+	reportRequest.Header.Set("Authorization", "Bearer "+tokenBody.AccessToken)
+	reportResponse := httptest.NewRecorder()
+	gateway.ServeHTTP(reportResponse, reportRequest)
+	if reportResponse.Code != http.StatusOK {
+		t.Fatalf("current device report status = %d; body=%s", reportResponse.Code, reportResponse.Body.String())
 	}
 
 	devicesRequest := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
@@ -121,7 +109,7 @@ func TestCloudBindingAuthorizeAndExchangeCreatesUserDevice(t *testing.T) {
 	}
 
 	reuseResponse := httptest.NewRecorder()
-	gateway.ServeHTTP(reuseResponse, httptest.NewRequest(http.MethodPost, "/api/device-bindings/exchange", bytes.NewBufferString(`{"code":"`+code+`","device":{"id":"dev-2","name":"local","public_key":"key"}}`)))
+	gateway.ServeHTTP(reuseResponse, httptest.NewRequest(http.MethodPost, "/api/cloud-connect/exchange", strings.NewReader(`{"code":"`+code+`"}`)))
 	assertAPIError(t, reuseResponse, http.StatusUnauthorized, errorCodeUnauthorized)
 }
 
@@ -180,8 +168,8 @@ func newCloudGatewayForTest(t *testing.T) *Handler {
 	deviceRepo := devicerepo.New(db, "sqlite")
 	insertGatewayUser(t, db, "user-1", "user-1@example.test")
 	insertGatewayUser(t, db, "user-2", "user-2@example.test")
-	authService := authapp.New(authRepo, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "remote", nil, nil)
-	return New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, DeviceRepository: deviceRepo})
+	authService := authapp.New(authRepo, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "cloud", nil, nil)
+	return New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, DeviceRepository: deviceRepo, WebMode: "cloud"})
 }
 
 func newGatewayTestDB(t *testing.T) *sql.DB {
@@ -194,6 +182,7 @@ func newGatewayTestDB(t *testing.T) *sql.DB {
 	statements := []string{
 		`PRAGMA foreign_keys = ON`,
 		`CREATE TABLE users (id TEXT PRIMARY KEY, email_normalized TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL DEFAULT '', status TEXT NOT NULL, email_verified_at TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_login_at TEXT NULL)`,
+		`CREATE TABLE user_identities (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL, provider_subject TEXT NOT NULL, password_hash TEXT NULL, oauth_email TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(provider, provider_subject), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`,
 		`CREATE TABLE devices (id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
 		`CREATE TABLE user_devices (user_id TEXT NOT NULL, device_id TEXT NOT NULL, role TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (user_id, device_id), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE)`,
 		`CREATE TABLE device_keys (id TEXT PRIMARY KEY, device_id TEXT NOT NULL, public_key TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE)`,
@@ -208,17 +197,20 @@ func newGatewayTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func insertGatewayUser(t *testing.T, db *sql.DB, userID string, email string) {
+func insertGatewayUser(t *testing.T, db *sql.DB, userId string, email string) {
 	t.Helper()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := db.Exec(`INSERT INTO users (id,email_normalized,display_name,status,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`, userID, email, email, "enabled", now, now, now); err != nil {
-		t.Fatalf("insert gateway user %s error = %v", userID, err)
+	if _, err := db.Exec(`INSERT INTO users (id,email_normalized,display_name,status,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`, userId, email, email, "enabled", now, now, now); err != nil {
+		t.Fatalf("insert gateway user %s error = %v", userId, err)
+	}
+	if _, err := db.Exec(`INSERT INTO user_identities (id,user_id,provider,provider_subject,password_hash,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`, userId+"-email", userId, "email", email, "", now, now); err != nil {
+		t.Fatalf("insert gateway user identity %s error = %v", userId, err)
 	}
 }
 
-func cloudUserToken(t *testing.T, authService *authapp.Service, userID string, email string) string {
+func cloudUserToken(t *testing.T, authService *authapp.Service, userId string, email string) string {
 	t.Helper()
-	token, err := gatewayauth.NewTokenService("test-secret").Sign(gatewayauth.Claims{Sub: userID, Email: email, Provider: "email"})
+	token, err := gatewayauth.NewTokenService("test-secret").Sign(gatewayauth.Claims{Sub: userId, Email: email, Provider: "email"})
 	if err != nil {
 		t.Fatalf("Sign token error = %v", err)
 	}

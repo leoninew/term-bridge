@@ -18,11 +18,10 @@
 
   onMounted(async () => {
     await gateway.initializeAuth()
-    if (gateway.authenticated) {
-      await router.replace({ name: 'sessions' })
+    if (gateway.capabilities?.mode === 'local' || gateway.authenticated) {
+      await router.replace({ name: 'dashboard' })
       return
     }
-    const setupAvailable = await gateway.checkSetupStatus()
-    await router.replace({ name: setupAvailable ? 'setup' : 'login' })
+    await router.replace({ name: 'login' })
   })
 </script>

@@ -60,23 +60,23 @@ func TestRepositoryBindingCodeIsSingleUseAndExpires(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateBindingCode() error = %v", err)
 	}
-	userID, ok, err := repo.UseBindingCode(ctx, code)
+	userId, ok, err := repo.UseBindingCode(ctx, code)
 	if err != nil {
 		t.Fatalf("UseBindingCode() error = %v", err)
 	}
-	if !ok || userID != "user-1" {
-		t.Fatalf("UseBindingCode() = %q, %v; want user-1, true", userID, ok)
+	if !ok || userId != "user-1" {
+		t.Fatalf("UseBindingCode() = %q, %v; want user-1, true", userId, ok)
 	}
-	if userID, ok, err := repo.UseBindingCode(ctx, code); err != nil || ok || userID != "" {
-		t.Fatalf("UseBindingCode(reuse) = %q, %v, %v; want empty, false, nil", userID, ok, err)
+	if userId, ok, err := repo.UseBindingCode(ctx, code); err != nil || ok || userId != "" {
+		t.Fatalf("UseBindingCode(reuse) = %q, %v, %v; want empty, false, nil", userId, ok, err)
 	}
 
 	expiredCode, err := repo.CreateBindingCode(ctx, "user-1", time.Now().UTC().Add(-time.Minute))
 	if err != nil {
 		t.Fatalf("CreateBindingCode(expired) error = %v", err)
 	}
-	if userID, ok, err := repo.UseBindingCode(ctx, expiredCode); err != nil || ok || userID != "" {
-		t.Fatalf("UseBindingCode(expired) = %q, %v, %v; want empty, false, nil", userID, ok, err)
+	if userId, ok, err := repo.UseBindingCode(ctx, expiredCode); err != nil || ok || userId != "" {
+		t.Fatalf("UseBindingCode(expired) = %q, %v, %v; want empty, false, nil", userId, ok, err)
 	}
 }
 
@@ -104,10 +104,10 @@ func newTestRepository(t *testing.T) (*Repository, *sql.DB) {
 	return New(db, "sqlite"), db
 }
 
-func insertTestUser(t *testing.T, db *sql.DB, userID string) {
+func insertTestUser(t *testing.T, db *sql.DB, userId string) {
 	t.Helper()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := db.Exec(`INSERT INTO users (id,email_normalized,display_name,status,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`, userID, userID+"@example.test", userID, "enabled", now, now, now); err != nil {
-		t.Fatalf("insert test user %s error = %v", userID, err)
+	if _, err := db.Exec(`INSERT INTO users (id,email_normalized,display_name,status,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`, userId, userId+"@example.test", userId, "enabled", now, now, now); err != nil {
+		t.Fatalf("insert test user %s error = %v", userId, err)
 	}
 }

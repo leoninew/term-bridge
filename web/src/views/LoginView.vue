@@ -1,6 +1,39 @@
 <template>
   <ToastProvider>
+    <section
+      v-if="gateway.capabilities?.mode === 'local'"
+      class="flex min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6"
+    >
+      <div
+        class="w-full max-w-lg rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-[var(--color-text)] shadow-xl"
+      >
+        <h1 class="text-xl font-semibold text-[var(--color-text-strong)]">
+          {{ t('gateway.localLoginTitle') }}
+        </h1>
+        <p class="mt-2 text-sm text-[var(--color-text-muted)]">
+          {{ t('gateway.localLoginDescription') }}
+        </p>
+        <div class="mt-6 flex flex-wrap gap-2">
+          <RouterLink
+            class="inline-flex h-9 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-500"
+            :to="{ name: 'dashboard' }"
+          >
+            {{ t('gateway.localLoginBackToDashboard') }}
+          </RouterLink>
+          <button
+            v-if="gateway.capabilities?.cloud_connect_enabled"
+            type="button"
+            class="inline-flex h-9 items-center justify-center rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-4 text-sm text-[var(--color-text)] hover:bg-[var(--color-control-hover)]"
+            @click="connectCloud"
+          >
+            {{ t('gateway.localLoginConnectCloud') }}
+          </button>
+        </div>
+      </div>
+    </section>
+
     <LoginPanel
+      v-else
       :username="gateway.usernameInput"
       :password="gateway.passwordInput"
       :logging-in="gateway.loggingIn"
@@ -16,13 +49,13 @@
 </template>
 
 <script setup lang="ts">
-  import { ref } from 'vue'
+  import { onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { useRoute, useRouter } from 'vue-router'
+  import { RouterLink, useRoute, useRouter } from 'vue-router'
   import { ToastProvider } from 'reka-ui'
   import LoginPanel from '../components/session/LoginPanel.vue'
   import ToastHost from '../components/session/ToastHost.vue'
-  import { authGoogleURL } from '../features/gateway/api'
+  import { authGoogleURL, cloudConnectStartURL } from '../features/gateway/api'
   import { writeStorageValue } from '../store/storage'
   import { useGatewayStore } from '../store/gateway'
   import { useNotificationsStore } from '../store/notifications'
@@ -35,6 +68,10 @@
   const googleLoggingIn = ref(false)
   const OAUTH_REDIRECT_KEY = 'termbridge.oauth_redirect'
 
+  onMounted(async () => {
+    await gateway.initializeAuth()
+  })
+
   async function login() {
     try {
       await gateway.login()
@@ -46,11 +83,15 @@
 
   function redirectAfterLogin() {
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-    return safeRedirect(redirect) || { name: 'sessions' }
+    return safeRedirect(redirect) || { name: 'dashboard' }
   }
 
   function safeRedirect(value: string | null) {
     return value && value.startsWith('/') && !value.startsWith('//') ? value : ''
+  }
+
+  function connectCloud() {
+    window.location.href = cloudConnectStartURL()
   }
 
   async function loginWithGoogle() {

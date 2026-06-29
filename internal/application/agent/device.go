@@ -116,12 +116,12 @@ func ensurePublicKeyFile(path string, publicKey ed25519.PublicKey) error {
 	return writePEMFile(path, "ED25519 PUBLIC KEY", publicKey, 0o644)
 }
 
-func LoadDevicePrivateKey(stateDir string, deviceID string) (ed25519.PrivateKey, error) {
-	return readPrivateKey(filepath.Join(stateDir, "devices", safeDeviceSegment(deviceID), PrivateKeyFileName))
+func LoadDevicePrivateKey(stateDir string, deviceId string) (ed25519.PrivateKey, error) {
+	return readPrivateKey(filepath.Join(stateDir, "devices", safeDeviceSegment(deviceId), PrivateKeyFileName))
 }
 
-func LoadDevicePublicKey(stateDir string, deviceID string) (ed25519.PublicKey, error) {
-	privateKey, err := LoadDevicePrivateKey(stateDir, deviceID)
+func LoadDevicePublicKey(stateDir string, deviceId string) (ed25519.PublicKey, error) {
+	privateKey, err := LoadDevicePrivateKey(stateDir, deviceId)
 	if err != nil {
 		return nil, err
 	}

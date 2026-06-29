@@ -18,10 +18,12 @@ export type UserInfo = {
 }
 
 export type AuthCapabilities = {
-  mode: 'local' | 'remote'
+  mode: 'local' | 'cloud'
   providers: string[]
   password_reset_enabled: boolean
   email_verification_enabled: boolean
+  account_auth_enabled: boolean
+  cloud_connect_enabled: boolean
 }
 
 export type AuthMeResp = {
@@ -33,10 +35,6 @@ export type AuthMeResp = {
 export type TokenResp = {
   access_token: string
   token_type: string
-}
-
-export type SetupStatusResp = {
-  available: boolean
 }
 
 export async function authMe(): Promise<AuthMeResp> {
@@ -108,27 +106,13 @@ export async function authGoogleCallback(code: string, state: string): Promise<T
   return response.data
 }
 
-export async function authSetupComplete(setupToken: string): Promise<TokenResp> {
-  const response = await apiClient.post<TokenResp>('/api/auth/setup/complete', {
-    setup_token: setupToken,
-  })
-  return response.data
+export function cloudConnectStartURL(): string {
+  return '/cloud/connect/start'
 }
 
-export async function authSetupStatus(): Promise<SetupStatusResp> {
-  const response = await apiClient.get<SetupStatusResp>('/api/auth/setup/status')
-  return response.data
-}
-
-export async function cloudBindingStart(): Promise<string> {
-  const response = await apiClient.post<{ authorize_url: string }>('/api/cloud-binding/start')
-  return response.data.authorize_url
-}
-
-export async function cloudBindingAuthorize(callback: string, state: string): Promise<string> {
-  const response = await apiClient.get<{ redirect_url: string }>('/api/device-bindings/authorize', {
-    headers: { 'X-TermBridge-Authorize-Mode': 'json' },
-    params: { callback, state },
+export async function cloudConnectAuthorize(redirectUri: string, state: string): Promise<string> {
+  const response = await apiClient.get<{ redirect_url: string }>('/api/cloud-connect/authorize', {
+    params: { redirect_uri: redirectUri, state },
   })
   return response.data.redirect_url
 }

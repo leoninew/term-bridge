@@ -7,14 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	authapp "termbridge-go/internal/application/auth"
-	"termbridge-go/internal/infrastructure/config"
-	gatewayauth "termbridge-go/internal/transport/http/gatewayapi/auth"
 )
 
 func testGatewayConfig() Config {
-	return Config{Username: "admin", Password: "admin", JWTSecret: "test-secret", Logger: slog.Default()}
+	return Config{Username: "admin", Password: "admin", JWTSecret: "test-secret", Logger: slog.Default(), WebMode: "cloud"}
 }
 
 func TestHealth(t *testing.T) {
@@ -77,45 +73,6 @@ func TestAuthEndpoints(t *testing.T) {
 	if devicesResponseAfterExpired.Code != http.StatusOK {
 		t.Fatalf("devices with valid token status = %d, want 200", devicesResponseAfterExpired.Code)
 	}
-}
-
-func TestSetupCompleteIssuesLocalAccessTokenOnce(t *testing.T) {
-	store := authapp.NewSetupTokenStore(t.TempDir())
-	token, err := store.Create(authapp.SetupTokenTTL)
-	if err != nil {
-		t.Fatalf("Create setup token error = %v", err)
-	}
-	authService := authapp.New(nil, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "local", nil, nil).WithLocalSetup(store, "dev-1", "local")
-	server := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService})
-
-	response := httptest.NewRecorder()
-	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/setup/complete", bytes.NewBufferString(`{"setup_token":"`+token+`"}`)))
-	if response.Code != http.StatusOK {
-		t.Fatalf("setup status = %d, want 200; body=%s", response.Code, response.Body.String())
-	}
-	var tokenResp struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &tokenResp); err != nil {
-		t.Fatalf("decode token response: %v", err)
-	}
-	if tokenResp.AccessToken == "" {
-		t.Fatal("access_token is empty")
-	}
-	meRequest := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
-	meRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
-	meResponse := httptest.NewRecorder()
-	server.ServeHTTP(meResponse, meRequest)
-	if meResponse.Code != http.StatusOK {
-		t.Fatalf("me status = %d, want 200; body=%s", meResponse.Code, meResponse.Body.String())
-	}
-	if !bytes.Contains(meResponse.Body.Bytes(), []byte(`"provider":"local_access"`)) {
-		t.Fatalf("me body missing local_access provider: %s", meResponse.Body.String())
-	}
-
-	reuseResponse := httptest.NewRecorder()
-	server.ServeHTTP(reuseResponse, httptest.NewRequest(http.MethodPost, "/api/auth/setup/complete", bytes.NewBufferString(`{"setup_token":"`+token+`"}`)))
-	assertAPIError(t, reuseResponse, http.StatusUnauthorized, errorCodeUnauthorized)
 }
 
 func TestLoginRejectsBadPassword(t *testing.T) {

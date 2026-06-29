@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	HeaderDeviceID        = "X-TermBridge-Device-ID"
+	HeaderDeviceId        = "X-TermBridge-Device-ID"
 	HeaderDeviceTimestamp = "X-TermBridge-Device-Timestamp"
 	HeaderDeviceNonce     = "X-TermBridge-Device-Nonce"
 	HeaderDeviceSignature = "X-TermBridge-Device-Signature"
@@ -23,13 +23,13 @@ const MaxSignatureSkew = 5 * time.Minute
 type SignatureInput struct {
 	Method    string
 	Path      string
-	DeviceID  string
+	DeviceId  string
 	Timestamp int64
 	Nonce     string
 	Audience  string
 }
 
-func SignedTunnelHeader(method string, path string, audience string, deviceID string, privateKey ed25519.PrivateKey, now time.Time, nonce string) (http.Header, error) {
+func SignedTunnelHeader(method string, path string, audience string, deviceId string, privateKey ed25519.PrivateKey, now time.Time, nonce string) (http.Header, error) {
 	if strings.TrimSpace(nonce) == "" {
 		generated, err := randomNonce()
 		if err != nil {
@@ -37,10 +37,10 @@ func SignedTunnelHeader(method string, path string, audience string, deviceID st
 		}
 		nonce = generated
 	}
-	input := SignatureInput{Method: method, Path: path, DeviceID: deviceID, Timestamp: now.UTC().Unix(), Nonce: nonce, Audience: audience}
+	input := SignatureInput{Method: method, Path: path, DeviceId: deviceId, Timestamp: now.UTC().Unix(), Nonce: nonce, Audience: audience}
 	signature := ed25519.Sign(privateKey, []byte(canonicalSignatureMessage(input)))
 	header := http.Header{}
-	header.Set(HeaderDeviceID, deviceID)
+	header.Set(HeaderDeviceId, deviceId)
 	header.Set(HeaderDeviceTimestamp, strconv.FormatInt(input.Timestamp, 10))
 	header.Set(HeaderDeviceNonce, nonce)
 	header.Set(HeaderDeviceSignature, base64.StdEncoding.EncodeToString(signature))
@@ -48,11 +48,11 @@ func SignedTunnelHeader(method string, path string, audience string, deviceID st
 }
 
 func VerifySignedRequest(r *http.Request, audience string, publicKey ed25519.PublicKey, now time.Time) (string, error) {
-	deviceID := strings.TrimSpace(r.Header.Get(HeaderDeviceID))
+	deviceId := strings.TrimSpace(r.Header.Get(HeaderDeviceId))
 	timestampText := strings.TrimSpace(r.Header.Get(HeaderDeviceTimestamp))
 	nonce := strings.TrimSpace(r.Header.Get(HeaderDeviceNonce))
 	signatureText := strings.TrimSpace(r.Header.Get(HeaderDeviceSignature))
-	if deviceID == "" || timestampText == "" || nonce == "" || signatureText == "" {
+	if deviceId == "" || timestampText == "" || nonce == "" || signatureText == "" {
 		return "", fmt.Errorf("missing device signature headers")
 	}
 	timestamp, err := strconv.ParseInt(timestampText, 10, 64)
@@ -67,11 +67,11 @@ func VerifySignedRequest(r *http.Request, audience string, publicKey ed25519.Pub
 	if err != nil {
 		return "", fmt.Errorf("invalid device signature encoding")
 	}
-	input := SignatureInput{Method: r.Method, Path: r.URL.Path, DeviceID: deviceID, Timestamp: timestamp, Nonce: nonce, Audience: audience}
+	input := SignatureInput{Method: r.Method, Path: r.URL.Path, DeviceId: deviceId, Timestamp: timestamp, Nonce: nonce, Audience: audience}
 	if !ed25519.Verify(publicKey, []byte(canonicalSignatureMessage(input)), signature) {
 		return "", fmt.Errorf("invalid device signature")
 	}
-	return deviceID, nil
+	return deviceId, nil
 }
 
 func randomNonce() (string, error) {
@@ -85,7 +85,7 @@ func randomNonce() (string, error) {
 func canonicalSignatureMessage(input SignatureInput) string {
 	return strings.ToUpper(strings.TrimSpace(input.Method)) + "\n" +
 		strings.TrimSpace(input.Path) + "\n" +
-		strings.TrimSpace(input.DeviceID) + "\n" +
+		strings.TrimSpace(input.DeviceId) + "\n" +
 		strconv.FormatInt(input.Timestamp, 10) + "\n" +
 		strings.TrimSpace(input.Nonce) + "\n" +
 		strings.TrimRight(strings.TrimSpace(input.Audience), "/")

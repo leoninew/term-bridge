@@ -27,7 +27,6 @@ import (
 
 const (
 	ProviderLocalAdmin       = "local_admin"
-	ProviderLocalAccess      = "local_access"
 	PurposeEmailVerification = "email_verification"
 	PurposePasswordReset     = "password_reset"
 )
@@ -66,15 +65,12 @@ type GoogleClient interface {
 }
 
 type Service struct {
-	repo       *authrepo.Repository
-	tokens     jwtauth.TokenService
-	cfg        config.AuthConfig
-	mode       string
-	sender     EmailSender
-	google     GoogleClient
-	setupStore *SetupTokenStore
-	deviceID   string
-	deviceName string
+	repo   *authrepo.Repository
+	tokens jwtauth.TokenService
+	cfg    config.AuthConfig
+	mode   string
+	sender EmailSender
+	google GoogleClient
 }
 
 type UserView struct {
@@ -90,6 +86,8 @@ type Capabilities struct {
 	Providers                []string `json:"providers"`
 	PasswordResetEnabled     bool     `json:"password_reset_enabled"`
 	EmailVerificationEnabled bool     `json:"email_verification_enabled"`
+	AccountAuthEnabled       bool     `json:"account_auth_enabled"`
+	CloudConnectEnabled      bool     `json:"cloud_connect_enabled"`
 }
 
 type AuthResult struct {
@@ -101,26 +99,16 @@ func New(repo *authrepo.Repository, tokens jwtauth.TokenService, cfg config.Auth
 	return &Service{repo: repo, tokens: tokens, cfg: cfg, mode: mode, sender: sender, google: google}
 }
 
-func (s *Service) WithLocalSetup(store *SetupTokenStore, deviceID string, deviceName string) *Service {
-	s.setupStore = store
-	s.deviceID = strings.TrimSpace(deviceID)
-	s.deviceName = strings.TrimSpace(deviceName)
-	return s
-}
-
 func (s *Service) Capabilities() Capabilities {
+	if s.mode == "local" {
+		return Capabilities{Mode: s.mode, Providers: []string{}, AccountAuthEnabled: false, CloudConnectEnabled: false}
+	}
 	providers := []string{"email"}
 	if s.google != nil {
 		providers = append(providers, "google")
 	}
-	if s.mode == "local" && s.cfg.LocalAdmin.Username != "" && s.cfg.LocalAdmin.Password != "" {
-		providers = append(providers, ProviderLocalAdmin)
-	}
-	if s.mode == "local" && s.setupStore != nil {
-		providers = append(providers, ProviderLocalAccess)
-	}
 	mail := s.sender != nil
-	return Capabilities{Mode: s.mode, Providers: providers, PasswordResetEnabled: mail, EmailVerificationEnabled: mail}
+	return Capabilities{Mode: s.mode, Providers: providers, PasswordResetEnabled: mail, EmailVerificationEnabled: mail, AccountAuthEnabled: true, CloudConnectEnabled: false}
 }
 
 func (s *Service) Register(ctx context.Context, email, password string) error {
@@ -163,10 +151,10 @@ func (s *Service) VerifyEmail(ctx context.Context, email, code string) error {
 	if err != nil {
 		return err
 	}
-	if !codeRow.UserID.Valid {
+	if !codeRow.UserId.Valid {
 		return ErrCodeInvalid
 	}
-	if err := s.repo.MarkEmailVerified(ctx, codeRow.UserID.String); err != nil {
+	if err := s.repo.MarkEmailVerified(ctx, codeRow.UserId.String); err != nil {
 		return err
 	}
 	return s.repo.MarkCodeUsed(ctx, codeRow.ID)
@@ -199,36 +187,11 @@ func (s *Service) VerifyBasic(ctx context.Context, username, password string) bo
 	return err == nil
 }
 
-func (s *Service) CompleteLocalSetup(ctx context.Context, token string) (AuthResult, error) {
-	if s.mode != "local" || s.setupStore == nil || s.deviceID == "" {
-		return AuthResult{}, ErrInvalidCredentials
-	}
-	ok, err := s.setupStore.Use(token)
-	if err != nil {
-		return AuthResult{}, err
-	}
-	if !ok {
-		return AuthResult{}, ErrInvalidCredentials
-	}
-	name := s.deviceName
-	if name == "" {
-		name = "Local device"
-	}
-	return s.sign(UserView{ID: "local:" + s.deviceID, DisplayName: name, Provider: ProviderLocalAccess, EmailVerified: true})
-}
-
-func (s *Service) HasAvailableSetupToken() (bool, error) {
-	if s.mode != "local" || s.setupStore == nil {
-		return false, nil
-	}
-	return s.setupStore.Available()
-}
-
-func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
-	if userID == "local-admin" {
+func (s *Service) ChangePassword(ctx context.Context, userId, currentPassword, newPassword string) error {
+	if userId == "local-admin" {
 		return ErrProviderUnsupported
 	}
-	identity, err := s.repo.FindIdentityForUser(ctx, userID, authrepo.ProviderEmail)
+	identity, err := s.repo.FindIdentityForUser(ctx, userId, authrepo.ProviderEmail)
 	if err != nil || !identity.PasswordHash.Valid {
 		return ErrProviderUnsupported
 	}
@@ -242,7 +205,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, n
 	if err != nil {
 		return err
 	}
-	return s.repo.UpdatePassword(ctx, userID, hash)
+	return s.repo.UpdatePassword(ctx, userId, hash)
 }
 
 func (s *Service) RequestPasswordReset(ctx context.Context, email string) error {
@@ -267,14 +230,14 @@ func (s *Service) ConfirmPasswordReset(ctx context.Context, email, code, newPass
 	if err != nil {
 		return err
 	}
-	if !codeRow.UserID.Valid {
+	if !codeRow.UserId.Valid {
 		return ErrCodeInvalid
 	}
 	hash, err := hashPassword(newPassword)
 	if err != nil {
 		return err
 	}
-	if err := s.repo.UpdatePassword(ctx, codeRow.UserID.String, hash); err != nil {
+	if err := s.repo.UpdatePassword(ctx, codeRow.UserId.String, hash); err != nil {
 		return err
 	}
 	return s.repo.MarkCodeUsed(ctx, codeRow.ID)
@@ -316,7 +279,7 @@ func (s *Service) GoogleCallback(ctx context.Context, code, state string) (AuthR
 		return AuthResult{}, ErrInvalidCredentials
 	}
 	if ident, err := s.repo.FindIdentity(ctx, authrepo.ProviderGoogle, googleUser.Subject); err == nil {
-		user, err := s.repo.FindUserByID(ctx, ident.UserID)
+		user, err := s.repo.FindUserByID(ctx, ident.UserId)
 		if err != nil {
 			return AuthResult{}, err
 		}
@@ -337,16 +300,17 @@ func (s *Service) GoogleCallback(ctx context.Context, code, state string) (AuthR
 	return s.sign(userView(user, authrepo.ProviderGoogle))
 }
 
+func (s *Service) IssueUserToken(ctx context.Context, userId string) (AuthResult, error) {
+	user, err := s.repo.FindUserByID(ctx, userId)
+	if err != nil {
+		return AuthResult{}, err
+	}
+	return s.sign(userView(user, authrepo.ProviderEmail))
+}
+
 func (s *Service) UserFromClaims(ctx context.Context, claims jwtauth.Claims) (UserView, error) {
 	if claims.Provider == ProviderLocalAdmin && claims.Sub == "local-admin" {
 		return UserView{ID: "local-admin", DisplayName: s.cfg.LocalAdmin.Username, Provider: ProviderLocalAdmin, EmailVerified: true}, nil
-	}
-	if claims.Provider == ProviderLocalAccess && strings.HasPrefix(claims.Sub, "local:") {
-		name := s.deviceName
-		if name == "" {
-			name = "Local device"
-		}
-		return UserView{ID: claims.Sub, DisplayName: name, Provider: ProviderLocalAccess, EmailVerified: true}, nil
 	}
 	user, err := s.repo.FindUserByID(ctx, claims.Sub)
 	if err != nil {
@@ -372,7 +336,7 @@ func (s *Service) validatePassword(password string) error {
 	return nil
 }
 
-func (s *Service) sendCode(ctx context.Context, userID *string, email, purpose string) error {
+func (s *Service) sendCode(ctx context.Context, userId *string, email, purpose string) error {
 	if s.sender == nil {
 		return ErrMailDisabled
 	}
@@ -386,7 +350,7 @@ func (s *Service) sendCode(ctx context.Context, userID *string, email, purpose s
 	}
 	hash := hashCode(email, purpose, code)
 	expires := time.Now().UTC().Add(s.cfg.Code.TTL)
-	codeID, err := s.repo.CreateCode(ctx, userID, email, purpose, hash, expires)
+	codeID, err := s.repo.CreateCode(ctx, userId, email, purpose, hash, expires)
 	if err != nil {
 		return err
 	}
