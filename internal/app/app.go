@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -110,7 +111,7 @@ func Run(ctx context.Context, options Options) (Result, error) {
 		return Result{}, err
 	}
 	bootstrap := config.BootstrapResult{}
-	if options.Command.Kind == CommandExec || options.Command.Kind == CommandWorkspace || options.Command.Kind == CommandSession || options.Command.Kind == CommandServe {
+	if options.Command.Kind == CommandExec || options.Command.Kind == CommandWorkspace || options.Command.Kind == CommandSession || (options.Command.Kind == CommandServe && !config.IsCloudMode(cfg)) {
 		cfg, bootstrap, err = config.EnsureLocalIdentity(cfg)
 		if err != nil {
 			return Result{}, err
@@ -286,10 +287,6 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		fmt.Fprintf(stdout, "Username: %s\n", bootstrap.Username)
 		fmt.Fprintf(stdout, "Password: %s\n", bootstrap.Password)
 	}
-	device, err := agent.LoadOrCreateDevice(agent.DeviceOptions{StateDir: cfg.Runtime.StateDir, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName})
-	if err != nil {
-		return Result{Cwd: cfg.Cwd}, err
-	}
 	db, err := database.Open(ctx, cfg.Database)
 	if err != nil {
 		return Result{Cwd: cfg.Cwd}, err
@@ -299,27 +296,76 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		return Result{Cwd: cfg.Cwd}, err
 	}
 	deviceRepository := devicerepo.New(db.DB, db.Driver)
-	if _, err := deviceRepository.UpsertLocalDevice(ctx, devicerepo.Device{ID: device.Id, Name: device.Name, PublicKey: device.PublicKey}); err != nil {
-		return Result{Cwd: cfg.Cwd}, apperrors.Runtime("upsert local device", err)
-	}
-	registry := newWebTerminalRegistry(cfg, logger, state.NewDBStore(db.DB, db.Driver, filepath.Join(cfg.Runtime.StateDir, "devices", device.Id), device.Id))
 	repo := authrepo.New(db.DB, db.Driver)
 	tokens := gatewayauth.NewTokenService(cfg.JWT.SecretKey, cfg.Auth.JWTTTL)
 	authService := authapp.New(repo, tokens, cfg.Auth, config.Mode(cfg), email.NewResendSender(cfg.Resend), authapp.NewOAuthGoogleClient(cfg.Auth.Google))
-	publicKey, err := agent.LoadDevicePublicKey(cfg.Runtime.StateDir, device.Id)
-	if err != nil {
-		return Result{Cwd: cfg.Cwd}, err
+
+	var device agent.Device
+	devicePublicKeys := map[string]ed25519.PublicKey{}
+	var runtimeAccess agent.RuntimeAccess
+	connectors := []*agent.Client{}
+	var cloudConnector *agent.Client
+	if !config.IsCloudMode(cfg) {
+		device, err = agent.LoadOrCreateDevice(agent.DeviceOptions{StateDir: cfg.Runtime.StateDir, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName})
+		if err != nil {
+			return Result{Cwd: cfg.Cwd}, err
+		}
+		if _, err := deviceRepository.UpsertLocalDevice(ctx, devicerepo.Device{ID: device.Id, Name: device.Name, PublicKey: device.PublicKey}); err != nil {
+			return Result{Cwd: cfg.Cwd}, apperrors.Runtime("upsert local device", err)
+		}
+		publicKey, err := agent.LoadDevicePublicKey(cfg.Runtime.StateDir, device.Id)
+		if err != nil {
+			return Result{Cwd: cfg.Cwd}, err
+		}
+		devicePublicKeys[device.Id] = publicKey
+		runtimeAccess = agent.WebTerminalAccess{Registry: newWebTerminalRegistry(cfg, logger, state.NewDBStore(db.DB, db.Driver, filepath.Join(cfg.Runtime.StateDir, "devices", device.Id), device.Id))}
+		connectors = append(connectors, newAgentConnector(cfg, cfg.Agent.ConnectUrl, runtimeAccess, device, logger))
+		if cloudConnectorConfigured(cfg) {
+			cloudConnector = newAgentConnector(cfg, cfg.Cloud.GateUrl, runtimeAccess, device, logger)
+		}
 	}
-	runtimeAccess := agent.WebTerminalAccess{Registry: registry}
-	gatewayHandler := gatewayapi.New(gatewayapi.Config{AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService, AgentTunnelAudience: cfg.Agent.ConnectUrl, DevicePublicKeys: map[string]ed25519.PublicKey{device.Id: publicKey}, DeviceRepository: deviceRepository, CloudGateURL: cfg.Cloud.GateUrl, CloudOAuth: gatewayapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectURL: cfg.Cloud.OAuth.RedirectURL, Scopes: cfg.Cloud.OAuth.Scopes}, CloudBindingAttemptStore: authapp.NewCloudBindingAttemptStore(cfg.Runtime.StateDir), LocalDevice: device, WebMode: cfg.Web.Mode})
-	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Agent.ListenUrl, StaticDir: cfg.Web.StaticDir, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
-	client := agent.New(agent.Config{ConnectUrl: cfg.Agent.ConnectUrl, Username: cfg.Auth.LocalAdmin.Username, Password: cfg.Auth.LocalAdmin.Password, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: runtimeAccess, Logger: logger.Slog})
-	client.SetDevice(device)
 
 	serveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	backendReady := make(chan struct{})
-	errCh := make(chan error, 2)
+	errCh := make(chan error, 3)
+	var connectorMu sync.Mutex
+	cloudConnectorStarted := false
+	startConnector := func(connector *agent.Client) {
+		connectorMu.Lock()
+		if connector == cloudConnector {
+			if cloudConnectorStarted {
+				connectorMu.Unlock()
+				return
+			}
+			cloudConnectorStarted = true
+		}
+		connectorMu.Unlock()
+		fmt.Fprintf(stdout, "TermBridge agent connector targeting %s\n", connector.Config().ConnectUrl)
+		go func() {
+			for {
+				err := normalizeServeError(runAgentClient(serveCtx, connector))
+				if err == nil {
+					errCh <- nil
+					return
+				}
+				logger.Warn("termbridge agent connector failed; local dashboard remains available", "target", connector.Config().ConnectUrl, "error", err)
+				select {
+				case <-serveCtx.Done():
+					errCh <- nil
+					return
+				case <-time.After(2 * time.Second):
+				}
+			}
+		}()
+	}
+
+	gatewayHandler := gatewayapi.New(gatewayapi.Config{AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService, AgentTunnelAudience: gatewayTunnelAudience(cfg), DevicePublicKeys: devicePublicKeys, DeviceRepository: deviceRepository, CloudGateURL: cfg.Cloud.GateUrl, CloudOAuth: gatewayapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectURL: cfg.Cloud.OAuth.RedirectURL, Scopes: cfg.Cloud.OAuth.Scopes}, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(cfg.Runtime.StateDir), LocalDevice: device, WebMode: cfg.Web.Mode, OnLocalCloudSession: func(gatewayapi.CloudSessionSummary) {
+		if cloudConnector != nil {
+			startConnector(cloudConnector)
+		}
+	}})
+	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Agent.ListenUrl, StaticDir: cfg.Web.StaticDir, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
 
 	go func() {
 		err := runBackendServer(serveCtx, server, func(info httpserver.Info) {
@@ -342,23 +388,9 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		return Result{Cwd: cfg.Cwd}, nil
 	}
 
-	fmt.Fprintf(stdout, "TermBridge agent connector targeting %s\n", cfg.Agent.ConnectUrl)
-	go func() {
-		for {
-			err := normalizeServeError(runAgentClient(serveCtx, client))
-			if err == nil || !config.IsLocalMode(cfg) {
-				errCh <- err
-				return
-			}
-			logger.Warn("termbridge agent connector failed; local dashboard remains available", "error", err)
-			select {
-			case <-serveCtx.Done():
-				errCh <- nil
-				return
-			case <-time.After(2 * time.Second):
-			}
-		}
-	}()
+	for _, connector := range connectors {
+		startConnector(connector)
+	}
 
 	select {
 	case err := <-errCh:
@@ -378,6 +410,27 @@ func normalizeServeError(err error) error {
 		return nil
 	}
 	return err
+}
+
+func newAgentConnector(cfg config.Config, connectURL string, runtimeAccess agent.RuntimeAccess, device agent.Device, logger *logging.Logger) *agent.Client {
+	client := agent.New(agent.Config{ConnectUrl: connectURL, Username: cfg.Auth.LocalAdmin.Username, Password: cfg.Auth.LocalAdmin.Password, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: runtimeAccess, Logger: logger.Slog})
+	client.SetDevice(device)
+	return client
+}
+
+func cloudConnectorConfigured(cfg config.Config) bool {
+	cloudGateURL := strings.TrimRight(strings.TrimSpace(cfg.Cloud.GateUrl), "/")
+	if cloudGateURL == "" {
+		return false
+	}
+	return cloudGateURL != strings.TrimRight(strings.TrimSpace(cfg.Agent.ConnectUrl), "/")
+}
+
+func gatewayTunnelAudience(cfg config.Config) string {
+	if config.IsCloudMode(cfg) && strings.TrimSpace(cfg.Cloud.GateUrl) != "" {
+		return cfg.Cloud.GateUrl
+	}
+	return cfg.Agent.ConnectUrl
 }
 
 func newWebTerminalRegistry(cfg config.Config, logger *logging.Logger, store terminalapp.RuntimeStore) *terminalapp.Registry {

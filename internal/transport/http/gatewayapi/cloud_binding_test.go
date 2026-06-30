@@ -14,6 +14,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	agentapp "termbridge-go/internal/application/agent"
 	authapp "termbridge-go/internal/application/auth"
 	"termbridge-go/internal/infrastructure/config"
 	authrepo "termbridge-go/internal/infrastructure/repository/auth"
@@ -21,37 +22,138 @@ import (
 	gatewayauth "termbridge-go/internal/transport/http/gatewayapi/auth"
 )
 
-func TestCloudConnectStartReturnsAuthorizeRedirectInLocalMode(t *testing.T) {
-	authService := authapp.New(nil, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "local", nil, nil)
-	gateway := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, CloudBindingAttemptStore: authapp.NewCloudBindingAttemptStore(t.TempDir()), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: "http://127.0.0.1:9030/cloud/connect/callback", Scopes: []string{"openid", "email", "profile"}}, WebMode: "local"})
+const registeredCloudOAuthRedirectURL = "http://localhost:9031/cloud/oauth/callback"
 
-	request := httptest.NewRequest(http.MethodGet, "/cloud/connect/start", nil)
+func TestCloudOAuthStartReturnsAuthorizeURLInLocalMode(t *testing.T) {
+	authService := authapp.New(nil, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "local", nil, nil)
+	gateway := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(t.TempDir()), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL, Scopes: []string{"openid", "email", "profile"}}, LocalDevice: testLocalDevice(), WebMode: "local"})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/cloud-oauth/start", nil)
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, request)
-	if response.Code != http.StatusFound {
-		t.Fatalf("cloud connect start status = %d; body=%s", response.Code, response.Body.String())
+	if response.Code != http.StatusOK {
+		t.Fatalf("cloud oauth start status = %d; body=%s", response.Code, response.Body.String())
 	}
-	location := response.Header().Get("Location")
-	if !strings.HasPrefix(location, "https://cloud.example.test/oauth2/authorize?") || !strings.Contains(location, "client_id=termbridge-local") || !strings.Contains(location, "redirect_uri=http%3A%2F%2F127.0.0.1%3A9030%2Fcloud%2Fconnect%2Fcallback") || !strings.Contains(location, "response_type=code") || !strings.Contains(location, "scope=openid+email+profile") || !strings.Contains(location, "state=") {
-		t.Fatalf("Location = %q", location)
+	var body struct {
+		AuthorizeURL string `json:"authorize_url"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode cloud oauth start response: %v", err)
+	}
+	if !strings.HasPrefix(body.AuthorizeURL, "https://cloud.example.test/oauth2/authorize?") || !strings.Contains(body.AuthorizeURL, "client_id=termbridge-local") || !strings.Contains(body.AuthorizeURL, "redirect_uri=http%3A%2F%2Flocalhost%3A9031%2Fcloud%2Foauth%2Fcallback") || !strings.Contains(body.AuthorizeURL, "response_type=code") || !strings.Contains(body.AuthorizeURL, "scope=openid+email+profile") || !strings.Contains(body.AuthorizeURL, "state=") {
+		t.Fatalf("authorize_url = %q", body.AuthorizeURL)
 	}
 }
 
-func TestCloudConnectAuthorizeRejectsNonLoopbackCallback(t *testing.T) {
+func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
+	authService := authapp.New(nil, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "local", nil, nil)
+	gateway := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(t.TempDir()), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, WebMode: "local"})
+	connectedAt := time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
+	gateway.setLocalCloudSession(CloudSessionSummary{GateURL: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: connectedAt})
+
+	response := httptest.NewRecorder()
+	gateway.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
+	}
+	var body struct {
+		Authenticated bool                 `json:"authenticated"`
+		CloudSession  *CloudSessionSummary `json:"cloud_session"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode auth me response: %v", err)
+	}
+	if body.Authenticated {
+		t.Fatal("authenticated = true")
+	}
+	if body.CloudSession == nil {
+		t.Fatalf("cloud_session is nil; body=%s", response.Body.String())
+	}
+	if body.CloudSession.GateURL != "https://cloud.example.test" || body.CloudSession.DeviceId != "dev-1" || body.CloudSession.DeviceName != "local-device" || !body.CloudSession.ConnectedAt.Equal(connectedAt) {
+		t.Fatalf("cloud_session = %#v", body.CloudSession)
+	}
+}
+
+func TestAuthMeDoesNotPersistLocalCloudSessionAcrossHandlerRestart(t *testing.T) {
+	authService := authapp.New(nil, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "local", nil, nil)
+	stateDir := t.TempDir()
+	first := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(stateDir), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, WebMode: "local"})
+	first.setLocalCloudSession(CloudSessionSummary{GateURL: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: time.Now().UTC()})
+
+	second := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(stateDir), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, WebMode: "local"})
+	response := httptest.NewRecorder()
+	second.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
+	}
+	var body struct {
+		CloudSession *CloudSessionSummary `json:"cloud_session"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode auth me response: %v", err)
+	}
+	if body.CloudSession != nil {
+		t.Fatalf("cloud_session = %#v, want nil after handler restart", body.CloudSession)
+	}
+}
+
+func TestCloudOAuthAuthorizeRejectsInvalidRegisteredClientRequest(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{name: "missing client id", query: "redirect_uri=http://localhost:9031/cloud/oauth/callback&state=state-1"},
+		{name: "wrong client id", query: "client_id=other-client&redirect_uri=http://localhost:9031/cloud/oauth/callback&state=state-1"},
+		{name: "wrong redirect uri", query: "client_id=termbridge-local&redirect_uri=http://127.0.0.1:9031/cloud/oauth/callback&state=state-1"},
+		{name: "missing state", query: "client_id=termbridge-local&redirect_uri=http://localhost:9031/cloud/oauth/callback"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gateway := newCloudGatewayForTest(t)
+			token := cloudUserToken(t, gateway.authService, "user-1", "user-1@example.test")
+			request := httptest.NewRequest(http.MethodGet, "/api/cloud-oauth/authorize?"+tt.query, nil)
+			request.Header.Set("Authorization", "Bearer "+token)
+			response := httptest.NewRecorder()
+			gateway.ServeHTTP(response, request)
+			assertAPIError(t, response, http.StatusBadRequest, errorCodeBadRequest)
+		})
+	}
+}
+
+func TestCloudOAuthAuthorizeRejectsUnauthenticatedRequest(t *testing.T) {
 	gateway := newCloudGatewayForTest(t)
-	token := cloudUserToken(t, gateway.authService, "user-1", "user-1@example.test")
-	request := httptest.NewRequest(http.MethodGet, "/api/cloud-connect/authorize?redirect_uri=https://evil.example.test/callback&state=state-1", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/cloud-oauth/authorize?client_id=termbridge-local&redirect_uri=http://localhost:9031/cloud/oauth/callback&state=state-1", nil)
+	response := httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	assertAPIError(t, response, http.StatusUnauthorized, errorCodeUnauthorized)
+}
+
+func TestCloudOAuthAuthorizeRequiresCloudMode(t *testing.T) {
+	authService := authapp.New(nil, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "local", nil, nil)
+	gateway := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, DeviceRepository: devicerepo.New(newGatewayTestDB(t), "sqlite"), CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, WebMode: "local"})
+	token := cloudUserToken(t, authService, "user-1", "user-1@example.test")
+
+	request := httptest.NewRequest(http.MethodGet, "/api/cloud-oauth/authorize?client_id=termbridge-local&redirect_uri=http://localhost:9031/cloud/oauth/callback&state=state-1", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, request)
-	assertAPIError(t, response, http.StatusBadRequest, errorCodeBadRequest)
+	assertAPIError(t, response, http.StatusNotFound, errorCodeNotFound)
 }
 
-func TestCloudConnectAuthorizeExchangeAndCurrentDeviceReport(t *testing.T) {
+func TestCloudOAuthExchangeRequiresCloudMode(t *testing.T) {
+	authService := authapp.New(nil, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "local", nil, nil)
+	gateway := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, DeviceRepository: devicerepo.New(newGatewayTestDB(t), "sqlite"), WebMode: "local"})
+
+	response := httptest.NewRecorder()
+	gateway.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/cloud-oauth/exchange", strings.NewReader(`{"code":"code-1"}`)))
+	assertAPIError(t, response, http.StatusNotFound, errorCodeNotFound)
+}
+
+func TestCloudOAuthAuthorizeExchangeAndCurrentDeviceReport(t *testing.T) {
 	gateway := newCloudGatewayForTest(t)
 	token := cloudUserToken(t, gateway.authService, "user-1", "user-1@example.test")
 
-	authorizeRequest := httptest.NewRequest(http.MethodGet, "/api/cloud-connect/authorize?redirect_uri=http://127.0.0.1:9030/cloud/connect/callback&state=state-1", nil)
+	authorizeRequest := httptest.NewRequest(http.MethodGet, "/api/cloud-oauth/authorize?client_id=termbridge-local&redirect_uri=http://localhost:9031/cloud/oauth/callback&state=state-1", nil)
 	authorizeRequest.Header.Set("Authorization", "Bearer "+token)
 	authorizeResponse := httptest.NewRecorder()
 	gateway.ServeHTTP(authorizeResponse, authorizeRequest)
@@ -64,14 +166,14 @@ func TestCloudConnectAuthorizeExchangeAndCurrentDeviceReport(t *testing.T) {
 	if err := json.Unmarshal(authorizeResponse.Body.Bytes(), &authorizeBody); err != nil {
 		t.Fatalf("decode authorize response: %v", err)
 	}
-	if !strings.Contains(authorizeBody.RedirectURL, "state=state-1") || !strings.Contains(authorizeBody.RedirectURL, "code=") {
+	if !strings.HasPrefix(authorizeBody.RedirectURL, registeredCloudOAuthRedirectURL+"?") || !strings.Contains(authorizeBody.RedirectURL, "state=state-1") || !strings.Contains(authorizeBody.RedirectURL, "code=") {
 		t.Fatalf("authorize redirect_url = %q", authorizeBody.RedirectURL)
 	}
 	callbackRequest := httptest.NewRequest(http.MethodGet, authorizeBody.RedirectURL, nil)
 	code := callbackRequest.URL.Query().Get("code")
 
 	exchangeResponse := httptest.NewRecorder()
-	gateway.ServeHTTP(exchangeResponse, httptest.NewRequest(http.MethodPost, "/api/cloud-connect/exchange", strings.NewReader(`{"code":"`+code+`"}`)))
+	gateway.ServeHTTP(exchangeResponse, httptest.NewRequest(http.MethodPost, "/api/cloud-oauth/exchange", strings.NewReader(`{"code":"`+code+`"}`)))
 	if exchangeResponse.Code != http.StatusOK {
 		t.Fatalf("exchange status = %d; body=%s", exchangeResponse.Code, exchangeResponse.Body.String())
 	}
@@ -85,7 +187,12 @@ func TestCloudConnectAuthorizeExchangeAndCurrentDeviceReport(t *testing.T) {
 		t.Fatal("exchange response access_token is empty")
 	}
 
-	reportRequest := httptest.NewRequest(http.MethodPost, "/api/devices/current", strings.NewReader(`{"id":"dev-1","name":"local"}`))
+	stateDir := t.TempDir()
+	localDevice, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir, DeviceId: "dev-1", DeviceName: "local"})
+	if err != nil {
+		t.Fatalf("LoadOrCreateDevice() error = %v", err)
+	}
+	reportRequest := httptest.NewRequest(http.MethodPost, "/api/devices/current", strings.NewReader(`{"id":"`+localDevice.Id+`","name":"`+localDevice.Name+`","public_key":"`+localDevice.PublicKey+`"}`))
 	reportRequest.Header.Set("Authorization", "Bearer "+tokenBody.AccessToken)
 	reportResponse := httptest.NewRecorder()
 	gateway.ServeHTTP(reportResponse, reportRequest)
@@ -104,12 +211,34 @@ func TestCloudConnectAuthorizeExchangeAndCurrentDeviceReport(t *testing.T) {
 	if err := json.Unmarshal(devicesResponse.Body.Bytes(), &devices); err != nil {
 		t.Fatalf("decode devices: %v", err)
 	}
-	if len(devices) != 1 || devices[0].Id != "dev-1" || devices[0].Online {
+	if len(devices) != 1 || devices[0].Id != localDevice.Id || devices[0].Online {
 		t.Fatalf("devices = %#v", devices)
+	}
+	publicKey, err := gateway.config.DeviceRepository.PublicKey(context.Background(), localDevice.Id)
+	if err != nil {
+		t.Fatalf("PublicKey(%s) error = %v", localDevice.Id, err)
+	}
+	if publicKey != localDevice.PublicKey {
+		t.Fatalf("PublicKey(%s) = %q", localDevice.Id, publicKey)
+	}
+	privateKey, err := agentapp.LoadDevicePrivateKey(stateDir, localDevice.Id)
+	if err != nil {
+		t.Fatalf("LoadDevicePrivateKey() error = %v", err)
+	}
+	gateway.config.AgentTunnelAudience = "test-audience"
+	tunnelHeader, err := agentapp.SignedTunnelHeader(http.MethodGet, "/api/agent/tunnel", "test-audience", localDevice.Id, privateKey, time.Now(), "test-nonce")
+	if err != nil {
+		t.Fatalf("SignedTunnelHeader() error = %v", err)
+	}
+	tunnelRequest := httptest.NewRequest(http.MethodGet, "/api/agent/tunnel", nil)
+	tunnelRequest.Header = tunnelHeader
+	verifiedDeviceId, ok := gateway.verifyAgentTunnelRequest(tunnelRequest)
+	if !ok || verifiedDeviceId != localDevice.Id {
+		t.Fatalf("verifyAgentTunnelRequest() = %q, %v; want %q, true", verifiedDeviceId, ok, localDevice.Id)
 	}
 
 	reuseResponse := httptest.NewRecorder()
-	gateway.ServeHTTP(reuseResponse, httptest.NewRequest(http.MethodPost, "/api/cloud-connect/exchange", strings.NewReader(`{"code":"`+code+`"}`)))
+	gateway.ServeHTTP(reuseResponse, httptest.NewRequest(http.MethodPost, "/api/cloud-oauth/exchange", strings.NewReader(`{"code":"`+code+`"}`)))
 	assertAPIError(t, reuseResponse, http.StatusUnauthorized, errorCodeUnauthorized)
 }
 
@@ -161,6 +290,10 @@ func TestDevicesFiltersByCloudUserAndDeleteDisconnectsRoute(t *testing.T) {
 	}
 }
 
+func testLocalDevice() agentapp.Device {
+	return agentapp.Device{Id: "dev-1", Name: "local-device"}
+}
+
 func newCloudGatewayForTest(t *testing.T) *Handler {
 	t.Helper()
 	db := newGatewayTestDB(t)
@@ -169,7 +302,7 @@ func newCloudGatewayForTest(t *testing.T) *Handler {
 	insertGatewayUser(t, db, "user-1", "user-1@example.test")
 	insertGatewayUser(t, db, "user-2", "user-2@example.test")
 	authService := authapp.New(authRepo, gatewayauth.NewTokenService("test-secret"), config.AuthConfig{}, "cloud", nil, nil)
-	return New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, DeviceRepository: deviceRepo, WebMode: "cloud"})
+	return New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AuthService: authService, DeviceRepository: deviceRepo, CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, WebMode: "cloud"})
 }
 
 func newGatewayTestDB(t *testing.T) *sql.DB {

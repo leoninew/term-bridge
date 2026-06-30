@@ -87,7 +87,7 @@ type Capabilities struct {
 	PasswordResetEnabled     bool     `json:"password_reset_enabled"`
 	EmailVerificationEnabled bool     `json:"email_verification_enabled"`
 	AccountAuthEnabled       bool     `json:"account_auth_enabled"`
-	CloudConnectEnabled      bool     `json:"cloud_connect_enabled"`
+	CloudOAuthEnabled        bool     `json:"cloud_oauth_enabled"`
 }
 
 type AuthResult struct {
@@ -101,14 +101,14 @@ func New(repo *authrepo.Repository, tokens jwtauth.TokenService, cfg config.Auth
 
 func (s *Service) Capabilities() Capabilities {
 	if s.mode == "local" {
-		return Capabilities{Mode: s.mode, Providers: []string{}, AccountAuthEnabled: false, CloudConnectEnabled: false}
+		return Capabilities{Mode: s.mode, Providers: []string{}, AccountAuthEnabled: false, CloudOAuthEnabled: false}
 	}
 	providers := []string{"email"}
 	if s.google != nil {
 		providers = append(providers, "google")
 	}
 	mail := s.sender != nil
-	return Capabilities{Mode: s.mode, Providers: providers, PasswordResetEnabled: mail, EmailVerificationEnabled: mail, AccountAuthEnabled: true, CloudConnectEnabled: false}
+	return Capabilities{Mode: s.mode, Providers: providers, PasswordResetEnabled: mail, EmailVerificationEnabled: mail, AccountAuthEnabled: true, CloudOAuthEnabled: false}
 }
 
 func (s *Service) Register(ctx context.Context, email, password string) error {

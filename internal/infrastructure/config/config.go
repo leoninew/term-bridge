@@ -424,6 +424,12 @@ func validateModeRequirements(cfg Config) error {
 	if cfg.Auth.Google.RedirectURL == "" {
 		missing = append(missing, envNameForKey("auth.google.redirect_url"))
 	}
+	if cfg.Cloud.OAuth.ClientID == "" {
+		missing = append(missing, envNameForKey("cloud.oauth.client_id"))
+	}
+	if cfg.Cloud.OAuth.RedirectURL == "" {
+		missing = append(missing, envNameForKey("cloud.oauth.redirect_url"))
+	}
 	if cfg.Resend.APIKey == "" {
 		missing = append(missing, envNameForKey("resend.api_key"))
 	}

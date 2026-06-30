@@ -43,7 +43,7 @@ describe('gateway store', () => {
         password_reset_enabled: false,
         email_verification_enabled: false,
         account_auth_enabled: false,
-        cloud_connect_enabled: false,
+        cloud_oauth_enabled: false,
       },
     })
     const store = useGatewayStore()
@@ -52,7 +52,39 @@ describe('gateway store', () => {
 
     expect(store.authenticated).toBe(false)
     expect(store.capabilities?.mode).toBe('local')
+    expect(store.cloudSession).toBeNull()
     expect(mocks.authMe).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps local cloud session separate from browser authentication', async () => {
+    mocks.authMe.mockResolvedValueOnce({
+      authenticated: false,
+      capabilities: {
+        mode: 'local',
+        providers: [],
+        password_reset_enabled: false,
+        email_verification_enabled: false,
+        account_auth_enabled: false,
+        cloud_oauth_enabled: true,
+      },
+      cloud_session: {
+        gate_url: 'https://cloud.example.test',
+        device_id: 'dev-1',
+        device_name: 'local-device',
+        connected_at: '2026-06-29T10:00:00Z',
+      },
+    })
+    const store = useGatewayStore()
+
+    await store.initializeAuth()
+
+    expect(store.authenticated).toBe(false)
+    expect(store.cloudSession?.gate_url).toBe('https://cloud.example.test')
+    expect(store.cloudSession?.device_name).toBe('local-device')
+
+    store.clearToken()
+
+    expect(store.cloudSession).toBeNull()
   })
 
   it('keeps dashboard in no-device state when cloud user has no devices', async () => {

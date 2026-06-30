@@ -21,7 +21,7 @@
             {{ t('gateway.localLoginBackToDashboard') }}
           </RouterLink>
           <button
-            v-if="gateway.capabilities?.cloud_connect_enabled"
+            v-if="gateway.capabilities?.cloud_oauth_enabled"
             type="button"
             class="inline-flex h-9 items-center justify-center rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-4 text-sm text-[var(--color-text)] hover:bg-[var(--color-control-hover)]"
             @click="connectCloud"
@@ -55,7 +55,7 @@
   import { ToastProvider } from 'reka-ui'
   import LoginPanel from '../components/session/LoginPanel.vue'
   import ToastHost from '../components/session/ToastHost.vue'
-  import { authGoogleURL, cloudConnectStartURL } from '../features/gateway/api'
+  import { authGoogleURL, cloudOAuthStartURL } from '../features/gateway/api'
   import { writeStorageValue } from '../store/storage'
   import { useGatewayStore } from '../store/gateway'
   import { useNotificationsStore } from '../store/notifications'
@@ -91,7 +91,7 @@
   }
 
   function connectCloud() {
-    window.location.href = cloudConnectStartURL()
+    window.location.href = cloudOAuthStartURL()
   }
 
   async function loginWithGoogle() {

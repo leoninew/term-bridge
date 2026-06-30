@@ -7,7 +7,7 @@ vi.mock('../../router', () => ({
   },
 }))
 
-import { cloudConnectAuthorize, cloudConnectStartURL } from './api'
+import { cloudOAuthAuthorize, cloudOAuthStart, cloudOAuthStartURL } from './api'
 import { apiClient } from '../api/client'
 
 describe('gateway api', () => {
@@ -15,21 +15,39 @@ describe('gateway api', () => {
     vi.restoreAllMocks()
   })
 
-  it('uses the product cloud connect start route', () => {
-    expect(cloudConnectStartURL()).toBe('/cloud/connect/start')
+  it('uses the product cloud oauth start route', () => {
+    expect(cloudOAuthStartURL()).toBe('/cloud/oauth/start')
   })
 
-  it('uses redirect_uri when authorizing cloud connect', async () => {
+  it('requests the backend OAuth start URL', async () => {
     const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
-      data: { redirect_url: 'http://127.0.0.1/callback?code=code-1&state=state-1' },
+      data: { authorize_url: 'http://termbridge.lvh.me/oauth2/authorize?state=state-1' },
     })
 
-    await expect(cloudConnectAuthorize('http://127.0.0.1/callback', 'state-1')).resolves.toBe(
-      'http://127.0.0.1/callback?code=code-1&state=state-1',
+    await expect(cloudOAuthStart('/dashboard')).resolves.toBe(
+      'http://termbridge.lvh.me/oauth2/authorize?state=state-1',
     )
 
-    expect(get).toHaveBeenCalledWith('/api/cloud-connect/authorize', {
-      params: { redirect_uri: 'http://127.0.0.1/callback', state: 'state-1' },
+    expect(get).toHaveBeenCalledWith('/api/cloud-oauth/start', {
+      params: { redirect: '/dashboard' },
+    })
+  })
+
+  it('uses client_id and redirect_uri when authorizing cloud oauth', async () => {
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+      data: { redirect_url: 'http://localhost:9031/callback?code=code-1&state=state-1' },
+    })
+
+    await expect(
+      cloudOAuthAuthorize('termbridge-local', 'http://localhost:9031/callback', 'state-1'),
+    ).resolves.toBe('http://localhost:9031/callback?code=code-1&state=state-1')
+
+    expect(get).toHaveBeenCalledWith('/api/cloud-oauth/authorize', {
+      params: {
+        client_id: 'termbridge-local',
+        redirect_uri: 'http://localhost:9031/callback',
+        state: 'state-1',
+      },
     })
   })
 

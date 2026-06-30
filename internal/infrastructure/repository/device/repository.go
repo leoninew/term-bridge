@@ -85,8 +85,8 @@ func (r *Repository) UpsertUserDevice(ctx context.Context, userId string, device
 	device.ID = strings.TrimSpace(device.ID)
 	device.Name = strings.TrimSpace(device.Name)
 	device.PublicKey = strings.TrimSpace(device.PublicKey)
-	if userId == "" || device.ID == "" || device.Name == "" {
-		return errors.New("user id, device id and device name are required")
+	if userId == "" || device.ID == "" || device.Name == "" || device.PublicKey == "" {
+		return errors.New("user id, device id, device name and public key are required")
 	}
 	now := time.Now().UTC()
 	tx, err := r.db.BeginTx(ctx, nil)

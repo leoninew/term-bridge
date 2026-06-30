@@ -85,6 +85,7 @@ export const messages = {
       connectFailed: '连接 Cloud Gate 失败',
       authorizingDeviceBinding: '正在授权当前设备绑定…',
       authorizingCloudConnect: '正在完成云端账号授权…',
+      completingCloudLogin: '正在完成云端账号授权…',
       logout: '退出',
       devices: '设备',
       selectDeviceDescription: '选择要连接的设备。本地使用时选择连接到自己的 Gate 的本机设备。',
@@ -117,8 +118,25 @@ export const messages = {
       localDeviceTitle: '当前本机设备',
       localDeviceDescription:
         'local mode 不要求浏览器登录。你可以直接进入本机 workbench，或连接 Cloud Gate 后让云端账号看到这台设备。',
+      localModeAction: '本机模式',
+      localModeDescription: '直接进入本机 workspace 和 session，不需要浏览器账号登录。',
+      cloudModeAction: '云端模式',
+      cloudModeDescription: '连接 Cloud Gate，让云端账号看到并管理这台本机设备。',
+      cloudModeDisabledDescription: '请先配置 Cloud Gate OAuth client 后再连接云端账号。',
+      cloudSessionActive: '当前已连接到 {gate}',
       openLocalWorkbench: '进入本机工作台',
       connectCloudAccount: '连接云端账号',
+      reconnectCloudAccount: '重新连接云端账号',
+      cloudAccountConnected: '已连接云端',
+      cloudAccountNotConnected: '未连接云端',
+      cloudGateNotConfigured: 'Cloud Gate 连接未配置。',
+      cloudConnectionDetails: '云端账号连接状态',
+      cloudConnectionConnectedDescription: '当前本机设备已完成 Cloud Gate 授权，可被云端账号看到。',
+      cloudConnectionNotConnectedDescription:
+        '当前本机设备尚未连接 Cloud Gate；这里不是本地登录状态。',
+      cloudConnectionGate: 'Cloud Gate',
+      cloudConnectionDevice: '本机设备',
+      cloudConnectionConnectedAt: '连接时间',
       connectGuideTitle: '连接本机设备',
       connectGuideDescription:
         '在要加入账号的机器上打开 local dashboard，再从那里发起 Cloud Gate 授权。',
@@ -262,6 +280,7 @@ export const messages = {
       connectFailed: 'Cloud Gate connection failed',
       authorizingDeviceBinding: 'Authorizing this device binding…',
       authorizingCloudConnect: 'Completing cloud account authorization…',
+      completingCloudLogin: 'Completing cloud account authorization…',
       logout: 'Logout',
       devices: 'Devices',
       selectDeviceDescription:
@@ -299,8 +318,29 @@ export const messages = {
       localDeviceTitle: 'Current local device',
       localDeviceDescription:
         'Local mode does not require browser sign-in. Open the local workbench directly, or connect Cloud Gate so your cloud account can see this device.',
+      localModeAction: 'Local mode',
+      localModeDescription:
+        'Open local workspaces and sessions directly without browser account sign-in.',
+      cloudModeAction: 'Cloud mode',
+      cloudModeDescription:
+        'Connect Cloud Gate so your cloud account can see and manage this local device.',
+      cloudModeDisabledDescription:
+        'Configure the Cloud Gate OAuth client before connecting a cloud account.',
+      cloudSessionActive: 'Currently connected to {gate}',
       openLocalWorkbench: 'Open local workbench',
       connectCloudAccount: 'Connect cloud account',
+      reconnectCloudAccount: 'Reconnect cloud account',
+      cloudAccountConnected: 'Cloud connected',
+      cloudAccountNotConnected: 'Cloud not connected',
+      cloudGateNotConfigured: 'Cloud Gate connection is not configured.',
+      cloudConnectionDetails: 'Cloud account connection status',
+      cloudConnectionConnectedDescription:
+        'This local device has completed Cloud Gate authorization and can be seen by the cloud account.',
+      cloudConnectionNotConnectedDescription:
+        'This local device is not connected to Cloud Gate yet; this is not a local sign-in state.',
+      cloudConnectionGate: 'Cloud Gate',
+      cloudConnectionDevice: 'Local device',
+      cloudConnectionConnectedAt: 'Connected at',
       connectGuideTitle: 'Connect a local device',
       connectGuideDescription:
         'Open the local dashboard on the machine you want to add, then start Cloud Gate authorization from there.',

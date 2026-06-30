@@ -6,6 +6,7 @@ import {
   authMe,
   listDevices,
   type AuthCapabilities,
+  type CloudSessionSummary,
   type DeviceSummary,
   type TokenResp,
   type UserInfo,
@@ -26,6 +27,7 @@ export const useGatewayStore = defineStore('gateway', () => {
   const passwordInput = ref('')
   const user = ref<UserInfo | null>(null)
   const capabilities = ref<AuthCapabilities | null>(null)
+  const cloudSession = ref<CloudSessionSummary | null>(null)
   const devices = ref<DeviceSummary[]>([])
   const selectedDeviceId = ref('')
   let initializedToken: string | null | undefined
@@ -53,12 +55,14 @@ export const useGatewayStore = defineStore('gateway', () => {
       authenticated.value = me.authenticated
       user.value = me.user ?? null
       capabilities.value = me.capabilities ?? null
+      cloudSession.value = me.cloud_session ?? null
       usernameInput.value = me.user?.email || usernameInput.value
       initializedToken = token.value
     } catch (err) {
       authenticated.value = false
       user.value = null
       capabilities.value = null
+      cloudSession.value = null
       initializedToken = undefined
       throw err
     } finally {
@@ -98,11 +102,16 @@ export const useGatewayStore = defineStore('gateway', () => {
     return true
   }
 
+  function setCloudSession(summary: CloudSessionSummary | null) {
+    cloudSession.value = summary
+  }
+
   function resetAuthState() {
     authInitialized.value = false
     authenticated.value = false
     user.value = null
     capabilities.value = null
+    cloudSession.value = null
     initializedToken = undefined
   }
 
@@ -120,6 +129,7 @@ export const useGatewayStore = defineStore('gateway', () => {
     passwordInput,
     user,
     capabilities,
+    cloudSession,
     devices,
     selectedDeviceId,
     setToken,
@@ -128,5 +138,6 @@ export const useGatewayStore = defineStore('gateway', () => {
     login,
     loadDevices,
     selectDeviceId,
+    setCloudSession,
   }
 })

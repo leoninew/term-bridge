@@ -28,21 +28,22 @@ import (
 )
 
 type Config struct {
-	Username                 string
-	Password                 string
-	JWTSecret                string
-	AllowedOrigins           []string
-	DebugErrors              bool
-	Logger                   *slog.Logger
-	AuthService              *authapp.Service
-	AgentTunnelAudience      string
-	DevicePublicKeys         map[string]ed25519.PublicKey
-	DeviceRepository         *devicerepo.Repository
-	CloudGateURL             string
-	CloudOAuth               CloudOAuthConfig
-	CloudBindingAttemptStore *authapp.CloudBindingAttemptStore
-	LocalDevice              agentapp.Device
-	WebMode                  string
+	Username               string
+	Password               string
+	JWTSecret              string
+	AllowedOrigins         []string
+	DebugErrors            bool
+	Logger                 *slog.Logger
+	AuthService            *authapp.Service
+	AgentTunnelAudience    string
+	DevicePublicKeys       map[string]ed25519.PublicKey
+	DeviceRepository       *devicerepo.Repository
+	CloudGateURL           string
+	CloudOAuth             CloudOAuthConfig
+	CloudOAuthAttemptStore *authapp.CloudOAuthAttemptStore
+	LocalDevice            agentapp.Device
+	WebMode                string
+	OnLocalCloudSession    func(CloudSessionSummary)
 }
 
 type CloudOAuthConfig struct {
@@ -64,6 +65,8 @@ type Handler struct {
 	cacheMu            sync.Mutex
 	workspaceTreeCache map[string]json.RawMessage
 	historyCache       map[string]map[string]string
+	cloudSessionMu     sync.Mutex
+	cloudSession       *CloudSessionSummary
 }
 
 type DeviceSummary struct {
@@ -73,6 +76,13 @@ type DeviceSummary struct {
 	Status      string    `json:"status"`
 	ConnectedAt time.Time `json:"connected_at"`
 	LastSeen    time.Time `json:"last_seen"`
+}
+
+type CloudSessionSummary struct {
+	GateURL     string    `json:"gate_url"`
+	DeviceId    string    `json:"device_id"`
+	DeviceName  string    `json:"device_name"`
+	ConnectedAt time.Time `json:"connected_at"`
 }
 
 type DeviceRegistry struct {
@@ -161,10 +171,10 @@ func (h *Handler) Handler() http.Handler {
 	mux.HandleFunc("/api/auth/password-reset/confirm", h.handlePasswordResetConfirm)
 	mux.HandleFunc("/api/auth/google", h.handleGoogleAuth)
 	mux.HandleFunc("/api/auth/google/callback", h.handleGoogleCallback)
-	mux.HandleFunc("/cloud/connect/start", h.handleCloudConnectStart)
-	mux.HandleFunc("/cloud/connect/callback", h.handleCloudBindingCallback)
-	mux.HandleFunc("/api/cloud-connect/authorize", h.handleCloudConnectAuthorize)
-	mux.HandleFunc("/api/cloud-connect/exchange", h.handleCloudConnectExchange)
+	mux.HandleFunc("/api/cloud-oauth/start", h.handleCloudOAuthStart)
+	mux.HandleFunc("/api/cloud-oauth/callback", h.handleCloudOAuthCallback)
+	mux.HandleFunc("/api/cloud-oauth/authorize", h.handleCloudOAuthAuthorize)
+	mux.HandleFunc("/api/cloud-oauth/exchange", h.handleCloudOAuthExchange)
 	mux.HandleFunc("/api/devices", h.authMiddleware(http.HandlerFunc(h.handleDevices)).ServeHTTP)
 	mux.HandleFunc("/api/devices/current", h.authMiddleware(http.HandlerFunc(h.handleCurrentDevice)).ServeHTTP)
 	mux.HandleFunc("/api/devices/", h.authMiddleware(http.HandlerFunc(h.handleDevice)).ServeHTTP)
@@ -240,10 +250,11 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.authService != nil {
 		capabilities := s.authService.Capabilities()
-		capabilities.CloudConnectEnabled = s.cloudConnectEnabled()
+		capabilities.CloudOAuthEnabled = s.cloudOAuthEnabled()
+		cloudSession := s.localCloudSessionSummary()
 		claims, ok := s.claimsFromRequest(r)
 		if !ok {
-			writeJSON(w, http.StatusOK, map[string]any{"authenticated": false, "capabilities": capabilities})
+			writeJSON(w, http.StatusOK, map[string]any{"authenticated": false, "capabilities": capabilities, "cloud_session": cloudSession})
 			return
 		}
 		user, err := s.authService.UserFromClaims(r.Context(), claims)
@@ -251,7 +262,7 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 			s.writeUnauthorized(w, r)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "user": user, "capabilities": capabilities})
+		writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "user": user, "capabilities": capabilities, "cloud_session": cloudSession})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "username": s.auth.UsernameFromRequest(r)})
@@ -465,8 +476,27 @@ func (s *Handler) isLocalWebMode() bool {
 	return s.config.WebMode == "local"
 }
 
-func (s *Handler) cloudConnectEnabled() bool {
-	return s.isLocalWebMode() && s.config.CloudBindingAttemptStore != nil && s.config.CloudGateURL != "" && s.config.CloudOAuth.ClientID != "" && s.config.CloudOAuth.RedirectURL != ""
+func (s *Handler) cloudOAuthEnabled() bool {
+	return s.isLocalWebMode() && s.config.CloudOAuthAttemptStore != nil && s.config.CloudGateURL != "" && s.config.CloudOAuth.ClientID != "" && s.config.CloudOAuth.RedirectURL != ""
+}
+
+func (s *Handler) localCloudSessionSummary() *CloudSessionSummary {
+	if !s.isLocalWebMode() {
+		return nil
+	}
+	s.cloudSessionMu.Lock()
+	defer s.cloudSessionMu.Unlock()
+	if s.cloudSession == nil {
+		return nil
+	}
+	summary := *s.cloudSession
+	return &summary
+}
+
+func (s *Handler) setLocalCloudSession(summary CloudSessionSummary) {
+	s.cloudSessionMu.Lock()
+	defer s.cloudSessionMu.Unlock()
+	s.cloudSession = &summary
 }
 
 func (s *Handler) requireCloudWebMode(w http.ResponseWriter, r *http.Request) bool {
@@ -504,22 +534,22 @@ func (s *Handler) writeAuthError(w http.ResponseWriter, r *http.Request, err err
 	}
 }
 
-func (s *Handler) handleCloudConnectStart(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleCloudOAuthStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	if !s.cloudConnectEnabled() {
+	if !s.cloudOAuthEnabled() {
 		s.writeNotFound(w, r)
 		return
 	}
-	state, err := s.config.CloudBindingAttemptStore.CreateWithOptions(authapp.CloudBindingAttemptOptions{CallbackURL: s.config.CloudOAuth.RedirectURL, PostAuthRedirect: r.URL.Query().Get("redirect"), GateURL: s.config.CloudGateURL, DeviceID: s.config.LocalDevice.Id, DeviceName: s.config.LocalDevice.Name, TTL: authapp.CloudBindingAttemptTTL})
+	state, err := s.config.CloudOAuthAttemptStore.CreateWithOptions(authapp.CloudOAuthAttemptOptions{CallbackURL: s.config.CloudOAuth.RedirectURL, PostAuthRedirect: r.URL.Query().Get("redirect"), GateURL: s.config.CloudGateURL, DeviceId: s.config.LocalDevice.Id, DeviceName: s.config.LocalDevice.Name, TTL: authapp.CloudOAuthAttemptTTL})
 	if err != nil {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
 		return
 	}
 	oauthConfig := s.cloudOAuthConfig()
-	http.Redirect(w, r, oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOnline), http.StatusFound)
+	writeJSON(w, http.StatusOK, map[string]string{"authorize_url": oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOnline)})
 }
 
 func (s *Handler) cloudOAuthConfig() oauth2.Config {
@@ -535,7 +565,7 @@ func (s *Handler) cloudOAuthConfig() oauth2.Config {
 	}
 }
 
-func (s *Handler) handleCloudConnectExchange(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleCloudOAuthExchange(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
@@ -571,9 +601,12 @@ func (s *Handler) handleCloudConnectExchange(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, map[string]string{"access_token": result.Token, "token_type": "bearer"})
 }
 
-func (s *Handler) handleCloudConnectAuthorize(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleCloudOAuthAuthorize(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		s.methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	if !s.requireCloudWebMode(w, r) {
 		return
 	}
 	claims, ok := s.claimsFromRequest(r)
@@ -585,10 +618,11 @@ func (s *Handler) handleCloudConnectAuthorize(w http.ResponseWriter, r *http.Req
 		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Device repository is not configured.", nil)
 		return
 	}
-	redirectURL := strings.TrimSpace(r.URL.Query().Get("redirect_uri"))
+	clientId := strings.TrimSpace(r.URL.Query().Get("client_id"))
+	redirectURL := strings.TrimRight(strings.TrimSpace(r.URL.Query().Get("redirect_uri")), "/")
 	state := strings.TrimSpace(r.URL.Query().Get("state"))
-	if redirectURL == "" || state == "" || !isLoopbackCallback(redirectURL) {
-		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Binding callback is invalid.", nil)
+	if clientId == "" || clientId != s.config.CloudOAuth.ClientID || redirectURL == "" || redirectURL != s.config.CloudOAuth.RedirectURL || state == "" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth redirect is invalid.", nil)
 		return
 	}
 	code, err := s.config.DeviceRepository.CreateBindingCode(r.Context(), claims.Sub, time.Now().UTC().Add(devicerepo.BindingCodeTTL))
@@ -598,42 +632,54 @@ func (s *Handler) handleCloudConnectAuthorize(w http.ResponseWriter, r *http.Req
 	}
 	redirectURL, err = appendBindingCallback(redirectURL, code, state)
 	if err != nil {
-		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Binding callback is invalid.", err)
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth redirect is invalid.", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"redirect_url": redirectURL})
 }
 
-func (s *Handler) handleCloudBindingCallback(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		s.methodNotAllowed(w, r, http.MethodGet)
+func (s *Handler) handleCloudOAuthCallback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !s.cloudConnectEnabled() {
+	if !s.cloudOAuthEnabled() {
 		s.writeNotFound(w, r)
 		return
 	}
-	state := strings.TrimSpace(r.URL.Query().Get("state"))
-	code := strings.TrimSpace(r.URL.Query().Get("code"))
-	if state == "" || code == "" {
-		http.Redirect(w, r, "/dashboard?cloud_connect_error=bad_request", http.StatusFound)
+	var req struct {
+		Code  string `json:"code"`
+		State string `json:"state"`
+	}
+	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
-	attempt, ok, err := s.config.CloudBindingAttemptStore.CompleteAttempt(state)
+	state := strings.TrimSpace(req.State)
+	code := strings.TrimSpace(req.Code)
+	if state == "" || code == "" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth callback is invalid.", nil)
+		return
+	}
+	attempt, ok, err := s.config.CloudOAuthAttemptStore.CompleteAttempt(state)
 	if err != nil {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
 		return
 	}
 	if !ok {
-		http.Redirect(w, r, "/dashboard?cloud_connect_error=state_invalid", http.StatusFound)
+		s.writeAPIError(w, r, http.StatusUnauthorized, errorCodeUnauthorized, "OAuth state is invalid or expired.", nil)
 		return
 	}
-	if err := s.exchangeCloudBinding(r.Context(), code, attempt); err != nil {
-		s.config.Logger.Warn("cloud connection exchange failed", "error", err)
-		http.Redirect(w, r, localCloudConnectRedirect(attempt.PostAuthRedirect, "cloud_connect_error", "exchange_failed"), http.StatusFound)
+	summary, err := s.completeCloudOAuthLogin(r.Context(), code, attempt)
+	if err != nil {
+		s.config.Logger.Warn("cloud oauth callback failed", "error", err)
+		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
 		return
 	}
-	http.Redirect(w, r, localCloudConnectRedirect(attempt.PostAuthRedirect, "cloud_connected", "1"), http.StatusFound)
+	s.setLocalCloudSession(summary)
+	if s.config.OnLocalCloudSession != nil {
+		s.config.OnLocalCloudSession(summary)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"cloud_session": summary, "redirect": attempt.PostAuthRedirect})
 }
 
 func (s *Handler) handleCurrentDevice(w http.ResponseWriter, r *http.Request) {
@@ -651,13 +697,14 @@ func (s *Handler) handleCurrentDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		PublicKey string `json:"public_key"`
 	}
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
-	device := devicerepo.Device{ID: req.ID, Name: req.Name}
+	device := devicerepo.Device{ID: req.ID, Name: req.Name, PublicKey: req.PublicKey}
 	if err := s.config.DeviceRepository.UpsertUserDevice(r.Context(), claims.Sub, device); err != nil {
 		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Device report is invalid.", err)
 		return
@@ -1193,16 +1240,19 @@ func (s *Handler) deviceSummary(device devicerepo.Device) DeviceSummary {
 	return DeviceSummary{Id: device.ID, Name: device.Name, Online: false, Status: "offline", LastSeen: device.UpdatedAt}
 }
 
-func (s *Handler) exchangeCloudBinding(ctx context.Context, code string, attempt authapp.CloudBindingAttempt) error {
+func (s *Handler) completeCloudOAuthLogin(ctx context.Context, code string, attempt authapp.CloudOAuthAttempt) (CloudSessionSummary, error) {
 	device := s.config.LocalDevice
-	if attempt.DeviceID != "" {
-		device.Id = attempt.DeviceID
+	if attempt.DeviceId != "" {
+		device.Id = attempt.DeviceId
 	}
 	if attempt.DeviceName != "" {
 		device.Name = attempt.DeviceName
 	}
 	if device.Id == "" || device.Name == "" {
-		return fmt.Errorf("local device identity is incomplete")
+		return CloudSessionSummary{}, fmt.Errorf("local device identity is incomplete")
+	}
+	if strings.TrimSpace(device.PublicKey) == "" {
+		return CloudSessionSummary{}, fmt.Errorf("local device public key is incomplete")
 	}
 	gateURL := attempt.GateURL
 	if gateURL == "" {
@@ -1210,51 +1260,51 @@ func (s *Handler) exchangeCloudBinding(ctx context.Context, code string, attempt
 	}
 	body, err := json.Marshal(map[string]string{"code": code})
 	if err != nil {
-		return err
+		return CloudSessionSummary{}, err
 	}
-	exchangeURL := gateURL + "/api/cloud-connect/exchange"
+	exchangeURL := gateURL + "/api/cloud-oauth/exchange"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, exchangeURL, bytes.NewReader(body))
 	if err != nil {
-		return err
+		return CloudSessionSummary{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return CloudSessionSummary{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("cloud exchange status %d", resp.StatusCode)
+		return CloudSessionSummary{}, fmt.Errorf("cloud exchange status %d", resp.StatusCode)
 	}
 	var tokenResp struct {
 		AccessToken string `json:"access_token"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return err
+		return CloudSessionSummary{}, err
 	}
 	if strings.TrimSpace(tokenResp.AccessToken) == "" {
-		return fmt.Errorf("cloud exchange response missing access token")
+		return CloudSessionSummary{}, fmt.Errorf("cloud exchange response missing access token")
 	}
-	reportBody, err := json.Marshal(map[string]string{"id": device.Id, "name": device.Name})
+	reportBody, err := json.Marshal(map[string]string{"id": device.Id, "name": device.Name, "public_key": device.PublicKey})
 	if err != nil {
-		return err
+		return CloudSessionSummary{}, err
 	}
 	reportURL := gateURL + "/api/devices/current"
 	reportReq, err := http.NewRequestWithContext(ctx, http.MethodPost, reportURL, bytes.NewReader(reportBody))
 	if err != nil {
-		return err
+		return CloudSessionSummary{}, err
 	}
 	reportReq.Header.Set("Content-Type", "application/json")
 	reportReq.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	reportResp, err := http.DefaultClient.Do(reportReq)
 	if err != nil {
-		return err
+		return CloudSessionSummary{}, err
 	}
 	defer reportResp.Body.Close()
 	if reportResp.StatusCode < 200 || reportResp.StatusCode >= 300 {
-		return fmt.Errorf("cloud device report status %d", reportResp.StatusCode)
+		return CloudSessionSummary{}, fmt.Errorf("cloud device report status %d", reportResp.StatusCode)
 	}
-	return s.config.CloudBindingAttemptStore.SaveConnection(authapp.CloudConnection{SchemaVersion: 1, GateURL: gateURL, DeviceID: device.Id, DeviceName: device.Name})
+	return CloudSessionSummary{GateURL: gateURL, DeviceId: device.Id, DeviceName: device.Name, ConnectedAt: time.Now().UTC()}, nil
 }
 
 func appendBindingCallback(callbackURL string, code string, state string) (string, error) {
@@ -1267,30 +1317,6 @@ func appendBindingCallback(callbackURL string, code string, state string) (strin
 	query.Set("state", state)
 	parsed.RawQuery = query.Encode()
 	return parsed.String(), nil
-}
-
-func localCloudConnectRedirect(base string, key string, value string) string {
-	base = strings.TrimSpace(base)
-	if base == "" || !strings.HasPrefix(base, "/") || strings.HasPrefix(base, "//") {
-		base = "/dashboard"
-	}
-	parsed, err := url.Parse(base)
-	if err != nil || parsed.IsAbs() || !strings.HasPrefix(parsed.Path, "/") {
-		parsed = &url.URL{Path: "/dashboard"}
-	}
-	query := parsed.Query()
-	query.Set(key, value)
-	parsed.RawQuery = query.Encode()
-	return parsed.String()
-}
-
-func isLoopbackCallback(callbackURL string) bool {
-	parsed, err := url.Parse(callbackURL)
-	if err != nil || parsed.Scheme == "" {
-		return false
-	}
-	host := strings.ToLower(parsed.Hostname())
-	return host == "127.0.0.1" || host == "localhost" || host == "::1"
 }
 
 func (s *Handler) disconnectDevice(deviceId string, reason string) {

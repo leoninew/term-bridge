@@ -9,6 +9,8 @@ const skipAuthGuardRoutes = [
   'forgot-password',
   'google-callback',
   'reset-password',
+  'cloud-oauth-start',
+  'cloud-oauth-callback',
 ]
 
 export const router = createRouter({
@@ -55,9 +57,21 @@ export const router = createRouter({
       component: () => import('../views/ConnectView.vue'),
     },
     {
+      path: '/cloud/oauth/start',
+      alias: '/cloud/connect/start',
+      name: 'cloud-oauth-start',
+      component: () => import('../views/CloudConnectStartView.vue'),
+    },
+    {
+      path: '/cloud/oauth/callback',
+      alias: '/cloud/connect/callback',
+      name: 'cloud-oauth-callback',
+      component: () => import('../views/CloudConnectCallbackView.vue'),
+    },
+    {
       path: '/oauth2/authorize',
       alias: '/cloud/connect/authorize',
-      name: 'cloud-connect-authorize',
+      name: 'cloud-oauth-authorize',
       component: () => import('../views/CloudConnectAuthorizeView.vue'),
     },
     {

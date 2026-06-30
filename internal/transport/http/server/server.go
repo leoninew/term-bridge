@@ -38,8 +38,6 @@ func New(config Config, apiHandler http.Handler) *Server {
 	mux := http.NewServeMux()
 	mux.Handle("/api", apiHandler)
 	mux.Handle("/api/", apiHandler)
-	mux.Handle("/cloud/connect/start", apiHandler)
-	mux.Handle("/cloud/connect/callback", apiHandler)
 	if config.StaticDir != "" {
 		mux.Handle("/", staticHandler(config.StaticDir))
 	}

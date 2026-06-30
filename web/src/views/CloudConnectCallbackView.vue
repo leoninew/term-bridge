@@ -3,7 +3,7 @@
     <section
       class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
     >
-      {{ t('gateway.authorizingCloudConnect') }}
+      {{ t('gateway.completingCloudLogin') }}
     </section>
     <ToastHost />
   </ToastProvider>
@@ -15,30 +15,32 @@
   import { useRoute, useRouter } from 'vue-router'
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../components/session/ToastHost.vue'
-  import { cloudOAuthAuthorize } from '../features/gateway/api'
+  import { cloudOAuthCallback } from '../features/gateway/api'
+  import { useGatewayStore } from '../store/gateway'
   import { useNotificationsStore } from '../store/notifications'
 
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
+  const gateway = useGatewayStore()
   const notifications = useNotificationsStore()
 
   onMounted(async () => {
-    const redirectUri = typeof route.query.redirect_uri === 'string' ? route.query.redirect_uri : ''
+    const code = typeof route.query.code === 'string' ? route.query.code : ''
     const state = typeof route.query.state === 'string' ? route.query.state : ''
-    if (!redirectUri || !state) {
-      notifications.notifyError(
-        t('gateway.connectFailed'),
-        new Error('missing redirect_uri or state'),
-      )
-      await router.replace({ name: 'dashboard' })
+    if (!code || !state) {
+      notifications.notifyError(t('gateway.connectFailed'), new Error('missing code or state'))
+      await router.replace({ name: 'dashboard', query: { cloud_connect_error: 'bad_request' } })
       return
     }
     try {
-      window.location.href = await cloudOAuthAuthorize('termbridge-local', redirectUri, state)
+      const result = await cloudOAuthCallback(code, state)
+      gateway.setCloudSession(result.cloud_session)
+      await gateway.initializeAuth({ force: true })
+      await router.replace(result.redirect || { name: 'dashboard' })
     } catch (err) {
       notifications.notifyError(t('gateway.connectFailed'), err)
-      await router.replace({ name: 'dashboard' })
+      await router.replace({ name: 'dashboard', query: { cloud_connect_error: 'exchange_failed' } })
     }
   })
 </script>

@@ -50,7 +50,7 @@ gate:
 # 本机 Agent / serve 配置
 agent:
   # 本机 termbridge serve 暴露的后端 API 地址。
-  # 本地模式下，agent.connect_url 留空时会默认等于此地址。
+  # agent.connect_url 留空时会默认等于此地址，用于本机 self-tunnel。
   listen_url: http://127.0.0.1:9030
 
   # 浏览器访问本机 Agent 前端的地址，用于 local dashboard 与云端授权回跳。
@@ -58,8 +58,8 @@ agent:
   # 该字段不表达云端 Gate 的公网发布地址。
   public_url: http://localhost:9031
 
-  # Agent tunnel 要连接的 Gate 地址。
-  # 为空表示使用 agent.listen_url，即本地模式；指向远程 Gate 时为远程/Cloud 模式。
+  # 本机 self-tunnel 目标地址；为空表示使用 agent.listen_url。
+  # 云端连接目标集中配置在 cloud.gate_url，不通过 agent.connect_url 切换。
   connect_url: ""
 
   # 当前设备 ID。通常保持为空，由 termbridge serve 首次启动时自动生成并写入 .termbridge.yaml。
@@ -71,15 +71,15 @@ agent:
 # Cloud connection 配置
 cloud:
   # 固定 Cloud Gate 的外部访问地址。
-  # 本地 /cloud/connect/start 会按 OAuth2 client 配置跳转到该地址完成云端账号授权。
+  # 本地 /cloud/oauth/start 会按 OAuth2 client 配置跳转到该地址完成云端账号授权。
   gate_url: "http://termbridge.lvh.me"
 
   # TermBridge Cloud OAuth2 client 配置。local mode 作为 Cloud Gate 的 OAuth2 client，
-  # redirect_url 指向本机 /cloud/connect/callback。
+  # redirect_url 指向本机 /cloud/oauth/callback。
   oauth:
     client_id: termbridge-local
     client_secret: ""
-    redirect_url: http://127.0.0.1:9030/cloud/connect/callback
+    redirect_url: http://localhost:9031/cloud/oauth/callback
     scopes:
       - openid
       - email

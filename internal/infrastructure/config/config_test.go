@@ -74,7 +74,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Cloud.OAuth.ClientSecret != "" {
 		t.Fatalf("Cloud.OAuth.ClientSecret = %q, want empty public-client secret", cfg.Cloud.OAuth.ClientSecret)
 	}
-	if cfg.Cloud.OAuth.RedirectURL != "http://127.0.0.1:9030/cloud/connect/callback" {
+	if cfg.Cloud.OAuth.RedirectURL != "http://localhost:9031/cloud/oauth/callback" {
 		t.Fatalf("Cloud.OAuth.RedirectURL = %q, want local OAuth2 redirect URL", cfg.Cloud.OAuth.RedirectURL)
 	}
 	if !reflect.DeepEqual(cfg.Cloud.OAuth.Scopes, []string{"openid", "email", "profile"}) {
@@ -315,6 +315,21 @@ func TestLoadOSEnvOverridesDotEnv(t *testing.T) {
 	}
 	if !cfg.Gate.API.ExposeErrors {
 		t.Fatal("Gate.API.ExposeErrors = false, want true")
+	}
+}
+
+func TestLoadCloudModeRequiresRegisteredLocalOAuthClient(t *testing.T) {
+	isolateHome(t)
+	configureRemoteAuth(t)
+	cwd := t.TempDir()
+	writeConfig(t, cwd, "web:\n  mode: cloud\ncloud:\n  oauth:\n    client_id: ''\n    redirect_url: ''\n")
+
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "TERMBRIDGE_CLOUD__OAUTH__CLIENT_ID") || !strings.Contains(err.Error(), "TERMBRIDGE_CLOUD__OAUTH__REDIRECT_URL") {
+		t.Fatalf("Load() error = %v, want missing cloud OAuth client configuration", err)
 	}
 }
 

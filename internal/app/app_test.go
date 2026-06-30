@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -127,7 +129,7 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	configContent := "web:\n  mode: local\ngate:\n  browser:\n    allowed_origins:\n      - http://127.0.0.1:9031\n  api:\n    expose_errors: true\nagent:\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\n"
+	configContent := "web:\n  mode: local\ngate:\n  browser:\n    allowed_origins:\n      - http://127.0.0.1:9031\n  api:\n    expose_errors: true\nagent:\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\ncloud:\n  gate_url: http://termbridge.lvh.me\n"
 	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
 		t.Fatalf("WriteFile(config) error = %v", err)
 	}
@@ -145,19 +147,43 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 		runAgentClient = oldRunAgentClient
 	}()
 	var gotServer *httpserver.Server
-	var gotClient *agent.Client
+	gotClients := []*agent.Client{}
 	runBackendServer = func(ctx context.Context, server *httpserver.Server, onListening func(httpserver.Info)) error {
 		gotServer = server
 		onListening(httpserver.Info{Url: "http://127.0.0.1:9090"})
 		<-ctx.Done()
 		return ctx.Err()
 	}
+	var clientMu sync.Mutex
 	runAgentClient = func(ctx context.Context, client *agent.Client) error {
-		gotClient = client
-		return context.Canceled
+		clientMu.Lock()
+		gotClients = append(gotClients, client)
+		clientMu.Unlock()
+		<-ctx.Done()
+		return ctx.Err()
 	}
 	stdout := &bytes.Buffer{}
-	result, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandServe}, Stdout: stdout, Stderr: &bytes.Buffer{}})
+	serveCtx, cancelServe := context.WithCancel(context.Background())
+	defer cancelServe()
+	resultCh := make(chan struct {
+		result Result
+		err    error
+	}, 1)
+	go func() {
+		result, err := Run(serveCtx, Options{Cwd: cwd, Command: Command{Kind: CommandServe}, Stdout: stdout, Stderr: &bytes.Buffer{}})
+		resultCh <- struct {
+			result Result
+			err    error
+		}{result: result, err: err}
+	}()
+	waitFor(t, time.Second, func() bool {
+		clientMu.Lock()
+		defer clientMu.Unlock()
+		return gotServer != nil && len(gotClients) == 1
+	})
+	cancelServe()
+	outcome := <-resultCh
+	result, err := outcome.result, outcome.err
 	if err != nil {
 		t.Fatalf("Run(serve) error = %v", err)
 	}
@@ -172,22 +198,157 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	if healthResponse.Code != http.StatusOK || !strings.Contains(healthResponse.Body.String(), `"status":"ok"`) {
 		t.Fatalf("health response = %d %s", healthResponse.Code, healthResponse.Body.String())
 	}
-	if gotClient == nil {
-		t.Fatal("runAgentClient was not called")
+	clientMu.Lock()
+	clientSnapshot := append([]*agent.Client(nil), gotClients...)
+	clientMu.Unlock()
+	if len(clientSnapshot) != 1 {
+		t.Fatalf("runAgentClient called %d times before OAuth completion, want 1", len(clientSnapshot))
 	}
-	gotConfig := gotClient.Config()
-	if gotConfig.ConnectUrl != "http://127.0.0.1:9090" || gotConfig.Username != "admin" || gotConfig.Password != "admin" || gotConfig.DeviceId != "dev-1" || gotConfig.DeviceName != "local-mac" {
+	gotConfig := clientSnapshot[0].Config()
+	if gotConfig.ConnectUrl != "http://127.0.0.1:9090" {
+		t.Fatalf("agent connector target before OAuth completion = %q, want self target", gotConfig.ConnectUrl)
+	}
+	if gotConfig.Username != "admin" || gotConfig.Password != "admin" || gotConfig.DeviceId != "dev-1" || gotConfig.DeviceName != "local-mac" {
 		t.Fatalf("agent config = %#v", gotConfig)
 	}
 	out := stdout.String()
 	if !strings.Contains(out, "TermBridge agent connector targeting http://127.0.0.1:9090") {
 		t.Fatalf("stdout = %s", out)
 	}
+	if strings.Contains(out, "TermBridge agent connector targeting http://termbridge.lvh.me") {
+		t.Fatalf("stdout shows cloud connector before OAuth completion: %s", out)
+	}
 	if strings.Contains(out, "setup?token=") {
 		t.Fatalf("stdout exposes local setup URL: %s", out)
 	}
 	if strings.Contains(out, "admin/admin") {
 		t.Fatalf("stdout exposes temporary auth: %s", out)
+	}
+}
+
+func TestRunServeStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	var reportSeen bool
+	cloudGate := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/cloud-oauth/exchange":
+			if r.Method != http.MethodPost {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"cloud-token"}`))
+		case "/api/devices/current":
+			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer cloud-token" {
+				http.NotFound(w, r)
+				return
+			}
+			reportSeen = true
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"accepted":true}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer cloudGate.Close()
+	configContent := "web:\n  mode: local\ngate:\n  browser:\n    allowed_origins:\n      - http://127.0.0.1:9031\n  api:\n    expose_errors: true\nagent:\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\ncloud:\n  gate_url: " + cloudGate.URL + "\n  oauth:\n    client_id: termbridge-local\n    redirect_url: http://localhost:9031/cloud/oauth/callback\n"
+	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(config) error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(cwd, ".termbridge"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(state dir) error = %v", err)
+	}
+	identityContent := "{\n  \"auth\": {\n    \"username\": \"admin\",\n    \"password\": \"admin\"\n  }\n}\n"
+	if err := os.WriteFile(filepath.Join(cwd, ".termbridge", "device.json"), []byte(identityContent), 0o600); err != nil {
+		t.Fatalf("WriteFile(identity) error = %v", err)
+	}
+	oldRunBackendServer := runBackendServer
+	oldRunAgentClient := runAgentClient
+	defer func() {
+		runBackendServer = oldRunBackendServer
+		runAgentClient = oldRunAgentClient
+	}()
+	var gotServer *httpserver.Server
+	runBackendServer = func(ctx context.Context, server *httpserver.Server, onListening func(httpserver.Info)) error {
+		gotServer = server
+		onListening(httpserver.Info{Url: "http://127.0.0.1:9090"})
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	var clientMu sync.Mutex
+	gotClients := []*agent.Client{}
+	runAgentClient = func(ctx context.Context, client *agent.Client) error {
+		clientMu.Lock()
+		gotClients = append(gotClients, client)
+		clientMu.Unlock()
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	stdout := &bytes.Buffer{}
+	serveCtx, cancelServe := context.WithCancel(context.Background())
+	defer cancelServe()
+	resultCh := make(chan error, 1)
+	go func() {
+		_, err := Run(serveCtx, Options{Cwd: cwd, Command: Command{Kind: CommandServe}, Stdout: stdout, Stderr: &bytes.Buffer{}})
+		resultCh <- err
+	}()
+	waitFor(t, time.Second, func() bool {
+		clientMu.Lock()
+		defer clientMu.Unlock()
+		return gotServer != nil && len(gotClients) == 1
+	})
+
+	startResponse := httptest.NewRecorder()
+	gotServer.ServeHTTP(startResponse, httptest.NewRequest(http.MethodGet, "/api/cloud-oauth/start", nil))
+	if startResponse.Code != http.StatusOK {
+		t.Fatalf("cloud oauth start status = %d; body=%s", startResponse.Code, startResponse.Body.String())
+	}
+	var startBody struct {
+		AuthorizeURL string `json:"authorize_url"`
+	}
+	if err := json.Unmarshal(startResponse.Body.Bytes(), &startBody); err != nil {
+		t.Fatalf("decode cloud oauth start response: %v", err)
+	}
+	callbackRequest := httptest.NewRequest(http.MethodGet, startBody.AuthorizeURL, nil)
+	state := callbackRequest.URL.Query().Get("state")
+	if state == "" {
+		t.Fatalf("authorize_url missing state: %q", startBody.AuthorizeURL)
+	}
+
+	callbackResponse := httptest.NewRecorder()
+	gotServer.ServeHTTP(callbackResponse, httptest.NewRequest(http.MethodPost, "/api/cloud-oauth/callback", strings.NewReader(`{"code":"code-1","state":"`+state+`"}`)))
+	if callbackResponse.Code != http.StatusOK {
+		t.Fatalf("cloud oauth callback status = %d; body=%s", callbackResponse.Code, callbackResponse.Body.String())
+	}
+	if !reportSeen {
+		t.Fatal("cloud device report was not sent")
+	}
+	waitFor(t, time.Second, func() bool {
+		clientMu.Lock()
+		defer clientMu.Unlock()
+		return len(gotClients) == 2
+	})
+	clientMu.Lock()
+	clientSnapshot := append([]*agent.Client(nil), gotClients...)
+	clientMu.Unlock()
+	gotTargets := map[string]bool{}
+	for _, client := range clientSnapshot {
+		gotTargets[client.Config().ConnectUrl] = true
+	}
+	if !gotTargets["http://127.0.0.1:9090"] || !gotTargets[cloudGate.URL] {
+		t.Fatalf("agent connector targets after OAuth completion = %#v", gotTargets)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "TermBridge agent connector targeting "+cloudGate.URL) {
+		t.Fatalf("stdout missing cloud connector target after OAuth completion: %s", out)
+	}
+	cancelServe()
+	if err := <-resultCh; err != nil {
+		t.Fatalf("Run(serve) error = %v", err)
 	}
 }
 
@@ -288,6 +449,20 @@ func globOne(t *testing.T, pattern string) string {
 		return ""
 	}
 	return matches[0]
+}
+
+func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !condition() {
+		t.Fatalf("condition was not met within %s", timeout)
+	}
 }
 
 func assertRuntimeDBCounts(t *testing.T, cwd string, wantWorkspaces int, wantSessions int, wantRuns int) {

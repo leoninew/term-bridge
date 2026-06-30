@@ -36,7 +36,7 @@
   import { useRoute } from 'vue-router'
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../components/session/ToastHost.vue'
-  import { cloudConnectStartURL } from '../features/gateway/api'
+  import { cloudOAuthStartURL } from '../features/gateway/api'
   import { useNotificationsStore } from '../store/notifications'
 
   const { t } = useI18n()
@@ -54,7 +54,7 @@
     }
     connecting.value = true
     try {
-      window.location.href = cloudConnectStartURL()
+      window.location.href = cloudOAuthStartURL()
     } catch (err) {
       connecting.value = false
       notifications.notifyError(t('gateway.connectFailed'), err)

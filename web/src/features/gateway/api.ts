@@ -23,18 +23,31 @@ export type AuthCapabilities = {
   password_reset_enabled: boolean
   email_verification_enabled: boolean
   account_auth_enabled: boolean
-  cloud_connect_enabled: boolean
+  cloud_oauth_enabled: boolean
+}
+
+export type CloudSessionSummary = {
+  gate_url: string
+  device_id: string
+  device_name: string
+  connected_at: string
 }
 
 export type AuthMeResp = {
   authenticated: boolean
   user?: UserInfo
   capabilities?: AuthCapabilities
+  cloud_session?: CloudSessionSummary | null
 }
 
 export type TokenResp = {
   access_token: string
   token_type: string
+}
+
+export type CloudOAuthCallbackResp = {
+  cloud_session: CloudSessionSummary
+  redirect: string
 }
 
 export async function authMe(): Promise<AuthMeResp> {
@@ -106,13 +119,35 @@ export async function authGoogleCallback(code: string, state: string): Promise<T
   return response.data
 }
 
-export function cloudConnectStartURL(): string {
-  return '/cloud/connect/start'
+export function cloudOAuthStartURL(): string {
+  return '/cloud/oauth/start'
 }
 
-export async function cloudConnectAuthorize(redirectUri: string, state: string): Promise<string> {
-  const response = await apiClient.get<{ redirect_url: string }>('/api/cloud-connect/authorize', {
-    params: { redirect_uri: redirectUri, state },
+export async function cloudOAuthStart(redirect?: string): Promise<string> {
+  const response = await apiClient.get<{ authorize_url: string }>('/api/cloud-oauth/start', {
+    params: redirect ? { redirect } : undefined,
+  })
+  return response.data.authorize_url
+}
+
+export async function cloudOAuthCallback(
+  code: string,
+  state: string,
+): Promise<CloudOAuthCallbackResp> {
+  const response = await apiClient.post<CloudOAuthCallbackResp>('/api/cloud-oauth/callback', {
+    code,
+    state,
+  })
+  return response.data
+}
+
+export async function cloudOAuthAuthorize(
+  clientId: string,
+  redirectUri: string,
+  state: string,
+): Promise<string> {
+  const response = await apiClient.get<{ redirect_url: string }>('/api/cloud-oauth/authorize', {
+    params: { client_id: clientId, redirect_uri: redirectUri, state },
   })
   return response.data.redirect_url
 }
