@@ -15,6 +15,11 @@ tasks:
       - go mod download
       - go mod tidy
 
+  run:
+    desc: Start web and backend development servers together
+    cmds:
+      - uv run python scripts/run.py
+
   clean:
     desc: Remove build outputs
     cmds:
