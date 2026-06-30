@@ -1,4 +1,6 @@
 -- +goose Up
+ALTER TABLE devices ADD COLUMN public_key TEXT NOT NULL;
+
 CREATE TABLE workspaces (
   id VARCHAR(32) PRIMARY KEY,
   device_id VARCHAR(128) NOT NULL,
@@ -70,3 +72,4 @@ CREATE TABLE session_runs (
 DROP TABLE IF EXISTS session_runs;
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS workspaces;
+ALTER TABLE devices DROP COLUMN public_key;

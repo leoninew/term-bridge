@@ -2,7 +2,6 @@
 CREATE TABLE devices (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  public_key TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

@@ -2,7 +2,6 @@
 CREATE TABLE devices (
   id VARCHAR(128) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  public_key TEXT NOT NULL,
   created_at DATETIME(6) NOT NULL,
   updated_at DATETIME(6) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

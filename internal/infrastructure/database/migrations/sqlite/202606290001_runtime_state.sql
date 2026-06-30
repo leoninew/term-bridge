@@ -1,4 +1,6 @@
 -- +goose Up
+ALTER TABLE devices ADD COLUMN public_key TEXT NOT NULL DEFAULT '';
+
 CREATE TABLE workspaces (
   id TEXT PRIMARY KEY,
   device_id TEXT NOT NULL,
@@ -86,3 +88,4 @@ DROP INDEX IF EXISTS idx_workspaces_device_order;
 DROP INDEX IF EXISTS idx_workspaces_device_path;
 DROP INDEX IF EXISTS idx_workspaces_device_deleted;
 DROP TABLE IF EXISTS workspaces;
+ALTER TABLE devices DROP COLUMN public_key;
