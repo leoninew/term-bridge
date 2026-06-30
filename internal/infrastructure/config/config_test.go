@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	apperrors "termbridge-go/internal/infrastructure/errors"
+	"termbridge-go/internal/infrastructure/security"
 )
 
 func TestLoadDefaults(t *testing.T) {
@@ -38,6 +39,9 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.Base.JWT.SecretKey != "" {
 		t.Fatalf("Base.JWT.SecretKey = %q, want default YAML value", cfg.Base.JWT.SecretKey)
+	}
+	if cfg.JWT.SecretKey != "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" {
+		t.Fatalf("JWT.SecretKey = %q, want env value", cfg.JWT.SecretKey)
 	}
 	if cfg.LogLevel != "info" {
 		t.Fatalf("LogLevel = %q, want info", cfg.LogLevel)
@@ -426,6 +430,30 @@ func TestLoadNormalizesZeroOrNegativeLogBodyLimit(t *testing.T) {
 	}
 	if cfg.LogHTTP.RequestBodyLimit != 0 || cfg.LogHTTP.ResponseBodyLimit != 0 {
 		t.Fatalf("LogHTTP = %#v", cfg.LogHTTP)
+	}
+}
+
+func TestLoadGeneratesMissingJWTSecretKey(t *testing.T) {
+	isolateHome(t)
+	if err := os.Unsetenv("TERMBRIDGE_JWT__SECRET_KEY"); err != nil {
+		t.Fatalf("Unsetenv(TERMBRIDGE_JWT__SECRET_KEY) error = %v", err)
+	}
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if _, err := security.ParseBase64Key(cfg.JWT.SecretKey, 32); err != nil {
+		t.Fatalf("JWT.SecretKey = %q, want generated fernet key: %v", cfg.JWT.SecretKey, err)
+	}
+	data, err := os.ReadFile(filepath.Join(cwd, EnvFileName))
+	if err != nil {
+		t.Fatalf("ReadFile(.env) error = %v", err)
+	}
+	if !strings.Contains(string(data), "TERMBRIDGE_JWT__SECRET_KEY="+quoteEnvValue(cfg.JWT.SecretKey)) {
+		t.Fatalf("env file missing generated jwt secret key: %s", string(data))
 	}
 }
 

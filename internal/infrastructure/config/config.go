@@ -2,6 +2,7 @@ package config
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -323,6 +324,13 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	normalizeWebConfig(&cfg)
 	normalizeAgentConfig(&cfg)
 	normalizeCloudConfig(&cfg)
+	if ensureDirs {
+		var err error
+		cfg, err = ensureJWTSecretKey(cfg)
+		if err != nil {
+			return Config{}, err
+		}
+	}
 	if !ensureDirs {
 		return cfg, nil
 	}
@@ -395,6 +403,14 @@ func IsResendEnabled(cfg ResendConfig) bool {
 	return strings.TrimSpace(cfg.APIKey) != ""
 }
 
+func GenerateFernetKey() (string, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(key), nil
+}
+
 func Mode(cfg Config) string {
 	return cfg.Web.Mode
 }
@@ -423,6 +439,21 @@ func loadDatabaseConfig(cwd string, v *viper.Viper) (DatabaseConfig, error) {
 		}
 	default:
 		return DatabaseConfig{}, apperrors.Config("invalid database.driver", fmt.Errorf("must be sqlite or mysql"))
+	}
+	return cfg, nil
+}
+
+func ensureJWTSecretKey(cfg Config) (Config, error) {
+	if strings.TrimSpace(cfg.JWT.SecretKey) != "" {
+		return cfg, nil
+	}
+	secretKey, err := GenerateFernetKey()
+	if err != nil {
+		return Config{}, apperrors.Config("generate jwt.secret_key", err)
+	}
+	cfg.JWT.SecretKey = secretKey
+	if err := upsertEnvFileValues(cfg.EnvFile, map[string]string{envNameForKey("jwt.secret_key"): secretKey}); err != nil {
+		return Config{}, apperrors.Config("save jwt.secret_key", err)
 	}
 	return cfg, nil
 }
@@ -587,13 +618,31 @@ func upsertEnvFileValues(path string, updates map[string]string) error {
 		lines[index] = key + "=" + quoteEnvValue(value)
 		seen[key] = struct{}{}
 	}
-	for _, key := range []string{envNameForKey("agent.device_id"), envNameForKey("agent.device_name")} {
+	for _, key := range envUpdateKeys(updates) {
 		if _, ok := seen[key]; ok {
 			continue
 		}
 		lines = append(lines, key+"="+quoteEnvValue(updates[key]))
 	}
 	return os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600)
+}
+
+func envUpdateKeys(updates map[string]string) []string {
+	preferred := []string{envNameForKey("jwt.secret_key"), envNameForKey("agent.device_id"), envNameForKey("agent.device_name")}
+	keys := make([]string, 0, len(updates))
+	seen := map[string]struct{}{}
+	for _, key := range preferred {
+		if _, ok := updates[key]; ok {
+			keys = append(keys, key)
+			seen[key] = struct{}{}
+		}
+	}
+	for key := range updates {
+		if _, ok := seen[key]; !ok {
+			keys = append(keys, key)
+		}
+	}
+	return keys
 }
 
 func envLineKey(line string) (string, bool) {

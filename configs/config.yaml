@@ -7,7 +7,7 @@
 # TERMBRIDGE_ENV 只从 OS env 读取，不从 .env / .env.<env> 读取。
 
 # JWT 认证密钥（必填）。必须是 base64 编码的 32 字节随机 key，普通明文 secret 会被拒绝。
-# 生成方式：openssl rand -base64 32
+# python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
 jwt:
   secret_key: ""
 
@@ -75,7 +75,7 @@ agent:
 cloud:
   # 固定 Cloud Gate 的外部访问地址。
   # 本地 /cloud/oauth/start 会按 OAuth2 client 配置跳转到该地址完成云端账号授权。
-  gate_url: "http://termbridge.lvh.me"
+  gate_url: ""
 
   # TermBridge Cloud OAuth2 client 配置。local mode 作为 Cloud Gate 的 OAuth2 client，
   # redirect_url 指向本机 /cloud/oauth/callback。
