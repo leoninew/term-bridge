@@ -30,7 +30,7 @@ import (
 type Config struct {
 	Username               string
 	Password               string
-	JWTSecret              string
+	JWTSecret              []byte
 	AllowedOrigins         []string
 	DebugErrors            bool
 	Logger                 *slog.Logger

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"termbridge-go/internal/infrastructure/security"
 )
 
 type Claims struct {
@@ -24,12 +26,27 @@ type TokenService struct {
 	ttl    time.Duration
 }
 
-func NewTokenService(secret string, ttl ...time.Duration) TokenService {
+func NewTokenService(secret []byte, ttl ...time.Duration) TokenService {
+	if len(secret) != sha256.Size {
+		panic("JWT secret key must be 32 bytes")
+	}
 	duration := 24 * time.Hour
 	if len(ttl) > 0 && ttl[0] > 0 {
 		duration = ttl[0]
 	}
-	return TokenService{secret: []byte(secret), ttl: duration}
+	return TokenService{secret: append([]byte(nil), secret...), ttl: duration}
+}
+
+func NewTokenServiceFromBase64Key(secret string, ttl ...time.Duration) (TokenService, error) {
+	key, err := security.ParseBase64Key(secret, sha256.Size)
+	if err != nil {
+		return TokenService{}, err
+	}
+	return NewTokenService(key, ttl...), nil
+}
+
+func (s TokenService) SecretKey() []byte {
+	return append([]byte(nil), s.secret...)
 }
 
 func (s TokenService) Sign(claims Claims) (string, error) {

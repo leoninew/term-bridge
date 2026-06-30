@@ -436,7 +436,7 @@ func constantEqual(a, b string) bool {
 type OAuthGoogleClient struct{ cfg *oauth2.Config }
 
 func NewOAuthGoogleClient(cfg config.GoogleConfig) GoogleClient {
-	if cfg.ClientID == "" || cfg.ClientSecret == "" || cfg.RedirectURL == "" {
+	if !config.IsGoogleAuthEnabled(cfg) {
 		return nil
 	}
 	return &OAuthGoogleClient{cfg: &oauth2.Config{ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret, RedirectURL: cfg.RedirectURL, Scopes: []string{"openid", "email", "profile"}, Endpoint: google.Endpoint}}

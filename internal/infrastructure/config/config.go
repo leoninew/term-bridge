@@ -16,13 +16,15 @@ import (
 	"github.com/subosito/gotenv"
 
 	apperrors "termbridge-go/internal/infrastructure/errors"
+	"termbridge-go/internal/infrastructure/security"
 )
 
 const (
-	DefaultFileName = ".termbridge.default.yaml"
-	FileName        = ".termbridge.yaml"
+	ConfigDirName   = "configs"
+	DefaultFileName = "config.yaml"
 	EnvFileName     = ".env"
 	EnvPrefix       = "TERMBRIDGE"
+	EnvNameVariable = EnvPrefix + "_ENV"
 
 	WebModeLocal = "local"
 	WebModeCloud = "cloud"
@@ -33,23 +35,27 @@ const (
 )
 
 type Config struct {
-	Cwd        string
-	Command    []string
-	LogLevel   string
-	LogFormat  string
-	LogDir     string
-	LogHTTP    LogHTTPConfig
-	History    HistoryConfig
-	Runtime    RuntimeConfig
-	Web        WebConfig
-	Gate       GateConfig
-	Agent      AgentConfig
-	Cloud      CloudConfig
-	Database   DatabaseConfig
-	Auth       AuthConfig
-	JWT        JWTConfig
-	Resend     ResendConfig
-	ConfigFile string
+	Cwd               string
+	Command           []string
+	Environment       string
+	LogLevel          string
+	LogFormat         string
+	LogDir            string
+	LogHTTP           LogHTTPConfig
+	History           HistoryConfig
+	Runtime           RuntimeConfig
+	Web               WebConfig
+	Gate              GateConfig
+	Agent             AgentConfig
+	Cloud             CloudConfig
+	Database          DatabaseConfig
+	Auth              AuthConfig
+	JWT               JWTConfig
+	Resend            ResendConfig
+	DefaultConfigFile string
+	EnvConfigFile     string
+	EnvFile           string
+	Base              *Config
 }
 
 type JWTConfig struct {
@@ -162,10 +168,10 @@ type CloudOAuthConfig struct {
 }
 
 type BootstrapResult struct {
-	ConfigFile string
-	Generated  bool
-	Username   string
-	Password   string
+	EnvFile   string
+	Generated bool
+	Username  string
+	Password  string
 }
 
 type Options struct {
@@ -179,32 +185,41 @@ func Load(options Options) (Config, error) {
 		return Config{}, err
 	}
 
-	defaultConfigFile := filepath.Join(cwd, DefaultFileName)
-	configFile, err := discoverConfig(cwd)
+	environment := environmentName()
+	defaultConfigFile := filepath.Join(cwd, ConfigDirName, DefaultFileName)
+	envConfigFile, err := discoverEnvConfig(cwd, environment)
 	if err != nil {
 		return Config{}, err
 	}
-	if err := loadEnvFile(filepath.Join(cwd, EnvFileName)); err != nil {
+	envFile := envFilePath(cwd, environment)
+
+	baseLoader, err := loadYAMLConfig(defaultConfigFile, envConfigFile, false)
+	if err != nil {
+		return Config{}, err
+	}
+	base, err := buildConfig(cwd, options, environment, defaultConfigFile, envConfigFile, "", baseLoader, false)
+	if err != nil {
 		return Config{}, err
 	}
 
-	v := newLoader()
-
-	v.SetConfigFile(defaultConfigFile)
-	if err := v.ReadInConfig(); err != nil {
-		return Config{}, apperrors.Config("read default config file", err)
-	}
-
-	if configFile != "" {
-		v.SetConfigFile(configFile)
-		if err := v.MergeInConfig(); err != nil {
-			return Config{}, apperrors.Config("read config file", err)
-		}
-	}
-	if err := rejectUnknownKeys(v); err != nil {
+	if err := loadEnvFile(envFile); err != nil {
 		return Config{}, err
 	}
 
+	v, err := loadYAMLConfig(defaultConfigFile, envConfigFile, true)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg, err := buildConfig(cwd, options, environment, defaultConfigFile, envConfigFile, envFile, v, true)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Base = &base
+
+	return cfg, nil
+}
+
+func buildConfig(cwd string, options Options, environment string, defaultConfigFile string, envConfigFile string, loadedEnvFile string, v *viper.Viper, ensureDirs bool) (Config, error) {
 	logDir, err := resolveLogDir(cwd, v.GetString("log.dir"))
 	if err != nil {
 		return Config{}, err
@@ -223,11 +238,12 @@ func Load(options Options) (Config, error) {
 	}
 
 	cfg := Config{
-		Cwd:       cwd,
-		Command:   append([]string(nil), options.Command...),
-		LogLevel:  strings.ToLower(v.GetString("log.level")),
-		LogFormat: strings.ToLower(v.GetString("log.format")),
-		LogDir:    logDir,
+		Cwd:         cwd,
+		Command:     append([]string(nil), options.Command...),
+		Environment: environment,
+		LogLevel:    strings.ToLower(v.GetString("log.level")),
+		LogFormat:   strings.ToLower(v.GetString("log.format")),
+		LogDir:      logDir,
 		LogHTTP: LogHTTPConfig{
 			RequestBodyLimit:  v.GetInt("log.http.request_body_limit"),
 			ResponseBodyLimit: v.GetInt("log.http.response_body_limit"),
@@ -292,13 +308,23 @@ func Load(options Options) (Config, error) {
 			},
 		},
 		JWT: JWTConfig{
-			SecretKey: strings.TrimSpace(v.GetString("jwt.secret_key")),
+			SecretKey: v.GetString("jwt.secret_key"),
 		},
 		Resend: ResendConfig{
 			APIKey:    strings.TrimSpace(v.GetString("resend.api_key")),
 			FromEmail: strings.TrimSpace(v.GetString("resend.from_email")),
 		},
-		ConfigFile: configFile,
+		DefaultConfigFile: defaultConfigFile,
+		EnvConfigFile:     envConfigFile,
+		EnvFile:           loadedEnvFile,
+	}
+
+	normalizeLogBodyLimits(&cfg)
+	normalizeWebConfig(&cfg)
+	normalizeAgentConfig(&cfg)
+	normalizeCloudConfig(&cfg)
+	if !ensureDirs {
+		return cfg, nil
 	}
 
 	if err := validateLogLevel(cfg.LogLevel); err != nil {
@@ -307,29 +333,28 @@ func Load(options Options) (Config, error) {
 	if err := validateLogFormat(cfg.LogFormat); err != nil {
 		return Config{}, err
 	}
-	normalizeLogBodyLimits(&cfg)
-	normalizeWebConfig(&cfg)
 	if err := validateWeb(cfg.Web); err != nil {
 		return Config{}, err
 	}
 	if err := validateHistory(cfg.History); err != nil {
 		return Config{}, err
 	}
-	normalizeAgentConfig(&cfg)
 	if err := validateGate(cfg.Gate); err != nil {
 		return Config{}, err
 	}
 	if err := validateAgent(cfg.Agent); err != nil {
 		return Config{}, err
 	}
-	normalizeCloudConfig(&cfg)
 	if err := validateCloud(cfg); err != nil {
 		return Config{}, err
 	}
-	if cfg.JWT.SecretKey == "" {
-		return Config{}, apperrors.Config("invalid jwt.secret_key", fmt.Errorf("JWT secret key is required"))
+	if err := validateJWT(cfg.JWT); err != nil {
+		return Config{}, err
 	}
 	if err := validateAuth(cfg.Auth); err != nil {
+		return Config{}, err
+	}
+	if err := validateIntegrationConfig(cfg); err != nil {
 		return Config{}, err
 	}
 	if err := validateModeRequirements(cfg); err != nil {
@@ -347,7 +372,7 @@ func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
 	if err != nil {
 		return Config{}, BootstrapResult{}, err
 	}
-	return updated, BootstrapResult{ConfigFile: updated.ConfigFile}, nil
+	return updated, BootstrapResult{EnvFile: updated.EnvFile}, nil
 }
 
 func IsSelfConnectedAgent(cfg Config) bool {
@@ -360,6 +385,14 @@ func IsLocalMode(cfg Config) bool {
 
 func IsCloudMode(cfg Config) bool {
 	return cfg.Web.Mode == WebModeCloud
+}
+
+func IsGoogleAuthEnabled(cfg GoogleConfig) bool {
+	return strings.TrimSpace(cfg.ClientID) != ""
+}
+
+func IsResendEnabled(cfg ResendConfig) bool {
+	return strings.TrimSpace(cfg.APIKey) != ""
 }
 
 func Mode(cfg Config) string {
@@ -394,6 +427,13 @@ func loadDatabaseConfig(cwd string, v *viper.Viper) (DatabaseConfig, error) {
 	return cfg, nil
 }
 
+func validateJWT(cfg JWTConfig) error {
+	if _, err := security.ParseBase64Key(cfg.SecretKey, 32); err != nil {
+		return apperrors.Config("invalid jwt.secret_key", err)
+	}
+	return nil
+}
+
 func validateAuth(cfg AuthConfig) error {
 	if cfg.JWTTTL <= 0 {
 		return apperrors.Config("invalid auth.jwt_ttl", fmt.Errorf("must be positive"))
@@ -406,6 +446,37 @@ func validateAuth(cfg AuthConfig) error {
 	}
 	if cfg.Code.TTL <= 0 || cfg.Code.ResendCooldown <= 0 || cfg.Code.MaxAttempts < 1 {
 		return apperrors.Config("invalid auth.code", fmt.Errorf("ttl, resend cooldown and max attempts must be positive"))
+	}
+	return nil
+}
+
+func validateIntegrationConfig(cfg Config) error {
+	if cfg.Auth.Google.ClientID != "" || cfg.Auth.Google.ClientSecret != "" || cfg.Auth.Google.RedirectURL != "" {
+		missing := []string{}
+		if cfg.Auth.Google.ClientID == "" {
+			missing = append(missing, envNameForKey("auth.google.client_id"))
+		}
+		if cfg.Auth.Google.ClientSecret == "" {
+			missing = append(missing, envNameForKey("auth.google.client_secret"))
+		}
+		if cfg.Auth.Google.RedirectURL == "" {
+			missing = append(missing, envNameForKey("auth.google.redirect_url"))
+		}
+		if len(missing) > 0 {
+			return apperrors.Config("incomplete google auth configuration", errors.New(strings.Join(missing, ", ")))
+		}
+	}
+	if cfg.Resend.APIKey != "" || cfg.Resend.FromEmail != "" {
+		missing := []string{}
+		if cfg.Resend.APIKey == "" {
+			missing = append(missing, envNameForKey("resend.api_key"))
+		}
+		if cfg.Resend.FromEmail == "" {
+			missing = append(missing, envNameForKey("resend.from_email"))
+		}
+		if len(missing) > 0 {
+			return apperrors.Config("incomplete resend configuration", errors.New(strings.Join(missing, ", ")))
+		}
 	}
 	return nil
 }
@@ -472,34 +543,82 @@ func ensureAgentIdentityInConfig(cfg Config) (Config, error) {
 	if !changed {
 		return cfg, nil
 	}
-	configFile := cfg.ConfigFile
-	if configFile == "" {
-		configFile = filepath.Join(cfg.Cwd, FileName)
-	}
-	if err := saveAgentIdentityToConfigFile(configFile, cfg.Agent); err != nil {
+	if err := saveAgentIdentityToEnvFile(cfg.EnvFile, cfg.Agent); err != nil {
 		return Config{}, apperrors.Config("save agent identity", err)
 	}
-	cfg.ConfigFile = configFile
 	return cfg, nil
 }
 
-func saveAgentIdentityToConfigFile(path string, agent AgentConfig) error {
-	local := viper.New()
-	local.SetConfigType("yaml")
-	local.SetConfigFile(path)
-	if exists, err := fileExists(path); err != nil {
-		return err
-	} else if exists {
-		if err := local.ReadInConfig(); err != nil {
-			return err
-		}
+func saveAgentIdentityToEnvFile(path string, agent AgentConfig) error {
+	updates := map[string]string{
+		envNameForKey("agent.device_id"):   strings.TrimSpace(agent.DeviceId),
+		envNameForKey("agent.device_name"): strings.TrimSpace(agent.DeviceName),
 	}
-	local.Set("agent.device_id", strings.TrimSpace(agent.DeviceId))
-	local.Set("agent.device_name", strings.TrimSpace(agent.DeviceName))
+	return upsertEnvFileValues(path, updates)
+}
+
+func upsertEnvFileValues(path string, updates map[string]string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return local.WriteConfigAs(path)
+	var lines []string
+	if exists, err := fileExists(path); err != nil {
+		return err
+	} else if exists {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		lines = strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+		if len(lines) > 0 && lines[len(lines)-1] == "" {
+			lines = lines[:len(lines)-1]
+		}
+	}
+	seen := map[string]struct{}{}
+	for index, line := range lines {
+		key, ok := envLineKey(line)
+		if !ok {
+			continue
+		}
+		value, exists := updates[key]
+		if !exists {
+			continue
+		}
+		lines[index] = key + "=" + quoteEnvValue(value)
+		seen[key] = struct{}{}
+	}
+	for _, key := range []string{envNameForKey("agent.device_id"), envNameForKey("agent.device_name")} {
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		lines = append(lines, key+"="+quoteEnvValue(updates[key]))
+	}
+	return os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600)
+}
+
+func envLineKey(line string) (string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+		return "", false
+	}
+	if strings.HasPrefix(trimmed, "export ") {
+		trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "export "))
+	}
+	index := strings.Index(trimmed, "=")
+	if index <= 0 {
+		return "", false
+	}
+	key := strings.TrimSpace(trimmed[:index])
+	if key == "" {
+		return "", false
+	}
+	return key, true
+}
+
+func quoteEnvValue(value string) string {
+	escaped := strings.ReplaceAll(value, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `"`, `\"`)
+	return `"` + escaped + `"`
 }
 
 func resolveCwd(path string) (string, error) {
@@ -525,14 +644,49 @@ func resolveCwd(path string) (string, error) {
 	return cwd, nil
 }
 
-func discoverConfig(effectiveCwd string) (string, error) {
-	local := filepath.Join(effectiveCwd, FileName)
-	if exists, err := fileExists(local); err != nil {
-		return "", apperrors.Config("check local config file", err)
+func environmentName() string {
+	return strings.TrimSpace(os.Getenv(EnvNameVariable))
+}
+
+func discoverEnvConfig(effectiveCwd string, environment string) (string, error) {
+	if environment == "" {
+		return "", nil
+	}
+	path := filepath.Join(effectiveCwd, ConfigDirName, envConfigFileName(environment))
+	if exists, err := fileExists(path); err != nil {
+		return "", apperrors.Config("check env config file", err)
 	} else if exists {
-		return local, nil
+		return path, nil
 	}
 	return "", nil
+}
+
+func envConfigFileName(environment string) string {
+	return "config." + environment + ".yaml"
+}
+
+func envFilePath(cwd string, environment string) string {
+	if environment == "" {
+		return filepath.Join(cwd, EnvFileName)
+	}
+	return filepath.Join(cwd, EnvFileName+"."+environment)
+}
+
+func loadYAMLConfig(defaultConfigFile string, envConfigFile string, bindEnvironment bool) (*viper.Viper, error) {
+	v := newLoader(bindEnvironment)
+
+	v.SetConfigFile(defaultConfigFile)
+	if err := v.ReadInConfig(); err != nil {
+		return nil, apperrors.Config("read default config file", err)
+	}
+
+	if envConfigFile != "" {
+		v.SetConfigFile(envConfigFile)
+		if err := v.MergeInConfig(); err != nil {
+			return nil, apperrors.Config("read env config file", err)
+		}
+	}
+	return v, nil
 }
 
 func fileExists(path string) (bool, error) {
@@ -563,10 +717,12 @@ func loadEnvFile(path string) error {
 	return nil
 }
 
-func newLoader() *viper.Viper {
+func newLoader(bindEnvironment bool) *viper.Viper {
 	loader := viper.New()
 	loader.SetConfigType("yaml")
-	bindEnv(loader)
+	if bindEnvironment {
+		bindEnv(loader)
+	}
 	return loader
 }
 
@@ -624,19 +780,6 @@ func configKeys() []string {
 		"resend.api_key",
 		"resend.from_email",
 	}
-}
-
-func rejectUnknownKeys(v *viper.Viper) error {
-	allowed := map[string]struct{}{}
-	for _, key := range configKeys() {
-		allowed[key] = struct{}{}
-	}
-	for _, key := range v.AllKeys() {
-		if _, ok := allowed[key]; !ok {
-			return apperrors.Config("unknown config key", fmt.Errorf("%q", key))
-		}
-	}
-	return nil
 }
 
 func resolveLogDir(cwd string, path string) (string, error) {

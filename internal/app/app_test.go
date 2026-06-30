@@ -130,9 +130,8 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
 	configContent := "web:\n  mode: local\ngate:\n  browser:\n    allowed_origins:\n      - http://127.0.0.1:9031\n  api:\n    expose_errors: true\nagent:\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\ncloud:\n  gate_url: http://termbridge.lvh.me\n"
-	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
-		t.Fatalf("WriteFile(config) error = %v", err)
-	}
+	t.Setenv("TERMBRIDGE_ENV", "develop")
+	writeEnvConfig(t, cwd, "develop", configContent)
 	if err := os.MkdirAll(filepath.Join(cwd, ".termbridge"), 0o755); err != nil {
 		t.Fatalf("MkdirAll(state dir) error = %v", err)
 	}
@@ -256,9 +255,8 @@ func TestRunServeStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 	}))
 	defer cloudGate.Close()
 	configContent := "web:\n  mode: local\ngate:\n  browser:\n    allowed_origins:\n      - http://127.0.0.1:9031\n  api:\n    expose_errors: true\nagent:\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\ncloud:\n  gate_url: " + cloudGate.URL + "\n  oauth:\n    client_id: termbridge-local\n    redirect_url: http://localhost:9031/cloud/oauth/callback\n"
-	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
-		t.Fatalf("WriteFile(config) error = %v", err)
-	}
+	t.Setenv("TERMBRIDGE_ENV", "develop")
+	writeEnvConfig(t, cwd, "develop", configContent)
 	if err := os.MkdirAll(filepath.Join(cwd, ".termbridge"), 0o755); err != nil {
 		t.Fatalf("MkdirAll(state dir) error = %v", err)
 	}
@@ -360,9 +358,8 @@ func TestRunExecUsesConfiguredStateDirAndHistoryLimits(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	configuredStateDir := filepath.Join(cwd, "runtime-state")
 	configContent := "history:\n  max_lines: 1\n  max_bytes: 8\n  max_line_bytes: 4\nruntime:\n  state_dir: " + filepath.ToSlash(configuredStateDir) + "\n"
-	if err := os.WriteFile(filepath.Join(cwd, ".termbridge.yaml"), []byte(configContent), 0o644); err != nil {
-		t.Fatalf("WriteFile(config) error = %v", err)
-	}
+	t.Setenv("TERMBRIDGE_ENV", "develop")
+	writeEnvConfig(t, cwd, "develop", configContent)
 	oldRunRuntime := runRuntime
 	defer func() { runRuntime = oldRunRuntime }()
 	runRuntime = func(ctx context.Context, logger *logging.Logger, spec process.ProcessSpec, streams runner.IO, hooks runner.Hooks) (runner.Result, error) {
@@ -429,14 +426,29 @@ func TestRunWorkspaceAndSessionList(t *testing.T) {
 
 func writeDefaultConfig(t *testing.T, dir string) {
 	t.Helper()
-	content, err := os.ReadFile(filepath.Join("..", "..", ".termbridge.default.yaml"))
+	content, err := os.ReadFile(filepath.Join("..", "..", "configs", "config.yaml"))
 	if err != nil {
 		t.Fatalf("ReadFile(default config) error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".termbridge.default.yaml"), content, 0o644); err != nil {
+	configDir := filepath.Join(dir, "configs")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(configs) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), content, 0o644); err != nil {
 		t.Fatalf("WriteFile(default config) error = %v", err)
 	}
-	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "test-secret-key-for-tests")
+	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+}
+
+func writeEnvConfig(t *testing.T, dir string, environment string, content string) {
+	t.Helper()
+	configDir := filepath.Join(dir, "configs")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(configs) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config."+environment+".yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile(env config) error = %v", err)
+	}
 }
 
 func globOne(t *testing.T, pattern string) string {

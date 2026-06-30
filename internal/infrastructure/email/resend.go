@@ -21,7 +21,7 @@ type ResendSender struct {
 }
 
 func NewResendSender(cfg config.ResendConfig) *ResendSender {
-	if cfg.APIKey == "" || cfg.FromEmail == "" {
+	if !config.IsResendEnabled(cfg) {
 		return nil
 	}
 	return &ResendSender{apiKey: cfg.APIKey, from: cfg.FromEmail, client: &http.Client{Timeout: 10 * time.Second}, endpoint: "https://api.resend.com/emails"}

@@ -130,17 +130,17 @@ func Run(ctx context.Context, options Options) (Result, error) {
 
 	switch options.Command.Kind {
 	case CommandExec:
-		logger.Info("termbridge exec command parsed", "cwd", cfg.Cwd, "command", strings.Join(cfg.Command, " "), "config", cfg.ConfigFile)
+		logger.Info("termbridge exec command parsed", "cwd", cfg.Cwd, "command", strings.Join(cfg.Command, " "), "config", cfg.DefaultConfigFile)
 		return runExec(ctx, cfg, logger, options)
 	case CommandWorkspace:
 		return runWorkspaceList(ctx, cfg, options.Stdout)
 	case CommandSession:
 		return runSessionList(ctx, cfg, options.Stdout)
 	case CommandServe:
-		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "web_mode", cfg.Web.Mode, "agent_listen_url", cfg.Agent.ListenUrl, "agent_connect_url", cfg.Agent.ConnectUrl, "agent_device_id", cfg.Agent.DeviceId, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.ConfigFile)
+		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "web_mode", cfg.Web.Mode, "agent_listen_url", cfg.Agent.ListenUrl, "agent_connect_url", cfg.Agent.ConnectUrl, "agent_device_id", cfg.Agent.DeviceId, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.DefaultConfigFile)
 		return runServe(ctx, cfg, bootstrap, logger, options)
 	case CommandMigrate:
-		logger.Info("termbridge migrate command parsed", "cwd", cfg.Cwd, "database_driver", cfg.Database.Driver, "config", cfg.ConfigFile)
+		logger.Info("termbridge migrate command parsed", "cwd", cfg.Cwd, "database_driver", cfg.Database.Driver, "config", cfg.DefaultConfigFile)
 		return runMigrate(ctx, cfg)
 	default:
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("missing command")
@@ -283,7 +283,7 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		stdout = io.Discard
 	}
 	if bootstrap.Generated {
-		fmt.Fprintf(stdout, "TermBridge generated login credentials in %s\n", bootstrap.ConfigFile)
+		fmt.Fprintf(stdout, "TermBridge generated local credentials in %s\n", bootstrap.EnvFile)
 		fmt.Fprintf(stdout, "Username: %s\n", bootstrap.Username)
 		fmt.Fprintf(stdout, "Password: %s\n", bootstrap.Password)
 	}
@@ -297,7 +297,10 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 	}
 	deviceRepository := devicerepo.New(db.DB, db.Driver)
 	repo := authrepo.New(db.DB, db.Driver)
-	tokens := gatewayauth.NewTokenService(cfg.JWT.SecretKey, cfg.Auth.JWTTTL)
+	tokens, err := gatewayauth.NewTokenServiceFromBase64Key(cfg.JWT.SecretKey, cfg.Auth.JWTTTL)
+	if err != nil {
+		return Result{Cwd: cfg.Cwd}, apperrors.Config("invalid jwt.secret_key", err)
+	}
 	authService := authapp.New(repo, tokens, cfg.Auth, config.Mode(cfg), email.NewResendSender(cfg.Resend), authapp.NewOAuthGoogleClient(cfg.Auth.Google))
 
 	var device agent.Device
@@ -360,7 +363,7 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		}()
 	}
 
-	gatewayHandler := gatewayapi.New(gatewayapi.Config{AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService, AgentTunnelAudience: gatewayTunnelAudience(cfg), DevicePublicKeys: devicePublicKeys, DeviceRepository: deviceRepository, CloudGateURL: cfg.Cloud.GateUrl, CloudOAuth: gatewayapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectURL: cfg.Cloud.OAuth.RedirectURL, Scopes: cfg.Cloud.OAuth.Scopes}, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(cfg.Runtime.StateDir), LocalDevice: device, WebMode: cfg.Web.Mode, OnLocalCloudSession: func(gatewayapi.CloudSessionSummary) {
+	gatewayHandler := gatewayapi.New(gatewayapi.Config{AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService, AgentTunnelAudience: gatewayTunnelAudience(cfg), DevicePublicKeys: devicePublicKeys, DeviceRepository: deviceRepository, CloudGateURL: cfg.Cloud.GateUrl, CloudOAuth: gatewayapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectURL: cfg.Cloud.OAuth.RedirectURL, Scopes: cfg.Cloud.OAuth.Scopes}, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(cfg.Runtime.StateDir), LocalDevice: device, WebMode: cfg.Web.Mode, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(gatewayapi.CloudSessionSummary) {
 		if cloudConnector != nil {
 			startConnector(cloudConnector)
 		}

@@ -88,16 +88,26 @@ task build
 
 ## 配置
 
-默认配置来自 `.termbridge.default.yaml`，项目级覆盖写入 `.termbridge.yaml`。也可以使用项目根目录 `.env` 或系统环境变量覆盖配置。
+默认配置来自 `configs/config.yaml`，这是提交到版本库的只读 baseline。运行环境差异写入 `configs/config.<env>.yaml`，敏感值和运行中生成的本机配置写入项目根目录 `.env` 或 `.env.<env>`，也可以使用系统环境变量覆盖配置。
 
-配置优先级：
+默认配置优先级：
 
 ```text
-.termbridge.default.yaml
-  < .termbridge.yaml
+configs/config.yaml
   < .env
   < OS env
 ```
+
+如果通过 OS env 设置 `TERMBRIDGE_ENV=<env>`，会额外加载环境配置与环境 `.env`：
+
+```text
+configs/config.yaml
+  < configs/config.<env>.yaml
+  < .env.<env>
+  < OS env
+```
+
+`TERMBRIDGE_ENV` 只从 OS env 读取，不从 `.env` 或 `.env.<env>` 读取；`.env` / `.env.<env>` 不覆盖已存在的 OS env。未知配置文件 key 和未知环境变量会被忽略。
 
 环境变量命名规则：
 
@@ -126,7 +136,10 @@ TERMBRIDGE_RUNTIME__STATE_DIR=/var/lib/termbridge
 
 用户系统相关配置：
 
+`TERMBRIDGE_JWT__SECRET_KEY` 必须是 base64 编码的 32 字节随机 key（例如 `openssl rand -base64 32`）；普通明文 secret 会在启动校验阶段被拒绝。
+
 ```dotenv
+TERMBRIDGE_JWT__SECRET_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 TERMBRIDGE_DATABASE__DRIVER=sqlite
 TERMBRIDGE_DATABASE__SQLITE__PATH=.termbridge/termbridge.db
 TERMBRIDGE_AUTH__LOCAL_ADMIN__USERNAME=admin
@@ -140,7 +153,7 @@ TERMBRIDGE_RESEND__FROM_EMAIL=
 
 `agent.connect_url` 与 `agent.listen_url` 规范化后一致时为本地模式；本地模式支持 `auth.local_admin` shortcut。两者不一致时为远程 Gate 模式，启动时会要求 Google OAuth 与 Resend 配置齐全。
 
-`agent.device_id` 和 `agent.device_name` 为空时，`termbridge serve` 会生成并写入 `.termbridge.yaml`，随后由 Agent 上报给 Gate。
+`agent.device_id` 和 `agent.device_name` 为空时，`termbridge serve` 会生成并写入生效的 `.env` 或 `.env.<env>`，随后由 Agent 上报给 Gate；业务运行中变化的配置不会写回 `configs/config.yaml`。
 
 ## 当前边界
 

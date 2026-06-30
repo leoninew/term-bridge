@@ -340,14 +340,18 @@ func exitCommand(code int) []string {
 
 func writeDefaultConfig(t *testing.T, dir string) {
 	t.Helper()
-	content, err := os.ReadFile(filepath.Join("..", "..", "..", ".termbridge.default.yaml"))
+	content, err := os.ReadFile(filepath.Join("..", "..", "..", "configs", "config.yaml"))
 	if err != nil {
 		t.Fatalf("ReadFile(default config) error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".termbridge.default.yaml"), content, 0o644); err != nil {
+	configDir := filepath.Join(dir, "configs")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(configs) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), content, 0o644); err != nil {
 		t.Fatalf("WriteFile(default config) error = %v", err)
 	}
-	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "test-secret-key-for-tests")
+	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
 }
 
 func isolateHome(t *testing.T) string {

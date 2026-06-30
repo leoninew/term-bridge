@@ -3,7 +3,10 @@
 bin/
 logs/
 .termbridge/
-.termbridge.yaml
+/configs/config.*.yaml
+!/configs/config.yaml
 /.env
+/.env.*
+!/.env.example
 .pomelo-pw/output/
 tmp/

@@ -1,9 +1,12 @@
 # TermBridge-go 默认配置
 #
-# 复制为 .termbridge.yaml 或使用 .env / 环境变量覆盖。
-# 配置优先级：.termbridge.default.yaml < .termbridge.yaml < .env < OS env。
+# 这是只读 baseline，提交到版本库；业务运行中变化的配置不要写回此文件。
+# 默认配置优先级：configs/config.yaml < .env < OS env。
+# 设置 TERMBRIDGE_ENV=<env> 后，优先级为：
+# configs/config.yaml < configs/config.<env>.yaml < .env.<env> < OS env。
+# TERMBRIDGE_ENV 只从 OS env 读取，不从 .env / .env.<env> 读取。
 
-# JWT 认证密钥（必填）
+# JWT 认证密钥（必填）。必须是 base64 编码的 32 字节随机 key，普通明文 secret 会被拒绝。
 # 生成方式：openssl rand -base64 32
 jwt:
   secret_key: ""
@@ -62,7 +65,7 @@ agent:
   # 云端连接目标集中配置在 cloud.gate_url，不通过 agent.connect_url 切换。
   connect_url: ""
 
-  # 当前设备 ID。通常保持为空，由 termbridge serve 首次启动时自动生成并写入 .termbridge.yaml。
+  # 当前设备 ID。通常保持为空，由 termbridge serve 首次启动时自动生成并写入生效的 .env / .env.<env>。
   device_id: ""
 
   # 当前设备显示名。为空时使用本机 hostname 自动生成；可手动设置为更友好的名称。

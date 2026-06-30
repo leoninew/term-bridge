@@ -20,7 +20,7 @@ RUN apt-get update \
 WORKDIR /opt/termbridge
 COPY --from=go-build /out/termbridge /usr/local/bin/termbridge
 COPY --from=web-build /src/web/dist ./web/dist
-COPY .termbridge.default.yaml ./
+COPY configs/ ./configs/
 ENV TERMBRIDGE_AGENT__LISTEN_URL=http://0.0.0.0:80 \
     TERMBRIDGE_WEB__STATIC_DIR=/opt/termbridge/web/dist \
     TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost \

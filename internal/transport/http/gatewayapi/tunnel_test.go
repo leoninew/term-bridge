@@ -31,7 +31,7 @@ func TestAgentTunnelRegistersDevice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadDevicePublicKey() error = %v", err)
 	}
-	gateway := New(Config{JWTSecret: "test-secret", Logger: slog.Default(), AgentTunnelAudience: "test-audience", DevicePublicKeys: map[string]ed25519.PublicKey{device.Id: publicKey}})
+	gateway := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AgentTunnelAudience: "test-audience", DevicePublicKeys: map[string]ed25519.PublicKey{device.Id: publicKey}})
 	server := httptest.NewServer(gateway)
 	defer server.Close()
 

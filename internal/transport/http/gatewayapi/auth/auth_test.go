@@ -6,8 +6,13 @@ import (
 	"testing"
 )
 
+var (
+	testJWTKeyOne = []byte("11111111111111111111111111111111")
+	testJWTKeyTwo = []byte("22222222222222222222222222222222")
+)
+
 func TestValidCredentials(t *testing.T) {
-	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
 	if !a.ValidCredentials("admin", "admin") {
 		t.Fatal("admin/admin rejected")
 	}
@@ -19,8 +24,24 @@ func TestValidCredentials(t *testing.T) {
 	}
 }
 
+func TestNewTokenServiceFromBase64KeyAcceptsStrictKey(t *testing.T) {
+	service, err := NewTokenServiceFromBase64Key("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+	if err != nil {
+		t.Fatalf("NewTokenServiceFromBase64Key() error = %v", err)
+	}
+	if len(service.SecretKey()) != 32 {
+		t.Fatalf("len(SecretKey()) = %d, want 32", len(service.SecretKey()))
+	}
+}
+
+func TestNewTokenServiceFromBase64KeyRejectsPlainSecret(t *testing.T) {
+	if _, err := NewTokenServiceFromBase64Key("test-secret"); err == nil {
+		t.Fatal("NewTokenServiceFromBase64Key() error = nil, want error")
+	}
+}
+
 func TestSignAndVerify(t *testing.T) {
-	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
 	token, err := a.SignToken("admin")
 	if err != nil {
 		t.Fatalf("SignToken() error = %v", err)
@@ -35,15 +56,15 @@ func TestSignAndVerify(t *testing.T) {
 }
 
 func TestVerifyRejectsInvalidToken(t *testing.T) {
-	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
 	if _, err := a.Verify("invalid.token.here"); err == nil {
 		t.Fatal("expected error for invalid token")
 	}
 }
 
 func TestVerifyRejectsWrongSecret(t *testing.T) {
-	a1 := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("secret-1"))
-	a2 := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("secret-2"))
+	a1 := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
+	a2 := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyTwo))
 	token, _ := a1.SignToken("admin")
 	if _, err := a2.Verify(token); err == nil {
 		t.Fatal("expected error for wrong secret")
@@ -51,7 +72,7 @@ func TestVerifyRejectsWrongSecret(t *testing.T) {
 }
 
 func TestAuthenticatedRequest(t *testing.T) {
-	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
 	token, _ := a.SignToken("admin")
 	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
@@ -61,7 +82,7 @@ func TestAuthenticatedRequest(t *testing.T) {
 }
 
 func TestAuthenticatedRejectsMissingToken(t *testing.T) {
-	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
 	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
 	if a.Authenticated(request) {
 		t.Fatal("Authenticated() = true, want false")
@@ -69,7 +90,7 @@ func TestAuthenticatedRejectsMissingToken(t *testing.T) {
 }
 
 func TestMiddlewareRejectsUnauthenticated(t *testing.T) {
-	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
 	handler := a.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}), func(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +104,7 @@ func TestMiddlewareRejectsUnauthenticated(t *testing.T) {
 }
 
 func TestUsernameFromRequest(t *testing.T) {
-	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
 	token, _ := a.SignToken("admin")
 	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
@@ -93,7 +114,7 @@ func TestUsernameFromRequest(t *testing.T) {
 }
 
 func TestUsernameFromRequestWithoutToken(t *testing.T) {
-	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService("test-secret"))
+	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
 	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
 	if got := a.UsernameFromRequest(request); got != "" {
 		t.Fatalf("UsernameFromRequest() = %q, want empty", got)

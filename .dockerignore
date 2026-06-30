@@ -2,8 +2,10 @@
 .claude
 .pomelo-pw
 .env
+.env.*
 .termbridge/
-.termbridge.yaml
+configs/config.*.yaml
+!configs/config.yaml
 logs/
 bin/
 web/node_modules/
