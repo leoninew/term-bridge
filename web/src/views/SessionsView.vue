@@ -16,13 +16,11 @@
         <WorkspaceSessionSidebar
           :workspace-tree="workspaceSessions.workspaceTree"
           :active-session-id="workbench.activeSessionId"
-          :devices="gateway.devices"
           :selected-device-id="gateway.selectedDeviceId"
           :stopping-session-id="stoppingSessionId"
           :rerunning-session-id="rerunningSessionId"
           :deleting-session-id="deletingSessionId"
           :removing-workspace-id="removingWorkspaceId"
-          @select-device="selectDeviceId"
           @select="openSessionTab"
           @refresh="refresh"
           @new-session="openCreateSessionForm"
@@ -54,6 +52,11 @@
           :active-tab="workbench.activeTab"
           :active-session="activeSession"
           :selected-device-id="gateway.selectedDeviceId"
+          :authenticated="gateway.authenticated"
+          :user-display-name="userDisplayName"
+          :user-email="gateway.user?.email ?? ''"
+          :user-action-label="userActionLabel"
+          :user-action-disabled="userActionDisabled"
           :create-session-form-open="workbench.createSessionFormOpen"
           :create-cwd="createDraft.cwd"
           :create-name="createDraft.sessionName"
@@ -74,6 +77,7 @@
           @terminal-state="handleTerminalState"
           @terminal-error="handleTerminalError"
           @open-dashboard="openDashboard"
+          @open-user-auth="openUserAuth"
         />
       </SplitterPanel>
     </SplitterGroup>
@@ -130,7 +134,7 @@
     terminalWsUrl,
     updateSession,
   } from '../features/sessions/api'
-  import { authLogout } from '../features/gateway/api'
+  import { authLogout, cloudOAuthStartURL } from '../features/gateway/api'
   import { deleteWorkspace } from '../features/workspaces/api'
   import type { ServerControlMessage, SessionSummary, WorkspaceSummary } from '../protocol/terminal'
   import { useGatewayStore } from '../store/gateway'
@@ -156,6 +160,17 @@
   const rerunningSessionId = ref<string | null>(null)
   const deletingSessionId = ref<string | null>(null)
   const removingWorkspaceId = ref<string | null>(null)
+
+  const isLocalMode = computed(() => gateway.capabilities?.mode === 'local')
+  const userActionDisabled = computed(
+    () => isLocalMode.value && !gateway.capabilities?.cloud_oauth_enabled,
+  )
+  const userActionLabel = computed(() =>
+    isLocalMode.value ? t('dashboard.signInWithOAuth') : t('dashboard.signIn'),
+  )
+  const userDisplayName = computed(
+    () => gateway.user?.display_name || gateway.user?.email || t('dashboard.signedIn'),
+  )
 
   const activeSession = computed(() => {
     const tab = workbench.activeTab
@@ -192,13 +207,6 @@
     }
   }
 
-  async function selectDeviceId(deviceId: string) {
-    if (!gateway.selectDeviceId(deviceId)) {
-      return
-    }
-    await selectDevice()
-  }
-
   async function selectDevice() {
     workspaceSessions.reset()
     workbench.resetForSourceChange()
@@ -207,6 +215,20 @@
 
   async function openDashboard() {
     await router.push({ name: 'dashboard' })
+  }
+
+  async function openUserAuth() {
+    if (gateway.authenticated) {
+      return
+    }
+    if (!isLocalMode.value) {
+      await router.push({ name: 'login', query: { redirect: '/sessions' } })
+      return
+    }
+    if (!gateway.capabilities?.cloud_oauth_enabled) {
+      return
+    }
+    window.location.href = cloudOAuthStartURL()
   }
 
   async function logout() {

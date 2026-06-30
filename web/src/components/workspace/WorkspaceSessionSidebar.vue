@@ -6,65 +6,18 @@
       class="flex h-11 shrink-0 items-center border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2"
     >
       <div class="flex w-full items-center gap-1.5">
-        <div class="grid min-w-0 flex-1 grid-cols-[4fr_6fr] gap-1.5">
-          <SelectRoot
-            :model-value="props.selectedDeviceId"
-            :disabled="deviceSelectDisabled"
-            @update:model-value="changeDevice"
-          >
-            <SelectTrigger
-              class="flex h-8 w-full min-w-0 items-center justify-between gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-left text-sm text-[var(--color-text)] outline-none hover:border-[var(--color-border-strong)] focus:border-[var(--color-border-strong)] disabled:cursor-not-allowed disabled:opacity-60"
-              :aria-label="t('gateway.devices')"
-              :title="selectedDeviceLabel"
-            >
-              <SelectValue class="min-w-0 truncate" :placeholder="deviceSelectPlaceholder" />
-              <ChevronDown
-                class="size-3.5 shrink-0 text-[var(--color-text-subtle)]"
-                aria-hidden="true"
-              />
-            </SelectTrigger>
-            <SelectPortal>
-              <SelectContent
-                side="bottom"
-                align="start"
-                :side-offset="4"
-                class="z-50 max-h-64 min-w-40 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
-              >
-                <SelectViewport>
-                  <SelectItem
-                    v-for="device in props.devices"
-                    :key="device.id"
-                    :value="device.id"
-                    :text-value="device.name"
-                    :disabled="!device.online"
-                    class="relative flex cursor-pointer select-none items-center rounded px-7 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                  >
-                    <SelectItemIndicator class="absolute left-2 inline-flex items-center">
-                      <Check class="size-4 text-blue-500" />
-                    </SelectItemIndicator>
-                    <SelectItemText class="min-w-0 truncate">
-                      {{ device.name }} ·
-                      {{ device.online ? t('gateway.online') : t('gateway.offline') }}
-                    </SelectItemText>
-                  </SelectItem>
-                </SelectViewport>
-              </SelectContent>
-            </SelectPortal>
-          </SelectRoot>
-
-          <label class="relative min-w-0">
-            <span class="sr-only">{{ t('sidebar.searchSessions') }}</span>
-            <Search
-              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--color-text-subtle)]"
-            />
-            <input
-              v-model="searchQuery"
-              type="search"
-              :placeholder="t('sidebar.searchPlaceholder')"
-              class="h-8 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] py-1.5 pl-8 pr-2 text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)]"
-            />
-          </label>
-        </div>
+        <label class="relative min-w-0 flex-1">
+          <span class="sr-only">{{ t('sidebar.searchSessions') }}</span>
+          <Search
+            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--color-text-subtle)]"
+          />
+          <input
+            v-model="searchQuery"
+            type="search"
+            :placeholder="t('sidebar.searchPlaceholder')"
+            class="h-8 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] py-1.5 pl-8 pr-2 text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)]"
+          />
+        </label>
         <button
           type="button"
           class="flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text)] hover:bg-[var(--color-control-hover)]"
@@ -408,7 +361,6 @@
   import { useI18n } from 'vue-i18n'
   import {
     Check,
-    ChevronDown,
     ChevronRight,
     CircleStop,
     Folder,
@@ -437,19 +389,9 @@
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
-    SelectContent,
-    SelectItem,
-    SelectItemIndicator,
-    SelectItemText,
-    SelectPortal,
-    SelectRoot,
-    SelectTrigger,
-    SelectValue,
-    SelectViewport,
   } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
   import { localeLabels, locales, setLocale, type AppLocale } from '../../i18n'
-  import type { DeviceSummary } from '../../features/gateway/api'
   import { themes, useThemeStore, type AppTheme } from '../../store/theme'
   import type {
     SessionSummary,
@@ -473,7 +415,6 @@
   const props = defineProps<{
     workspaceTree: WorkspaceTreeSummary[]
     activeSessionId: string | null
-    devices: DeviceSummary[]
     selectedDeviceId: string
     stoppingSessionId: string | null
     rerunningSessionId: string | null
@@ -493,7 +434,6 @@
     unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
     reorderWorkspaces: [workspaceIds: string[]]
     reorderSessions: [workspaceId: string, sessionIds: string[]]
-    selectDevice: [deviceId: string]
     logout: []
     openDashboard: []
   }>()
@@ -506,16 +446,7 @@
   const draggableTreeItems = ref<WorkspaceTreeItem[]>([])
 
   const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
-  const selectedDevice = computed(
-    () => props.devices.find((device) => device.id === props.selectedDeviceId) ?? null,
-  )
-  const deviceSelectPlaceholder = computed(() =>
-    props.devices.length === 0 ? t('gateway.noDevices') : t('gateway.selectDevicePlaceholder'),
-  )
-  const selectedDeviceLabel = computed(
-    () => selectedDevice.value?.name ?? deviceSelectPlaceholder.value,
-  )
-  const deviceSelectDisabled = computed(() => props.devices.every((device) => !device.online))
+  const deviceSelectPlaceholder = computed(() => t('gateway.selectDevicePlaceholder'))
   const localeOptions = computed(() =>
     locales.map((value) => ({ value, label: localeLabels[value] })),
   )
@@ -525,14 +456,6 @@
       label: t(`theme.${value}`),
     })),
   )
-
-  function changeDevice(value: unknown) {
-    const device =
-      typeof value === 'string' ? props.devices.find((item) => item.id === value) : null
-    if (device?.online && device.id !== props.selectedDeviceId) {
-      emit('selectDevice', device.id)
-    }
-  }
 
   function changeLocale(value: unknown) {
     if (typeof value === 'string' && locales.includes(value as AppLocale)) {
