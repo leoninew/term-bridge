@@ -52,7 +52,7 @@ describe('gateway api', () => {
   })
 
   it('lists devices from the gateway', async () => {
-    const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: [] })
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { items: [] } })
 
     const { listDevices } = await import('./api')
     await expect(listDevices()).resolves.toEqual([])

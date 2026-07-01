@@ -4,11 +4,14 @@ import { clampTerminalSize } from '../../protocol/terminal'
 import type {
   CreateSessionReq,
   CreateSessionResp,
+  ListResp,
   RerunSessionReq,
   SessionSummary,
   UpdateSessionReq,
   WorkspaceTreeSession,
 } from '../../protocol/terminal'
+
+type UpdateSessionOrderResp = ListResp<WorkspaceTreeSession>
 
 export type ApiResult<T> = {
   data: T
@@ -113,11 +116,11 @@ export async function updateSessionOrder(
   workspaceId: string,
   sessionIds: string[],
 ): Promise<WorkspaceTreeSession[]> {
-  const response = await apiClient.patch<WorkspaceTreeSession[] | null>(
+  const response = await apiClient.patch<UpdateSessionOrderResp>(
     devicePath(deviceId, `${workspaceSessionPath(workspaceId)}/order`),
     { session_ids: sessionIds },
   )
-  return response.data ?? []
+  return response.data.items
 }
 
 export function terminalWsUrl(

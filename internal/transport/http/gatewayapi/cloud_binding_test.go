@@ -209,11 +209,11 @@ func TestCloudOAuthAuthorizeExchangeAndCurrentDeviceReport(t *testing.T) {
 	if devicesResponse.Code != http.StatusOK {
 		t.Fatalf("devices status = %d; body=%s", devicesResponse.Code, devicesResponse.Body.String())
 	}
-	var devices []DeviceSummary
+	var devices ListDevicesResp
 	if err := json.Unmarshal(devicesResponse.Body.Bytes(), &devices); err != nil {
 		t.Fatalf("decode devices: %v", err)
 	}
-	if len(devices) != 1 || devices[0].Id != localDevice.Id || devices[0].Online {
+	if len(devices.Items) != 1 || devices.Items[0].Id != localDevice.Id || devices.Items[0].Online {
 		t.Fatalf("devices = %#v", devices)
 	}
 	publicKey, err := gateway.config.DeviceRepository.PublicKey(context.Background(), localDevice.Id)
@@ -265,11 +265,11 @@ func TestDevicesFiltersByCloudUserAndDeleteDisconnectsRoute(t *testing.T) {
 	if devicesResponse.Code != http.StatusOK {
 		t.Fatalf("devices status = %d; body=%s", devicesResponse.Code, devicesResponse.Body.String())
 	}
-	var devices []DeviceSummary
+	var devices ListDevicesResp
 	if err := json.Unmarshal(devicesResponse.Body.Bytes(), &devices); err != nil {
 		t.Fatalf("decode devices: %v", err)
 	}
-	if len(devices) != 1 || devices[0].Id != "dev-1" || !devices[0].Online {
+	if len(devices.Items) != 1 || devices.Items[0].Id != "dev-1" || !devices.Items[0].Online {
 		t.Fatalf("devices = %#v", devices)
 	}
 

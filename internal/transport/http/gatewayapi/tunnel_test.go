@@ -96,11 +96,11 @@ func TestDevicesEndpointReturnsRegisteredDevices(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("devices status = %d", response.Code)
 	}
-	var devices []DeviceSummary
+	var devices ListDevicesResp
 	if err := json.Unmarshal(response.Body.Bytes(), &devices); err != nil {
 		t.Fatalf("Unmarshal() error = %v; body=%s", err, response.Body.String())
 	}
-	if len(devices) != 1 || devices[0].Id != "dev-1" || !devices[0].Online {
+	if len(devices.Items) != 1 || devices.Items[0].Id != "dev-1" || !devices.Items[0].Online {
 		t.Fatalf("devices = %#v", devices)
 	}
 }

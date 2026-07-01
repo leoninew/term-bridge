@@ -21,6 +21,7 @@ import (
 
 	agentapp "termbridge-go/internal/application/agent"
 	authapp "termbridge-go/internal/application/auth"
+	terminalapp "termbridge-go/internal/application/terminal"
 	devicerepo "termbridge-go/internal/infrastructure/repository/device"
 	terminalproto "termbridge-go/internal/protocol/terminal"
 	"termbridge-go/internal/protocol/tunnel"
@@ -67,22 +68,6 @@ type Handler struct {
 	historyCache       map[string]map[string]string
 	cloudSessionMu     sync.Mutex
 	cloudSession       *CloudSessionSummary
-}
-
-type DeviceSummary struct {
-	Id          string    `json:"id"`
-	Name        string    `json:"name"`
-	Online      bool      `json:"online"`
-	Status      string    `json:"status"`
-	ConnectedAt time.Time `json:"connected_at"`
-	LastSeen    time.Time `json:"last_seen"`
-}
-
-type CloudSessionSummary struct {
-	GateURL     string    `json:"gate_url"`
-	DeviceId    string    `json:"device_id"`
-	DeviceName  string    `json:"device_name"`
-	ConnectedAt time.Time `json:"connected_at"`
 }
 
 type DeviceRegistry struct {
@@ -191,7 +176,7 @@ func (s *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, HealthResp{Status: "ok"})
 }
 
 func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
@@ -202,11 +187,7 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	if !s.requireCloudWebMode(w, r) {
 		return
 	}
-	var req struct {
-		Email    string `json:"email"`
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
+	var req AuthLoginReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -220,7 +201,7 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 			s.writeAuthError(w, r, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"access_token": result.Token, "token_type": "bearer"})
+		writeJSON(w, http.StatusOK, TokenResp{AccessToken: result.Token, TokenType: "bearer"})
 		return
 	}
 	if !s.auth.ValidCredentials(login, req.Password) {
@@ -232,7 +213,7 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, "Failed to sign token", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"access_token": token, "token_type": "bearer"})
+	writeJSON(w, http.StatusOK, TokenResp{AccessToken: token, TokenType: "bearer"})
 }
 
 func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -240,7 +221,7 @@ func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
@@ -254,7 +235,7 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		cloudSession := s.localCloudSessionSummary()
 		claims, ok := s.claimsFromRequest(r)
 		if !ok {
-			writeJSON(w, http.StatusOK, map[string]any{"authenticated": false, "capabilities": capabilities, "cloud_session": cloudSession})
+			writeJSON(w, http.StatusOK, AuthMeResp{Authenticated: false, Capabilities: &capabilities, CloudSession: cloudSession})
 			return
 		}
 		user, err := s.authService.UserFromClaims(r.Context(), claims)
@@ -262,10 +243,10 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 			s.writeUnauthorized(w, r)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "user": user, "capabilities": capabilities, "cloud_session": cloudSession})
+		writeJSON(w, http.StatusOK, AuthMeResp{Authenticated: true, User: &user, Capabilities: &capabilities, CloudSession: cloudSession})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "username": s.auth.UsernameFromRequest(r)})
+	writeJSON(w, http.StatusOK, AuthMeResp{Authenticated: true, Username: s.auth.UsernameFromRequest(r)})
 }
 
 func (s *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
@@ -276,10 +257,7 @@ func (s *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if !s.requireCloudWebMode(w, r) {
 		return
 	}
-	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
+	var req AuthRegisterReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -291,7 +269,7 @@ func (s *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
+	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Handler) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -301,10 +279,7 @@ func (s *Handler) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	if !s.requireCloudWebMode(w, r) {
 		return
 	}
-	var req struct {
-		Email string `json:"email"`
-		Code  string `json:"code"`
-	}
+	var req AuthVerifyEmailReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -316,7 +291,7 @@ func (s *Handler) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Handler) handleResendVerification(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -326,9 +301,7 @@ func (s *Handler) handleResendVerification(w http.ResponseWriter, r *http.Reques
 	if !s.requireCloudWebMode(w, r) {
 		return
 	}
-	var req struct {
-		Email string `json:"email"`
-	}
+	var req AuthResendVerificationReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -340,7 +313,7 @@ func (s *Handler) handleResendVerification(w http.ResponseWriter, r *http.Reques
 		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
+	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -350,10 +323,7 @@ func (s *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	if !s.requireCloudWebMode(w, r) {
 		return
 	}
-	var req struct {
-		CurrentPassword string `json:"current_password"`
-		NewPassword     string `json:"new_password"`
-	}
+	var req AuthChangePasswordReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -362,7 +332,7 @@ func (s *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Handler) handlePasswordResetRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -372,16 +342,14 @@ func (s *Handler) handlePasswordResetRequest(w http.ResponseWriter, r *http.Requ
 	if !s.requireCloudWebMode(w, r) {
 		return
 	}
-	var req struct {
-		Email string `json:"email"`
-	}
+	var req AuthPasswordResetRequestReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
 	if s.authService != nil {
 		_ = s.authService.RequestPasswordReset(r.Context(), req.Email)
 	}
-	writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
+	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Handler) handlePasswordResetConfirm(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -391,11 +359,7 @@ func (s *Handler) handlePasswordResetConfirm(w http.ResponseWriter, r *http.Requ
 	if !s.requireCloudWebMode(w, r) {
 		return
 	}
-	var req struct {
-		Email       string `json:"email"`
-		Code        string `json:"code"`
-		NewPassword string `json:"new_password"`
-	}
+	var req AuthPasswordResetConfirmReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -407,7 +371,7 @@ func (s *Handler) handlePasswordResetConfirm(w http.ResponseWriter, r *http.Requ
 		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Handler) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -426,7 +390,7 @@ func (s *Handler) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"auth_url": url})
+	writeJSON(w, http.StatusOK, GoogleAuthURLResp{AuthURL: url})
 }
 func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -436,10 +400,7 @@ func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if !s.requireCloudWebMode(w, r) {
 		return
 	}
-	var req struct {
-		Code  string `json:"code"`
-		State string `json:"state"`
-	}
+	var req AuthGoogleCallbackReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -452,7 +413,7 @@ func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"access_token": result.Token, "token_type": "bearer"})
+	writeJSON(w, http.StatusOK, TokenResp{AccessToken: result.Token, TokenType: "bearer"})
 }
 
 func (s *Handler) authMiddleware(next http.Handler) http.Handler {
@@ -549,7 +510,7 @@ func (s *Handler) handleCloudOAuthStart(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	oauthConfig := s.cloudOAuthConfig()
-	writeJSON(w, http.StatusOK, map[string]string{"authorize_url": oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOnline)})
+	writeJSON(w, http.StatusOK, CloudOAuthStartResp{AuthorizeURL: oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOnline)})
 }
 
 func (s *Handler) cloudOAuthConfig() oauth2.Config {
@@ -578,9 +539,7 @@ func (s *Handler) handleCloudOAuthExchange(w http.ResponseWriter, r *http.Reques
 		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud connection exchange is not configured.", nil)
 		return
 	}
-	var req struct {
-		Code string `json:"code"`
-	}
+	var req CloudOAuthExchangeReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -598,7 +557,7 @@ func (s *Handler) handleCloudOAuthExchange(w http.ResponseWriter, r *http.Reques
 		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"access_token": result.Token, "token_type": "bearer"})
+	writeJSON(w, http.StatusOK, TokenResp{AccessToken: result.Token, TokenType: "bearer"})
 }
 
 func (s *Handler) handleCloudOAuthAuthorize(w http.ResponseWriter, r *http.Request) {
@@ -635,7 +594,7 @@ func (s *Handler) handleCloudOAuthAuthorize(w http.ResponseWriter, r *http.Reque
 		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth redirect is invalid.", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"redirect_url": redirectURL})
+	writeJSON(w, http.StatusOK, CloudOAuthAuthorizeResp{RedirectURL: redirectURL})
 }
 
 func (s *Handler) handleCloudOAuthCallback(w http.ResponseWriter, r *http.Request) {
@@ -647,10 +606,7 @@ func (s *Handler) handleCloudOAuthCallback(w http.ResponseWriter, r *http.Reques
 		s.writeNotFound(w, r)
 		return
 	}
-	var req struct {
-		Code  string `json:"code"`
-		State string `json:"state"`
-	}
+	var req CloudOAuthCallbackReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -679,7 +635,7 @@ func (s *Handler) handleCloudOAuthCallback(w http.ResponseWriter, r *http.Reques
 	if s.config.OnLocalCloudSession != nil {
 		s.config.OnLocalCloudSession(summary)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"cloud_session": summary, "redirect": attempt.PostAuthRedirect})
+	writeJSON(w, http.StatusOK, CloudOAuthCallbackResp{CloudSession: summary, Redirect: attempt.PostAuthRedirect})
 }
 
 func (s *Handler) handleCurrentDevice(w http.ResponseWriter, r *http.Request) {
@@ -696,11 +652,7 @@ func (s *Handler) handleCurrentDevice(w http.ResponseWriter, r *http.Request) {
 		s.writeUnauthorized(w, r)
 		return
 	}
-	var req struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		PublicKey string `json:"public_key"`
-	}
+	var req CurrentDeviceReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -709,7 +661,7 @@ func (s *Handler) handleCurrentDevice(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Device report is invalid.", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"accepted": true, "device": s.deviceSummary(device)})
+	writeJSON(w, http.StatusOK, CurrentDeviceResp{Accepted: true, Device: s.deviceSummary(device)})
 }
 
 func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
@@ -726,7 +678,7 @@ func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, devices)
+	writeJSON(w, http.StatusOK, ListDevicesResp{Items: devices})
 }
 func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/devices/"), "/")
@@ -746,7 +698,7 @@ func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkspaceRoute(w, r, route, deviceId, parts)
 	case "sessions":
 		if len(parts) == 2 && r.Method == http.MethodPost {
-			var request json.RawMessage
+			var request terminalapp.CreateSessionReq
 			if !s.decodeJSONRequest(w, r, &request) {
 				return
 			}
@@ -768,9 +720,7 @@ func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, r
 		return
 	}
 	if len(parts) == 3 && parts[2] == "order" && r.Method == http.MethodPatch {
-		var request struct {
-			WorkspaceIds []string `json:"workspace_ids"`
-		}
+		var request terminalapp.UpdateWorkspaceOrderReq
 		if !s.decodeJSONRequest(w, r, &request) {
 			return
 		}
@@ -778,7 +728,7 @@ func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, r
 		return
 	}
 	if len(parts) == 3 && r.Method == http.MethodDelete {
-		s.handleJSONRelay(w, r, route, deviceId, "delete_workspace", map[string]string{"workspace_id": parts[2]}, "")
+		s.handleNoContentRelay(w, r, route, "delete_workspace", terminalapp.DeleteWorkspaceReq{WorkspaceId: parts[2]})
 		return
 	}
 	if len(parts) >= 4 && parts[3] == "sessions" {
@@ -791,26 +741,25 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 	if len(parts) == 0 {
 		switch r.Method {
 		case http.MethodGet:
-			s.handleJSONRelay(w, r, route, deviceId, "workspace_sessions", map[string]string{"workspace_id": workspaceId}, "")
+			s.handleJSONRelay(w, r, route, deviceId, "workspace_sessions", terminalapp.WorkspaceSessionsReq{WorkspaceId: workspaceId}, "")
 		case http.MethodPost:
-			var request json.RawMessage
+			var request terminalapp.CreateSessionReq
 			if !s.decodeJSONRequest(w, r, &request) {
 				return
 			}
-			s.handleJSONRelayWithStatus(w, r, route, deviceId, "create_session", workspaceSessionParams(workspaceId, request), "", http.StatusCreated)
+			request.WorkspaceId = workspaceId
+			s.handleJSONRelayWithStatus(w, r, route, deviceId, "create_session", request, "", http.StatusCreated)
 		default:
 			s.methodNotAllowed(w, r, http.MethodGet, http.MethodPost)
 		}
 		return
 	}
 	if len(parts) == 1 && parts[0] == "order" && r.Method == http.MethodPatch {
-		var request struct {
-			SessionIds []string `json:"session_ids"`
-		}
+		var request terminalapp.UpdateSessionOrderReq
 		if !s.decodeJSONRequest(w, r, &request) {
 			return
 		}
-		s.handleJSONRelay(w, r, route, deviceId, "session_order", map[string]any{"workspace_id": workspaceId, "session_ids": request.SessionIds}, "")
+		s.handleJSONRelay(w, r, route, deviceId, "session_order", terminalapp.WorkspaceSessionOrderReq{WorkspaceId: workspaceId, SessionIds: request.SessionIds}, "")
 		return
 	}
 	sessionId := parts[0]
@@ -818,17 +767,17 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 		s.writeNotFound(w, r)
 		return
 	}
-	params := map[string]string{"workspace_id": workspaceId, "session_id": sessionId}
+	params := terminalapp.WorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId}
 	if len(parts) == 1 {
 		switch r.Method {
 		case http.MethodGet:
 			s.handleJSONRelay(w, r, route, deviceId, "get_session", params, "")
 		case http.MethodPatch:
-			var request json.RawMessage
+			var request terminalapp.UpdateSessionReq
 			if !s.decodeJSONRequest(w, r, &request) {
 				return
 			}
-			s.handleJSONRelay(w, r, route, deviceId, "update_session", map[string]any{"workspace_id": workspaceId, "session_id": sessionId, "request": request}, "")
+			s.handleJSONRelay(w, r, route, deviceId, "update_session", terminalapp.UpdateWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
 		case http.MethodDelete:
 			s.handleNoContentRelay(w, r, route, "delete_session", params)
 		default:
@@ -852,11 +801,11 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 			s.methodNotAllowed(w, r, http.MethodPost)
 			return
 		}
-		var request json.RawMessage
+		var request terminalapp.RerunSessionReq
 		if !s.decodeJSONRequest(w, r, &request) {
 			return
 		}
-		s.handleJSONRelay(w, r, route, deviceId, "rerun_session", map[string]any{"workspace_id": workspaceId, "session_id": sessionId, "request": request}, "")
+		s.handleJSONRelay(w, r, route, deviceId, "rerun_session", terminalapp.RerunWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
 	case "history":
 		if r.Method != http.MethodGet {
 			s.methodNotAllowed(w, r, http.MethodGet)
@@ -904,14 +853,6 @@ func (s *Handler) handleDeleteDevice(w http.ResponseWriter, r *http.Request, dev
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func workspaceSessionParams(workspaceId string, request json.RawMessage) map[string]any {
-	var params map[string]any
-	if err := json.Unmarshal(request, &params); err != nil || params == nil {
-		params = map[string]any{}
-	}
-	params["workspace_id"] = workspaceId
-	return params
-}
 func (s *Handler) handleJSONRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, method string, params any, cacheKind string) {
 	s.handleJSONRelayWithStatus(w, r, route, deviceId, method, params, cacheKind, http.StatusOK)
 }
@@ -962,7 +903,7 @@ func (s *Handler) handleHistoryRelay(w http.ResponseWriter, r *http.Request, rou
 		s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeDeviceOffline, errorMessageDeviceOffline, nil)
 		return
 	}
-	result, err := route.request(r.Context(), "history", map[string]string{"workspace_id": workspaceId, "session_id": sessionId}, s.requestIdFor(w, r))
+	result, err := route.request(r.Context(), "history", terminalapp.WorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId}, s.requestIdFor(w, r))
 	if err != nil {
 		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
 		return
@@ -1258,7 +1199,7 @@ func (s *Handler) completeCloudOAuthLogin(ctx context.Context, code string, atte
 	if gateURL == "" {
 		gateURL = s.config.CloudGateURL
 	}
-	body, err := json.Marshal(map[string]string{"code": code})
+	body, err := json.Marshal(CloudOAuthExchangeTokenReq{Code: code})
 	if err != nil {
 		return CloudSessionSummary{}, err
 	}
@@ -1276,16 +1217,14 @@ func (s *Handler) completeCloudOAuthLogin(ctx context.Context, code string, atte
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return CloudSessionSummary{}, fmt.Errorf("cloud exchange status %d", resp.StatusCode)
 	}
-	var tokenResp struct {
-		AccessToken string `json:"access_token"`
-	}
+	var tokenResp CloudOAuthExchangeTokenResp
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
 		return CloudSessionSummary{}, err
 	}
 	if strings.TrimSpace(tokenResp.AccessToken) == "" {
 		return CloudSessionSummary{}, fmt.Errorf("cloud exchange response missing access token")
 	}
-	reportBody, err := json.Marshal(map[string]string{"id": device.Id, "name": device.Name, "public_key": device.PublicKey})
+	reportBody, err := json.Marshal(CloudOAuthDeviceReportReq{ID: device.Id, Name: device.Name, PublicKey: device.PublicKey})
 	if err != nil {
 		return CloudSessionSummary{}, err
 	}

@@ -1,3 +1,4 @@
+import type { ListResp } from '../../protocol/terminal'
 import { apiClient } from '../api/client'
 
 export type DeviceSummary = {
@@ -49,6 +50,20 @@ export type CloudOAuthCallbackResp = {
   cloud_session: CloudSessionSummary
   redirect: string
 }
+
+export type GoogleAuthURLResp = {
+  auth_url: string
+}
+
+export type CloudOAuthStartResp = {
+  authorize_url: string
+}
+
+export type CloudOAuthAuthorizeResp = {
+  redirect_url: string
+}
+
+export type ListDevicesResp = ListResp<DeviceSummary>
 
 export async function authMe(): Promise<AuthMeResp> {
   try {
@@ -110,7 +125,7 @@ export async function authChangePassword(
 }
 
 export async function authGoogleURL(): Promise<string> {
-  const response = await apiClient.get<{ auth_url: string }>('/api/auth/google')
+  const response = await apiClient.get<GoogleAuthURLResp>('/api/auth/google')
   return response.data.auth_url
 }
 
@@ -124,7 +139,7 @@ export function cloudOAuthStartURL(): string {
 }
 
 export async function cloudOAuthStart(redirect?: string): Promise<string> {
-  const response = await apiClient.get<{ authorize_url: string }>('/api/cloud-oauth/start', {
+  const response = await apiClient.get<CloudOAuthStartResp>('/api/cloud-oauth/start', {
     params: redirect ? { redirect } : undefined,
   })
   return response.data.authorize_url
@@ -146,7 +161,7 @@ export async function cloudOAuthAuthorize(
   redirectUri: string,
   state: string,
 ): Promise<string> {
-  const response = await apiClient.get<{ redirect_url: string }>('/api/cloud-oauth/authorize', {
+  const response = await apiClient.get<CloudOAuthAuthorizeResp>('/api/cloud-oauth/authorize', {
     params: { client_id: clientId, redirect_uri: redirectUri, state },
   })
   return response.data.redirect_url
@@ -157,8 +172,8 @@ export async function deleteDevice(deviceId: string): Promise<void> {
 }
 
 export async function listDevices(): Promise<DeviceSummary[]> {
-  const response = await apiClient.get<DeviceSummary[] | null>('/api/devices')
-  return response.data ?? []
+  const response = await apiClient.get<ListDevicesResp>('/api/devices')
+  return response.data.items
 }
 
 function isUnauthorizedApiError(err: unknown): boolean {

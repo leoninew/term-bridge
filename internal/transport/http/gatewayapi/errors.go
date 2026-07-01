@@ -41,13 +41,6 @@ const (
 
 var generatedRequestCounter atomic.Uint64
 
-type errorResponse struct {
-	Code      string `json:"code"`
-	Error     string `json:"error"`
-	RequestId string `json:"requestId"`
-	Details   any    `json:"details,omitempty"`
-}
-
 func (h *Handler) requestIdFor(w http.ResponseWriter, r *http.Request) string {
 	requestId := strings.TrimSpace(r.Header.Get(requestIdHeader))
 	if requestId == "" {
@@ -65,7 +58,7 @@ func (h *Handler) writeAPIError(w http.ResponseWriter, r *http.Request, status i
 	h.logAPIError(r, status, code, requestId, cause)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(errorResponse{Code: code, Error: h.responseErrorText(safeError, cause), RequestId: requestId})
+	_ = json.NewEncoder(w).Encode(APIErrorResp[any]{Code: code, Error: h.responseErrorText(safeError, cause), RequestId: requestId})
 }
 
 func (h *Handler) writeUnauthorized(w http.ResponseWriter, r *http.Request) {

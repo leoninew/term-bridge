@@ -55,11 +55,22 @@ export type ServerControlMessage =
   | { type: 'error'; code: string; message: string; error?: string }
   | { type: 'pong'; nonce: string }
 
-export type ApiErrorResp = {
+export type ApiErrorResp<TDetails = unknown> = {
   code: string
   error: string
   requestId: string
-  details?: unknown
+  details?: TDetails
+}
+
+export type ListResp<T> = {
+  items: T[]
+}
+
+export type PaginatedResp<T> = ListResp<T> & {
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
 }
 
 export type WorkspaceSummary = {

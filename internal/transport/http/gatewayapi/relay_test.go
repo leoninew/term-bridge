@@ -34,9 +34,9 @@ func TestBrowserAPIRelay(t *testing.T) {
 			}
 			switch request.Method {
 			case "workspace_tree":
-				return rawResponse(`[{"id":"ws-1","name":"Workspace"}]`)
+				return rawResponse(`{"items":[{"id":"ws-1","name":"Workspace"}]}`)
 			case "workspace_sessions":
-				return rawResponse(`[{"id":"sess-1","name":"Session"}]`)
+				return rawResponse(`{"items":[{"id":"sess-1","name":"Session"}]}`)
 			case "history":
 				return rawResponse(`"` + strings.Repeat("h", 64*1024) + `"`)
 			default:

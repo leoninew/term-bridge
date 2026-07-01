@@ -62,8 +62,8 @@ func TestAuthEndpoints(t *testing.T) {
 	logoutRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	logoutResponse := httptest.NewRecorder()
 	server.ServeHTTP(logoutResponse, logoutRequest)
-	if logoutResponse.Code != http.StatusOK {
-		t.Fatalf("logout status = %d, want 200", logoutResponse.Code)
+	if logoutResponse.Code != http.StatusNoContent {
+		t.Fatalf("logout status = %d, want 204", logoutResponse.Code)
 	}
 
 	devicesRequestAfterExpired := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
@@ -72,6 +72,13 @@ func TestAuthEndpoints(t *testing.T) {
 	server.ServeHTTP(devicesResponseAfterExpired, devicesRequestAfterExpired)
 	if devicesResponseAfterExpired.Code != http.StatusOK {
 		t.Fatalf("devices with valid token status = %d, want 200", devicesResponseAfterExpired.Code)
+	}
+	var devicesBody ListDevicesResp
+	if err := json.Unmarshal(devicesResponseAfterExpired.Body.Bytes(), &devicesBody); err != nil {
+		t.Fatalf("decode devices response: %v; body=%s", err, devicesResponseAfterExpired.Body.String())
+	}
+	if devicesBody.Items == nil {
+		t.Fatalf("devices items is nil; body=%s", devicesResponseAfterExpired.Body.String())
 	}
 }
 

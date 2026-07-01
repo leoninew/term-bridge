@@ -157,42 +157,38 @@ func (c *Client) handleRequest(ctx context.Context, conn *websocket.Conn, writeM
 func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.RequestReq) (any, error) {
 	switch request.Method {
 	case "workspaces":
-		return c.config.Runtime.ListWorkspaces(ctx)
+		items, err := c.config.Runtime.ListWorkspaces(ctx)
+		return terminalapp.ListWorkspacesResp{Items: items}, err
 	case "workspace_tree":
-		return c.config.Runtime.WorkspaceTree(ctx)
+		items, err := c.config.Runtime.WorkspaceTree(ctx)
+		return terminalapp.WorkspaceTreeResp{Items: items}, err
 	case "workspace_order":
-		var params struct {
-			WorkspaceIds []string `json:"workspace_ids"`
-		}
+		var params terminalapp.UpdateWorkspaceOrderReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return c.config.Runtime.UpdateWorkspaceOrder(ctx, params.WorkspaceIds)
+		items, err := c.config.Runtime.UpdateWorkspaceOrder(ctx, params.WorkspaceIds)
+		return terminalapp.UpdateWorkspaceOrderResp{Items: items}, err
 	case "delete_workspace":
-		var params struct {
-			WorkspaceId string `json:"workspace_id"`
-		}
+		var params terminalapp.DeleteWorkspaceReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
 		return nil, c.config.Runtime.DeleteWorkspace(ctx, params.WorkspaceId)
 	case "workspace_sessions":
-		var params struct {
-			WorkspaceId string `json:"workspace_id"`
-		}
+		var params terminalapp.WorkspaceSessionsReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return c.config.Runtime.ListSessionsByWorkspaceId(ctx, params.WorkspaceId)
+		items, err := c.config.Runtime.ListSessionsByWorkspaceId(ctx, params.WorkspaceId)
+		return terminalapp.WorkspaceSessionsResp{Items: items}, err
 	case "session_order":
-		var params struct {
-			WorkspaceId string   `json:"workspace_id"`
-			SessionIds  []string `json:"session_ids"`
-		}
+		var params terminalapp.WorkspaceSessionOrderReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return c.config.Runtime.UpdateSessionOrder(ctx, params.WorkspaceId, params.SessionIds)
+		items, err := c.config.Runtime.UpdateSessionOrder(ctx, params.WorkspaceId, params.SessionIds)
+		return terminalapp.UpdateSessionOrderResp{Items: items}, err
 	case "create_session":
 		var params terminalapp.CreateSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
@@ -200,57 +196,37 @@ func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.Reques
 		}
 		return c.config.Runtime.CreateSession(ctx, params)
 	case "rerun_session":
-		var params struct {
-			WorkspaceId string                      `json:"workspace_id"`
-			SessionId   string                      `json:"session_id"`
-			Request     terminalapp.RerunSessionReq `json:"request"`
-		}
+		var params terminalapp.RerunWorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
 		return c.config.Runtime.RerunSession(ctx, params.WorkspaceId, params.SessionId, params.Request)
 	case "get_session":
-		var params struct {
-			WorkspaceId string `json:"workspace_id"`
-			SessionId   string `json:"session_id"`
-		}
+		var params terminalapp.WorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
 		return c.config.Runtime.GetSession(ctx, params.WorkspaceId, params.SessionId)
 	case "update_session":
-		var params struct {
-			WorkspaceId string                       `json:"workspace_id"`
-			SessionId   string                       `json:"session_id"`
-			Request     terminalapp.UpdateSessionReq `json:"request"`
-		}
+		var params terminalapp.UpdateWorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
 		return c.config.Runtime.UpdateSession(ctx, params.WorkspaceId, params.SessionId, params.Request)
 	case "delete_session":
-		var params struct {
-			WorkspaceId string `json:"workspace_id"`
-			SessionId   string `json:"session_id"`
-		}
+		var params terminalapp.WorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
 		return nil, c.config.Runtime.DeleteSession(ctx, params.WorkspaceId, params.SessionId)
 	case "close_session":
-		var params struct {
-			WorkspaceId string `json:"workspace_id"`
-			SessionId   string `json:"session_id"`
-		}
+		var params terminalapp.WorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
 		return c.config.Runtime.CloseSession(ctx, params.WorkspaceId, params.SessionId)
 	case "history":
-		var params struct {
-			WorkspaceId string `json:"workspace_id"`
-			SessionId   string `json:"session_id"`
-		}
+		var params terminalapp.WorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
