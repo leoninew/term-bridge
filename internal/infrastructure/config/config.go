@@ -15,6 +15,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/subosito/gotenv"
+	"go.yaml.in/yaml/v3"
 
 	apperrors "termbridge-go/internal/infrastructure/errors"
 	"termbridge-go/internal/infrastructure/security"
@@ -169,15 +170,16 @@ type CloudOAuthConfig struct {
 }
 
 type BootstrapResult struct {
-	EnvFile   string
-	Generated bool
-	Username  string
-	Password  string
+	GeneratedConfigFile string
+	Generated           bool
+	Username            string
+	Password            string
 }
 
 type Options struct {
-	Cwd     string
-	Command []string
+	Cwd              string
+	Command          []string
+	LoadedConfigFile func(path string)
 }
 
 func Load(options Options) (Config, error) {
@@ -203,7 +205,9 @@ func Load(options Options) (Config, error) {
 		return Config{}, err
 	}
 
-	if err := loadEnvFile(envFile); err != nil {
+	notifyLoadedConfigFile(options.LoadedConfigFile, defaultConfigFile)
+	notifyLoadedConfigFile(options.LoadedConfigFile, envConfigFile)
+	if err := loadEnvFile(envFile, options.LoadedConfigFile); err != nil {
 		return Config{}, err
 	}
 
@@ -380,7 +384,7 @@ func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
 	if err != nil {
 		return Config{}, BootstrapResult{}, err
 	}
-	return updated, BootstrapResult{EnvFile: updated.EnvFile}, nil
+	return updated, BootstrapResult{GeneratedConfigFile: generatedConfigWritePath(updated)}, nil
 }
 
 func IsSelfConnectedAgent(cfg Config) bool {
@@ -452,7 +456,8 @@ func ensureJWTSecretKey(cfg Config) (Config, error) {
 		return Config{}, apperrors.Config("generate jwt.secret_key", err)
 	}
 	cfg.JWT.SecretKey = secretKey
-	if err := upsertEnvFileValues(cfg.EnvFile, map[string]string{envNameForKey("jwt.secret_key"): secretKey}); err != nil {
+	cfg, err = upsertGeneratedConfigValues(cfg, map[string]string{"jwt.secret_key": secretKey})
+	if err != nil {
 		return Config{}, apperrors.Config("save jwt.secret_key", err)
 	}
 	return cfg, nil
@@ -574,18 +579,87 @@ func ensureAgentIdentityInConfig(cfg Config) (Config, error) {
 	if !changed {
 		return cfg, nil
 	}
-	if err := saveAgentIdentityToEnvFile(cfg.EnvFile, cfg.Agent); err != nil {
+	cfg, err := upsertGeneratedConfigValues(cfg, map[string]string{
+		"agent.device_id":   strings.TrimSpace(cfg.Agent.DeviceId),
+		"agent.device_name": strings.TrimSpace(cfg.Agent.DeviceName),
+	})
+	if err != nil {
 		return Config{}, apperrors.Config("save agent identity", err)
 	}
 	return cfg, nil
 }
 
-func saveAgentIdentityToEnvFile(path string, agent AgentConfig) error {
-	updates := map[string]string{
-		envNameForKey("agent.device_id"):   strings.TrimSpace(agent.DeviceId),
-		envNameForKey("agent.device_name"): strings.TrimSpace(agent.DeviceName),
+func upsertGeneratedConfigValues(cfg Config, updates map[string]string) (Config, error) {
+	if cfg.Environment == "" {
+		envUpdates := make(map[string]string, len(updates))
+		for key, value := range updates {
+			envUpdates[envNameForKey(key)] = value
+		}
+		return cfg, upsertEnvFileValues(cfg.EnvFile, envUpdates)
 	}
-	return upsertEnvFileValues(path, updates)
+	path := envConfigWritePath(cfg)
+	if err := upsertYAMLConfigValues(path, updates); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
+func generatedConfigWritePath(cfg Config) string {
+	if cfg.Environment == "" {
+		return cfg.EnvFile
+	}
+	return envConfigWritePath(cfg)
+}
+
+func envConfigWritePath(cfg Config) string {
+	if strings.TrimSpace(cfg.EnvConfigFile) != "" {
+		return cfg.EnvConfigFile
+	}
+	return filepath.Join(cfg.Cwd, ConfigDirName, envConfigFileName(cfg.Environment))
+}
+
+func upsertYAMLConfigValues(path string, updates map[string]string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	root := map[string]any{}
+	if exists, err := fileExists(path); err != nil {
+		return err
+	} else if exists {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(string(data)) != "" {
+			if err := yaml.Unmarshal(data, &root); err != nil {
+				return err
+			}
+		}
+	}
+	for key, value := range updates {
+		setNestedYAMLValue(root, strings.Split(key, "."), value)
+	}
+	data, err := yaml.Marshal(root)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o600)
+}
+
+func setNestedYAMLValue(root map[string]any, path []string, value string) {
+	if len(path) == 0 {
+		return
+	}
+	if len(path) == 1 {
+		root[path[0]] = value
+		return
+	}
+	child, ok := root[path[0]].(map[string]any)
+	if !ok {
+		child = map[string]any{}
+		root[path[0]] = child
+	}
+	setNestedYAMLValue(child, path[1:], value)
 }
 
 func upsertEnvFileValues(path string, updates map[string]string) error {
@@ -752,7 +826,7 @@ func fileExists(path string) (bool, error) {
 	return false, err
 }
 
-func loadEnvFile(path string) error {
+func loadEnvFile(path string, loadedConfigFile func(path string)) error {
 	exists, err := fileExists(path)
 	if err != nil {
 		return apperrors.Config("check env file", err)
@@ -763,7 +837,15 @@ func loadEnvFile(path string) error {
 	if err := gotenv.Load(path); err != nil {
 		return apperrors.Config("read env file", err)
 	}
+	notifyLoadedConfigFile(loadedConfigFile, path)
 	return nil
+}
+
+func notifyLoadedConfigFile(loadedConfigFile func(path string), path string) {
+	if loadedConfigFile == nil || strings.TrimSpace(path) == "" {
+		return
+	}
+	loadedConfigFile(path)
 }
 
 func newLoader(bindEnvironment bool) *viper.Viper {

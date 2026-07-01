@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -78,8 +79,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Agent.DeviceId != "" || cfg.Agent.DeviceName != "" {
 		t.Fatalf("Agent = %#v, want empty identity", cfg.Agent)
 	}
-	if cfg.Cloud.GateUrl != "http://termbridge.lvh.me" {
-		t.Fatalf("Cloud.GateUrl = %q, want default Cloud Gate URL", cfg.Cloud.GateUrl)
+	if cfg.Cloud.GateUrl != "" {
+		t.Fatalf("Cloud.GateUrl = %q, want empty by default", cfg.Cloud.GateUrl)
 	}
 	if cfg.Cloud.OAuth.ClientID != "termbridge-local" || cfg.Cloud.OAuth.ClientSecret != "" || cfg.Cloud.OAuth.RedirectURL != "http://localhost:9031/cloud/oauth/callback" {
 		t.Fatalf("Cloud.OAuth = %#v", cfg.Cloud.OAuth)
@@ -300,7 +301,10 @@ func TestLoadIgnoresMissingEnvironmentConfigAndDotEnv(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	t.Setenv(EnvNameVariable, "develop")
 
-	cfg, err := Load(Options{Cwd: cwd})
+	loadedFiles := []string{}
+	cfg, err := Load(Options{Cwd: cwd, LoadedConfigFile: func(path string) {
+		loadedFiles = append(loadedFiles, path)
+	}})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -315,6 +319,35 @@ func TestLoadIgnoresMissingEnvironmentConfigAndDotEnv(t *testing.T) {
 	}
 	if cfg.LogLevel != "info" {
 		t.Fatalf("LogLevel = %q, want default", cfg.LogLevel)
+	}
+	wantLoadedFiles := []string{filepath.Join(cwd, ConfigDirName, DefaultFileName)}
+	if !reflect.DeepEqual(loadedFiles, wantLoadedFiles) {
+		t.Fatalf("loaded files = %#v, want %#v", loadedFiles, wantLoadedFiles)
+	}
+}
+
+func TestLoadReportsActuallyLoadedConfigFilesInOrder(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: warn\n")
+	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_LOG__LEVEL=debug\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	loadedFiles := []string{}
+	_, err := Load(Options{Cwd: cwd, LoadedConfigFile: func(path string) {
+		loadedFiles = append(loadedFiles, path)
+	}})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	wantLoadedFiles := []string{
+		filepath.Join(cwd, ConfigDirName, DefaultFileName),
+		filepath.Join(cwd, ConfigDirName, envConfigFileName("develop")),
+		filepath.Join(cwd, EnvFileName+".develop"),
+	}
+	if !reflect.DeepEqual(loadedFiles, wantLoadedFiles) {
+		t.Fatalf("loaded files = %#v, want %#v", loadedFiles, wantLoadedFiles)
 	}
 }
 
@@ -457,6 +490,82 @@ func TestLoadGeneratesMissingJWTSecretKey(t *testing.T) {
 	}
 }
 
+func TestLoadGeneratesMissingJWTSecretKeyIntoEnvironmentConfig(t *testing.T) {
+	isolateHome(t)
+	if err := os.Unsetenv("TERMBRIDGE_JWT__SECRET_KEY"); err != nil {
+		t.Fatalf("Unsetenv(TERMBRIDGE_JWT__SECRET_KEY) error = %v", err)
+	}
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	t.Setenv(EnvNameVariable, "develop")
+
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if _, err := security.ParseBase64Key(cfg.JWT.SecretKey, 32); err != nil {
+		t.Fatalf("JWT.SecretKey = %q, want generated fernet key: %v", cfg.JWT.SecretKey, err)
+	}
+	if _, err := os.Stat(filepath.Join(cwd, EnvFileName+".develop")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("environment .env file exists err = %v, want not exist", err)
+	}
+	path := filepath.Join(cwd, ConfigDirName, envConfigFileName("develop"))
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(config.develop.yaml) error = %v", err)
+	}
+	if !strings.Contains(string(data), "secret_key: "+cfg.JWT.SecretKey) {
+		t.Fatalf("env config file missing generated jwt secret key: %s", string(data))
+	}
+}
+
+func TestLoadUpsertsGeneratedValuesIntoExistingEnvironmentConfig(t *testing.T) {
+	isolateHome(t)
+	if err := os.Unsetenv("TERMBRIDGE_JWT__SECRET_KEY"); err != nil {
+		t.Fatalf("Unsetenv(TERMBRIDGE_JWT__SECRET_KEY) error = %v", err)
+	}
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\nagent:\n  listen_url: http://127.0.0.1:9040\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	loadedFiles := []string{}
+	cfg, err := Load(Options{Cwd: cwd, LoadedConfigFile: func(path string) {
+		loadedFiles = append(loadedFiles, path)
+	}})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	updated, _, err := EnsureLocalIdentity(cfg)
+	if err != nil {
+		t.Fatalf("EnsureLocalIdentity() error = %v", err)
+	}
+	path := filepath.Join(cwd, ConfigDirName, envConfigFileName("develop"))
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(config.develop.yaml) error = %v", err)
+	}
+	content := string(data)
+	for _, want := range []string{
+		"level: debug",
+		"listen_url: http://127.0.0.1:9040",
+		"secret_key: " + cfg.JWT.SecretKey,
+		"device_id: " + updated.Agent.DeviceId,
+		"device_name: " + updated.Agent.DeviceName,
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("env config file missing %q: %s", want, content)
+		}
+	}
+	wantLoadedFiles := []string{
+		filepath.Join(cwd, ConfigDirName, DefaultFileName),
+		path,
+	}
+	if !reflect.DeepEqual(loadedFiles, wantLoadedFiles) {
+		t.Fatalf("loaded files = %#v, want %#v", loadedFiles, wantLoadedFiles)
+	}
+}
+
 func TestLoadRejectsInvalidJWTSecretKey(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
@@ -572,8 +681,8 @@ func TestEnsureLocalIdentityWritesAgentIdentityToActiveEnvFile(t *testing.T) {
 	if bootstrap.Generated {
 		t.Fatal("BootstrapResult.Generated = true, want false")
 	}
-	if bootstrap.EnvFile != filepath.Join(cwd, EnvFileName) {
-		t.Fatalf("BootstrapResult.EnvFile = %q", bootstrap.EnvFile)
+	if bootstrap.GeneratedConfigFile != filepath.Join(cwd, EnvFileName) {
+		t.Fatalf("BootstrapResult.GeneratedConfigFile = %q", bootstrap.GeneratedConfigFile)
 	}
 	if updated.Auth.Username != DefaultAuthUsername || updated.Auth.Password != DefaultAuthPassword {
 		t.Fatalf("Auth = %#v, want default PoC auth", updated.Auth)
@@ -613,7 +722,7 @@ func TestEnsureLocalIdentityWritesAgentIdentityToActiveEnvFile(t *testing.T) {
 	}
 }
 
-func TestEnsureLocalIdentityWritesEnvironmentIdentityToEnvironmentDotEnv(t *testing.T) {
+func TestEnsureLocalIdentityWritesEnvironmentIdentityToEnvironmentConfig(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
@@ -627,21 +736,27 @@ func TestEnsureLocalIdentityWritesEnvironmentIdentityToEnvironmentDotEnv(t *test
 	if err != nil {
 		t.Fatalf("EnsureLocalIdentity() error = %v", err)
 	}
-	want := filepath.Join(cwd, EnvFileName+".develop")
-	if bootstrap.EnvFile != want || updated.EnvFile != want {
-		t.Fatalf("EnvFile = %q/%q, want %q", bootstrap.EnvFile, updated.EnvFile, want)
+	want := filepath.Join(cwd, ConfigDirName, envConfigFileName("develop"))
+	if bootstrap.GeneratedConfigFile != want {
+		t.Fatalf("GeneratedConfigFile = %q, want %q", bootstrap.GeneratedConfigFile, want)
+	}
+	if updated.EnvFile != filepath.Join(cwd, EnvFileName+".develop") {
+		t.Fatalf("EnvFile = %q, want active .env.develop path", updated.EnvFile)
+	}
+	if _, err := os.Stat(updated.EnvFile); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("environment .env file exists err = %v, want not exist", err)
 	}
 	data, err := os.ReadFile(want)
 	if err != nil {
-		t.Fatalf("ReadFile(.env.develop) error = %v", err)
+		t.Fatalf("ReadFile(config.develop.yaml) error = %v", err)
 	}
 	content := string(data)
 	for _, want := range []string{
-		"TERMBRIDGE_AGENT__DEVICE_ID=" + quoteEnvValue(updated.Agent.DeviceId),
-		"TERMBRIDGE_AGENT__DEVICE_NAME=" + quoteEnvValue(updated.Agent.DeviceName),
+		"device_id: " + updated.Agent.DeviceId,
+		"device_name: " + updated.Agent.DeviceName,
 	} {
 		if !strings.Contains(content, want) {
-			t.Fatalf("env file missing %q: %s", want, content)
+			t.Fatalf("env config file missing %q: %s", want, content)
 		}
 	}
 }
@@ -661,8 +776,8 @@ func TestEnsureLocalIdentityUpsertsExistingActiveEnvFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureLocalIdentity() error = %v", err)
 	}
-	if bootstrap.EnvFile != filepath.Join(cwd, EnvFileName) {
-		t.Fatalf("BootstrapResult.EnvFile = %q", bootstrap.EnvFile)
+	if bootstrap.GeneratedConfigFile != filepath.Join(cwd, EnvFileName) {
+		t.Fatalf("BootstrapResult.GeneratedConfigFile = %q", bootstrap.GeneratedConfigFile)
 	}
 	data, err := os.ReadFile(filepath.Join(cwd, EnvFileName))
 	if err != nil {

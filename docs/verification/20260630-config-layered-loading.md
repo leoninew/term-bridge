@@ -1,5 +1,5 @@
 # Config Layered Loading Verification
-最后修改时间: 2026-06-30 15:57:32
+最后修改时间: 2026-07-01 14:07:31
 
 ## Review status
 
@@ -24,7 +24,9 @@ Accepted
 | `Config.Base` 表示 YAML-only baseline，不受 `.env` 与 OS env 影响 | 已实现并由 config tests 覆盖 base isolation。 |
 | 运行时 `Config` 包含 `.env` 与 OS env 最终覆盖值 | 已实现并由 config tests 覆盖运行时覆盖值。 |
 | unknown YAML key 和 unknown 环境变量被忽略 | 已实现；未实现 rejectUnknown；由 `TestLoadIgnoresUnknownConfigAndEnvironmentKeys` 覆盖。 |
-| `agent.device_id` / `agent.device_name` 写入当前生效 `.env` 或 `.env.<env>`，不写回 baseline | 已实现并由 identity write / env-specific write / existing env upsert tests 覆盖。 |
+| `agent.device_id` / `agent.device_name` 写入当前生效 `.env` 或 `.env.<env>`，不写回 baseline | 历史结论已被 2026-07-01 local package 修正覆盖：无环境名时兼容写入 `.env`；指定 `TERMBRIDGE_ENV=<env>` 时生成项写入 `configs/config.<env>.yaml`，不写入 `.env.<env>`。 |
+| `jwt.secret_key`、`agent.device_id` / `agent.device_name` 生成项不写回 `configs/config.yaml` | 已实现。`TestLoadGeneratesMissingJWTSecretKey` 覆盖无环境名写 `.env`；`TestLoadGeneratesMissingJWTSecretKeyIntoEnvironmentConfig` 与 `TestEnsureLocalIdentityWritesEnvironmentIdentityToEnvironmentConfig` 覆盖有环境名写 `configs/config.<env>.yaml`。 |
+| 配置加载日志进入现有日志系统并只记录实际读取文件 | 已实现。`config.Load` 通过 `LoadedConfigFile` 回调报告实际加载文件，`internal/app` 初始化 logger 后逐行打印“加载配置文件”；`TestLoadReportsActuallyLoadedConfigFilesInOrder` 和 missing env file 测试覆盖顺序与不存在文件不记录。 |
 | Google OAuth、Resend、cloud mode 配置完整性在 `config.Load` 初始化阶段集中校验 | 已实现；业务层保留 enablement 判断，不散落完整性校验；由 integration/cloud mode config tests 覆盖。 |
 | 测试覆盖加载路径、覆盖顺序、base 隔离、缺失文件、非法 env、unknown key、active env 写入 | 已覆盖。目标包测试与全量 backend Go tests 通过。 |
 | README、`configs/config.yaml`、`.env.example`、Dockerfile、Dockerfile.cn 更新说明 | 已更新配置优先级、环境名、JWT secret key 约束与 Docker copy source。 |
@@ -53,7 +55,9 @@ Accepted
    - 新增 `Config.Base` 保存 YAML-only baseline。
    - 取消 unknown key reject 行为；未知 YAML key / env var 被忽略。
    - 集中校验 Google OAuth、Resend、cloud mode 与 JWT key 约束。
-   - `EnsureLocalIdentity` 将运行中生成的 agent identity upsert 到当前生效 env file。
+   - `EnsureLocalIdentity` 将运行中生成的 agent identity 写入生成配置目标：无环境名时 upsert `.env`；有环境名时 upsert `configs/config.<env>.yaml`。
+   - `config.Load` 缺失 `jwt.secret_key` 时同样按生成配置目标写入，避免 portable local 场景污染 `.env.local`。
+   - 配置加载过程通过回调报告真实读取的文件，app 层用现有 logger 打印“加载配置文件”。
 
 3. JWT key hardening（用户后续要求的同批安全约束）
    - 新增 `internal/infrastructure/security/key.go` / `key_test.go`，严格解析 base64 编码的固定长度 key。
@@ -108,9 +112,12 @@ Accepted
 
 | Command | Result |
 | --- | --- |
-| `go test ./internal/infrastructure/security ./internal/infrastructure/config ./internal/transport/http/gatewayapi/auth ./internal/transport/http/gatewayapi ./internal/app ./internal/transport/cli` | Passed |
-| `go test ./cmd/... ./internal/...` | Passed |
-| `go vet ./cmd/... ./internal/...` | Passed，命令无输出 |
+| `go test ./internal/infrastructure/security ./internal/infrastructure/config ./internal/transport/http/gatewayapi/auth ./internal/transport/http/gatewayapi ./internal/app ./internal/transport/cli` | Passed（历史验证） |
+| `go test ./cmd/... ./internal/...` | Passed（历史验证） |
+| `go vet ./cmd/... ./internal/...` | Passed，命令无输出（历史验证） |
+| `go test ./internal/infrastructure/config` | Passed（2026-07-01 增量验证；完整 config 包已通过，包含 local/env 生成配置写入与加载日志回调测试） |
+| `go test ./internal/app` | Passed（2026-07-01 增量验证；覆盖 app logger wiring 编译与既有 app tests） |
+| `go test ./internal/infrastructure/config ./internal/app` | Passed（2026-07-01 增量验证，结果为 cached） |
 
 ## Scope deviation
 

@@ -65,10 +65,10 @@ agent:
   # 云端连接目标集中配置在 cloud.gate_url，不通过 agent.connect_url 切换。
   connect_url: ""
 
-  # 当前设备 ID。通常保持为空，由 termbridge serve 首次启动时自动生成并写入生效的 .env / .env.<env>。
+  # 当前设备 ID。通常保持为空。未指定 TERMBRIDGE_ENV 时首次启动写入 .env；指定环境时写入 configs/config.<env>.yaml。
   device_id: ""
 
-  # 当前设备显示名。为空时使用本机 hostname 自动生成；可手动设置为更友好的名称。
+  # 当前设备显示名。为空时使用本机 hostname 自动生成；未指定 TERMBRIDGE_ENV 时写入 .env，指定环境时写入 configs/config.<env>.yaml。
   device_name: ""
 
 # Cloud connection 配置

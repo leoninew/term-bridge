@@ -103,9 +103,13 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	}
 
 	command := options.Command.Exec.Command
+	loadedConfigFiles := []string{}
 	cfg, err := config.Load(config.Options{
 		Cwd:     options.Cwd,
 		Command: command,
+		LoadedConfigFile: func(path string) {
+			loadedConfigFiles = append(loadedConfigFiles, path)
+		},
 	})
 	if err != nil {
 		return Result{}, err
@@ -127,6 +131,7 @@ func Run(ctx context.Context, options Options) (Result, error) {
 		return Result{}, err
 	}
 	defer func() { _ = logger.Close() }()
+	logLoadedConfigFiles(logger, loadedConfigFiles)
 
 	switch options.Command.Kind {
 	case CommandExec:
@@ -144,6 +149,15 @@ func Run(ctx context.Context, options Options) (Result, error) {
 		return runMigrate(ctx, cfg)
 	default:
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("missing command")
+	}
+}
+
+func logLoadedConfigFiles(logger *logging.Logger, paths []string) {
+	for _, path := range paths {
+		if strings.TrimSpace(path) == "" {
+			continue
+		}
+		logger.Info("加载配置文件", "path", path)
 	}
 }
 
@@ -283,7 +297,7 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		stdout = io.Discard
 	}
 	if bootstrap.Generated {
-		fmt.Fprintf(stdout, "TermBridge generated local credentials in %s\n", bootstrap.EnvFile)
+		fmt.Fprintf(stdout, "TermBridge generated local credentials in %s\n", bootstrap.GeneratedConfigFile)
 		fmt.Fprintf(stdout, "Username: %s\n", bootstrap.Username)
 		fmt.Fprintf(stdout, "Password: %s\n", bootstrap.Password)
 	}
