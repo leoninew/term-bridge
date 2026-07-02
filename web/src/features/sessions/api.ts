@@ -1,5 +1,6 @@
 import type { AxiosResponse } from 'axios'
 import { apiClient } from '../api/client'
+import { buildApiWebSocketUrl } from '../../config'
 import { clampTerminalSize } from '../../protocol/terminal'
 import { runtimePath, type RuntimeTarget } from '../runtimeTarget'
 import type {
@@ -138,5 +139,6 @@ export function terminalWsUrl(
     params.set('rows', String(clamped.rows))
   }
   const query = params.toString()
-  return query ? `${path}?${query}` : path
+  const pathWithQuery = query ? `${path}?${query}` : path
+  return buildApiWebSocketUrl(pathWithQuery)
 }

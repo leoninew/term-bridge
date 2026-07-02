@@ -88,6 +88,23 @@ describe('api client', () => {
     expect(err).toBeInstanceOf(ApiContractMismatchError)
   })
 
+  it('uses runtime API base URL for requests', async () => {
+    vi.stubGlobal('window', { __CONFIG__: { apiBaseUrl: 'https://api.example.com/' } })
+
+    const result = await apiClient.get<string>('/api/history', {
+      adapter: async (config) => ({
+        data: config.baseURL,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      }),
+    })
+
+    expect(result.data).toBe('https://api.example.com')
+    vi.unstubAllGlobals()
+  })
+
   it('does not parse successful text responses as JSON', async () => {
     const result = await apiClient.get<string>('/api/history', {
       responseType: 'text',

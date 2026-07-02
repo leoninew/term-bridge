@@ -44,6 +44,7 @@ type Config struct {
 	LocalDevice            agentapp.Device
 	LocalRuntime           agentapp.RuntimeAccess
 	ServerMode             string
+	CORSAllowedOrigins     []string
 	OnLocalCloudSession    func(CloudSessionSummary)
 }
 
@@ -1387,13 +1388,32 @@ func sessionScopeKey(workspaceId string, sessionId string) string {
 	return workspaceId + "/" + sessionId
 }
 func (s *Handler) originPatterns(r *http.Request) []string {
-	return []string{"http://" + r.Host, "https://" + r.Host}
+	patterns := []string{"http://" + r.Host, "https://" + r.Host}
+	patterns = append(patterns, s.config.CORSAllowedOrigins...)
+	return patterns
 }
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }
+func cleanOrigins(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		value = strings.TrimRight(strings.TrimSpace(value), "/")
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
 func normalizeConfig(config Config) Config {
 	if config.Logger == nil {
 		panic("gateway api logger is required")
@@ -1403,6 +1423,7 @@ func normalizeConfig(config Config) Config {
 		config.ServerMode = "local"
 	}
 	config.CloudGateURL = strings.TrimRight(strings.TrimSpace(config.CloudGateURL), "/")
+	config.CORSAllowedOrigins = cleanOrigins(config.CORSAllowedOrigins)
 	config.CloudOAuth.ClientID = strings.TrimSpace(config.CloudOAuth.ClientID)
 	config.CloudOAuth.ClientSecret = strings.TrimSpace(config.CloudOAuth.ClientSecret)
 	config.CloudOAuth.RedirectURL = strings.TrimRight(strings.TrimSpace(config.CloudOAuth.RedirectURL), "/")

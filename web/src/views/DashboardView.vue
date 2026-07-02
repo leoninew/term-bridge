@@ -33,10 +33,14 @@
             class="group flex items-center gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl transition hover:border-blue-500/60 hover:bg-[var(--color-control-hover)]"
             :to="{ name: 'sessions' }"
           >
-            <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+            <span
+              class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
+            >
               <Monitor class="size-5" />
             </span>
-            <span class="min-w-0 flex-1 truncate text-base font-medium text-[var(--color-text-strong)]">
+            <span
+              class="min-w-0 flex-1 truncate text-base font-medium text-[var(--color-text-strong)]"
+            >
               {{ t('dashboard.localModeAction') }}
             </span>
           </RouterLink>
@@ -47,7 +51,9 @@
             class="group flex items-center gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-left shadow-xl transition hover:border-blue-500/60 hover:bg-[var(--color-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
             @click="startCloudMode"
           >
-            <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+            <span
+              class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
+            >
               <Cloud class="size-5" />
             </span>
             <span class="min-w-0 flex-1">
@@ -77,8 +83,12 @@
             v-else
             class="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
           >
-            <div class="flex h-12 items-center justify-between border-b border-[var(--color-border)] px-4">
-              <div class="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-text-strong)]">
+            <div
+              class="flex h-12 items-center justify-between border-b border-[var(--color-border)] px-4"
+            >
+              <div
+                class="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-text-strong)]"
+              >
                 <Monitor class="size-4 text-[var(--color-text-subtle)]" />
                 {{ t('dashboard.devicesTitle') }}
               </div>

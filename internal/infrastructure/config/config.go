@@ -128,10 +128,12 @@ type RuntimeConfig struct {
 }
 
 type ServerConfig struct {
-	ListenUrl string
-	StaticDir string
-	Mode      string
-	PublicUrl string
+	ListenUrl          string
+	StaticDir          string
+	Mode               string
+	PublicUrl          string
+	APIBaseURL         string
+	CORSAllowedOrigins []string
 }
 
 type GateConfig struct {
@@ -239,10 +241,12 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 		Runtime:  RuntimeConfig{StateDir: stateDir},
 		Database: database,
 		Server: ServerConfig{
-			ListenUrl: strings.TrimSpace(v.GetString("server.listen_url")),
-			StaticDir: staticDir,
-			Mode:      strings.ToLower(strings.TrimSpace(v.GetString("server.mode"))),
-			PublicUrl: strings.TrimSpace(v.GetString("server.public_url")),
+			ListenUrl:          strings.TrimSpace(v.GetString("server.listen_url")),
+			StaticDir:          staticDir,
+			Mode:               strings.ToLower(strings.TrimSpace(v.GetString("server.mode"))),
+			PublicUrl:          strings.TrimSpace(v.GetString("server.public_url")),
+			APIBaseURL:         strings.TrimSpace(v.GetString("server.api_base_url")),
+			CORSAllowedOrigins: getStringSlice(v, "server.cors_allowed_origins"),
 		},
 		Gate: GateConfig{
 			API: GateAPIConfig{
@@ -790,6 +794,8 @@ func configKeys() []string {
 		"server.static_dir",
 		"server.mode",
 		"server.public_url",
+		"server.api_base_url",
+		"server.cors_allowed_origins",
 		"cloud.gate_url",
 		"cloud.oauth.client_id",
 		"cloud.oauth.client_secret",
@@ -920,6 +926,25 @@ func normalizeServerConfig(cfg *Config) {
 		cfg.Server.Mode = ModeLocal
 	}
 	cfg.Server.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Server.PublicUrl), "/")
+	cfg.Server.APIBaseURL = strings.TrimRight(strings.TrimSpace(cfg.Server.APIBaseURL), "/")
+	cfg.Server.CORSAllowedOrigins = normalizeHTTPOrigins(cfg.Server.CORSAllowedOrigins)
+}
+
+func normalizeHTTPOrigins(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		value = strings.TrimRight(strings.TrimSpace(value), "/")
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }
 
 func normalizeCloudConfig(cfg *Config) {
@@ -943,6 +968,16 @@ func validateServer(cfg ServerConfig) error {
 	}
 	if cfg.PublicUrl != "" {
 		if err := validateHTTPURL("server.public_url", cfg.PublicUrl, false); err != nil {
+			return err
+		}
+	}
+	if cfg.APIBaseURL != "" {
+		if err := validateHTTPURL("server.api_base_url", cfg.APIBaseURL, false); err != nil {
+			return err
+		}
+	}
+	for _, origin := range cfg.CORSAllowedOrigins {
+		if err := validateHTTPURL("server.cors_allowed_origins", origin, false); err != nil {
 			return err
 		}
 	}

@@ -121,6 +121,82 @@ func TestServerLogsUnifiedBackendRequests(t *testing.T) {
 	}
 }
 
+func TestServerInjectsRuntimeConfigIntoIndexHTML(t *testing.T) {
+	staticDir := t.TempDir()
+	index := "<!doctype html><html><head><!-- __RUNTIME_CONFIG__ --><title>app</title></head><body></body></html>"
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte(index), 0o644); err != nil {
+		t.Fatalf("WriteFile(index) error = %v", err)
+	}
+	server := New(Config{StaticDir: staticDir, APIBaseURL: "https://api.example.com/", Logger: slog.Default()}, http.NotFoundHandler())
+
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("GET / = %d", response.Code)
+	}
+	if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
+		t.Fatalf("Content-Type = %q", got)
+	}
+	want := `<script>window.__CONFIG__ = {"apiBaseUrl":"https://api.example.com"};</script>`
+	if !strings.Contains(response.Body.String(), want) {
+		t.Fatalf("runtime config missing: %s", response.Body.String())
+	}
+}
+
+func TestServerInjectsEmptyRuntimeConfig(t *testing.T) {
+	staticDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("<html><head></head><body></body></html>"), 0o644); err != nil {
+		t.Fatalf("WriteFile(index) error = %v", err)
+	}
+	server := New(Config{StaticDir: staticDir, Logger: slog.Default()}, http.NotFoundHandler())
+
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/sessions", nil))
+
+	want := `<script>window.__CONFIG__ = {};</script>`
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), want) {
+		t.Fatalf("GET /sessions = %d %q, want empty runtime config", response.Code, response.Body.String())
+	}
+}
+
+func TestServerDoesNotInjectRuntimeConfigIntoStaticAssets(t *testing.T) {
+	staticDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("<html><head></head></html>"), 0o644); err != nil {
+		t.Fatalf("WriteFile(index) error = %v", err)
+	}
+	assetsDir := filepath.Join(staticDir, "assets")
+	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(assets) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(assetsDir, "app.js"), []byte("console.log('app')"), 0o644); err != nil {
+		t.Fatalf("WriteFile(asset) error = %v", err)
+	}
+	server := New(Config{StaticDir: staticDir, APIBaseURL: "https://api.example.com", Logger: slog.Default()}, http.NotFoundHandler())
+
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/assets/app.js", nil))
+
+	if response.Code != http.StatusOK || strings.Contains(response.Body.String(), "window.__CONFIG__") {
+		t.Fatalf("asset response = %d %q, want original asset", response.Code, response.Body.String())
+	}
+}
+
+func TestServerHeadIndexDoesNotWriteBody(t *testing.T) {
+	staticDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("<html><head></head></html>"), 0o644); err != nil {
+		t.Fatalf("WriteFile(index) error = %v", err)
+	}
+	server := New(Config{StaticDir: staticDir, APIBaseURL: "https://api.example.com", Logger: slog.Default()}, http.NotFoundHandler())
+
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodHead, "/", nil))
+
+	if response.Code != http.StatusOK || response.Body.Len() != 0 {
+		t.Fatalf("HEAD / = %d body %q, want no body", response.Code, response.Body.String())
+	}
+}
+
 func decodeLogEntries(t *testing.T, content string) []map[string]any {
 	t.Helper()
 	lines := strings.Split(strings.TrimSpace(content), "\n")

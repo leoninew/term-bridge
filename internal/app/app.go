@@ -362,12 +362,12 @@ func runServe(ctx context.Context, cfg config.Config, logger *logging.Logger, op
 		}()
 	}
 
-	gatewayHandler := gatewayapi.New(gatewayapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService, AgentTunnelAudience: gatewayTunnelAudience(cfg), DevicePublicKeys: devicePublicKeys, DeviceRepository: deviceRepository, CloudGateURL: cfg.Cloud.GateUrl, CloudOAuth: gatewayapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectURL: cfg.Cloud.OAuth.RedirectURL, Scopes: cfg.Cloud.OAuth.Scopes}, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(cfg.Runtime.StateDir), LocalDevice: device, LocalRuntime: runtimeAccess, ServerMode: cfg.Server.Mode, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(gatewayapi.CloudSessionSummary) {
+	gatewayHandler := gatewayapi.New(gatewayapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService, AgentTunnelAudience: gatewayTunnelAudience(cfg), DevicePublicKeys: devicePublicKeys, DeviceRepository: deviceRepository, CloudGateURL: cfg.Cloud.GateUrl, CloudOAuth: gatewayapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectURL: cfg.Cloud.OAuth.RedirectURL, Scopes: cfg.Cloud.OAuth.Scopes}, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(cfg.Runtime.StateDir), LocalDevice: device, LocalRuntime: runtimeAccess, ServerMode: cfg.Server.Mode, CORSAllowedOrigins: cfg.Server.CORSAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(gatewayapi.CloudSessionSummary) {
 		if cloudConnector != nil {
 			startConnector(cloudConnector)
 		}
 	}})
-	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Server.ListenUrl, StaticDir: cfg.Server.StaticDir, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
+	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Server.ListenUrl, StaticDir: cfg.Server.StaticDir, APIBaseURL: cfg.Server.APIBaseURL, CORSAllowedOrigins: cfg.Server.CORSAllowedOrigins, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
 
 	go func() {
 		err := runBackendServer(serveCtx, server, func(info httpserver.Info) {

@@ -76,6 +76,12 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Server.PublicUrl != "http://localhost:9031" {
 		t.Fatalf("Server.PublicUrl = %q, want local frontend URL", cfg.Server.PublicUrl)
 	}
+	if cfg.Server.APIBaseURL != "" {
+		t.Fatalf("Server.APIBaseURL = %q, want empty", cfg.Server.APIBaseURL)
+	}
+	if len(cfg.Server.CORSAllowedOrigins) != 0 {
+		t.Fatalf("Server.CORSAllowedOrigins = %#v, want empty", cfg.Server.CORSAllowedOrigins)
+	}
 	if cfg.Cloud.GateUrl != "" {
 		t.Fatalf("Cloud.GateUrl = %q, want empty by default", cfg.Cloud.GateUrl)
 	}
@@ -103,7 +109,7 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "configured-logs")
 	stateDir := filepath.Join(cwd, "configured-state")
-	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\ngate:\n  api:\n    expose_errors: true\nserver:\n  listen_url: http://0.0.0.0:9090\n  mode: cloud\n  static_dir: web/dist\n  public_url: https://configured.example.com/app/\n")
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\ngate:\n  api:\n    expose_errors: true\nserver:\n  listen_url: http://0.0.0.0:9090\n  mode: cloud\n  static_dir: web/dist\n  public_url: https://configured.example.com/app/\n  api_base_url: https://api.configured.example.com/\n  cors_allowed_origins:\n    - https://configured.example.com/\n    - https://preview.configured.example.com\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -132,6 +138,13 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	if cfg.Server.PublicUrl != "https://configured.example.com/app" {
 		t.Fatalf("Server.PublicUrl = %q", cfg.Server.PublicUrl)
 	}
+	if cfg.Server.APIBaseURL != "https://api.configured.example.com" {
+		t.Fatalf("Server.APIBaseURL = %q", cfg.Server.APIBaseURL)
+	}
+	wantOrigins := []string{"https://configured.example.com", "https://preview.configured.example.com"}
+	if !reflect.DeepEqual(cfg.Server.CORSAllowedOrigins, wantOrigins) {
+		t.Fatalf("Server.CORSAllowedOrigins = %#v, want %#v", cfg.Server.CORSAllowedOrigins, wantOrigins)
+	}
 	if cfg.Server.Mode != ModeCloud {
 		t.Fatalf("Server.Mode = %q, want cloud", cfg.Server.Mode)
 	}
@@ -156,7 +169,7 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "dotenv-logs")
 	stateDir := filepath.Join(cwd, "dotenv-state")
-	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_SERVER__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_SERVER__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_SERVER__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_SERVER__MODE=cloud\nTERMBRIDGE_GATE__API__EXPOSE_ERRORS=true\n")
+	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_SERVER__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_SERVER__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_SERVER__API_BASE_URL=https://api.dotenv.example.com\nTERMBRIDGE_SERVER__CORS_ALLOWED_ORIGINS=https://dotenv.example.com,https://preview.dotenv.example.com\nTERMBRIDGE_SERVER__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_SERVER__MODE=cloud\nTERMBRIDGE_GATE__API__EXPOSE_ERRORS=true\n")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
@@ -179,6 +192,13 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	}
 	if cfg.Server.PublicUrl != "https://dotenv.example.com" || cfg.Server.ListenUrl != "http://127.0.0.1:9091" || cfg.Server.Mode != ModeCloud {
 		t.Fatalf("Server = %#v", cfg.Server)
+	}
+	if cfg.Server.APIBaseURL != "https://api.dotenv.example.com" {
+		t.Fatalf("Server.APIBaseURL = %q", cfg.Server.APIBaseURL)
+	}
+	wantOrigins := []string{"https://dotenv.example.com", "https://preview.dotenv.example.com"}
+	if !reflect.DeepEqual(cfg.Server.CORSAllowedOrigins, wantOrigins) {
+		t.Fatalf("Server.CORSAllowedOrigins = %#v, want %#v", cfg.Server.CORSAllowedOrigins, wantOrigins)
 	}
 	if !cfg.Gate.API.ExposeErrors {
 		t.Fatal("Gate.API.ExposeErrors = false, want true")
@@ -409,6 +429,38 @@ func TestLoadRejectsInvalidServerPublicURL(t *testing.T) {
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
 	writeEnvConfig(t, cwd, "develop", "server:\n  public_url: ftp://example.com\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !apperrors.IsConfig(err) {
+		t.Fatalf("Load() error = %T, want config error", err)
+	}
+}
+
+func TestLoadRejectsInvalidServerAPIBaseURL(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeEnvConfig(t, cwd, "develop", "server:\n  api_base_url: ftp://api.example.com\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !apperrors.IsConfig(err) {
+		t.Fatalf("Load() error = %T, want config error", err)
+	}
+}
+
+func TestLoadRejectsInvalidServerCORSAllowedOrigin(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeEnvConfig(t, cwd, "develop", "server:\n  cors_allowed_origins:\n    - chrome-extension://example\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	_, err := Load(Options{Cwd: cwd})

@@ -5,6 +5,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios'
 import type { ApiErrorResp } from '../../protocol/terminal'
+import { runtimeConfig } from '../../config'
 import { useGatewayStore } from '../../store/gateway'
 import { router } from '../../router'
 
@@ -38,19 +39,22 @@ export class ApiContractMismatchError extends Error {
   }
 }
 
-export const apiClient = axios.create({
-  baseURL: '',
+export const apiClient = axios.create()
+
+apiClient.interceptors.request.use((cfg) => {
+  cfg.baseURL = runtimeConfig.apiBaseUrl
+  return cfg
 })
 
-apiClient.interceptors.request.use((config) => {
-  ensureRequestId(config)
+apiClient.interceptors.request.use((cfg) => {
+  ensureRequestId(cfg)
   const gateway = useGatewayStore()
   if (gateway.token) {
-    const headers = AxiosHeaders.from(config.headers)
+    const headers = AxiosHeaders.from(cfg.headers)
     headers.set('Authorization', `Bearer ${gateway.token}`)
-    config.headers = headers
+    cfg.headers = headers
   }
-  return config
+  return cfg
 })
 
 apiClient.interceptors.response.use(

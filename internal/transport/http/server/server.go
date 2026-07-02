@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net"
 	"net/http"
@@ -13,15 +15,18 @@ import (
 	"time"
 
 	apperrors "termbridge-go/internal/infrastructure/errors"
+	transportmiddleware "termbridge-go/internal/transport/http/middleware"
 	"termbridge-go/internal/transport/http/middleware/requestlog"
 )
 
 type Config struct {
-	ServerUrl         string
-	StaticDir         string
-	Logger            *slog.Logger
-	RequestBodyLimit  int
-	ResponseBodyLimit int
+	ServerUrl          string
+	StaticDir          string
+	APIBaseURL         string
+	CORSAllowedOrigins []string
+	Logger             *slog.Logger
+	RequestBodyLimit   int
+	ResponseBodyLimit  int
 }
 
 type Server struct {
@@ -36,10 +41,11 @@ type Info struct {
 func New(config Config, apiHandler http.Handler) *Server {
 	config = normalizeConfig(config)
 	mux := http.NewServeMux()
+	apiHandler = transportmiddleware.CORS(config.CORSAllowedOrigins)(apiHandler)
 	mux.Handle("/api", apiHandler)
 	mux.Handle("/api/", apiHandler)
 	if config.StaticDir != "" {
-		mux.Handle("/", staticHandler(config.StaticDir))
+		mux.Handle("/", staticHandler(config.StaticDir, config.APIBaseURL))
 	}
 	return &Server{config: config, server: &http.Server{Handler: requestlog.Middleware(config.Logger, requestlog.Config{RequestBodyLimit: config.RequestBodyLimit, ResponseBodyLimit: config.ResponseBodyLimit})(mux)}}
 }
@@ -92,6 +98,8 @@ func normalizeConfig(config Config) Config {
 	}
 	config.ServerUrl = strings.TrimRight(strings.TrimSpace(config.ServerUrl), "/")
 	config.StaticDir = strings.TrimSpace(config.StaticDir)
+	config.APIBaseURL = strings.TrimRight(strings.TrimSpace(config.APIBaseURL), "/")
+	config.CORSAllowedOrigins = cleanOrigins(config.CORSAllowedOrigins)
 	if config.Logger == nil {
 		panic("http server logger is required")
 	}
@@ -126,7 +134,7 @@ func validateStaticDir(staticDir string) error {
 	return nil
 }
 
-func staticHandler(staticDir string) http.Handler {
+func staticHandler(staticDir string, apiBaseURL string) http.Handler {
 	fileServer := http.FileServer(http.Dir(staticDir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -140,6 +148,10 @@ func staticHandler(staticDir string) http.Handler {
 		if urlPath != "" {
 			fullPath := filepath.Join(staticDir, filepath.FromSlash(urlPath))
 			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+				if filepath.Clean(fullPath) == filepath.Clean(filepath.Join(staticDir, "index.html")) {
+					serveIndexHTML(w, r, fullPath, apiBaseURL)
+					return
+				}
 				fileServer.ServeHTTP(w, r)
 				return
 			}
@@ -148,6 +160,57 @@ func staticHandler(staticDir string) http.Handler {
 				return
 			}
 		}
-		http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
+		serveIndexHTML(w, r, filepath.Join(staticDir, "index.html"), apiBaseURL)
 	})
+}
+
+func serveIndexHTML(w http.ResponseWriter, r *http.Request, indexPath string, apiBaseURL string) {
+	content, err := os.ReadFile(indexPath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if r.Method == http.MethodHead {
+		return
+	}
+	_, _ = w.Write(injectRuntimeConfig(content, apiBaseURL))
+}
+
+func injectRuntimeConfig(content []byte, apiBaseURL string) []byte {
+	configValue := map[string]string{}
+	if strings.TrimSpace(apiBaseURL) != "" {
+		configValue["apiBaseUrl"] = strings.TrimRight(strings.TrimSpace(apiBaseURL), "/")
+	}
+	configJSON, err := json.Marshal(configValue)
+	if err != nil {
+		panic("marshal runtime config: " + err.Error())
+	}
+	script := []byte("<script>window.__CONFIG__ = " + string(configJSON) + ";</script>")
+	placeholder := []byte("<!-- __RUNTIME_CONFIG__ -->")
+	if bytes.Contains(content, placeholder) {
+		return bytes.Replace(content, placeholder, script, 1)
+	}
+	headEnd := []byte("</head>")
+	if bytes.Contains(content, headEnd) {
+		return bytes.Replace(content, headEnd, append(script, headEnd...), 1)
+	}
+	return content
+}
+
+func cleanOrigins(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		value = strings.TrimRight(strings.TrimSpace(value), "/")
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }
