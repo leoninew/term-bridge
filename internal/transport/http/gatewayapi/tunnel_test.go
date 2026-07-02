@@ -19,7 +19,7 @@ import (
 
 func TestAgentTunnelRegistersDevice(t *testing.T) {
 	stateDir := t.TempDir()
-	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir, DeviceId: "dev-1", DeviceName: "local"})
+	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir})
 	if err != nil {
 		t.Fatalf("LoadOrCreateDevice() error = %v", err)
 	}
@@ -46,7 +46,7 @@ func TestAgentTunnelRegistersDevice(t *testing.T) {
 		t.Fatalf("Dial() error = %v", err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
-	hello, err := tunnel.NewFrame(tunnel.ControlStreamId, tunnel.FrameHello, tunnel.HelloPayload{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion})
+	hello, err := tunnel.NewFrame(tunnel.ControlStreamId, tunnel.FrameHello, tunnel.HelloPayload{DeviceId: device.Id, DeviceName: device.Name, ProtocolVersion: tunnel.ProtocolVersion})
 	if err != nil {
 		t.Fatalf("NewFrame() error = %v", err)
 	}
@@ -70,7 +70,7 @@ func TestAgentTunnelRegistersDevice(t *testing.T) {
 	}
 
 	devices := gateway.registry.List()
-	if len(devices) != 1 || devices[0].Id != "dev-1" || devices[0].Name != "local" || !devices[0].Online {
+	if len(devices) != 1 || devices[0].Id != device.Id || devices[0].Name != device.Name || !devices[0].Online {
 		t.Fatalf("devices = %#v", devices)
 	}
 }

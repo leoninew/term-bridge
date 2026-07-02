@@ -18,6 +18,8 @@ vi.mock('../features/sessions/api', () => ({
   updateSessionOrder: mocks.updateSessionOrder,
 }))
 
+const target = { mode: 'cloud' as const, deviceId: 'device-1' }
+
 const workspaceTree: WorkspaceTreeSummary[] = [
   {
     id: 'workspace-1',
@@ -153,9 +155,9 @@ describe('useWorkspaceSessionsStore', () => {
     store.applyWorkspaceTree(workspaceTree)
     mocks.updateWorkspaceOrder.mockRejectedValueOnce(error)
 
-    await expect(
-      store.reorderWorkspaces('device-1', ['workspace-2', 'workspace-1']),
-    ).rejects.toThrow(error)
+    await expect(store.reorderWorkspaces(target, ['workspace-2', 'workspace-1'])).rejects.toThrow(
+      error,
+    )
     expect(store.workspaceTree.map((workspace) => workspace.id)).toEqual([
       'workspace-1',
       'workspace-2',
@@ -171,9 +173,9 @@ describe('useWorkspaceSessionsStore', () => {
       workspaceTree[0].children[0],
     ])
 
-    await store.reorderSessions('device-1', 'workspace-1', ['session-2', 'session-1'])
+    await store.reorderSessions(target, 'workspace-1', ['session-2', 'session-1'])
 
-    expect(mocks.updateSessionOrder).toHaveBeenCalledWith('device-1', 'workspace-1', [
+    expect(mocks.updateSessionOrder).toHaveBeenCalledWith(target, 'workspace-1', [
       'session-2',
       'session-1',
     ])
@@ -192,7 +194,7 @@ describe('useWorkspaceSessionsStore', () => {
     mocks.updateSessionOrder.mockRejectedValueOnce(error)
 
     await expect(
-      store.reorderSessions('device-1', 'workspace-1', ['session-2', 'session-1']),
+      store.reorderSessions(target, 'workspace-1', ['session-2', 'session-1']),
     ).rejects.toThrow(error)
     expect(store.workspaceTree[0].children.map((session) => session.id)).toEqual([
       'session-1',

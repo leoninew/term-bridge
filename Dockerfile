@@ -21,9 +21,9 @@ WORKDIR /opt/termbridge
 COPY --from=go-build /out/termbridge /usr/local/bin/termbridge
 COPY --from=web-build /src/web/dist ./web/dist
 COPY configs/ ./configs/
-ENV TERMBRIDGE_AGENT__LISTEN_URL=http://0.0.0.0:80 \
-    TERMBRIDGE_WEB__STATIC_DIR=/opt/termbridge/web/dist \
-    TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost \
+ENV TERMBRIDGE_SERVER__LISTEN_URL=http://0.0.0.0:80 \
+    TERMBRIDGE_SERVER__STATIC_DIR=/opt/termbridge/web/dist \
+    TERMBRIDGE_SERVER__PUBLIC_URL=http://localhost \
     TERMBRIDGE_RUNTIME__STATE_DIR=/var/lib/termbridge
 EXPOSE 80
 VOLUME ["/var/lib/termbridge"]

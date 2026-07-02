@@ -22,8 +22,6 @@ type Config struct {
 	ConnectUrl string
 	Username   string
 	Password   string
-	DeviceId   string
-	DeviceName string
 	StateDir   string
 	Runtime    RuntimeAccess
 	Logger     *slog.Logger
@@ -59,7 +57,7 @@ func (c *Client) logWarn(message string, attrs ...any) {
 func (c *Client) Run(ctx context.Context) error {
 	device := c.device
 	if strings.TrimSpace(device.Id) == "" {
-		loaded, err := LoadOrCreateDevice(DeviceOptions{StateDir: c.config.StateDir, DeviceId: c.config.DeviceId, DeviceName: c.config.DeviceName})
+		loaded, err := LoadOrCreateDevice(DeviceOptions{StateDir: c.config.StateDir})
 		if err != nil {
 			return err
 		}
@@ -155,82 +153,86 @@ func (c *Client) handleRequest(ctx context.Context, conn *websocket.Conn, writeM
 }
 
 func (c *Client) handleRuntimeRequest(ctx context.Context, request tunnel.RequestReq) (any, error) {
+	return HandleRuntimeRequest(ctx, c.config.Runtime, request)
+}
+
+func HandleRuntimeRequest(ctx context.Context, runtime RuntimeAccess, request tunnel.RequestReq) (any, error) {
 	switch request.Method {
 	case "workspaces":
-		items, err := c.config.Runtime.ListWorkspaces(ctx)
+		items, err := runtime.ListWorkspaces(ctx)
 		return terminalapp.ListWorkspacesResp{Items: items}, err
 	case "workspace_tree":
-		items, err := c.config.Runtime.WorkspaceTree(ctx)
+		items, err := runtime.WorkspaceTree(ctx)
 		return terminalapp.WorkspaceTreeResp{Items: items}, err
 	case "workspace_order":
 		var params terminalapp.UpdateWorkspaceOrderReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		items, err := c.config.Runtime.UpdateWorkspaceOrder(ctx, params.WorkspaceIds)
+		items, err := runtime.UpdateWorkspaceOrder(ctx, params.WorkspaceIds)
 		return terminalapp.UpdateWorkspaceOrderResp{Items: items}, err
 	case "delete_workspace":
 		var params terminalapp.DeleteWorkspaceReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return nil, c.config.Runtime.DeleteWorkspace(ctx, params.WorkspaceId)
+		return nil, runtime.DeleteWorkspace(ctx, params.WorkspaceId)
 	case "workspace_sessions":
 		var params terminalapp.WorkspaceSessionsReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		items, err := c.config.Runtime.ListSessionsByWorkspaceId(ctx, params.WorkspaceId)
+		items, err := runtime.ListSessionsByWorkspaceId(ctx, params.WorkspaceId)
 		return terminalapp.WorkspaceSessionsResp{Items: items}, err
 	case "session_order":
 		var params terminalapp.WorkspaceSessionOrderReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		items, err := c.config.Runtime.UpdateSessionOrder(ctx, params.WorkspaceId, params.SessionIds)
+		items, err := runtime.UpdateSessionOrder(ctx, params.WorkspaceId, params.SessionIds)
 		return terminalapp.UpdateSessionOrderResp{Items: items}, err
 	case "create_session":
 		var params terminalapp.CreateSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return c.config.Runtime.CreateSession(ctx, params)
+		return runtime.CreateSession(ctx, params)
 	case "rerun_session":
 		var params terminalapp.RerunWorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return c.config.Runtime.RerunSession(ctx, params.WorkspaceId, params.SessionId, params.Request)
+		return runtime.RerunSession(ctx, params.WorkspaceId, params.SessionId, params.Request)
 	case "get_session":
 		var params terminalapp.WorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return c.config.Runtime.GetSession(ctx, params.WorkspaceId, params.SessionId)
+		return runtime.GetSession(ctx, params.WorkspaceId, params.SessionId)
 	case "update_session":
 		var params terminalapp.UpdateWorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return c.config.Runtime.UpdateSession(ctx, params.WorkspaceId, params.SessionId, params.Request)
+		return runtime.UpdateSession(ctx, params.WorkspaceId, params.SessionId, params.Request)
 	case "delete_session":
 		var params terminalapp.WorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return nil, c.config.Runtime.DeleteSession(ctx, params.WorkspaceId, params.SessionId)
+		return nil, runtime.DeleteSession(ctx, params.WorkspaceId, params.SessionId)
 	case "close_session":
 		var params terminalapp.WorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		return c.config.Runtime.CloseSession(ctx, params.WorkspaceId, params.SessionId)
+		return runtime.CloseSession(ctx, params.WorkspaceId, params.SessionId)
 	case "history":
 		var params terminalapp.WorkspaceSessionReq
 		if err := decodeRequestParams(request.Params, &params); err != nil {
 			return nil, err
 		}
-		data, err := c.config.Runtime.ReadHistory(ctx, params.WorkspaceId, params.SessionId)
+		data, err := runtime.ReadHistory(ctx, params.WorkspaceId, params.SessionId)
 		return string(data), err
 	default:
 		return nil, fmt.Errorf("unknown request method: %s", request.Method)

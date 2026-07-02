@@ -114,14 +114,6 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	bootstrap := config.BootstrapResult{}
-	if options.Command.Kind == CommandExec || options.Command.Kind == CommandWorkspace || options.Command.Kind == CommandSession || (options.Command.Kind == CommandServe && !config.IsCloudMode(cfg)) {
-		cfg, bootstrap, err = config.EnsureLocalIdentity(cfg)
-		if err != nil {
-			return Result{}, err
-		}
-	}
-
 	var logOutput io.Writer
 	if options.Command.Kind == CommandServe {
 		logOutput = options.Stdout
@@ -142,8 +134,8 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	case CommandSession:
 		return runSessionList(ctx, cfg, options.Stdout)
 	case CommandServe:
-		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "web_mode", cfg.Web.Mode, "agent_listen_url", cfg.Agent.ListenUrl, "agent_connect_url", cfg.Agent.ConnectUrl, "agent_device_id", cfg.Agent.DeviceId, "agent_device_name", cfg.Agent.DeviceName, "config", cfg.DefaultConfigFile)
-		return runServe(ctx, cfg, bootstrap, logger, options)
+		logger.Info("termbridge serve command parsed", "cwd", cfg.Cwd, "server_mode", cfg.Server.Mode, "server_listen_url", cfg.Server.ListenUrl, "config", cfg.DefaultConfigFile)
+		return runServe(ctx, cfg, logger, options)
 	case CommandMigrate:
 		logger.Info("termbridge migrate command parsed", "cwd", cfg.Cwd, "database_driver", cfg.Database.Driver, "config", cfg.DefaultConfigFile)
 		return runMigrate(ctx, cfg)
@@ -174,7 +166,7 @@ func runMigrate(ctx context.Context, cfg config.Config) (Result, error) {
 }
 
 func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, options Options) (Result, error) {
-	device, err := agent.LoadOrCreateDevice(agent.DeviceOptions{StateDir: cfg.Runtime.StateDir, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName})
+	device, err := agent.LoadOrCreateDevice(agent.DeviceOptions{StateDir: cfg.Runtime.StateDir})
 	if err != nil {
 		return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...)}, err
 	}
@@ -291,15 +283,10 @@ func runExec(ctx context.Context, cfg config.Config, logger *logging.Logger, opt
 	return Result{Cwd: cfg.Cwd, Command: append([]string(nil), cfg.Command...), ExitCode: runtimeResult.ExitCode}, nil
 }
 
-func runServe(ctx context.Context, cfg config.Config, bootstrap config.BootstrapResult, logger *logging.Logger, options Options) (Result, error) {
+func runServe(ctx context.Context, cfg config.Config, logger *logging.Logger, options Options) (Result, error) {
 	stdout := options.Stdout
 	if stdout == nil {
 		stdout = io.Discard
-	}
-	if bootstrap.Generated {
-		fmt.Fprintf(stdout, "TermBridge generated local credentials in %s\n", bootstrap.GeneratedConfigFile)
-		fmt.Fprintf(stdout, "Username: %s\n", bootstrap.Username)
-		fmt.Fprintf(stdout, "Password: %s\n", bootstrap.Password)
 	}
 	db, err := database.Open(ctx, cfg.Database)
 	if err != nil {
@@ -320,10 +307,9 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 	var device agent.Device
 	devicePublicKeys := map[string]ed25519.PublicKey{}
 	var runtimeAccess agent.RuntimeAccess
-	connectors := []*agent.Client{}
 	var cloudConnector *agent.Client
 	if !config.IsCloudMode(cfg) {
-		device, err = agent.LoadOrCreateDevice(agent.DeviceOptions{StateDir: cfg.Runtime.StateDir, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName})
+		device, err = agent.LoadOrCreateDevice(agent.DeviceOptions{StateDir: cfg.Runtime.StateDir})
 		if err != nil {
 			return Result{Cwd: cfg.Cwd}, err
 		}
@@ -336,7 +322,6 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		}
 		devicePublicKeys[device.Id] = publicKey
 		runtimeAccess = agent.WebTerminalAccess{Registry: newWebTerminalRegistry(cfg, logger, state.NewDBStore(db.DB, db.Driver, filepath.Join(cfg.Runtime.StateDir, "devices", device.Id), device.Id))}
-		connectors = append(connectors, newAgentConnector(cfg, cfg.Agent.ConnectUrl, runtimeAccess, device, logger))
 		if cloudConnectorConfigured(cfg) {
 			cloudConnector = newAgentConnector(cfg, cfg.Cloud.GateUrl, runtimeAccess, device, logger)
 		}
@@ -377,12 +362,12 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 		}()
 	}
 
-	gatewayHandler := gatewayapi.New(gatewayapi.Config{AllowedOrigins: cfg.Gate.Browser.AllowedOrigins, DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService, AgentTunnelAudience: gatewayTunnelAudience(cfg), DevicePublicKeys: devicePublicKeys, DeviceRepository: deviceRepository, CloudGateURL: cfg.Cloud.GateUrl, CloudOAuth: gatewayapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectURL: cfg.Cloud.OAuth.RedirectURL, Scopes: cfg.Cloud.OAuth.Scopes}, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(cfg.Runtime.StateDir), LocalDevice: device, WebMode: cfg.Web.Mode, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(gatewayapi.CloudSessionSummary) {
+	gatewayHandler := gatewayapi.New(gatewayapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger.Slog, AuthService: authService, AgentTunnelAudience: gatewayTunnelAudience(cfg), DevicePublicKeys: devicePublicKeys, DeviceRepository: deviceRepository, CloudGateURL: cfg.Cloud.GateUrl, CloudOAuth: gatewayapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectURL: cfg.Cloud.OAuth.RedirectURL, Scopes: cfg.Cloud.OAuth.Scopes}, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(cfg.Runtime.StateDir), LocalDevice: device, LocalRuntime: runtimeAccess, ServerMode: cfg.Server.Mode, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(gatewayapi.CloudSessionSummary) {
 		if cloudConnector != nil {
 			startConnector(cloudConnector)
 		}
 	}})
-	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Agent.ListenUrl, StaticDir: cfg.Web.StaticDir, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
+	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Server.ListenUrl, StaticDir: cfg.Server.StaticDir, Logger: logger.Slog, RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit}, gatewayHandler)
 
 	go func() {
 		err := runBackendServer(serveCtx, server, func(info httpserver.Info) {
@@ -403,10 +388,6 @@ func runServe(ctx context.Context, cfg config.Config, bootstrap config.Bootstrap
 	case <-ctx.Done():
 		cancel()
 		return Result{Cwd: cfg.Cwd}, nil
-	}
-
-	for _, connector := range connectors {
-		startConnector(connector)
 	}
 
 	select {
@@ -430,24 +411,20 @@ func normalizeServeError(err error) error {
 }
 
 func newAgentConnector(cfg config.Config, connectURL string, runtimeAccess agent.RuntimeAccess, device agent.Device, logger *logging.Logger) *agent.Client {
-	client := agent.New(agent.Config{ConnectUrl: connectURL, Username: cfg.Auth.LocalAdmin.Username, Password: cfg.Auth.LocalAdmin.Password, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName, StateDir: cfg.Runtime.StateDir, Runtime: runtimeAccess, Logger: logger.Slog})
+	client := agent.New(agent.Config{ConnectUrl: connectURL, Username: cfg.Auth.LocalAdmin.Username, Password: cfg.Auth.LocalAdmin.Password, StateDir: cfg.Runtime.StateDir, Runtime: runtimeAccess, Logger: logger.Slog})
 	client.SetDevice(device)
 	return client
 }
 
 func cloudConnectorConfigured(cfg config.Config) bool {
-	cloudGateURL := strings.TrimRight(strings.TrimSpace(cfg.Cloud.GateUrl), "/")
-	if cloudGateURL == "" {
-		return false
-	}
-	return cloudGateURL != strings.TrimRight(strings.TrimSpace(cfg.Agent.ConnectUrl), "/")
+	return strings.TrimSpace(cfg.Cloud.GateUrl) != ""
 }
 
 func gatewayTunnelAudience(cfg config.Config) string {
 	if config.IsCloudMode(cfg) && strings.TrimSpace(cfg.Cloud.GateUrl) != "" {
 		return cfg.Cloud.GateUrl
 	}
-	return cfg.Agent.ConnectUrl
+	return cfg.Server.ListenUrl
 }
 
 func newWebTerminalRegistry(cfg config.Config, logger *logging.Logger, store terminalapp.RuntimeStore) *terminalapp.Registry {
@@ -532,7 +509,7 @@ func runSessionList(ctx context.Context, cfg config.Config, stdout io.Writer) (R
 }
 
 func runtimeStateStore(ctx context.Context, cfg config.Config) (state.DBStore, func(), error) {
-	device, err := agent.LoadOrCreateDevice(agent.DeviceOptions{StateDir: cfg.Runtime.StateDir, DeviceId: cfg.Agent.DeviceId, DeviceName: cfg.Agent.DeviceName})
+	device, err := agent.LoadOrCreateDevice(agent.DeviceOptions{StateDir: cfg.Runtime.StateDir})
 	if err != nil {
 		return state.DBStore{}, func() {}, err
 	}

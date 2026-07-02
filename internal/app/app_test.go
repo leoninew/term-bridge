@@ -129,7 +129,7 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	configContent := "web:\n  mode: local\ngate:\n  browser:\n    allowed_origins:\n      - http://127.0.0.1:9031\n  api:\n    expose_errors: true\nagent:\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\ncloud:\n  gate_url: http://termbridge.lvh.me\n"
+	configContent := "gate:\n  api:\n    expose_errors: true\nserver:\n  listen_url: http://127.0.0.1:9090\n  mode: local\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: http://termbridge.lvh.me\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
 	if err := os.MkdirAll(filepath.Join(cwd, ".termbridge"), 0o755); err != nil {
@@ -140,24 +140,13 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 		t.Fatalf("WriteFile(identity) error = %v", err)
 	}
 	oldRunBackendServer := runBackendServer
-	oldRunAgentClient := runAgentClient
 	defer func() {
 		runBackendServer = oldRunBackendServer
-		runAgentClient = oldRunAgentClient
 	}()
 	var gotServer *httpserver.Server
-	gotClients := []*agent.Client{}
 	runBackendServer = func(ctx context.Context, server *httpserver.Server, onListening func(httpserver.Info)) error {
 		gotServer = server
 		onListening(httpserver.Info{Url: "http://127.0.0.1:9090"})
-		<-ctx.Done()
-		return ctx.Err()
-	}
-	var clientMu sync.Mutex
-	runAgentClient = func(ctx context.Context, client *agent.Client) error {
-		clientMu.Lock()
-		gotClients = append(gotClients, client)
-		clientMu.Unlock()
 		<-ctx.Done()
 		return ctx.Err()
 	}
@@ -176,9 +165,7 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 		}{result: result, err: err}
 	}()
 	waitFor(t, time.Second, func() bool {
-		clientMu.Lock()
-		defer clientMu.Unlock()
-		return gotServer != nil && len(gotClients) == 1
+		return gotServer != nil
 	})
 	cancelServe()
 	outcome := <-resultCh
@@ -197,26 +184,7 @@ func TestRunServeStartsUnifiedBackendAndAgentFromConfig(t *testing.T) {
 	if healthResponse.Code != http.StatusOK || !strings.Contains(healthResponse.Body.String(), `"status":"ok"`) {
 		t.Fatalf("health response = %d %s", healthResponse.Code, healthResponse.Body.String())
 	}
-	clientMu.Lock()
-	clientSnapshot := append([]*agent.Client(nil), gotClients...)
-	clientMu.Unlock()
-	if len(clientSnapshot) != 1 {
-		t.Fatalf("runAgentClient called %d times before OAuth completion, want 1", len(clientSnapshot))
-	}
-	gotConfig := clientSnapshot[0].Config()
-	if gotConfig.ConnectUrl != "http://127.0.0.1:9090" {
-		t.Fatalf("agent connector target before OAuth completion = %q, want self target", gotConfig.ConnectUrl)
-	}
-	if gotConfig.Username != "admin" || gotConfig.Password != "admin" || gotConfig.DeviceId != "dev-1" || gotConfig.DeviceName != "local-mac" {
-		t.Fatalf("agent config = %#v", gotConfig)
-	}
 	out := stdout.String()
-	if !strings.Contains(out, "TermBridge agent connector targeting http://127.0.0.1:9090") {
-		t.Fatalf("stdout = %s", out)
-	}
-	if strings.Contains(out, "TermBridge agent connector targeting http://termbridge.lvh.me") {
-		t.Fatalf("stdout shows cloud connector before OAuth completion: %s", out)
-	}
 	if strings.Contains(out, "setup?token=") {
 		t.Fatalf("stdout exposes local setup URL: %s", out)
 	}
@@ -254,7 +222,7 @@ func TestRunServeStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 		}
 	}))
 	defer cloudGate.Close()
-	configContent := "web:\n  mode: local\ngate:\n  browser:\n    allowed_origins:\n      - http://127.0.0.1:9031\n  api:\n    expose_errors: true\nagent:\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\n  connect_url: http://127.0.0.1:9090\n  device_id: dev-1\n  device_name: local-mac\ncloud:\n  gate_url: " + cloudGate.URL + "\n  oauth:\n    client_id: termbridge-local\n    redirect_url: http://localhost:9031/cloud/oauth/callback\n"
+	configContent := "gate:\n  api:\n    expose_errors: true\nserver:\n  listen_url: http://127.0.0.1:9090\n  mode: local\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: " + cloudGate.URL + "\n  oauth:\n    client_id: termbridge-local\n    redirect_url: http://localhost:9031/cloud/oauth/callback\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
 	if err := os.MkdirAll(filepath.Join(cwd, ".termbridge"), 0o755); err != nil {
@@ -295,9 +263,7 @@ func TestRunServeStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 		resultCh <- err
 	}()
 	waitFor(t, time.Second, func() bool {
-		clientMu.Lock()
-		defer clientMu.Unlock()
-		return gotServer != nil && len(gotClients) == 1
+		return gotServer != nil
 	})
 
 	startResponse := httptest.NewRecorder()
@@ -328,7 +294,7 @@ func TestRunServeStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 	waitFor(t, time.Second, func() bool {
 		clientMu.Lock()
 		defer clientMu.Unlock()
-		return len(gotClients) == 2
+		return len(gotClients) == 1
 	})
 	clientMu.Lock()
 	clientSnapshot := append([]*agent.Client(nil), gotClients...)
@@ -337,7 +303,7 @@ func TestRunServeStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 	for _, client := range clientSnapshot {
 		gotTargets[client.Config().ConnectUrl] = true
 	}
-	if !gotTargets["http://127.0.0.1:9090"] || !gotTargets[cloudGate.URL] {
+	if len(gotTargets) != 1 || !gotTargets[cloudGate.URL] {
 		t.Fatalf("agent connector targets after OAuth completion = %#v", gotTargets)
 	}
 	out := stdout.String()

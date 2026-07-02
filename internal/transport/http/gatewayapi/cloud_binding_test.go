@@ -28,7 +28,7 @@ var testJWTKey = []byte("11111111111111111111111111111111")
 
 func TestCloudOAuthStartReturnsAuthorizeURLInLocalMode(t *testing.T) {
 	authService := authapp.New(nil, gatewayauth.NewTokenService(testJWTKey), config.AuthConfig{}, "local", nil, nil)
-	gateway := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(t.TempDir()), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL, Scopes: []string{"openid", "email", "profile"}}, LocalDevice: testLocalDevice(), WebMode: "local"})
+	gateway := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(t.TempDir()), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL, Scopes: []string{"openid", "email", "profile"}}, LocalDevice: testLocalDevice(), ServerMode: "local"})
 
 	request := httptest.NewRequest(http.MethodGet, "/api/cloud-oauth/start", nil)
 	response := httptest.NewRecorder()
@@ -49,7 +49,7 @@ func TestCloudOAuthStartReturnsAuthorizeURLInLocalMode(t *testing.T) {
 
 func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	authService := authapp.New(nil, gatewayauth.NewTokenService(testJWTKey), config.AuthConfig{}, "local", nil, nil)
-	gateway := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(t.TempDir()), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, WebMode: "local"})
+	gateway := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(t.TempDir()), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, ServerMode: "local"})
 	connectedAt := time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
 	gateway.setLocalCloudSession(CloudSessionSummary{GateURL: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: connectedAt})
 
@@ -79,10 +79,10 @@ func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 func TestAuthMeDoesNotPersistLocalCloudSessionAcrossHandlerRestart(t *testing.T) {
 	authService := authapp.New(nil, gatewayauth.NewTokenService(testJWTKey), config.AuthConfig{}, "local", nil, nil)
 	stateDir := t.TempDir()
-	first := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(stateDir), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, WebMode: "local"})
+	first := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(stateDir), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, ServerMode: "local"})
 	first.setLocalCloudSession(CloudSessionSummary{GateURL: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: time.Now().UTC()})
 
-	second := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(stateDir), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, WebMode: "local"})
+	second := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: authapp.NewCloudOAuthAttemptStore(stateDir), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, ServerMode: "local"})
 	response := httptest.NewRecorder()
 	second.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
 	if response.Code != http.StatusOK {
@@ -132,7 +132,7 @@ func TestCloudOAuthAuthorizeRejectsUnauthenticatedRequest(t *testing.T) {
 
 func TestCloudOAuthAuthorizeRequiresCloudMode(t *testing.T) {
 	authService := authapp.New(nil, gatewayauth.NewTokenService(testJWTKey), config.AuthConfig{}, "local", nil, nil)
-	gateway := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, DeviceRepository: devicerepo.New(newGatewayTestDB(t), "sqlite"), CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, WebMode: "local"})
+	gateway := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, DeviceRepository: devicerepo.New(newGatewayTestDB(t), "sqlite"), CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, ServerMode: "local"})
 	token := cloudUserToken(t, authService, "user-1", "user-1@example.test")
 
 	request := httptest.NewRequest(http.MethodGet, "/api/cloud-oauth/authorize?client_id=termbridge-local&redirect_uri=http://localhost:9031/cloud/oauth/callback&state=state-1", nil)
@@ -144,7 +144,7 @@ func TestCloudOAuthAuthorizeRequiresCloudMode(t *testing.T) {
 
 func TestCloudOAuthExchangeRequiresCloudMode(t *testing.T) {
 	authService := authapp.New(nil, gatewayauth.NewTokenService(testJWTKey), config.AuthConfig{}, "local", nil, nil)
-	gateway := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, DeviceRepository: devicerepo.New(newGatewayTestDB(t), "sqlite"), WebMode: "local"})
+	gateway := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, DeviceRepository: devicerepo.New(newGatewayTestDB(t), "sqlite"), ServerMode: "local"})
 
 	response := httptest.NewRecorder()
 	gateway.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/cloud-oauth/exchange", strings.NewReader(`{"code":"code-1"}`)))
@@ -190,7 +190,7 @@ func TestCloudOAuthAuthorizeExchangeAndCurrentDeviceReport(t *testing.T) {
 	}
 
 	stateDir := t.TempDir()
-	localDevice, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir, DeviceId: "dev-1", DeviceName: "local"})
+	localDevice, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir})
 	if err != nil {
 		t.Fatalf("LoadOrCreateDevice() error = %v", err)
 	}
@@ -304,7 +304,7 @@ func newCloudGatewayForTest(t *testing.T) *Handler {
 	insertGatewayUser(t, db, "user-1", "user-1@example.test")
 	insertGatewayUser(t, db, "user-2", "user-2@example.test")
 	authService := authapp.New(authRepo, gatewayauth.NewTokenService(testJWTKey), config.AuthConfig{}, "cloud", nil, nil)
-	return New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, DeviceRepository: deviceRepo, CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, WebMode: "cloud"})
+	return New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, DeviceRepository: deviceRepo, CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}, ServerMode: "cloud"})
 }
 
 func newGatewayTestDB(t *testing.T) *sql.DB {

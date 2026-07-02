@@ -34,20 +34,31 @@ describe('useWorkbenchStore', () => {
     const store = useWorkbenchStore()
     mocks.readHistory.mockResolvedValueOnce({ data: 'history text' })
 
-    await expect(store.openSession('device-1', session())).resolves.toBeNull()
-    await expect(store.openSession('device-1', session())).resolves.toBeNull()
+    await expect(
+      store.openSession({ mode: 'cloud', deviceId: 'device-1' }, session()),
+    ).resolves.toBeNull()
+    await expect(
+      store.openSession({ mode: 'cloud', deviceId: 'device-1' }, session()),
+    ).resolves.toBeNull()
 
     expect(store.openedTabs).toHaveLength(1)
     expect(store.activeSessionId).toBe('session-1')
     expect(store.activeTab?.historyText).toBe('history text')
     expect(mocks.readHistory).toHaveBeenCalledTimes(1)
-    expect(mocks.readHistory).toHaveBeenCalledWith('device-1', 'workspace-1', 'session-1')
+    expect(mocks.readHistory).toHaveBeenCalledWith(
+      { mode: 'cloud', deviceId: 'device-1' },
+      'workspace-1',
+      'session-1',
+    )
   })
 
   it('does not read history for running sessions', async () => {
     const store = useWorkbenchStore()
 
-    await store.openSession('device-1', session({ lifecycle_state: 'running' }))
+    await store.openSession(
+      { mode: 'cloud', deviceId: 'device-1' },
+      session({ lifecycle_state: 'running' }),
+    )
 
     expect(store.openedTabs).toHaveLength(1)
     expect(mocks.readHistory).not.toHaveBeenCalled()
@@ -58,7 +69,9 @@ describe('useWorkbenchStore', () => {
 
     mocks.readHistory.mockRejectedValueOnce(new Error('history failed'))
 
-    await expect(store.openSession('device-1', session())).resolves.toBe('history failed')
+    await expect(
+      store.openSession({ mode: 'cloud', deviceId: 'device-1' }, session()),
+    ).resolves.toBe('history failed')
     expect(store.activeTab?.historyError).toBe('history failed')
   })
 
@@ -76,9 +89,9 @@ describe('useWorkbenchStore', () => {
       return null
     })
 
-    await store.openSession('device-1', first)
-    await store.openSession('device-1', second)
-    await store.activateSession('device-1', first.id, resolver)
+    await store.openSession({ mode: 'cloud', deviceId: 'device-1' }, first)
+    await store.openSession({ mode: 'cloud', deviceId: 'device-1' }, second)
+    await store.activateSession({ mode: 'cloud', deviceId: 'device-1' }, first.id, resolver)
 
     expect(store.activeSessionId).toBe(first.id)
     expect(store.activeTab?.workspaceId).toBe(first.workspace_id)
@@ -90,8 +103,11 @@ describe('useWorkbenchStore', () => {
   it('closes tabs for removed workspace sessions', async () => {
     const store = useWorkbenchStore()
 
-    await store.openSession('device-1', session())
-    await store.openSession('device-1', session({ id: 'session-2', workspace_id: 'workspace-2' }))
+    await store.openSession({ mode: 'cloud', deviceId: 'device-1' }, session())
+    await store.openSession(
+      { mode: 'cloud', deviceId: 'device-1' },
+      session({ id: 'session-2', workspace_id: 'workspace-2' }),
+    )
 
     store.closeRemovedSessions([{ id: 'session-1', workspace_id: 'workspace-1' }])
 

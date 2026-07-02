@@ -3,12 +3,10 @@ package config
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -28,12 +26,11 @@ const (
 	EnvPrefix       = "TERMBRIDGE"
 	EnvNameVariable = EnvPrefix + "_ENV"
 
-	WebModeLocal = "local"
-	WebModeCloud = "cloud"
+	ModeLocal = "local"
+	ModeCloud = "cloud"
 
 	DefaultAuthUsername = "admin"
 	DefaultAuthPassword = "admin"
-	DefaultListenURL    = "http://127.0.0.1:9030"
 )
 
 type Config struct {
@@ -46,9 +43,8 @@ type Config struct {
 	LogHTTP           LogHTTPConfig
 	History           HistoryConfig
 	Runtime           RuntimeConfig
-	Web               WebConfig
+	Server            ServerConfig
 	Gate              GateConfig
-	Agent             AgentConfig
 	Cloud             CloudConfig
 	Database          DatabaseConfig
 	Auth              AuthConfig
@@ -131,30 +127,19 @@ type RuntimeConfig struct {
 	StateDir string
 }
 
-type WebConfig struct {
+type ServerConfig struct {
+	ListenUrl string
 	StaticDir string
 	Mode      string
+	PublicUrl string
 }
 
 type GateConfig struct {
-	Browser GateBrowserConfig
-	API     GateAPIConfig
-}
-
-type GateBrowserConfig struct {
-	AllowedOrigins []string
+	API GateAPIConfig
 }
 
 type GateAPIConfig struct {
 	ExposeErrors bool
-}
-
-type AgentConfig struct {
-	ListenUrl  string
-	PublicUrl  string
-	ConnectUrl string
-	DeviceId   string
-	DeviceName string
 }
 
 type CloudConfig struct {
@@ -167,13 +152,6 @@ type CloudOAuthConfig struct {
 	ClientSecret string
 	RedirectURL  string
 	Scopes       []string
-}
-
-type BootstrapResult struct {
-	GeneratedConfigFile string
-	Generated           bool
-	Username            string
-	Password            string
 }
 
 type Options struct {
@@ -233,9 +211,9 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	if err != nil {
 		return Config{}, err
 	}
-	staticDir, err := resolveOptionalDir(cwd, v.GetString("web.static_dir"))
+	staticDir, err := resolveOptionalDir(cwd, v.GetString("server.static_dir"))
 	if err != nil {
-		return Config{}, apperrors.Config("invalid web.static_dir", err)
+		return Config{}, apperrors.Config("invalid server.static_dir", err)
 	}
 	database, err := loadDatabaseConfig(cwd, v)
 	if err != nil {
@@ -258,26 +236,18 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			MaxBytes:     v.GetInt64("history.max_bytes"),
 			MaxLineBytes: v.GetInt("history.max_line_bytes"),
 		},
-		Runtime: RuntimeConfig{StateDir: stateDir},
-		Web: WebConfig{
-			StaticDir: staticDir,
-			Mode:      strings.ToLower(strings.TrimSpace(v.GetString("web.mode"))),
-		},
+		Runtime:  RuntimeConfig{StateDir: stateDir},
 		Database: database,
+		Server: ServerConfig{
+			ListenUrl: strings.TrimSpace(v.GetString("server.listen_url")),
+			StaticDir: staticDir,
+			Mode:      strings.ToLower(strings.TrimSpace(v.GetString("server.mode"))),
+			PublicUrl: strings.TrimSpace(v.GetString("server.public_url")),
+		},
 		Gate: GateConfig{
-			Browser: GateBrowserConfig{
-				AllowedOrigins: getStringSlice(v, "gate.browser.allowed_origins"),
-			},
 			API: GateAPIConfig{
 				ExposeErrors: v.GetBool("gate.api.expose_errors"),
 			},
-		},
-		Agent: AgentConfig{
-			ListenUrl:  strings.TrimSpace(v.GetString("agent.listen_url")),
-			PublicUrl:  strings.TrimSpace(v.GetString("agent.public_url")),
-			ConnectUrl: strings.TrimSpace(v.GetString("agent.connect_url")),
-			DeviceId:   strings.TrimSpace(v.GetString("agent.device_id")),
-			DeviceName: strings.TrimSpace(v.GetString("agent.device_name")),
 		},
 		Cloud: CloudConfig{
 			GateUrl: strings.TrimSpace(v.GetString("cloud.gate_url")),
@@ -325,8 +295,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	}
 
 	normalizeLogBodyLimits(&cfg)
-	normalizeWebConfig(&cfg)
-	normalizeAgentConfig(&cfg)
+	normalizeServerConfig(&cfg)
 	normalizeCloudConfig(&cfg)
 	if ensureDirs {
 		var err error
@@ -345,16 +314,13 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	if err := validateLogFormat(cfg.LogFormat); err != nil {
 		return Config{}, err
 	}
-	if err := validateWeb(cfg.Web); err != nil {
-		return Config{}, err
-	}
 	if err := validateHistory(cfg.History); err != nil {
 		return Config{}, err
 	}
-	if err := validateGate(cfg.Gate); err != nil {
+	if err := validateServer(cfg.Server); err != nil {
 		return Config{}, err
 	}
-	if err := validateAgent(cfg.Agent); err != nil {
+	if err := validateGate(cfg.Gate); err != nil {
 		return Config{}, err
 	}
 	if err := validateCloud(cfg); err != nil {
@@ -379,24 +345,12 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	return cfg, nil
 }
 
-func EnsureLocalIdentity(cfg Config) (Config, BootstrapResult, error) {
-	updated, err := ensureAgentIdentityInConfig(cfg)
-	if err != nil {
-		return Config{}, BootstrapResult{}, err
-	}
-	return updated, BootstrapResult{GeneratedConfigFile: generatedConfigWritePath(updated)}, nil
-}
-
-func IsSelfConnectedAgent(cfg Config) bool {
-	return normalizeModeURL(cfg.Agent.ConnectUrl) == normalizeModeURL(cfg.Agent.ListenUrl)
-}
-
 func IsLocalMode(cfg Config) bool {
-	return cfg.Web.Mode == WebModeLocal
+	return cfg.Server.Mode == ModeLocal
 }
 
 func IsCloudMode(cfg Config) bool {
-	return cfg.Web.Mode == WebModeCloud
+	return cfg.Server.Mode == ModeCloud
 }
 
 func IsGoogleAuthEnabled(cfg GoogleConfig) bool {
@@ -416,7 +370,7 @@ func GenerateFernetKey() (string, error) {
 }
 
 func Mode(cfg Config) string {
-	return cfg.Web.Mode
+	return cfg.Server.Mode
 }
 
 func loadDatabaseConfig(cwd string, v *viper.Viper) (DatabaseConfig, error) {
@@ -549,46 +503,6 @@ func validateModeRequirements(cfg Config) error {
 	return nil
 }
 
-func normalizeModeURL(value string) string {
-	parsed, err := url.Parse(strings.TrimRight(strings.TrimSpace(value), "/"))
-	if err != nil {
-		return strings.TrimRight(strings.TrimSpace(value), "/")
-	}
-	parsed.Path = strings.TrimRight(parsed.Path, "/")
-	return parsed.String()
-}
-
-func ensureAgentIdentityInConfig(cfg Config) (Config, error) {
-	changed := false
-	deviceId := strings.TrimSpace(cfg.Agent.DeviceId)
-	if deviceId == "" {
-		generated, err := randomHex(16)
-		if err != nil {
-			return Config{}, apperrors.Config("generate device id", err)
-		}
-		deviceId = generated
-		changed = true
-	}
-	deviceName := strings.TrimSpace(cfg.Agent.DeviceName)
-	if deviceName == "" {
-		deviceName = defaultDeviceName()
-		changed = true
-	}
-	cfg.Agent.DeviceId = deviceId
-	cfg.Agent.DeviceName = deviceName
-	if !changed {
-		return cfg, nil
-	}
-	cfg, err := upsertGeneratedConfigValues(cfg, map[string]string{
-		"agent.device_id":   strings.TrimSpace(cfg.Agent.DeviceId),
-		"agent.device_name": strings.TrimSpace(cfg.Agent.DeviceName),
-	})
-	if err != nil {
-		return Config{}, apperrors.Config("save agent identity", err)
-	}
-	return cfg, nil
-}
-
 func upsertGeneratedConfigValues(cfg Config, updates map[string]string) (Config, error) {
 	if cfg.Environment == "" {
 		envUpdates := make(map[string]string, len(updates))
@@ -602,13 +516,6 @@ func upsertGeneratedConfigValues(cfg Config, updates map[string]string) (Config,
 		return Config{}, err
 	}
 	return cfg, nil
-}
-
-func generatedConfigWritePath(cfg Config) string {
-	if cfg.Environment == "" {
-		return cfg.EnvFile
-	}
-	return envConfigWritePath(cfg)
 }
 
 func envConfigWritePath(cfg Config) string {
@@ -702,7 +609,7 @@ func upsertEnvFileValues(path string, updates map[string]string) error {
 }
 
 func envUpdateKeys(updates map[string]string) []string {
-	preferred := []string{envNameForKey("jwt.secret_key"), envNameForKey("agent.device_id"), envNameForKey("agent.device_name")}
+	preferred := []string{envNameForKey("jwt.secret_key")}
 	keys := make([]string, 0, len(updates))
 	seen := map[string]struct{}{}
 	for _, key := range preferred {
@@ -878,15 +785,11 @@ func configKeys() []string {
 		"history.max_bytes",
 		"history.max_line_bytes",
 		"runtime.state_dir",
-		"web.static_dir",
-		"web.mode",
-		"gate.browser.allowed_origins",
 		"gate.api.expose_errors",
-		"agent.listen_url",
-		"agent.public_url",
-		"agent.connect_url",
-		"agent.device_id",
-		"agent.device_name",
+		"server.listen_url",
+		"server.static_dir",
+		"server.mode",
+		"server.public_url",
 		"cloud.gate_url",
 		"cloud.oauth.client_id",
 		"cloud.oauth.client_secret",
@@ -1010,30 +913,13 @@ func validateGate(cfg GateConfig) error {
 	return nil
 }
 
-func normalizeWebConfig(cfg *Config) {
-	cfg.Web.Mode = strings.ToLower(strings.TrimSpace(cfg.Web.Mode))
-	if cfg.Web.Mode == "" {
-		cfg.Web.Mode = WebModeLocal
+func normalizeServerConfig(cfg *Config) {
+	cfg.Server.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Server.ListenUrl), "/")
+	cfg.Server.Mode = strings.ToLower(strings.TrimSpace(cfg.Server.Mode))
+	if cfg.Server.Mode == "" {
+		cfg.Server.Mode = ModeLocal
 	}
-}
-
-func validateWeb(cfg WebConfig) error {
-	switch cfg.Mode {
-	case WebModeLocal, WebModeCloud:
-		return nil
-	default:
-		return apperrors.Config("invalid web.mode", fmt.Errorf("must be local or cloud"))
-	}
-}
-
-func normalizeAgentConfig(cfg *Config) {
-	cfg.Agent.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.ListenUrl), "/")
-	cfg.Agent.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.PublicUrl), "/")
-	if strings.TrimSpace(cfg.Agent.ConnectUrl) == "" {
-		cfg.Agent.ConnectUrl = cfg.Agent.ListenUrl
-		return
-	}
-	cfg.Agent.ConnectUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.ConnectUrl), "/")
+	cfg.Server.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Server.PublicUrl), "/")
 }
 
 func normalizeCloudConfig(cfg *Config) {
@@ -1046,16 +932,21 @@ func normalizeCloudConfig(cfg *Config) {
 	}
 }
 
-func validateAgent(cfg AgentConfig) error {
-	if err := validateHTTPURL("agent.listen_url", cfg.ListenUrl, true); err != nil {
+func validateServer(cfg ServerConfig) error {
+	if err := validateHTTPURL("server.listen_url", cfg.ListenUrl, true); err != nil {
 		return err
 	}
+	switch cfg.Mode {
+	case ModeLocal, ModeCloud:
+	default:
+		return apperrors.Config("invalid server.mode", fmt.Errorf("must be local or cloud"))
+	}
 	if cfg.PublicUrl != "" {
-		if err := validateHTTPURL("agent.public_url", cfg.PublicUrl, false); err != nil {
+		if err := validateHTTPURL("server.public_url", cfg.PublicUrl, false); err != nil {
 			return err
 		}
 	}
-	return validateHTTPURL("agent.connect_url", cfg.ConnectUrl, false)
+	return nil
 }
 
 func validateCloud(cfg Config) error {
@@ -1094,50 +985,4 @@ func ensureLogDir(path string) error {
 		return apperrors.Config("create log dir", err)
 	}
 	return nil
-}
-
-func randomHex(byteCount int) (string, error) {
-	data := make([]byte, byteCount)
-	if _, err := rand.Read(data); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(data), nil
-}
-
-func currentUsername() string {
-	for _, key := range []string{"USERNAME", "USER"} {
-		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
-			return value
-		}
-	}
-	current, err := user.Current()
-	if err == nil && strings.TrimSpace(current.Username) != "" {
-		name := current.Username
-		if index := strings.LastIndexAny(name, `\\/`); index >= 0 {
-			name = name[index+1:]
-		}
-		if strings.TrimSpace(name) != "" {
-			return name
-		}
-	}
-	return "termbridge"
-}
-
-func defaultDeviceName() string {
-	hostname, err := os.Hostname()
-	if err != nil || strings.TrimSpace(hostname) == "" {
-		hostname = "termbridge-device"
-	}
-	hostname = sanitizeName(hostname)
-	if hostname == "" {
-		return "termbridge-device"
-	}
-	return hostname
-}
-
-func sanitizeName(value string) string {
-	value = strings.TrimSpace(value)
-	value = strings.ReplaceAll(value, " ", "-")
-	value = strings.ReplaceAll(value, "_", "-")
-	return strings.Trim(value, "-")
 }

@@ -32,7 +32,6 @@ type Config struct {
 	Username               string
 	Password               string
 	JWTSecret              []byte
-	AllowedOrigins         []string
 	DebugErrors            bool
 	Logger                 *slog.Logger
 	AuthService            *authapp.Service
@@ -43,7 +42,8 @@ type Config struct {
 	CloudOAuth             CloudOAuthConfig
 	CloudOAuthAttemptStore *authapp.CloudOAuthAttemptStore
 	LocalDevice            agentapp.Device
-	WebMode                string
+	LocalRuntime           agentapp.RuntimeAccess
+	ServerMode             string
 	OnLocalCloudSession    func(CloudSessionSummary)
 }
 
@@ -68,6 +68,7 @@ type Handler struct {
 	historyCache       map[string]map[string]string
 	cloudSessionMu     sync.Mutex
 	cloudSession       *CloudSessionSummary
+	localRuntime       runtimeEndpoint
 }
 
 type DeviceRegistry struct {
@@ -139,7 +140,11 @@ func normalizeDeviceStatus(d DeviceSummary) DeviceSummary {
 
 func New(config Config) *Handler {
 	config = normalizeConfig(config)
-	return &Handler{config: config, auth: auth.NewAuther(auth.Credentials{Username: config.Username, Password: config.Password}, auth.NewTokenService(config.JWTSecret)), authService: config.AuthService, registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, writers: map[string]tunnel.StreamId{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
+	handler := &Handler{config: config, auth: auth.NewAuther(auth.Credentials{Username: config.Username, Password: config.Password}, auth.NewTokenService(config.JWTSecret)), authService: config.AuthService, registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, writers: map[string]tunnel.StreamId{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
+	if handler.isLocalServerMode() && config.LocalRuntime != nil {
+		handler.localRuntime = localRuntimeEndpoint{runtime: config.LocalRuntime, handler: handler}
+	}
+	return handler
 }
 
 func (h *Handler) Handler() http.Handler {
@@ -160,6 +165,9 @@ func (h *Handler) Handler() http.Handler {
 	mux.HandleFunc("/api/cloud-oauth/callback", h.handleCloudOAuthCallback)
 	mux.HandleFunc("/api/cloud-oauth/authorize", h.handleCloudOAuthAuthorize)
 	mux.HandleFunc("/api/cloud-oauth/exchange", h.handleCloudOAuthExchange)
+	mux.HandleFunc("/api/workspaces", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
+	mux.HandleFunc("/api/workspaces/", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
+	mux.HandleFunc("/api/sessions", h.authMiddleware(http.HandlerFunc(h.handleLocalSessions)).ServeHTTP)
 	mux.HandleFunc("/api/devices", h.authMiddleware(http.HandlerFunc(h.handleDevices)).ServeHTTP)
 	mux.HandleFunc("/api/devices/current", h.authMiddleware(http.HandlerFunc(h.handleCurrentDevice)).ServeHTTP)
 	mux.HandleFunc("/api/devices/", h.authMiddleware(http.HandlerFunc(h.handleDevice)).ServeHTTP)
@@ -184,7 +192,7 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !s.requireCloudWebMode(w, r) {
+	if !s.requireCloudServerMode(w, r) {
 		return
 	}
 	var req AuthLoginReq
@@ -254,7 +262,7 @@ func (s *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !s.requireCloudWebMode(w, r) {
+	if !s.requireCloudServerMode(w, r) {
 		return
 	}
 	var req AuthRegisterReq
@@ -276,7 +284,7 @@ func (s *Handler) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !s.requireCloudWebMode(w, r) {
+	if !s.requireCloudServerMode(w, r) {
 		return
 	}
 	var req AuthVerifyEmailReq
@@ -298,7 +306,7 @@ func (s *Handler) handleResendVerification(w http.ResponseWriter, r *http.Reques
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !s.requireCloudWebMode(w, r) {
+	if !s.requireCloudServerMode(w, r) {
 		return
 	}
 	var req AuthResendVerificationReq
@@ -320,7 +328,7 @@ func (s *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !s.requireCloudWebMode(w, r) {
+	if !s.requireCloudServerMode(w, r) {
 		return
 	}
 	var req AuthChangePasswordReq
@@ -339,7 +347,7 @@ func (s *Handler) handlePasswordResetRequest(w http.ResponseWriter, r *http.Requ
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !s.requireCloudWebMode(w, r) {
+	if !s.requireCloudServerMode(w, r) {
 		return
 	}
 	var req AuthPasswordResetRequestReq
@@ -356,7 +364,7 @@ func (s *Handler) handlePasswordResetConfirm(w http.ResponseWriter, r *http.Requ
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !s.requireCloudWebMode(w, r) {
+	if !s.requireCloudServerMode(w, r) {
 		return
 	}
 	var req AuthPasswordResetConfirmReq
@@ -378,7 +386,7 @@ func (s *Handler) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	if !s.requireCloudWebMode(w, r) {
+	if !s.requireCloudServerMode(w, r) {
 		return
 	}
 	if s.authService == nil {
@@ -397,7 +405,7 @@ func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !s.requireCloudWebMode(w, r) {
+	if !s.requireCloudServerMode(w, r) {
 		return
 	}
 	var req AuthGoogleCallbackReq
@@ -418,7 +426,7 @@ func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 
 func (s *Handler) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.isLocalWebMode() {
+		if s.isLocalServerMode() {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -433,16 +441,16 @@ func (s *Handler) authMiddleware(next http.Handler) http.Handler {
 		s.auth.Middleware(next, s.writeUnauthorized).ServeHTTP(w, r)
 	})
 }
-func (s *Handler) isLocalWebMode() bool {
-	return s.config.WebMode == "local"
+func (s *Handler) isLocalServerMode() bool {
+	return s.config.ServerMode == "local"
 }
 
 func (s *Handler) cloudOAuthEnabled() bool {
-	return s.isLocalWebMode() && s.config.CloudOAuthAttemptStore != nil && s.config.CloudGateURL != "" && s.config.CloudOAuth.ClientID != "" && s.config.CloudOAuth.RedirectURL != ""
+	return s.isLocalServerMode() && s.config.CloudOAuthAttemptStore != nil && s.config.CloudGateURL != "" && s.config.CloudOAuth.ClientID != "" && s.config.CloudOAuth.RedirectURL != ""
 }
 
 func (s *Handler) localCloudSessionSummary() *CloudSessionSummary {
-	if !s.isLocalWebMode() {
+	if !s.isLocalServerMode() {
 		return nil
 	}
 	s.cloudSessionMu.Lock()
@@ -460,8 +468,8 @@ func (s *Handler) setLocalCloudSession(summary CloudSessionSummary) {
 	s.cloudSession = &summary
 }
 
-func (s *Handler) requireCloudWebMode(w http.ResponseWriter, r *http.Request) bool {
-	if s.isLocalWebMode() {
+func (s *Handler) requireCloudServerMode(w http.ResponseWriter, r *http.Request) bool {
+	if s.isLocalServerMode() {
 		s.writeNotFound(w, r)
 		return false
 	}
@@ -531,7 +539,7 @@ func (s *Handler) handleCloudOAuthExchange(w http.ResponseWriter, r *http.Reques
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if s.isLocalWebMode() {
+	if s.isLocalServerMode() {
 		s.writeNotFound(w, r)
 		return
 	}
@@ -565,7 +573,7 @@ func (s *Handler) handleCloudOAuthAuthorize(w http.ResponseWriter, r *http.Reque
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	if !s.requireCloudWebMode(w, r) {
+	if !s.requireCloudServerMode(w, r) {
 		return
 	}
 	claims, ok := s.claimsFromRequest(r)
@@ -680,6 +688,39 @@ func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, ListDevicesResp{Items: devices})
 }
+func (s *Handler) handleLocalWorkspaces(w http.ResponseWriter, r *http.Request) {
+	if !s.isLocalServerMode() {
+		s.writeNotFound(w, r)
+		return
+	}
+	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/workspaces"), "/")
+	parts := []string{"", "workspaces"}
+	if path != "" {
+		parts = append(parts, strings.Split(path, "/")...)
+	}
+	s.handleWorkspaceRoute(w, r, s.localRuntime, "", parts)
+}
+
+func (s *Handler) handleLocalSessions(w http.ResponseWriter, r *http.Request) {
+	if !s.isLocalServerMode() {
+		s.writeNotFound(w, r)
+		return
+	}
+	if r.URL.Path != "/api/sessions" {
+		s.writeNotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	var request terminalapp.CreateSessionReq
+	if !s.decodeJSONRequest(w, r, &request) {
+		return
+	}
+	s.handleJSONRuntimeWithStatus(w, r, s.localRuntime, "", "create_session", request, "", http.StatusCreated)
+}
+
 func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/devices/"), "/")
 	parts := strings.Split(path, "/")
@@ -693,16 +734,17 @@ func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	deviceId := parts[0]
 	route := s.routeFor(deviceId)
+	endpoint := tunnelRuntimeEndpoint{route: route, deviceId: deviceId, handler: s}
 	switch parts[1] {
 	case "workspaces":
-		s.handleWorkspaceRoute(w, r, route, deviceId, parts)
+		s.handleWorkspaceRoute(w, r, endpoint, deviceId, parts)
 	case "sessions":
 		if len(parts) == 2 && r.Method == http.MethodPost {
 			var request terminalapp.CreateSessionReq
 			if !s.decodeJSONRequest(w, r, &request) {
 				return
 			}
-			s.handleJSONRelayWithStatus(w, r, route, deviceId, "create_session", request, "", http.StatusCreated)
+			s.handleJSONRuntimeWithStatus(w, r, endpoint, deviceId, "create_session", request, "", http.StatusCreated)
 			return
 		}
 		s.writeNotFound(w, r)
@@ -710,13 +752,13 @@ func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 		s.writeNotFound(w, r)
 	}
 }
-func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, parts []string) {
+func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, parts []string) {
 	if len(parts) == 2 && r.Method == http.MethodGet {
-		s.handleJSONRelay(w, r, route, deviceId, "workspaces", nil, "")
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "workspaces", nil, "")
 		return
 	}
 	if len(parts) == 3 && parts[2] == "tree" && r.Method == http.MethodGet {
-		s.handleJSONRelay(w, r, route, deviceId, "workspace_tree", nil, "workspace_tree")
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "workspace_tree", nil, "workspace_tree")
 		return
 	}
 	if len(parts) == 3 && parts[2] == "order" && r.Method == http.MethodPatch {
@@ -724,31 +766,31 @@ func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, r
 		if !s.decodeJSONRequest(w, r, &request) {
 			return
 		}
-		s.handleJSONRelay(w, r, route, deviceId, "workspace_order", request, "")
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "workspace_order", request, "")
 		return
 	}
 	if len(parts) == 3 && r.Method == http.MethodDelete {
-		s.handleNoContentRelay(w, r, route, "delete_workspace", terminalapp.DeleteWorkspaceReq{WorkspaceId: parts[2]})
+		s.handleNoContentRuntime(w, r, endpoint, "delete_workspace", terminalapp.DeleteWorkspaceReq{WorkspaceId: parts[2]})
 		return
 	}
 	if len(parts) >= 4 && parts[3] == "sessions" {
-		s.handleWorkspaceSessionRoute(w, r, route, deviceId, parts[2], parts[4:])
+		s.handleWorkspaceSessionRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
 		return
 	}
 	s.writeNotFound(w, r)
 }
-func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, workspaceId string, parts []string) {
+func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, workspaceId string, parts []string) {
 	if len(parts) == 0 {
 		switch r.Method {
 		case http.MethodGet:
-			s.handleJSONRelay(w, r, route, deviceId, "workspace_sessions", terminalapp.WorkspaceSessionsReq{WorkspaceId: workspaceId}, "")
+			s.handleJSONRuntime(w, r, endpoint, deviceId, "workspace_sessions", terminalapp.WorkspaceSessionsReq{WorkspaceId: workspaceId}, "")
 		case http.MethodPost:
 			var request terminalapp.CreateSessionReq
 			if !s.decodeJSONRequest(w, r, &request) {
 				return
 			}
 			request.WorkspaceId = workspaceId
-			s.handleJSONRelayWithStatus(w, r, route, deviceId, "create_session", request, "", http.StatusCreated)
+			s.handleJSONRuntimeWithStatus(w, r, endpoint, deviceId, "create_session", request, "", http.StatusCreated)
 		default:
 			s.methodNotAllowed(w, r, http.MethodGet, http.MethodPost)
 		}
@@ -759,7 +801,7 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 		if !s.decodeJSONRequest(w, r, &request) {
 			return
 		}
-		s.handleJSONRelay(w, r, route, deviceId, "session_order", terminalapp.WorkspaceSessionOrderReq{WorkspaceId: workspaceId, SessionIds: request.SessionIds}, "")
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "session_order", terminalapp.WorkspaceSessionOrderReq{WorkspaceId: workspaceId, SessionIds: request.SessionIds}, "")
 		return
 	}
 	sessionId := parts[0]
@@ -771,15 +813,15 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 	if len(parts) == 1 {
 		switch r.Method {
 		case http.MethodGet:
-			s.handleJSONRelay(w, r, route, deviceId, "get_session", params, "")
+			s.handleJSONRuntime(w, r, endpoint, deviceId, "get_session", params, "")
 		case http.MethodPatch:
 			var request terminalapp.UpdateSessionReq
 			if !s.decodeJSONRequest(w, r, &request) {
 				return
 			}
-			s.handleJSONRelay(w, r, route, deviceId, "update_session", terminalapp.UpdateWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
+			s.handleJSONRuntime(w, r, endpoint, deviceId, "update_session", terminalapp.UpdateWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
 		case http.MethodDelete:
-			s.handleNoContentRelay(w, r, route, "delete_session", params)
+			s.handleNoContentRuntime(w, r, endpoint, "delete_session", params)
 		default:
 			s.methodNotAllowed(w, r, http.MethodGet, http.MethodPatch, http.MethodDelete)
 		}
@@ -795,7 +837,7 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 			s.methodNotAllowed(w, r, http.MethodPost)
 			return
 		}
-		s.handleJSONRelay(w, r, route, deviceId, "close_session", params, "")
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "close_session", params, "")
 	case "rerun":
 		if r.Method != http.MethodPost {
 			s.methodNotAllowed(w, r, http.MethodPost)
@@ -805,23 +847,25 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 		if !s.decodeJSONRequest(w, r, &request) {
 			return
 		}
-		s.handleJSONRelay(w, r, route, deviceId, "rerun_session", terminalapp.RerunWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "rerun_session", terminalapp.RerunWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
 	case "history":
 		if r.Method != http.MethodGet {
 			s.methodNotAllowed(w, r, http.MethodGet)
 			return
 		}
-		s.handleHistoryRelay(w, r, route, deviceId, workspaceId, sessionId)
+		s.handleHistoryRuntime(w, r, endpoint, deviceId, workspaceId, sessionId)
 	case "ws":
 		if r.Method != http.MethodGet {
 			s.methodNotAllowed(w, r, http.MethodGet)
 			return
 		}
-		if route == nil {
+		if !runtimeEndpointAvailable(endpoint) {
 			s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeDeviceOffline, errorMessageDeviceOffline, nil)
 			return
 		}
-		s.handleTerminalWS(w, r, route, workspaceId, sessionId)
+		if err := endpoint.Attach(w, r, workspaceId, sessionId); err != nil {
+			s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		}
 	default:
 		s.writeNotFound(w, r)
 	}
@@ -853,11 +897,15 @@ func (s *Handler) handleDeleteDevice(w http.ResponseWriter, r *http.Request, dev
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Handler) handleJSONRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, method string, params any, cacheKind string) {
-	s.handleJSONRelayWithStatus(w, r, route, deviceId, method, params, cacheKind, http.StatusOK)
+func runtimeEndpointAvailable(endpoint runtimeEndpoint) bool {
+	return endpoint != nil && endpoint.Available()
 }
-func (s *Handler) handleJSONRelayWithStatus(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, method string, params any, cacheKind string, status int) {
-	if route == nil {
+
+func (s *Handler) handleJSONRuntime(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, method string, params any, cacheKind string) {
+	s.handleJSONRuntimeWithStatus(w, r, endpoint, deviceId, method, params, cacheKind, http.StatusOK)
+}
+func (s *Handler) handleJSONRuntimeWithStatus(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, method string, params any, cacheKind string, status int) {
+	if !runtimeEndpointAvailable(endpoint) {
 		if cached, ok := s.cachedJSON(deviceId, cacheKind); ok {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-TermBridge-Offline", "true")
@@ -868,31 +916,31 @@ func (s *Handler) handleJSONRelayWithStatus(w http.ResponseWriter, r *http.Reque
 		s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeDeviceOffline, errorMessageDeviceOffline, nil)
 		return
 	}
-	result, err := route.request(r.Context(), method, params, s.requestIdFor(w, r))
+	result, err := endpoint.JSON(r.Context(), method, params, s.requestIdFor(w, r))
 	if err != nil {
 		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
 		return
 	}
-	if cacheKind != "" {
+	if cacheKind != "" && deviceId != "" {
 		s.storeJSONCache(deviceId, cacheKind, result)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = w.Write(result)
 }
-func (s *Handler) handleNoContentRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, method string, params any) {
-	if route == nil {
+func (s *Handler) handleNoContentRuntime(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, method string, params any) {
+	if !runtimeEndpointAvailable(endpoint) {
 		s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeDeviceOffline, errorMessageDeviceOffline, nil)
 		return
 	}
-	if _, err := route.request(r.Context(), method, params, s.requestIdFor(w, r)); err != nil {
+	if _, err := endpoint.JSON(r.Context(), method, params, s.requestIdFor(w, r)); err != nil {
 		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-func (s *Handler) handleHistoryRelay(w http.ResponseWriter, r *http.Request, route *agentRoute, deviceId string, workspaceId string, sessionId string) {
-	if route == nil {
+func (s *Handler) handleHistoryRuntime(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, workspaceId string, sessionId string) {
+	if !runtimeEndpointAvailable(endpoint) {
 		if cached, ok := s.cachedHistory(deviceId, workspaceId, sessionId); ok {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			w.Header().Set("X-TermBridge-Offline", "true")
@@ -903,18 +951,18 @@ func (s *Handler) handleHistoryRelay(w http.ResponseWriter, r *http.Request, rou
 		s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeDeviceOffline, errorMessageDeviceOffline, nil)
 		return
 	}
-	result, err := route.request(r.Context(), "history", terminalapp.WorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId}, s.requestIdFor(w, r))
+	text, offline, err := endpoint.History(r.Context(), workspaceId, sessionId, s.requestIdFor(w, r))
 	if err != nil {
 		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
 		return
 	}
-	var text string
-	if err := json.Unmarshal(result, &text); err != nil {
-		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstreamInvalid, err)
-		return
+	if deviceId != "" {
+		s.storeHistoryCache(deviceId, workspaceId, sessionId, text)
 	}
-	s.storeHistoryCache(deviceId, workspaceId, sessionId, text)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if offline {
+		w.Header().Set("X-TermBridge-Offline", "true")
+	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(text))
 }
@@ -1139,7 +1187,7 @@ func (s *Handler) devicesForRequest(r *http.Request) ([]DeviceSummary, error) {
 	if s.authService == nil {
 		return s.registry.List(), nil
 	}
-	if s.isLocalWebMode() {
+	if s.isLocalServerMode() {
 		deviceId := strings.TrimSpace(s.config.LocalDevice.Id)
 		if deviceId == "" {
 			return s.registry.List(), nil
@@ -1339,9 +1387,7 @@ func sessionScopeKey(workspaceId string, sessionId string) string {
 	return workspaceId + "/" + sessionId
 }
 func (s *Handler) originPatterns(r *http.Request) []string {
-	patterns := []string{"http://" + r.Host, "https://" + r.Host}
-	patterns = append(patterns, s.config.AllowedOrigins...)
-	return patterns
+	return []string{"http://" + r.Host, "https://" + r.Host}
 }
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -1352,9 +1398,9 @@ func normalizeConfig(config Config) Config {
 	if config.Logger == nil {
 		panic("gateway api logger is required")
 	}
-	config.WebMode = strings.ToLower(strings.TrimSpace(config.WebMode))
-	if config.WebMode == "" {
-		config.WebMode = "local"
+	config.ServerMode = strings.ToLower(strings.TrimSpace(config.ServerMode))
+	if config.ServerMode == "" {
+		config.ServerMode = "local"
 	}
 	config.CloudGateURL = strings.TrimRight(strings.TrimSpace(config.CloudGateURL), "/")
 	config.CloudOAuth.ClientID = strings.TrimSpace(config.CloudOAuth.ClientID)

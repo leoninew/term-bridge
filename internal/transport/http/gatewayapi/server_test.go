@@ -10,7 +10,7 @@ import (
 )
 
 func testGatewayConfig() Config {
-	return Config{Username: "admin", Password: "admin", JWTSecret: testJWTKey, Logger: slog.Default(), WebMode: "cloud"}
+	return Config{Username: "admin", Password: "admin", JWTSecret: testJWTKey, Logger: slog.Default(), ServerMode: "cloud"}
 }
 
 func TestHealth(t *testing.T) {

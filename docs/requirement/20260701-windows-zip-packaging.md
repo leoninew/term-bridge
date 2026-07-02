@@ -1,5 +1,5 @@
 # Windows EXE Static Directory Zip Packaging Requirement
-最后修改时间: 2026-07-01 13:21:25
+最后修改时间: 2026-07-02 13:32:16
 
 ## Review status
 
@@ -14,7 +14,7 @@ Accepted
 用户希望分析并推进 TermBridge-go 的 Windows 可分发应用打包方案。项目当前已经具备：
 
 - Go CLI 入口 `cmd/termbridge/main.go`，支持 `termbridge serve` 和 `termbridge exec -- <command>` 等命令。
-- Go 后端 HTTP server 可通过 `web.static_dir` 寄宿静态页面。
+- Go 后端 HTTP server 可通过 `server.static_dir` 寄宿静态页面。
 - Vue/Vite 前端可构建为静态资源目录。
 - 后端已有 PTY/runtime/session 体系，可运行其他 CLI 命令并通过 Web terminal 使用。
 
@@ -87,7 +87,7 @@ TermBridge-windows-x64.zip
 
 优点：
 
-- 与当前架构最匹配；后端已经支持 `web.static_dir`。
+- 与当前架构最匹配；后端已经支持 `server.static_dir`。
 - 不需要重构为桌面应用。
 - 构建和验证成本最低。
 - 静态资源独立于 exe，便于快速检查和替换。
@@ -97,7 +97,7 @@ TermBridge-windows-x64.zip
 
 - 不是单文件分发；用户可能误删 `web/` 或 `configs/`。
 - 双击体验依赖 `start.cmd`；`termbridge.exe` 本身仍是 CLI 程序。
-- 需要明确 cwd、配置文件路径和 `web.static_dir` 相对路径规则。
+- 需要明确 cwd、配置文件路径和 `server.static_dir` 相对路径规则。
 - 分发包只包含 package 专用 `.env.local` 和根目录 `.env.example` 参考文件；不能包含开发者本机 `.env`、数据库、日志、`.termbridge` runtime state 或 node_modules。
 
 结论：作为当前任务的首选评估和实现方案。
@@ -172,7 +172,7 @@ termbridge.exe
 
 1. 当前代码是否已经支持通过 `termbridge.exe serve` 本地寄宿静态页面。
 2. zip 包内应包含哪些最小文件。
-3. 分发配置如何通过 `.env.local` 设置 `web.static_dir`、`agent.listen_url`、`agent.public_url` 和数据库/日志/runtime 路径。
+3. 分发配置如何通过 `.env.local` 设置 `server.static_dir`、`server.listen_url`、`server.public_url` 和数据库/日志/runtime 路径。
 4. 启动时 cwd 对配置和静态目录解析的影响。
 5. Windows 上运行其他 CLI 命令时对 PATH、工作目录、PTY 和进程清理的要求。
 6. 应排除哪些开发产物和本地状态。
@@ -185,13 +185,13 @@ termbridge.exe
 - [ ] Plan / 计划阶段给出 exe + 静态目录 zip 包的候选目录结构。
 - [ ] Plan / 计划阶段给出构建命令草案：前端 build、Go build、zip 组装。
 - [ ] Plan / 计划阶段明确哪些文件进入 zip，哪些文件必须排除。
-- [ ] Plan / 计划阶段评估现有配置是否能直接支持 `web.static_dir` 指向分发静态目录。
+- [ ] Plan / 计划阶段评估现有配置是否能直接支持 `server.static_dir` 指向分发静态目录。
 - [ ] Plan / 计划阶段纳入 `Taskfile.yml` 新增 `package` task 的实现方案。
 - [ ] Implementation / 实现阶段在 `Taskfile.yml` 添加 `package` task。
 - [ ] Implementation / 实现阶段生成或纳入 `start.cmd` 和 `start.sh` 到 zip 包。
 - [ ] 生成的 zip 包面向 Windows x64，包含 `termbridge.exe`、静态页面目录、`configs/config.yaml`、`.env.local`、`.env.example`、`start.cmd`、`start.sh`。
 - [ ] `start.cmd` 支持双击后设置 `TERMBRIDGE_ENV=local`、加载 `.env.local`、启动本地服务并打开浏览器。
-- [ ] 启动生成的 `TERMBRIDGE_JWT__SECRET_KEY`、`TERMBRIDGE_AGENT__DEVICE_ID`、`TERMBRIDGE_AGENT__DEVICE_NAME` 写入 `configs/config.<env>.yaml`；local package 场景为 `configs/config.local.yaml`，且不能写入 `.env.local`。
+- [ ] 启动生成的 `TERMBRIDGE_JWT__SECRET_KEY` 写入 `configs/config.<env>.yaml`；local package 场景为 `configs/config.local.yaml`，且不能写入 `.env.local`；设备身份生成并读取自 `<runtime.state_dir>/agent.json`。
 - [ ] Verification / 验证阶段至少验证 zip 包能被创建，且包内文件结构符合预期。
 - [ ] Verification / 验证阶段如可执行，应验证包内 exe 能启动本地服务并能访问静态页面。
 - [ ] Verification / 验证阶段如可执行，应验证通过页面或 API 创建/运行 CLI session 的最小路径，或记录无法自动验证的原因。
@@ -217,8 +217,8 @@ termbridge.exe
 ## Risk
 
 1. 当前配置加载以 cwd 下 `configs/config.yaml` 为默认入口；zip 分发时如果用户从不同目录启动 exe，可能导致配置路径不稳定。
-2. 当前 `web.static_dir` 为空时只提供 API；zip 分发需要明确设置为静态资源目录。
-3. 如果分发版前端和后端同源运行，`agent.public_url` 应从开发默认的 `http://localhost:9031` 调整为本地后端地址，否则页面/回跳 URL 可能不一致。
+2. 当前 `server.static_dir` 为空时只提供 API；zip 分发需要明确设置为静态资源目录。
+3. 如果分发版前端和后端同源运行，`server.public_url` 应从开发默认的 `http://localhost:9031` 调整为本地后端地址，否则页面/回跳 URL 可能不一致。
 4. 运行其他 CLI 命令依赖用户机器上的 PATH 和命令安装状态；zip 包不能保证第三方 CLI 存在。
 5. Windows 交互终端、进程树清理和杀进程行为需要实机验证，不能只依赖静态分析。
 6. 本地 HTTP API 具备运行用户命令的能力，分发版必须避免默认监听 `0.0.0.0`，并需要关注本地访问认证、Origin/Host 校验等安全边界。

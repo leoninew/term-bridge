@@ -113,13 +113,7 @@
         <h3 class="text-lg font-semibold text-[var(--color-text)]">
           {{ t('workbench.noTabTitle') }}
         </h3>
-        <p>
-          {{
-            !selectedDeviceId
-              ? t('gateway.selectDevicePlaceholder')
-              : t('workbench.noTabDescription')
-          }}
-        </p>
+        <p>{{ t('workbench.noTabDescription') }}</p>
         <button
           type="button"
           class="rounded-md border border-[var(--color-border-strong)] bg-[var(--color-control-active)] px-2.5 py-1.5 text-[var(--color-text-strong)] hover:bg-[var(--color-control-hover)]"
@@ -130,18 +124,7 @@
       </section>
     </TabsRoot>
 
-    <footer
-      class="flex h-8 shrink-0 items-center gap-1.5 overflow-hidden border-t border-[var(--color-border)] bg-[var(--color-panel-header)] px-3 text-sm text-[var(--color-text-muted)]"
-    >
-      <template v-if="activeSession">
-        <span>{{ t('workbench.status') }}</span>
-        <span class="text-[var(--color-text)]">{{ activeSession.lifecycle_state }}</span>
-        <span class="text-[var(--color-border-strong)]">·</span>
-        <span>{{ t('workbench.command') }}</span>
-        <span class="min-w-0 truncate text-[var(--color-text)]">{{ activeSession.command }}</span>
-      </template>
-      <span v-else>{{ t('workbench.noActiveSession') }}</span>
-    </footer>
+    <SessionStatusBar :session="activeSession" :device="currentDevice" />
   </section>
 </template>
 
@@ -152,8 +135,10 @@
   import { TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
   import CreateSessionPanel from './CreateSessionPanel.vue'
+  import SessionStatusBar from './SessionStatusBar.vue'
   import TerminalPane from './TerminalPane.vue'
   import type { ServerControlMessage, SessionSummary } from '../../protocol/terminal'
+  import type { CloudSessionSummary, DeviceSummary } from '../../features/gateway/api'
   import type { OpenSessionTab } from '../../store/workbench'
 
   const props = defineProps<{
@@ -161,7 +146,7 @@
     activeSessionId: string | null
     activeTab: OpenSessionTab | null
     activeSession: SessionSummary | null
-    selectedDeviceId: string
+    currentDevice: DeviceSummary | CloudSessionSummary | null
     authenticated: boolean
     userDisplayName: string
     userEmail: string

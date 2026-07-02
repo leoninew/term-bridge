@@ -471,7 +471,7 @@ Accepted
 
 `/api/devices/` 下还有 path 分发逻辑，形成 workspace、session、terminal WebSocket 等动态接口。
 
-`httpserver.New()` 只把 `/api` 和 `/api/` 挂给 gateway API handler；如果配置了 `web.static_dir`，`/` 下会挂静态资源 handler，但静态资源不纳入本次业务 API 清单。
+`httpserver.New()` 只把 `/api` 和 `/api/` 挂给 gateway API handler；如果配置了 `server.static_dir`，`/` 下会挂静态资源 handler，但静态资源不纳入本次业务 API 清单。
 
 ## Implementation notes
 

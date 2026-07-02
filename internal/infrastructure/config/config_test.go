@@ -64,20 +64,17 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.History.MaxLines != 10000 || cfg.History.MaxBytes != 5242880 || cfg.History.MaxLineBytes != 65536 {
 		t.Fatalf("History = %#v", cfg.History)
 	}
-	if !reflect.DeepEqual(cfg.Gate.Browser.AllowedOrigins, []string{"http://127.0.0.1:9031", "http://localhost:9031"}) {
-		t.Fatalf("Gate.Browser.AllowedOrigins = %#v", cfg.Gate.Browser.AllowedOrigins)
-	}
 	if cfg.Gate.API.ExposeErrors {
 		t.Fatal("Gate.API.ExposeErrors = true, want false")
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9030" || cfg.Agent.ConnectUrl != "http://127.0.0.1:9030" {
-		t.Fatalf("Agent listen/connect = %q/%q, want default listen URL", cfg.Agent.ListenUrl, cfg.Agent.ConnectUrl)
+	if cfg.Server.ListenUrl != "http://127.0.0.1:9030" {
+		t.Fatalf("Server.ListenUrl = %q, want default listen URL", cfg.Server.ListenUrl)
 	}
-	if cfg.Agent.PublicUrl != "http://localhost:9031" {
-		t.Fatalf("Agent.PublicUrl = %q, want local frontend URL", cfg.Agent.PublicUrl)
+	if cfg.Server.Mode != ModeLocal {
+		t.Fatalf("Server.Mode = %q, want local", cfg.Server.Mode)
 	}
-	if cfg.Agent.DeviceId != "" || cfg.Agent.DeviceName != "" {
-		t.Fatalf("Agent = %#v, want empty identity", cfg.Agent)
+	if cfg.Server.PublicUrl != "http://localhost:9031" {
+		t.Fatalf("Server.PublicUrl = %q, want local frontend URL", cfg.Server.PublicUrl)
 	}
 	if cfg.Cloud.GateUrl != "" {
 		t.Fatalf("Cloud.GateUrl = %q, want empty by default", cfg.Cloud.GateUrl)
@@ -91,8 +88,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Auth.Username != DefaultAuthUsername || cfg.Auth.Password != DefaultAuthPassword {
 		t.Fatalf("Auth = %#v, want default PoC auth", cfg.Auth)
 	}
-	if cfg.Web.StaticDir != "" {
-		t.Fatalf("Web.StaticDir = %q, want empty", cfg.Web.StaticDir)
+	if cfg.Server.StaticDir != "" {
+		t.Fatalf("Server.StaticDir = %q, want empty", cfg.Server.StaticDir)
 	}
 	if !reflect.DeepEqual(cfg.Command, []string{"pwsh"}) {
 		t.Fatalf("Command = %#v", cfg.Command)
@@ -106,7 +103,7 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "configured-logs")
 	stateDir := filepath.Join(cwd, "configured-state")
-	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\nweb:\n  static_dir: web/dist\ngate:\n  browser:\n    allowed_origins:\n      - \" http://127.0.0.1:9031 \"\n      - http://127.0.0.1:9031\n  api:\n    expose_errors: true\nagent:\n  listen_url: http://0.0.0.0:9090\n  public_url: https://configured.example.com/app/\n  connect_url: https://gate.example.com:9443/\n  device_id: dev-1\n  device_name: local-mac\n")
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\ngate:\n  api:\n    expose_errors: true\nserver:\n  listen_url: http://0.0.0.0:9090\n  mode: cloud\n  static_dir: web/dist\n  public_url: https://configured.example.com/app/\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -129,29 +126,26 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(stateDir) {
 		t.Fatalf("StateDir = %q, want %q", cfg.Runtime.StateDir, stateDir)
 	}
-	if filepath.Clean(cfg.Web.StaticDir) != filepath.Join(cwd, "web", "dist") {
-		t.Fatalf("Web.StaticDir = %q", cfg.Web.StaticDir)
+	if filepath.Clean(cfg.Server.StaticDir) != filepath.Join(cwd, "web", "dist") {
+		t.Fatalf("Server.StaticDir = %q", cfg.Server.StaticDir)
 	}
-	if cfg.Agent.PublicUrl != "https://configured.example.com/app" {
-		t.Fatalf("Agent.PublicUrl = %q", cfg.Agent.PublicUrl)
+	if cfg.Server.PublicUrl != "https://configured.example.com/app" {
+		t.Fatalf("Server.PublicUrl = %q", cfg.Server.PublicUrl)
+	}
+	if cfg.Server.Mode != ModeCloud {
+		t.Fatalf("Server.Mode = %q, want cloud", cfg.Server.Mode)
 	}
 	if cfg.History.MaxLines != 42 || cfg.History.MaxBytes != 2048 || cfg.History.MaxLineBytes != 128 {
 		t.Fatalf("History = %#v", cfg.History)
 	}
-	if cfg.Agent.ListenUrl != "http://0.0.0.0:9090" || cfg.Agent.ConnectUrl != "https://gate.example.com:9443" {
-		t.Fatalf("Agent listen/connect = %q/%q", cfg.Agent.ListenUrl, cfg.Agent.ConnectUrl)
-	}
-	if !reflect.DeepEqual(cfg.Gate.Browser.AllowedOrigins, []string{"http://127.0.0.1:9031", "http://127.0.0.1:9031"}) {
-		t.Fatalf("Gate.Browser.AllowedOrigins = %#v", cfg.Gate.Browser.AllowedOrigins)
+	if cfg.Server.ListenUrl != "http://0.0.0.0:9090" {
+		t.Fatalf("Server.ListenUrl = %q", cfg.Server.ListenUrl)
 	}
 	if !cfg.Gate.API.ExposeErrors {
 		t.Fatal("Gate.API.ExposeErrors = false, want true")
 	}
-	if cfg.Agent.DeviceId != "dev-1" || cfg.Agent.DeviceName != "local-mac" {
-		t.Fatalf("Agent = %#v", cfg.Agent)
-	}
-	if cfg.Base == nil || cfg.Base.Agent.PublicUrl != cfg.Agent.PublicUrl {
-		t.Fatalf("Base.Agent.PublicUrl = %#v, want YAML-only env config value", cfg.Base)
+	if cfg.Base == nil || cfg.Base.Server.PublicUrl != cfg.Server.PublicUrl || cfg.Base.Server.Mode != ModeCloud {
+		t.Fatalf("Base.Server = %#v, want YAML-only env config value", cfg.Base)
 	}
 }
 
@@ -162,7 +156,7 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "dotenv-logs")
 	stateDir := filepath.Join(cwd, "dotenv-state")
-	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_WEB__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_AGENT__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_GATE__BROWSER__ALLOWED_ORIGINS=http://127.0.0.1:9031, http://127.0.0.1:9031,,\nTERMBRIDGE_GATE__API__EXPOSE_ERRORS=true\nTERMBRIDGE_AGENT__CONNECT_URL=https://gate.example.com\nTERMBRIDGE_AGENT__DEVICE_ID=dotenv-device\nTERMBRIDGE_AGENT__DEVICE_NAME=dotenv-name\n")
+	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_SERVER__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_SERVER__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_SERVER__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_SERVER__MODE=cloud\nTERMBRIDGE_GATE__API__EXPOSE_ERRORS=true\n")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
@@ -180,25 +174,19 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	if cfg.History.MaxLines != 20 || cfg.History.MaxBytes != 4096 || cfg.History.MaxLineBytes != 256 {
 		t.Fatalf("History = %#v", cfg.History)
 	}
-	if cfg.Web.StaticDir != filepath.Clean("/opt/termbridge/web/dist") {
-		t.Fatalf("Web.StaticDir = %q", cfg.Web.StaticDir)
+	if cfg.Server.StaticDir != filepath.Clean("/opt/termbridge/web/dist") {
+		t.Fatalf("Server.StaticDir = %q", cfg.Server.StaticDir)
 	}
-	if cfg.Agent.PublicUrl != "https://dotenv.example.com" || cfg.Agent.ListenUrl != "http://127.0.0.1:9091" || cfg.Agent.ConnectUrl != "https://gate.example.com" {
-		t.Fatalf("Agent = %#v", cfg.Agent)
-	}
-	if !reflect.DeepEqual(cfg.Gate.Browser.AllowedOrigins, []string{"http://127.0.0.1:9031", "http://127.0.0.1:9031"}) {
-		t.Fatalf("Gate.Browser.AllowedOrigins = %#v", cfg.Gate.Browser.AllowedOrigins)
+	if cfg.Server.PublicUrl != "https://dotenv.example.com" || cfg.Server.ListenUrl != "http://127.0.0.1:9091" || cfg.Server.Mode != ModeCloud {
+		t.Fatalf("Server = %#v", cfg.Server)
 	}
 	if !cfg.Gate.API.ExposeErrors {
 		t.Fatal("Gate.API.ExposeErrors = false, want true")
 	}
-	if cfg.Agent.DeviceId != "dotenv-device" || cfg.Agent.DeviceName != "dotenv-name" {
-		t.Fatalf("Agent identity = %#v", cfg.Agent)
-	}
 	if cfg.Base == nil {
 		t.Fatal("Base = nil, want YAML-only baseline config")
 	}
-	if cfg.Base.LogLevel != "info" || cfg.Base.Agent.PublicUrl != "http://localhost:9031" || cfg.Base.Agent.DeviceId != "" {
+	if cfg.Base.LogLevel != "info" || cfg.Base.Server.PublicUrl != "http://localhost:9031" || cfg.Base.Server.Mode != ModeLocal {
 		t.Fatalf("Base = %#v, want default YAML values", cfg.Base)
 	}
 }
@@ -208,17 +196,16 @@ func TestLoadOSEnvOverridesDotEnv(t *testing.T) {
 	configureRemoteAuth(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeDotEnv(t, cwd, "TERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:8080\nTERMBRIDGE_AGENT__CONNECT_URL=http://127.0.0.1:8080\nTERMBRIDGE_GATE__API__EXPOSE_ERRORS=false\n")
-	t.Setenv("TERMBRIDGE_AGENT__LISTEN_URL", "http://127.0.0.1:9092")
-	t.Setenv("TERMBRIDGE_AGENT__CONNECT_URL", "https://gate.example.com")
+	writeDotEnv(t, cwd, "TERMBRIDGE_SERVER__LISTEN_URL=http://127.0.0.1:8080\nTERMBRIDGE_GATE__API__EXPOSE_ERRORS=false\n")
+	t.Setenv("TERMBRIDGE_SERVER__LISTEN_URL", "http://127.0.0.1:9092")
 	t.Setenv("TERMBRIDGE_GATE__API__EXPOSE_ERRORS", "true")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9092" || cfg.Agent.ConnectUrl != "https://gate.example.com" {
-		t.Fatalf("Agent listen/connect = %q/%q", cfg.Agent.ListenUrl, cfg.Agent.ConnectUrl)
+	if cfg.Server.ListenUrl != "http://127.0.0.1:9092" {
+		t.Fatalf("Server.ListenUrl = %q", cfg.Server.ListenUrl)
 	}
 	if !cfg.Gate.API.ExposeErrors {
 		t.Fatal("Gate.API.ExposeErrors = false, want true")
@@ -229,9 +216,9 @@ func TestLoadEnvironmentDotEnvOverridesYAMLAndSkipsDefaultDotEnv(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "log:\n  level: warn\nagent:\n  listen_url: http://127.0.0.1:9040\n  connect_url: http://127.0.0.1:9040\n")
-	writeDotEnvFile(t, cwd, EnvFileName, "TERMBRIDGE_LOG__LEVEL=error\nTERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:8080\nTERMBRIDGE_AGENT__CONNECT_URL=http://127.0.0.1:8080\n")
-	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:9093\nTERMBRIDGE_AGENT__CONNECT_URL=http://127.0.0.1:9093\n")
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: warn\nserver:\n  listen_url: http://127.0.0.1:9040\n")
+	writeDotEnvFile(t, cwd, EnvFileName, "TERMBRIDGE_LOG__LEVEL=error\nTERMBRIDGE_SERVER__LISTEN_URL=http://127.0.0.1:8080\n")
+	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_SERVER__LISTEN_URL=http://127.0.0.1:9093\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -244,10 +231,10 @@ func TestLoadEnvironmentDotEnvOverridesYAMLAndSkipsDefaultDotEnv(t *testing.T) {
 	if cfg.LogLevel != "debug" {
 		t.Fatalf("LogLevel = %q, want .env.develop override", cfg.LogLevel)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9093" || cfg.Agent.ConnectUrl != "http://127.0.0.1:9093" {
-		t.Fatalf("Agent listen/connect = %q/%q, want .env.develop override", cfg.Agent.ListenUrl, cfg.Agent.ConnectUrl)
+	if cfg.Server.ListenUrl != "http://127.0.0.1:9093" {
+		t.Fatalf("Server.ListenUrl = %q, want .env.develop override", cfg.Server.ListenUrl)
 	}
-	if cfg.Base == nil || cfg.Base.LogLevel != "warn" || cfg.Base.Agent.ListenUrl != "http://127.0.0.1:9040" {
+	if cfg.Base == nil || cfg.Base.LogLevel != "warn" || cfg.Base.Server.ListenUrl != "http://127.0.0.1:9040" {
 		t.Fatalf("Base = %#v, want YAML-only env config value", cfg.Base)
 	}
 }
@@ -281,17 +268,16 @@ func TestLoadOSEnvOverridesEnvironmentDotEnv(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:8080\nTERMBRIDGE_AGENT__CONNECT_URL=http://127.0.0.1:8080\n")
+	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_SERVER__LISTEN_URL=http://127.0.0.1:8080\n")
 	t.Setenv(EnvNameVariable, "develop")
-	t.Setenv("TERMBRIDGE_AGENT__LISTEN_URL", "http://127.0.0.1:9094")
-	t.Setenv("TERMBRIDGE_AGENT__CONNECT_URL", "http://127.0.0.1:9094")
+	t.Setenv("TERMBRIDGE_SERVER__LISTEN_URL", "http://127.0.0.1:9094")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9094" || cfg.Agent.ConnectUrl != "http://127.0.0.1:9094" {
-		t.Fatalf("Agent listen/connect = %q/%q, want OS env override", cfg.Agent.ListenUrl, cfg.Agent.ConnectUrl)
+	if cfg.Server.ListenUrl != "http://127.0.0.1:9094" {
+		t.Fatalf("Server.ListenUrl = %q, want OS env override", cfg.Server.ListenUrl)
 	}
 }
 
@@ -402,11 +388,11 @@ func TestLoadRejectsInvalidHistoryLimit(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsInvalidAgentListenURL(t *testing.T) {
+func TestLoadRejectsInvalidServerListenURL(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "agent:\n  listen_url: not-a-url\n")
+	writeEnvConfig(t, cwd, "develop", "server:\n  listen_url: not-a-url\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	_, err := Load(Options{Cwd: cwd})
@@ -418,27 +404,11 @@ func TestLoadRejectsInvalidAgentListenURL(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsInvalidAgentPublicURL(t *testing.T) {
+func TestLoadRejectsInvalidServerPublicURL(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "agent:\n  public_url: ftp://example.com\n")
-	t.Setenv(EnvNameVariable, "develop")
-
-	_, err := Load(Options{Cwd: cwd})
-	if err == nil {
-		t.Fatal("Load() error = nil, want error")
-	}
-	if !apperrors.IsConfig(err) {
-		t.Fatalf("Load() error = %T, want config error", err)
-	}
-}
-
-func TestLoadRejectsInvalidAgentConnectURL(t *testing.T) {
-	isolateHome(t)
-	cwd := t.TempDir()
-	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "agent:\n  connect_url: ftp://example.com\n")
+	writeEnvConfig(t, cwd, "develop", "server:\n  public_url: ftp://example.com\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	_, err := Load(Options{Cwd: cwd})
@@ -526,7 +496,7 @@ func TestLoadUpsertsGeneratedValuesIntoExistingEnvironmentConfig(t *testing.T) {
 	}
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\nagent:\n  listen_url: http://127.0.0.1:9040\n")
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\nserver:\n  listen_url: http://127.0.0.1:9040\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	loadedFiles := []string{}
@@ -535,10 +505,6 @@ func TestLoadUpsertsGeneratedValuesIntoExistingEnvironmentConfig(t *testing.T) {
 	}})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
-	}
-	updated, _, err := EnsureLocalIdentity(cfg)
-	if err != nil {
-		t.Fatalf("EnsureLocalIdentity() error = %v", err)
 	}
 	path := filepath.Join(cwd, ConfigDirName, envConfigFileName("develop"))
 	data, err := os.ReadFile(path)
@@ -550,8 +516,6 @@ func TestLoadUpsertsGeneratedValuesIntoExistingEnvironmentConfig(t *testing.T) {
 		"level: debug",
 		"listen_url: http://127.0.0.1:9040",
 		"secret_key: " + cfg.JWT.SecretKey,
-		"device_id: " + updated.Agent.DeviceId,
-		"device_name: " + updated.Agent.DeviceName,
 	} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("env config file missing %q: %s", want, content)
@@ -601,7 +565,7 @@ func TestLoadCloudModeRequiresRegisteredLocalOAuthClient(t *testing.T) {
 	configureRemoteAuth(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "cloud", "web:\n  mode: cloud\ncloud:\n  oauth:\n    client_id: ''\n    redirect_url: ''\n")
+	writeEnvConfig(t, cwd, "cloud", "server:\n  mode: cloud\ncloud:\n  oauth:\n    client_id: ''\n    redirect_url: ''\n")
 	t.Setenv(EnvNameVariable, "cloud")
 
 	_, err := Load(Options{Cwd: cwd})
@@ -622,8 +586,8 @@ func TestLoadIgnoresMissingDotEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9030" {
-		t.Fatalf("Agent.ListenUrl = %q, want http://127.0.0.1:9030", cfg.Agent.ListenUrl)
+	if cfg.Server.ListenUrl != "http://127.0.0.1:9030" {
+		t.Fatalf("Server.ListenUrl = %q, want http://127.0.0.1:9030", cfg.Server.ListenUrl)
 	}
 }
 
@@ -649,7 +613,7 @@ func TestLoadIgnoresUnknownConfigAndEnvironmentKeys(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "unknown_root:\n  value: ignored\nagent:\n  listen_url: http://127.0.0.1:9045\n  connect_url: http://127.0.0.1:9045\n  unknown_field: ignored\n")
+	writeEnvConfig(t, cwd, "develop", "unknown_root:\n  value: ignored\nserver:\n  listen_url: http://127.0.0.1:9045\n  unknown_field: ignored\n")
 	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_UNKNOWN__FIELD=ignored\nTERMBRIDGE_LOG__LEVEL=debug\n")
 	t.Setenv(EnvNameVariable, "develop")
 
@@ -657,163 +621,17 @@ func TestLoadIgnoresUnknownConfigAndEnvironmentKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9045" || cfg.Agent.ConnectUrl != "http://127.0.0.1:9045" {
-		t.Fatalf("Agent listen/connect = %q/%q", cfg.Agent.ListenUrl, cfg.Agent.ConnectUrl)
+	if cfg.Server.ListenUrl != "http://127.0.0.1:9045" {
+		t.Fatalf("Server.ListenUrl = %q", cfg.Server.ListenUrl)
 	}
 	if cfg.LogLevel != "debug" {
 		t.Fatalf("LogLevel = %q, want known .env override", cfg.LogLevel)
 	}
 }
 
-func TestEnsureLocalIdentityWritesAgentIdentityToActiveEnvFile(t *testing.T) {
-	isolateHome(t)
-	cwd := t.TempDir()
-	writeDefaultConfig(t, cwd)
-
-	cfg, err := Load(Options{Cwd: cwd})
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	updated, bootstrap, err := EnsureLocalIdentity(cfg)
-	if err != nil {
-		t.Fatalf("EnsureLocalIdentity() error = %v", err)
-	}
-	if bootstrap.Generated {
-		t.Fatal("BootstrapResult.Generated = true, want false")
-	}
-	if bootstrap.GeneratedConfigFile != filepath.Join(cwd, EnvFileName) {
-		t.Fatalf("BootstrapResult.GeneratedConfigFile = %q", bootstrap.GeneratedConfigFile)
-	}
-	if updated.Auth.Username != DefaultAuthUsername || updated.Auth.Password != DefaultAuthPassword {
-		t.Fatalf("Auth = %#v, want default PoC auth", updated.Auth)
-	}
-	if updated.Agent.DeviceId == "" || updated.Agent.DeviceName != defaultDeviceName() {
-		t.Fatalf("Agent = %#v", updated.Agent)
-	}
-	if updated.Agent.ListenUrl != "http://127.0.0.1:9030" || updated.Agent.ConnectUrl != "http://127.0.0.1:9030" {
-		t.Fatalf("Agent listen/connect = %q/%q, want default listen URL", updated.Agent.ListenUrl, updated.Agent.ConnectUrl)
-	}
-	data, err := os.ReadFile(filepath.Join(cwd, EnvFileName))
-	if err != nil {
-		t.Fatalf("ReadFile(.env) error = %v", err)
-	}
-	content := string(data)
-	for _, want := range []string{
-		"TERMBRIDGE_AGENT__DEVICE_ID=" + quoteEnvValue(updated.Agent.DeviceId),
-		"TERMBRIDGE_AGENT__DEVICE_NAME=" + quoteEnvValue(updated.Agent.DeviceName),
-	} {
-		if !strings.Contains(content, want) {
-			t.Fatalf("env file missing %q: %s", want, content)
-		}
-	}
-	if strings.Contains(content, "TERMBRIDGE_AUTH") {
-		t.Fatalf("env file unexpectedly contains auth block: %s", content)
-	}
-
-	reloaded, secondBootstrap, err := EnsureLocalIdentity(updated)
-	if err != nil {
-		t.Fatalf("second EnsureLocalIdentity() error = %v", err)
-	}
-	if secondBootstrap.Generated {
-		t.Fatal("second BootstrapResult.Generated = true, want false")
-	}
-	if reloaded.Auth != updated.Auth {
-		t.Fatalf("reloaded Auth = %#v, want %#v", reloaded.Auth, updated.Auth)
-	}
-}
-
-func TestEnsureLocalIdentityWritesEnvironmentIdentityToEnvironmentConfig(t *testing.T) {
-	isolateHome(t)
-	cwd := t.TempDir()
-	writeDefaultConfig(t, cwd)
-	t.Setenv(EnvNameVariable, "develop")
-
-	cfg, err := Load(Options{Cwd: cwd})
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	updated, bootstrap, err := EnsureLocalIdentity(cfg)
-	if err != nil {
-		t.Fatalf("EnsureLocalIdentity() error = %v", err)
-	}
-	want := filepath.Join(cwd, ConfigDirName, envConfigFileName("develop"))
-	if bootstrap.GeneratedConfigFile != want {
-		t.Fatalf("GeneratedConfigFile = %q, want %q", bootstrap.GeneratedConfigFile, want)
-	}
-	if updated.EnvFile != filepath.Join(cwd, EnvFileName+".develop") {
-		t.Fatalf("EnvFile = %q, want active .env.develop path", updated.EnvFile)
-	}
-	if _, err := os.Stat(updated.EnvFile); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("environment .env file exists err = %v, want not exist", err)
-	}
-	data, err := os.ReadFile(want)
-	if err != nil {
-		t.Fatalf("ReadFile(config.develop.yaml) error = %v", err)
-	}
-	content := string(data)
-	for _, want := range []string{
-		"device_id: " + updated.Agent.DeviceId,
-		"device_name: " + updated.Agent.DeviceName,
-	} {
-		if !strings.Contains(content, want) {
-			t.Fatalf("env config file missing %q: %s", want, content)
-		}
-	}
-}
-
-func TestEnsureLocalIdentityUpsertsExistingActiveEnvFile(t *testing.T) {
-	isolateHome(t)
-	cwd := t.TempDir()
-	writeDefaultConfig(t, cwd)
-	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_AGENT__DEVICE_ID=stale-device\n")
-
-	cfg, err := Load(Options{Cwd: cwd})
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	cfg.Agent.DeviceId = ""
-	updated, bootstrap, err := EnsureLocalIdentity(cfg)
-	if err != nil {
-		t.Fatalf("EnsureLocalIdentity() error = %v", err)
-	}
-	if bootstrap.GeneratedConfigFile != filepath.Join(cwd, EnvFileName) {
-		t.Fatalf("BootstrapResult.GeneratedConfigFile = %q", bootstrap.GeneratedConfigFile)
-	}
-	data, err := os.ReadFile(filepath.Join(cwd, EnvFileName))
-	if err != nil {
-		t.Fatalf("ReadFile(.env) error = %v", err)
-	}
-	content := string(data)
-	for _, want := range []string{
-		"TERMBRIDGE_LOG__LEVEL=debug",
-		"TERMBRIDGE_AGENT__DEVICE_ID=" + quoteEnvValue(updated.Agent.DeviceId),
-		"TERMBRIDGE_AGENT__DEVICE_NAME=" + quoteEnvValue(updated.Agent.DeviceName),
-	} {
-		if !strings.Contains(content, want) {
-			t.Fatalf("env file missing %q: %s", want, content)
-		}
-	}
-	if strings.Contains(content, "stale-device") {
-		t.Fatalf("env file still contains stale identity: %s", content)
-	}
-}
-
 func TestDefaultConfigFileExists(t *testing.T) {
 	if _, err := os.ReadFile(repoDefaultConfigPath(t)); err != nil {
 		t.Fatalf("ReadFile(default config) error = %v", err)
-	}
-}
-
-func TestDefaultDeviceNameUsesHostnameOnly(t *testing.T) {
-	hostname, err := os.Hostname()
-	want := "termbridge-device"
-	if err == nil {
-		if sanitized := sanitizeName(hostname); sanitized != "" {
-			want = sanitized
-		}
-	}
-	if got := defaultDeviceName(); got != want {
-		t.Fatalf("defaultDeviceName() = %q, want %q", got, want)
 	}
 }
 

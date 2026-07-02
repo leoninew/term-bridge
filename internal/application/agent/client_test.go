@@ -25,7 +25,7 @@ func TestTunnelUrl(t *testing.T) {
 func TestClientRunSendsHello(t *testing.T) {
 	stateDir := t.TempDir()
 	helloCh := make(chan tunnel.HelloPayload, 1)
-	device, err := LoadOrCreateDevice(DeviceOptions{StateDir: stateDir, DeviceId: "dev-1", DeviceName: "local"})
+	device, err := LoadOrCreateDevice(DeviceOptions{StateDir: stateDir})
 	if err != nil {
 		t.Fatalf("LoadOrCreateDevice() error = %v", err)
 	}
@@ -64,14 +64,14 @@ func TestClientRunSendsHello(t *testing.T) {
 	}))
 	defer server.Close()
 	ctx, cancel := context.WithCancel(context.Background())
-	client := New(Config{ConnectUrl: server.URL, Username: "admin", Password: "admin", DeviceId: "dev-1", DeviceName: "local", StateDir: stateDir})
+	client := New(Config{ConnectUrl: server.URL, Username: "admin", Password: "admin", StateDir: stateDir})
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- client.Run(ctx)
 	}()
 	select {
 	case hello := <-helloCh:
-		if hello.DeviceId == "" || hello.DeviceName != "local" || hello.ProtocolVersion != tunnel.ProtocolVersion {
+		if hello.DeviceId != device.Id || hello.DeviceName != device.Name || hello.ProtocolVersion != tunnel.ProtocolVersion {
 			t.Fatalf("hello = %#v", hello)
 		}
 	case <-time.After(2 * time.Second):

@@ -8,6 +8,7 @@ import type {
 } from '../protocol/terminal'
 import { updateSessionOrder } from '../features/sessions/api'
 import { listWorkspaceTree, updateWorkspaceOrder } from '../features/workspaces/api'
+import type { RuntimeTarget } from '../features/runtimeTarget'
 
 export type RemovedSessionSummary = Pick<SessionSummary, 'id' | 'workspace_id'>
 
@@ -27,13 +28,13 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
     workspaceTree.value = []
   }
 
-  async function refresh(deviceId: string) {
-    if (!deviceId) {
+  async function refresh(target: RuntimeTarget | null) {
+    if (!target) {
       return
     }
     loading.value = true
     try {
-      const response = await listWorkspaceTree(deviceId)
+      const response = await listWorkspaceTree(target)
       applyWorkspaceTree(response.data)
     } finally {
       loading.value = false
@@ -41,7 +42,7 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
   }
 
   function applyWorkspaceTree(nextWorkspaceTree: WorkspaceTreeSummary[]) {
-    workspaceTree.value = nextWorkspaceTree
+    workspaceTree.value = Array.isArray(nextWorkspaceTree) ? nextWorkspaceTree : []
   }
 
   function workspaceById(workspaceId: string): WorkspaceSummary | null {
@@ -119,11 +120,14 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
     return removedSessions
   }
 
-  async function reorderWorkspaces(deviceId: string, workspaceIds: string[]) {
+  async function reorderWorkspaces(target: RuntimeTarget | null, workspaceIds: string[]) {
+    if (!target) {
+      return
+    }
     const previousTree = workspaceTree.value
     workspaceTree.value = orderWorkspaceTree(previousTree, workspaceIds)
     try {
-      const orderedWorkspaces = await updateWorkspaceOrder(deviceId, workspaceIds)
+      const orderedWorkspaces = await updateWorkspaceOrder(target, workspaceIds)
       workspaceTree.value = orderWorkspaceTree(
         workspaceTree.value,
         orderedWorkspaces.map((workspace) => workspace.id),
@@ -134,11 +138,18 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
     }
   }
 
-  async function reorderSessions(deviceId: string, workspaceId: string, sessionIds: string[]) {
+  async function reorderSessions(
+    target: RuntimeTarget | null,
+    workspaceId: string,
+    sessionIds: string[],
+  ) {
+    if (!target) {
+      return
+    }
     const previousTree = workspaceTree.value
     workspaceTree.value = orderWorkspaceSessions(previousTree, workspaceId, sessionIds)
     try {
-      const orderedSessions = await updateSessionOrder(deviceId, workspaceId, sessionIds)
+      const orderedSessions = await updateSessionOrder(target, workspaceId, sessionIds)
       workspaceTree.value = replaceWorkspaceSessions(
         workspaceTree.value,
         workspaceId,

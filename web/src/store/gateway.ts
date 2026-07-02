@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { readStorageValue, removeStorageValue, writeStorageValue } from './storage'
 import {
   authLogin,
@@ -11,6 +11,7 @@ import {
   type TokenResp,
   type UserInfo,
 } from '../features/gateway/api'
+import type { RuntimeTarget } from '../features/runtimeTarget'
 
 const TOKEN_KEY = 'termbridge_gateway_token'
 
@@ -30,6 +31,18 @@ export const useGatewayStore = defineStore('gateway', () => {
   const cloudSession = ref<CloudSessionSummary | null>(null)
   const devices = ref<DeviceSummary[]>([])
   const selectedDeviceId = ref('')
+  const runtimeTarget = computed<RuntimeTarget | null>(() => {
+    if (capabilities.value?.mode === 'local') {
+      return { mode: 'local' }
+    }
+    return selectedDeviceId.value ? { mode: 'cloud', deviceId: selectedDeviceId.value } : null
+  })
+  const currentDevice = computed<DeviceSummary | CloudSessionSummary | null>(() => {
+    if (capabilities.value?.mode === 'local') {
+      return devices.value[0] ?? cloudSession.value
+    }
+    return devices.value.find((device) => device.id === selectedDeviceId.value) ?? null
+  })
   let initializedToken: string | null | undefined
 
   function setToken(newToken: string) {
@@ -132,6 +145,8 @@ export const useGatewayStore = defineStore('gateway', () => {
     cloudSession,
     devices,
     selectedDeviceId,
+    runtimeTarget,
+    currentDevice,
     setToken,
     clearToken,
     initializeAuth,

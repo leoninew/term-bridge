@@ -4,6 +4,8 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -13,9 +15,10 @@ import (
 )
 
 const (
-	DeviceSchemaVersion = 1
-	PrivateKeyFileName  = "private_key.pem"
-	PublicKeyFileName   = "public_key.pem"
+	DeviceSchemaVersion    = 1
+	DeviceIdentityFileName = "agent.json"
+	PrivateKeyFileName     = "private_key.pem"
+	PublicKeyFileName      = "public_key.pem"
 )
 
 type Device struct {
@@ -28,34 +31,77 @@ type Device struct {
 }
 
 type DeviceOptions struct {
-	StateDir   string
-	DeviceId   string
-	DeviceName string
-	Now        func() time.Time
+	StateDir string
+	Now      func() time.Time
+}
+
+type deviceIdentity struct {
+	SchemaVersion int       `json:"schema_version"`
+	Id            string    `json:"id"`
+	Name          string    `json:"name"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 func LoadOrCreateDevice(options DeviceOptions) (Device, error) {
 	if strings.TrimSpace(options.StateDir) == "" {
 		return Device{}, fmt.Errorf("state dir is required")
 	}
-	deviceId := strings.TrimSpace(options.DeviceId)
-	if deviceId == "" {
-		return Device{}, fmt.Errorf("device id is required")
-	}
-	deviceName := strings.TrimSpace(options.DeviceName)
-	if deviceName == "" {
-		return Device{}, fmt.Errorf("device name is required")
-	}
 	if options.Now == nil {
 		options.Now = time.Now
 	}
-	now := options.Now().UTC()
-	deviceDir := filepath.Join(options.StateDir, "devices", safeDeviceSegment(deviceId))
+	identity, err := loadOrCreateDeviceIdentity(options.StateDir, options.Now().UTC())
+	if err != nil {
+		return Device{}, err
+	}
+	deviceDir := filepath.Join(options.StateDir, "devices", safeDeviceSegment(identity.Id))
 	keys, err := loadOrCreateDeviceKeys(deviceDir)
 	if err != nil {
 		return Device{}, err
 	}
-	return Device{SchemaVersion: DeviceSchemaVersion, Id: deviceId, Name: deviceName, PublicKey: keys.PublicKeyBase64, CreatedAt: now, UpdatedAt: now}, nil
+	return Device{SchemaVersion: DeviceSchemaVersion, Id: identity.Id, Name: identity.Name, PublicKey: keys.PublicKeyBase64, CreatedAt: identity.CreatedAt, UpdatedAt: identity.UpdatedAt}, nil
+}
+
+func loadOrCreateDeviceIdentity(stateDir string, now time.Time) (deviceIdentity, error) {
+	path := filepath.Join(stateDir, DeviceIdentityFileName)
+	data, err := os.ReadFile(path)
+	if err == nil {
+		var identity deviceIdentity
+		if err := json.Unmarshal(data, &identity); err != nil {
+			return deviceIdentity{}, fmt.Errorf("read device identity: %w", err)
+		}
+		if identity.SchemaVersion != DeviceSchemaVersion {
+			return deviceIdentity{}, fmt.Errorf("read device identity: unsupported schema version %d", identity.SchemaVersion)
+		}
+		if strings.TrimSpace(identity.Id) == "" {
+			return deviceIdentity{}, fmt.Errorf("read device identity: id is required")
+		}
+		if strings.TrimSpace(identity.Name) == "" {
+			return deviceIdentity{}, fmt.Errorf("read device identity: name is required")
+		}
+		return identity, nil
+	}
+	if !os.IsNotExist(err) {
+		return deviceIdentity{}, err
+	}
+	id, err := randomDeviceId()
+	if err != nil {
+		return deviceIdentity{}, err
+	}
+	identity := deviceIdentity{SchemaVersion: DeviceSchemaVersion, Id: id, Name: defaultDeviceName(), CreatedAt: now, UpdatedAt: now}
+	if err := writeDeviceIdentity(path, identity); err != nil {
+		return deviceIdentity{}, err
+	}
+	return identity, nil
+}
+
+func writeDeviceIdentity(path string, identity deviceIdentity) error {
+	data, err := json.MarshalIndent(identity, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	return writeFileAtomic(path, data, 0o600)
 }
 
 type deviceKeys struct {
@@ -155,6 +201,38 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 		return err
 	}
 	return nil
+}
+
+func randomDeviceId() (string, error) {
+	data := make([]byte, 16)
+	if _, err := rand.Read(data); err != nil {
+		return "", fmt.Errorf("generate device id: %w", err)
+	}
+	return hex.EncodeToString(data), nil
+}
+
+func defaultDeviceName() string {
+	hostname, err := os.Hostname()
+	if err != nil || strings.TrimSpace(hostname) == "" {
+		hostname = "termbridge-device"
+	}
+	hostname = sanitizeName(hostname)
+	if hostname == "" {
+		return "termbridge-device"
+	}
+	return hostname
+}
+
+func sanitizeName(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.ReplaceAll(value, " ", "-")
+	value = strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' || r == '.' {
+			return r
+		}
+		return -1
+	}, value)
+	return strings.Trim(value, "-_.")
 }
 
 func safeDeviceSegment(value string) string {

@@ -52,6 +52,7 @@ describe('gateway store', () => {
 
     expect(store.authenticated).toBe(false)
     expect(store.capabilities?.mode).toBe('local')
+    expect(store.runtimeTarget).toEqual({ mode: 'local' })
     expect(store.cloudSession).toBeNull()
     expect(mocks.authMe).toHaveBeenCalledTimes(1)
   })
@@ -81,6 +82,7 @@ describe('gateway store', () => {
     expect(store.authenticated).toBe(false)
     expect(store.cloudSession?.gate_url).toBe('https://cloud.example.test')
     expect(store.cloudSession?.device_name).toBe('local-device')
+    expect(store.currentDevice).toEqual(store.cloudSession)
 
     store.clearToken()
 
@@ -113,5 +115,7 @@ describe('gateway store', () => {
     await store.loadDevices()
 
     expect(store.selectedDeviceId).toBe('dev-1')
+    expect(store.runtimeTarget).toEqual({ mode: 'cloud', deviceId: 'dev-1' })
+    expect(store.currentDevice).toEqual(store.devices[0])
   })
 })

@@ -12,10 +12,10 @@ for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env.local") do (
   if not "%%A"=="" set "%%A=%%B"
 )
 
-if not defined TERMBRIDGE_AGENT__PUBLIC_URL (
-  echo TERMBRIDGE_AGENT__PUBLIC_URL is not set in .env.local
+if not defined TERMBRIDGE_SERVER__PUBLIC_URL (
+  echo TERMBRIDGE_SERVER__PUBLIC_URL is not set in .env.local
   exit /b 1
 )
 
-start "" /min cmd /c "timeout /t 2 /nobreak >nul & start %TERMBRIDGE_AGENT__PUBLIC_URL%"
+start "" /min cmd /c "timeout /t 2 /nobreak >nul & start %TERMBRIDGE_SERVER__PUBLIC_URL%"
 termbridge.exe serve

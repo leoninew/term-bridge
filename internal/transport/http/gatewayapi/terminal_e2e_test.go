@@ -37,7 +37,7 @@ func TestGatewayAgentTerminalAttachE2E(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	errCh := make(chan error, 1)
-	client := agentapp.New(agentapp.Config{ConnectUrl: server.URL, Username: "admin", Password: "admin", DeviceId: device.Id, DeviceName: device.Name, StateDir: stateDir, Runtime: runtime, Logger: slog.Default()})
+	client := agentapp.New(agentapp.Config{ConnectUrl: server.URL, Username: "admin", Password: "admin", StateDir: stateDir, Runtime: runtime, Logger: slog.Default()})
 	go func() {
 		errCh <- client.Run(ctx)
 	}()
@@ -123,7 +123,7 @@ func TestGatewayAgentTerminalAttachResizeErrorReturnsControlError(t *testing.T) 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	errCh := make(chan error, 1)
-	client := agentapp.New(agentapp.Config{ConnectUrl: server.URL, Username: "admin", Password: "admin", DeviceId: device.Id, DeviceName: device.Name, StateDir: stateDir, Runtime: runtime, Logger: slog.Default()})
+	client := agentapp.New(agentapp.Config{ConnectUrl: server.URL, Username: "admin", Password: "admin", StateDir: stateDir, Runtime: runtime, Logger: slog.Default()})
 	go func() {
 		errCh <- client.Run(ctx)
 	}()
@@ -163,7 +163,7 @@ func TestGatewayAgentTerminalAttachResizeErrorReturnsControlError(t *testing.T) 
 
 func writeGatewayE2EDevice(t *testing.T, stateDir string) agentapp.Device {
 	t.Helper()
-	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir, DeviceId: "gateway-e2e-device", DeviceName: "gateway-e2e", Now: func() time.Time { return time.Now().UTC() }})
+	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir, Now: func() time.Time { return time.Now().UTC() }})
 	if err != nil {
 		t.Fatalf("LoadOrCreateDevice() error = %v", err)
 	}

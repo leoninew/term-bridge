@@ -16,7 +16,6 @@
         <WorkspaceSessionSidebar
           :workspace-tree="workspaceSessions.workspaceTree"
           :active-session-id="workbench.activeSessionId"
-          :selected-device-id="gateway.selectedDeviceId"
           :stopping-session-id="stoppingSessionId"
           :rerunning-session-id="rerunningSessionId"
           :deleting-session-id="deletingSessionId"
@@ -51,7 +50,7 @@
           :active-session-id="workbench.activeSessionId"
           :active-tab="workbench.activeTab"
           :active-session="activeSession"
-          :selected-device-id="gateway.selectedDeviceId"
+          :current-device="gateway.currentDevice"
           :authenticated="gateway.authenticated"
           :user-display-name="userDisplayName"
           :user-email="gateway.user?.email ?? ''"
@@ -179,38 +178,26 @@
 
   const activeTerminalWsUrl = computed(() => {
     const session = activeSession.value
-    if (!session) {
+    const target = gateway.runtimeTarget
+    if (!session || !target) {
       return null
     }
-    return terminalWsUrl(
-      gateway.selectedDeviceId,
-      session.workspace_id,
-      session.id,
-      gateway.token ?? undefined,
-    )
+    return terminalWsUrl(target, session.workspace_id, session.id, gateway.token ?? undefined)
   })
 
   async function refresh() {
-    if (!gateway.selectedDeviceId) {
+    const target = gateway.runtimeTarget
+    if (!target) {
       return
     }
     try {
-      await workspaceSessions.refresh(gateway.selectedDeviceId)
+      await workspaceSessions.refresh(target)
       await notifyHistoryError(
-        await workbench.ensureActiveHistoryLoaded(
-          gateway.selectedDeviceId,
-          workspaceSessions.sessionById,
-        ),
+        await workbench.ensureActiveHistoryLoaded(target, workspaceSessions.sessionById),
       )
     } catch (err) {
       notifications.notifyError(t('toast.refreshFailed'), err)
     }
-  }
-
-  async function selectDevice() {
-    workspaceSessions.reset()
-    workbench.resetForSourceChange()
-    await refresh()
   }
 
   async function openDashboard() {
@@ -253,6 +240,10 @@
       notifyCreateSessionValidationError(draft.error)
       return
     }
+    const target = gateway.runtimeTarget
+    if (!target) {
+      return
+    }
     creatingSession.value = true
     try {
       const size = measureInitialTerminalSize()
@@ -264,7 +255,7 @@
         cols: size.cols,
         rows: size.rows,
       })
-      const created = await createSession(gateway.selectedDeviceId, draft.value.workspaceId, {
+      const created = await createSession(target, draft.value.workspaceId, {
         ...(draft.value.workspaceId ? { workspace_id: draft.value.workspaceId } : {}),
         name: draft.value.name,
         cwd: draft.value.cwd,
@@ -277,11 +268,7 @@
         workspaceId: created.workspace_id,
         state: created.state,
       })
-      const session = await getSession(
-        gateway.selectedDeviceId,
-        created.workspace_id,
-        created.session_id,
-      )
+      const session = await getSession(target, created.workspace_id, created.session_id)
       logTerminalDiagnostic('session.create.summary', {
         sessionId: session.id,
         lifecycleState: session.lifecycle_state,
@@ -304,7 +291,8 @@
   }
 
   async function editSelectedSession(name: string) {
-    if (!dialogs.selectedSession || editingSession.value) {
+    const target = gateway.runtimeTarget
+    if (!dialogs.selectedSession || editingSession.value || !target) {
       return
     }
     if (!name) {
@@ -314,7 +302,7 @@
     editingSession.value = true
     try {
       const updated = await updateSession(
-        gateway.selectedDeviceId,
+        target,
         dialogs.selectedSession.workspace_id,
         dialogs.selectedSession.id,
         { name },
@@ -332,12 +320,13 @@
 
   async function deleteSelectedSession() {
     const session = dialogs.selectedSession
-    if (!session || deletingSessionId.value || isActiveLifecycle(session)) {
+    const target = gateway.runtimeTarget
+    if (!session || deletingSessionId.value || isActiveLifecycle(session) || !target) {
       return
     }
     deletingSessionId.value = session.id
     try {
-      await deleteSession(gateway.selectedDeviceId, session.workspace_id, session.id)
+      await deleteSession(target, session.workspace_id, session.id)
       workspaceSessions.removeSession(session.workspace_id, session.id)
       const nextSession = workbench.closeTab(
         session.workspace_id,
@@ -345,9 +334,7 @@
         workspaceSessions.sessionById,
       )
       if (nextSession) {
-        await notifyHistoryError(
-          await workbench.ensureHistoryLoaded(gateway.selectedDeviceId, nextSession),
-        )
+        await notifyHistoryError(await workbench.ensureHistoryLoaded(target, nextSession))
       }
       dialogs.clearSelectedSession()
       dialogs.deleteSessionDialogOpen = false
@@ -361,12 +348,13 @@
 
   async function removeSelectedWorkspace() {
     const workspace = dialogs.selectedWorkspace
-    if (!workspace || removingWorkspaceId.value) {
+    const target = gateway.runtimeTarget
+    if (!workspace || removingWorkspaceId.value || !target) {
       return
     }
     removingWorkspaceId.value = workspace.id
     try {
-      await deleteWorkspace(gateway.selectedDeviceId, workspace.id)
+      await deleteWorkspace(target, workspace.id)
       const removedSessions = workspaceSessions.removeWorkspace(workspace.id)
       workbench.closeRemovedSessions(removedSessions)
       dialogs.clearSelectedWorkspace()
@@ -385,7 +373,7 @@
 
   async function reorderWorkspaces(workspaceIds: string[]) {
     try {
-      await workspaceSessions.reorderWorkspaces(gateway.selectedDeviceId, workspaceIds)
+      await workspaceSessions.reorderWorkspaces(gateway.runtimeTarget, workspaceIds)
     } catch (err) {
       notifications.notifyError(t('toast.updateWorkspaceOrderFailed'), err)
       await refresh()
@@ -394,7 +382,7 @@
 
   async function reorderSessions(workspaceId: string, sessionIds: string[]) {
     try {
-      await workspaceSessions.reorderSessions(gateway.selectedDeviceId, workspaceId, sessionIds)
+      await workspaceSessions.reorderSessions(gateway.runtimeTarget, workspaceId, sessionIds)
     } catch (err) {
       notifications.notifyError(t('toast.updateSessionOrderFailed'), err)
       await refresh()
@@ -402,13 +390,13 @@
   }
 
   async function openSessionTab(session: SessionSummary) {
-    await notifyHistoryError(await workbench.openSession(gateway.selectedDeviceId, session))
+    await notifyHistoryError(await workbench.openSession(gateway.runtimeTarget, session))
   }
 
   async function activateOpenedTab(sessionId: string) {
     await notifyHistoryError(
       await workbench.activateSession(
-        gateway.selectedDeviceId,
+        gateway.runtimeTarget,
         sessionId,
         workspaceSessions.sessionById,
       ),
@@ -419,7 +407,7 @@
     const nextSession = workbench.closeTab(workspaceId, sessionId, workspaceSessions.sessionById)
     if (nextSession) {
       await notifyHistoryError(
-        await workbench.ensureHistoryLoaded(gateway.selectedDeviceId, nextSession),
+        await workbench.ensureHistoryLoaded(gateway.runtimeTarget, nextSession),
       )
     }
   }
@@ -440,16 +428,15 @@
   }
 
   async function stopSessionFromSidebar(session: SessionSummary) {
-    if (!isStoppableLifecycle(session) || stoppingSessionId.value) {
+    const target = gateway.runtimeTarget
+    if (!isStoppableLifecycle(session) || stoppingSessionId.value || !target) {
       return
     }
     stoppingSessionId.value = session.id
     try {
-      const updated = await closeSession(gateway.selectedDeviceId, session.workspace_id, session.id)
+      const updated = await closeSession(target, session.workspace_id, session.id)
       workspaceSessions.updateSession(updated)
-      await notifyHistoryError(
-        await workbench.ensureHistoryLoaded(gateway.selectedDeviceId, updated),
-      )
+      await notifyHistoryError(await workbench.ensureHistoryLoaded(target, updated))
     } catch (err) {
       notifications.notifyError(t('toast.stopSessionFailed'), err)
     } finally {
@@ -458,23 +445,15 @@
   }
 
   async function rerunSessionFromSidebar(session: SessionSummary) {
-    if (!canRerunLifecycle(session) || rerunningSessionId.value) {
+    const target = gateway.runtimeTarget
+    if (!canRerunLifecycle(session) || rerunningSessionId.value || !target) {
       return
     }
     rerunningSessionId.value = session.id
     try {
       const size = measureInitialTerminalSize()
-      const response = await rerunSession(
-        gateway.selectedDeviceId,
-        session.workspace_id,
-        session.id,
-        size,
-      )
-      const updated = await getSession(
-        gateway.selectedDeviceId,
-        response.workspace_id,
-        response.session_id,
-      )
+      const response = await rerunSession(target, session.workspace_id, session.id, size)
+      const updated = await getSession(target, response.workspace_id, response.session_id)
       workspaceSessions.updateSession(updated)
       workbench.resetTabHistory(updated.workspace_id, updated.id)
       await openSessionTab(updated)
@@ -488,13 +467,15 @@
   }
 
   async function refreshSessionAfterRerunFailure(session: SessionSummary) {
+    const target = gateway.runtimeTarget
+    if (!target) {
+      return
+    }
     workbench.resetTabHistory(session.workspace_id, session.id)
     try {
-      const updated = await getSession(gateway.selectedDeviceId, session.workspace_id, session.id)
+      const updated = await getSession(target, session.workspace_id, session.id)
       workspaceSessions.updateSession(updated)
-      await notifyHistoryError(
-        await workbench.ensureHistoryLoaded(gateway.selectedDeviceId, updated),
-      )
+      await notifyHistoryError(await workbench.ensureHistoryLoaded(target, updated))
     } catch {
       await refresh()
     }
@@ -551,15 +532,14 @@
   }
 
   async function refreshActiveSession(session = activeSession.value) {
-    if (!session || !gateway.selectedDeviceId) {
+    const target = gateway.runtimeTarget
+    if (!session || !target) {
       return
     }
     try {
-      const updated = await getSession(gateway.selectedDeviceId, session.workspace_id, session.id)
+      const updated = await getSession(target, session.workspace_id, session.id)
       workspaceSessions.updateSession(updated)
-      await notifyHistoryError(
-        await workbench.ensureHistoryLoaded(gateway.selectedDeviceId, updated),
-      )
+      await notifyHistoryError(await workbench.ensureHistoryLoaded(target, updated))
     } catch (err) {
       notifications.notifyError(t('toast.refreshFailed'), err)
     }
@@ -589,9 +569,7 @@
   onMounted(async () => {
     try {
       await gateway.loadDevices()
-      if (gateway.selectedDeviceId) {
-        await selectDevice()
-      }
+      await refresh()
     } catch (err) {
       notifications.notifyError(t('toast.refreshFailed'), err)
     }

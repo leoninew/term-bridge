@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { SessionSummary } from '../protocol/terminal'
 import { readHistory } from '../features/sessions/api'
+import type { RuntimeTarget } from '../features/runtimeTarget'
 import { errorMessage } from './notifications'
 
 export type OpenSessionTab = {
@@ -30,11 +31,11 @@ export const useWorkbenchStore = defineStore('workbench', () => {
     activeSessionId.value = null
   }
 
-  async function openSession(deviceId: string, session: SessionSummary) {
+  async function openSession(target: RuntimeTarget | null, session: SessionSummary) {
     createSessionFormOpen.value = false
     ensureTab(session)
     setActiveSession(session.id)
-    return ensureHistoryLoaded(deviceId, session)
+    return ensureHistoryLoaded(target, session)
   }
 
   function ensureTab(session: SessionSummary) {
@@ -56,7 +57,7 @@ export const useWorkbenchStore = defineStore('workbench', () => {
   }
 
   async function activateSession(
-    deviceId: string,
+    target: RuntimeTarget | null,
     sessionId: string,
     sessionResolver: (workspaceId: string, sessionId: string) => SessionSummary | null,
   ) {
@@ -64,7 +65,7 @@ export const useWorkbenchStore = defineStore('workbench', () => {
     setActiveSession(sessionId)
     const tab = tabFor(sessionId)
     const session = tab ? sessionResolver(tab.workspaceId, tab.sessionId) : null
-    return session ? ensureHistoryLoaded(deviceId, session) : null
+    return session ? ensureHistoryLoaded(target, session) : null
   }
 
   function closeTab(
@@ -85,15 +86,21 @@ export const useWorkbenchStore = defineStore('workbench', () => {
     return nextTab ? sessionResolver(nextTab.workspaceId, nextTab.sessionId) : null
   }
 
-  async function ensureHistoryLoaded(deviceId: string, session: SessionSummary) {
+  async function ensureHistoryLoaded(target: RuntimeTarget | null, session: SessionSummary) {
     const tab = tabFor(session.id)
-    if (!tab || session.lifecycle_state === 'running' || tab.historyLoaded || tab.historyLoading) {
+    if (
+      !tab ||
+      !target ||
+      session.lifecycle_state === 'running' ||
+      tab.historyLoaded ||
+      tab.historyLoading
+    ) {
       return null
     }
     tab.historyLoading = true
     tab.historyError = null
     try {
-      const response = await readHistory(deviceId, session.workspace_id, session.id)
+      const response = await readHistory(target, session.workspace_id, session.id)
       tab.historyText = response.data
       tab.historyLoaded = true
       return null
@@ -107,7 +114,7 @@ export const useWorkbenchStore = defineStore('workbench', () => {
   }
 
   async function ensureActiveHistoryLoaded(
-    deviceId: string,
+    target: RuntimeTarget | null,
     sessionResolver: (workspaceId: string, sessionId: string) => SessionSummary | null,
   ) {
     const tab = activeTab.value
@@ -118,7 +125,7 @@ export const useWorkbenchStore = defineStore('workbench', () => {
     if (!session) {
       return null
     }
-    return ensureHistoryLoaded(deviceId, session)
+    return ensureHistoryLoaded(target, session)
   }
 
   function resetTabHistory(workspaceId: string, sessionId: string) {

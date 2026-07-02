@@ -23,10 +23,10 @@ User -> Device -> Workspace -> Session -> Terminal
 
 ## 当前状态
 
-当前重点是本地 self-connected Gate 和统一 `/sessions` 工作台：
+当前重点是本地 Gate、local direct runtime path 和统一 `/sessions` 工作台：
 
-- `termbridge serve` 启动后端 Gate、Local Agent 和本地 runtime。
-- Browser 通过 `/sessions` 选择 device、workspace、session 并 attach terminal。
+- `termbridge serve` 启动后端 Gate 和本地 runtime。
+- Browser 通过 `/sessions` 选择 workspace、session 并 attach terminal。
 - 本地开发采用前后端分离。
 - 镜像交付采用前后端一体：Go 服务提供后端 API 和已构建的前端静态资源。
 
@@ -118,19 +118,19 @@ TERMBRIDGE_ + 配置 key 大写，并将 . 转为 __
 本地开发示例：
 
 ```dotenv
-TERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:9030
-TERMBRIDGE_GATE__BROWSER__ALLOWED_ORIGINS=http://localhost:9031
+TERMBRIDGE_SERVER__LISTEN_URL=http://127.0.0.1:9030
 TERMBRIDGE_RUNTIME__STATE_DIR=.termbridge
-TERMBRIDGE_WEB__STATIC_DIR=
-TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost:9031
+TERMBRIDGE_SERVER__MODE=local
+TERMBRIDGE_SERVER__STATIC_DIR=
+TERMBRIDGE_SERVER__PUBLIC_URL=http://localhost:9031
 ```
 
 镜像内置静态资源示例：
 
 ```dotenv
-TERMBRIDGE_AGENT__LISTEN_URL=http://0.0.0.0:80
-TERMBRIDGE_WEB__STATIC_DIR=/opt/termbridge/web/dist
-TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost
+TERMBRIDGE_SERVER__LISTEN_URL=http://0.0.0.0:80
+TERMBRIDGE_SERVER__STATIC_DIR=/opt/termbridge/web/dist
+TERMBRIDGE_SERVER__PUBLIC_URL=http://localhost
 TERMBRIDGE_RUNTIME__STATE_DIR=/var/lib/termbridge
 ```
 
@@ -151,9 +151,9 @@ TERMBRIDGE_RESEND__API_KEY=
 TERMBRIDGE_RESEND__FROM_EMAIL=
 ```
 
-`agent.connect_url` 与 `agent.listen_url` 规范化后一致时为本地模式；本地模式支持 `auth.local_admin` shortcut。两者不一致时为远程 Gate 模式，启动时会要求 Google OAuth 与 Resend 配置齐全。
+`server.mode` 决定运行模式：`local` 使用本地控制台与 local direct runtime path；`cloud` 用于云端门户部署，启动时会要求 Google OAuth 与 Resend 配置齐全。
 
-`agent.device_id` 和 `agent.device_name` 为空时，`termbridge serve` 会生成并写入生效的 `.env` 或 `.env.<env>`，随后由 Agent 上报给 Gate；业务运行中变化的配置不会写回 `configs/config.yaml`。
+设备身份由 `termbridge serve` 在 `<runtime.state_dir>/agent.json` 中生成并读取；业务运行中变化的配置不会写回 `configs/config.yaml`。
 
 ## 当前边界
 

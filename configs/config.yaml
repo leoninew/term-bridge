@@ -30,46 +30,23 @@ history:
 runtime:
   state_dir: .termbridge
 
-# Web 前端配置。
-web:
-  # Web runtime mode: local 为本机 Agent 控制台；cloud 为云端 Gate 门户。
+# 当前进程 HTTP/API server 配置
+server:
+  # Web/runtime mode: local 为本机控制台；cloud 为云端门户。
   mode: local
+  # termbridge serve 暴露的后端 API 地址。
+  listen_url: http://127.0.0.1:9030
   # Web 静态资源目录；为空时只提供 API，便于本地 Vite 开发。
   static_dir: ""
+  # 浏览器访问当前 server 前端/setup 的地址，用于 local dashboard 与云端授权回跳。
+  public_url: http://localhost:9031
 
 # Gate API 行为配置
 gate:
-  browser:
-    # 允许访问 Gate API 的浏览器前端 Origin。
-    # 本地开发默认允许 Vite dev server；生产部署时应改为实际 Web origin。
-    allowed_origins:
-      - http://127.0.0.1:9031
-      - http://localhost:9031
   api:
     # 是否在 API 错误响应中暴露内部错误细节。
     # 仅建议本地调试打开；生产保持 false。
     expose_errors: false
-
-# 本机 Agent / serve 配置
-agent:
-  # 本机 termbridge serve 暴露的后端 API 地址。
-  # agent.connect_url 留空时会默认等于此地址，用于本机 self-tunnel。
-  listen_url: http://127.0.0.1:9030
-
-  # 浏览器访问本机 Agent 前端的地址，用于 local dashboard 与云端授权回跳。
-  # 本地开发指向 Vite dev server；内置静态资源部署时指向浏览器访问该 Agent 的地址。
-  # 该字段不表达云端 Gate 的公网发布地址。
-  public_url: http://localhost:9031
-
-  # 本机 self-tunnel 目标地址；为空表示使用 agent.listen_url。
-  # 云端连接目标集中配置在 cloud.gate_url，不通过 agent.connect_url 切换。
-  connect_url: ""
-
-  # 当前设备 ID。通常保持为空。未指定 TERMBRIDGE_ENV 时首次启动写入 .env；指定环境时写入 configs/config.<env>.yaml。
-  device_id: ""
-
-  # 当前设备显示名。为空时使用本机 hostname 自动生成；未指定 TERMBRIDGE_ENV 时写入 .env，指定环境时写入 configs/config.<env>.yaml。
-  device_name: ""
 
 # Cloud connection 配置
 cloud:

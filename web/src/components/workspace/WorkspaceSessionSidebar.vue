@@ -32,13 +32,7 @@
 
     <div class="min-h-0 flex-1 overflow-y-auto p-1.5">
       <div
-        v-if="!props.selectedDeviceId"
-        class="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2 text-sm text-[var(--color-text-muted)]"
-      >
-        {{ deviceSelectPlaceholder }}
-      </div>
-      <div
-        v-else-if="workspaceTree.length === 0"
+        v-if="workspaceTree.length === 0"
         class="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2 text-sm text-[var(--color-text-muted)]"
       >
         {{ t('sidebar.emptyWorkspaces') }}
@@ -415,7 +409,6 @@
   const props = defineProps<{
     workspaceTree: WorkspaceTreeSummary[]
     activeSessionId: string | null
-    selectedDeviceId: string
     stoppingSessionId: string | null
     rerunningSessionId: string | null
     deletingSessionId: string | null
@@ -446,7 +439,6 @@
   const draggableTreeItems = ref<WorkspaceTreeItem[]>([])
 
   const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
-  const deviceSelectPlaceholder = computed(() => t('gateway.selectDevicePlaceholder'))
   const localeOptions = computed(() =>
     locales.map((value) => ({ value, label: localeLabels[value] })),
   )

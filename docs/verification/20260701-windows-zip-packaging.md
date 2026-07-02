@@ -1,5 +1,5 @@
 # Windows EXE Static Directory Zip Packaging Verification
-最后修改时间: 2026-07-01 14:22:56
+最后修改时间: 2026-07-02 14:18:28
 
 ## Review status
 
@@ -21,7 +21,7 @@ Accepted
 | Windows x64 zip 包包含 `termbridge.exe`、静态页面目录、`configs/config.yaml`、`.env.local`、`.env.example`、`start.cmd`、`start.sh` | 已验证。`task package` 成功生成 `bin/TermBridge-windows-x64.zip`，zip entries 包含上述文件。 |
 | `start.cmd` 双击入口设置 `TERMBRIDGE_ENV=local`、加载 `.env.local`、启动服务并打开浏览器 | 已按脚本内容静态核对；未在本验证中实际双击启动。 |
 | `start.sh` 作为便携 shell 入口设置 `TERMBRIDGE_ENV=local`、source `.env.local`，不调用 `cmd.exe`，不手写 `read -r` 解析 dotenv | 已按脚本内容静态核对。 |
-| 端口/URL 修改点只在 `.env.local` | 已实现。`.env.local` 包含 `TERMBRIDGE_AGENT__LISTEN_URL`、`TERMBRIDGE_AGENT__PUBLIC_URL`、`TERMBRIDGE_GATE__BROWSER__ALLOWED_ORIGINS`；启动脚本只读取 `TERMBRIDGE_AGENT__PUBLIC_URL`。 |
+| 端口/URL 修改点只在 `.env.local` | 已实现。`.env.local` 包含 `TERMBRIDGE_SERVER__LISTEN_URL`、`TERMBRIDGE_SERVER__PUBLIC_URL`、`TERMBRIDGE_SERVER__STATIC_DIR`；启动脚本只读取 `TERMBRIDGE_SERVER__PUBLIC_URL`。 |
 | 根目录 `.env.example` 原样复制进包，不在 `scripts/package` 下维护第二份示例 | 已验证。package task 复制根目录 `.env.example` 到 zip。 |
 | 启动生成项不写入 `.env.local`，有环境名时写入 `configs/config.<env>.yaml` | 已由 config package 测试验证；local package 由启动脚本设置 `TERMBRIDGE_ENV=local`，因此生成目标为 `configs/config.local.yaml`。 |
 
@@ -50,12 +50,12 @@ Accepted
    - package 复制 `.env.example`、`.env.local`、`start.cmd`、`start.sh`。
 
 2. `scripts/package/.env.local`
-   - 定义 portable local 运行最小配置：静态目录、listen/public URL、allowed origins。
+   - 定义 portable local 运行最小配置：静态目录、listen/public URL。
 
 3. `scripts/package/start.cmd`
    - 设置 `TERMBRIDGE_ENV=local`。
    - 加载 `.env.local`。
-   - 使用 `.env.local` 中的 `TERMBRIDGE_AGENT__PUBLIC_URL` 打开浏览器。
+   - 使用 `.env.local` 中的 `TERMBRIDGE_SERVER__PUBLIC_URL` 打开浏览器。
 
 4. `scripts/package/start.sh`
    - 设置 `TERMBRIDGE_ENV=local`。
