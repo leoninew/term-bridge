@@ -28,7 +28,7 @@ User -> Device -> Workspace -> Session -> Terminal
 - `termbridge agent` 启动本地 agent 后端、本机 runtime 与 PTY 能力。
 - `termbridge cloud` 启动云端门户后端。
 - Browser 通过 `/sessions` 选择 workspace、session 并 attach terminal。
-- 本地开发采用前后端分离。
+- 本地开发采用一个 Web/Vite dev server 同时代理 agent 与 cloud。
 - 镜像交付采用前后端一体：Go 服务提供后端 API 和已构建的前端静态资源。
 
 Cloud Gate PoC 阶段仍是验证态，不是生产发布态。Browser login 已切到 `/api/auth/*` 用户系统；agent 本地入口仍支持配置里的 `admin/admin` shortcut，cloud 入口要求配置 Google OAuth 与 Resend。device 绑定、pairing、credential rotation 后续再补。
@@ -48,24 +48,36 @@ task install
 
 ## 本地开发
 
-启动后端：
+同时启动 Web、agent 与 cloud：
 
 ```bash
-task serve
+task run
 ```
 
-启动前端开发服务：
+也可以分别启动；`task agent` 与 `task cloud` 会注入对应的本地联调端口和 API base：
 
 ```bash
+task agent
+task cloud
 task web
 ```
 
-默认本地开发地址：
+默认本地联调地址：
 
 ```text
-Backend: http://127.0.0.1:9030
-Frontend: http://localhost:9031
+web:   http://localhost:9030
+agent: http://127.0.0.1:9031
+cloud: http://127.0.0.1:9032
 ```
+
+Vite dev proxy 分流：
+
+```text
+/agent-api/* -> http://127.0.0.1:9031
+/cloud-api/* -> http://127.0.0.1:9032
+```
+
+`/agent-api` 与 `/cloud-api` 只用于本地 Vite 联调，不是最终产品 API path。最终 agent 本机运行和 cloud 云端同源部署时，前端仍按同源 `/api` 访问后端。
 
 ## 常用命令
 
@@ -116,21 +128,36 @@ configs/config.yaml
 TERMBRIDGE_ + 配置 key 大写，并将 . 转为 __
 ```
 
-本地 agent 开发示例：
+本地联调配置示例见 `configs/config.develop.example.yaml`。`task run` 会在未显式设置相关 OS env 时使用等价默认值：
+
+```dotenv
+TERMBRIDGE_ENV=develop
+TERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:9031
+TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost:9030
+TERMBRIDGE_AGENT__API_BASE_URL=/agent-api
+TERMBRIDGE_CLOUD__LISTEN_URL=http://127.0.0.1:9032
+TERMBRIDGE_CLOUD__PUBLIC_URL=http://localhost:9030
+TERMBRIDGE_CLOUD__API_BASE_URL=/cloud-api
+TERMBRIDGE_CLOUD__OAUTH__REDIRECT_URL=http://localhost:9030/cloud/oauth/callback
+```
+
+最终本机 agent 运行示例：
 
 ```dotenv
 TERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:9030
 TERMBRIDGE_RUNTIME__STATE_DIR=.termbridge
-TERMBRIDGE_AGENT__STATIC_DIR=
-TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost:9031
+TERMBRIDGE_AGENT__STATIC_DIR=web
+TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost:9030
+TERMBRIDGE_AGENT__API_BASE_URL=
 ```
 
 镜像内置静态资源示例：
 
 ```dotenv
-TERMBRIDGE_AGENT__LISTEN_URL=http://0.0.0.0:80
-TERMBRIDGE_AGENT__STATIC_DIR=/opt/termbridge/web/dist
-TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost
+TERMBRIDGE_CLOUD__LISTEN_URL=http://0.0.0.0:80
+TERMBRIDGE_CLOUD__STATIC_DIR=/opt/termbridge/web/dist
+TERMBRIDGE_CLOUD__PUBLIC_URL=https://cloud.example.com
+TERMBRIDGE_CLOUD__API_BASE_URL=
 TERMBRIDGE_RUNTIME__STATE_DIR=/var/lib/termbridge
 ```
 

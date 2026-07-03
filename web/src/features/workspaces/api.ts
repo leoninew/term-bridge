@@ -1,12 +1,16 @@
-import type { AxiosResponse } from 'axios'
+import type { AxiosInstance, AxiosResponse } from 'axios'
 import type { ListResp, WorkspaceSummary, WorkspaceTreeSummary } from '../../protocol/terminal'
-import { apiClient } from '../api/client'
+import { agentApiClient, cloudApiClient } from '../api/client'
 import type { ApiResult } from '../sessions/api'
-import { runtimePath, type RuntimeTarget } from '../runtimeTarget'
+import { runtimeApiTarget, runtimePath, type RuntimeTarget } from '../runtimeTarget'
 
 type ListWorkspacesResp = ListResp<WorkspaceSummary>
 type WorkspaceTreeResp = ListResp<WorkspaceTreeSummary>
 type UpdateWorkspaceOrderResp = ListResp<WorkspaceSummary>
+
+function apiClientForTarget(target: RuntimeTarget): AxiosInstance {
+  return runtimeApiTarget(target) === 'cloud' ? cloudApiClient : agentApiClient
+}
 
 function offline(response: AxiosResponse): boolean {
   return String(response.headers['x-termbridge-offline'] ?? '').toLowerCase() === 'true'
@@ -15,7 +19,9 @@ function offline(response: AxiosResponse): boolean {
 export async function listWorkspaces(
   target: RuntimeTarget,
 ): Promise<ApiResult<WorkspaceSummary[]>> {
-  const response = await apiClient.get<ListWorkspacesResp>(runtimePath(target, '/workspaces'))
+  const response = await apiClientForTarget(target).get<ListWorkspacesResp>(
+    runtimePath(target, '/workspaces'),
+  )
   return {
     data: response.data.items,
     offline: offline(response),
@@ -25,7 +31,9 @@ export async function listWorkspaces(
 export async function listWorkspaceTree(
   target: RuntimeTarget,
 ): Promise<ApiResult<WorkspaceTreeSummary[]>> {
-  const response = await apiClient.get<WorkspaceTreeResp>(runtimePath(target, '/workspaces/tree'))
+  const response = await apiClientForTarget(target).get<WorkspaceTreeResp>(
+    runtimePath(target, '/workspaces/tree'),
+  )
   return {
     data: response.data.items,
     offline: offline(response),
@@ -41,7 +49,7 @@ export async function updateWorkspaceOrder(
   workspaceIds: string[],
 ): Promise<WorkspaceSummary[]> {
   const request: UpdateWorkspaceOrderReq = { workspace_ids: workspaceIds }
-  const response = await apiClient.patch<UpdateWorkspaceOrderResp>(
+  const response = await apiClientForTarget(target).patch<UpdateWorkspaceOrderResp>(
     runtimePath(target, '/workspaces/order'),
     request,
   )
@@ -49,5 +57,7 @@ export async function updateWorkspaceOrder(
 }
 
 export async function deleteWorkspace(target: RuntimeTarget, workspaceId: string): Promise<void> {
-  await apiClient.delete(runtimePath(target, `/workspaces/${encodeURIComponent(workspaceId)}`))
+  await apiClientForTarget(target).delete(
+    runtimePath(target, `/workspaces/${encodeURIComponent(workspaceId)}`),
+  )
 }

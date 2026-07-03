@@ -5,6 +5,7 @@ logs/
 .termbridge/
 /configs/config.*.yaml
 !/configs/config.yaml
+!/configs/config.*.example.yaml
 /.env
 /.env.*
 !/.env.example

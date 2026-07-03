@@ -16,7 +16,7 @@ tasks:
       - go mod tidy
 
   run:
-    desc: Start web and backend development servers together
+    desc: Start web, agent, and cloud development servers together
     cmds:
       - uv run python scripts/run.py
 
@@ -80,12 +80,24 @@ tasks:
 
   agent:
     desc: Run database migrations and start local agent server
+    env:
+      TERMBRIDGE_ENV: develop
+      TERMBRIDGE_AGENT__LISTEN_URL: http://127.0.0.1:9031
+      TERMBRIDGE_AGENT__PUBLIC_URL: http://localhost:9030
+      TERMBRIDGE_AGENT__API_BASE_URL: /agent-api
+      TERMBRIDGE_CLOUD__OAUTH__REDIRECT_URL: http://localhost:9030/cloud/oauth/callback
     cmds:
       - go run cmd/termbridge/main.go migrate agent
       - go run cmd/termbridge/main.go agent {{.CLI_ARGS}}
 
   cloud:
     desc: Run database migrations and start cloud backend
+    env:
+      TERMBRIDGE_ENV: develop
+      TERMBRIDGE_CLOUD__LISTEN_URL: http://127.0.0.1:9032
+      TERMBRIDGE_CLOUD__PUBLIC_URL: http://localhost:9030
+      TERMBRIDGE_CLOUD__API_BASE_URL: /cloud-api
+      TERMBRIDGE_CLOUD__OAUTH__REDIRECT_URL: http://localhost:9030/cloud/oauth/callback
     cmds:
       - go run cmd/termbridge/main.go migrate cloud
       - go run cmd/termbridge/main.go cloud {{.CLI_ARGS}}
@@ -96,7 +108,7 @@ tasks:
       - go run cmd/termbridge/main.go exec -- {{.CLI_ARGS}}
 
   web:
-    desc: Start web frontend on localhost:9031
+    desc: Start web frontend on localhost:9030
     dir: web
     cmds:
       - yarn dev

@@ -5,6 +5,7 @@ import {
   ApiClientError,
   ApiContractMismatchError,
   apiClient,
+  cloudApiClient,
   ensureRequestId,
   errorFromResponse,
   requestIdHeader,
@@ -102,6 +103,25 @@ describe('api client', () => {
     })
 
     expect(result.data).toBe('https://api.example.com')
+    vi.unstubAllGlobals()
+  })
+
+  it('uses cloud API base URL for cloud requests', async () => {
+    vi.stubGlobal('window', {
+      __CONFIG__: { agentApiBaseUrl: '/agent-api', cloudApiBaseUrl: '/cloud-api' },
+    })
+
+    const result = await cloudApiClient.get<string>('/api/devices', {
+      adapter: async (config) => ({
+        data: config.baseURL,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      }),
+    })
+
+    expect(result.data).toBe('/cloud-api')
     vi.unstubAllGlobals()
   })
 

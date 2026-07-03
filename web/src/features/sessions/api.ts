@@ -1,8 +1,8 @@
-import type { AxiosResponse } from 'axios'
-import { apiClient } from '../api/client'
+import type { AxiosInstance, AxiosResponse } from 'axios'
+import { agentApiClient, cloudApiClient } from '../api/client'
 import { buildApiWebSocketUrl } from '../../config'
 import { clampTerminalSize } from '../../protocol/terminal'
-import { runtimePath, type RuntimeTarget } from '../runtimeTarget'
+import { runtimeApiTarget, runtimePath, type RuntimeTarget } from '../runtimeTarget'
 import type {
   CreateSessionReq,
   CreateSessionResp,
@@ -25,6 +25,10 @@ function workspaceSessionPath(workspaceId: string, sessionId?: string): string {
   return sessionId ? `${base}/${encodeURIComponent(sessionId)}` : base
 }
 
+function apiClientForTarget(target: RuntimeTarget): AxiosInstance {
+  return runtimeApiTarget(target) === 'cloud' ? cloudApiClient : agentApiClient
+}
+
 function offline(response: AxiosResponse): boolean {
   return String(response.headers['x-termbridge-offline'] ?? '').toLowerCase() === 'true'
 }
@@ -34,7 +38,7 @@ export async function createSession(
   workspaceId: string | null,
   request: CreateSessionReq,
 ): Promise<CreateSessionResp> {
-  const response = await apiClient.post<CreateSessionResp>(
+  const response = await apiClientForTarget(target).post<CreateSessionResp>(
     runtimePath(target, workspaceId ? workspaceSessionPath(workspaceId) : '/sessions'),
     workspaceId ? { ...request, workspace_id: workspaceId } : request,
   )
@@ -46,7 +50,7 @@ export async function getSession(
   workspaceId: string,
   sessionId: string,
 ): Promise<SessionSummary> {
-  const response = await apiClient.get<SessionSummary>(
+  const response = await apiClientForTarget(target).get<SessionSummary>(
     runtimePath(target, workspaceSessionPath(workspaceId, sessionId)),
   )
   return response.data
@@ -58,7 +62,7 @@ export async function updateSession(
   sessionId: string,
   request: UpdateSessionReq,
 ): Promise<SessionSummary> {
-  const response = await apiClient.patch<SessionSummary>(
+  const response = await apiClientForTarget(target).patch<SessionSummary>(
     runtimePath(target, workspaceSessionPath(workspaceId, sessionId)),
     request,
   )
@@ -70,7 +74,9 @@ export async function deleteSession(
   workspaceId: string,
   sessionId: string,
 ): Promise<void> {
-  await apiClient.delete(runtimePath(target, workspaceSessionPath(workspaceId, sessionId)))
+  await apiClientForTarget(target).delete(
+    runtimePath(target, workspaceSessionPath(workspaceId, sessionId)),
+  )
 }
 
 export async function readHistory(
@@ -78,7 +84,7 @@ export async function readHistory(
   workspaceId: string,
   sessionId: string,
 ): Promise<ApiResult<string>> {
-  const response = await apiClient.get<string>(
+  const response = await apiClientForTarget(target).get<string>(
     runtimePath(target, `${workspaceSessionPath(workspaceId, sessionId)}/history`),
     { responseType: 'text' },
   )
@@ -90,7 +96,7 @@ export async function closeSession(
   workspaceId: string,
   sessionId: string,
 ): Promise<SessionSummary> {
-  const response = await apiClient.post<SessionSummary>(
+  const response = await apiClientForTarget(target).post<SessionSummary>(
     runtimePath(target, `${workspaceSessionPath(workspaceId, sessionId)}/close`),
   )
   return response.data
@@ -102,7 +108,7 @@ export async function rerunSession(
   sessionId: string,
   request: RerunSessionReq,
 ): Promise<CreateSessionResp> {
-  const response = await apiClient.post<CreateSessionResp>(
+  const response = await apiClientForTarget(target).post<CreateSessionResp>(
     runtimePath(target, `${workspaceSessionPath(workspaceId, sessionId)}/rerun`),
     request,
   )
@@ -114,7 +120,7 @@ export async function updateSessionOrder(
   workspaceId: string,
   sessionIds: string[],
 ): Promise<WorkspaceTreeSession[]> {
-  const response = await apiClient.patch<UpdateSessionOrderResp>(
+  const response = await apiClientForTarget(target).patch<UpdateSessionOrderResp>(
     runtimePath(target, `${workspaceSessionPath(workspaceId)}/order`),
     { session_ids: sessionIds },
   )
@@ -140,5 +146,5 @@ export function terminalWsUrl(
   }
   const query = params.toString()
   const pathWithQuery = query ? `${path}?${query}` : path
-  return buildApiWebSocketUrl(pathWithQuery)
+  return buildApiWebSocketUrl(pathWithQuery, runtimeApiTarget(target))
 }

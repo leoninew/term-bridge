@@ -13,7 +13,7 @@ import (
 	sharedauth "termbridge-go/internal/shared/auth"
 )
 
-const registeredCloudOAuthRedirectURL = "http://localhost:9031/cloud/oauth/callback"
+const registeredCloudOAuthRedirectURL = "http://localhost:9030/cloud/oauth/callback"
 
 func testLocalDevice() agentapp.Device {
 	return agentapp.Device{Id: "dev-1", Name: "local-device"}
@@ -35,7 +35,7 @@ func TestCloudOAuthStartReturnsAuthorizeURLInLocalMode(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode cloud oauth start response: %v", err)
 	}
-	if !strings.HasPrefix(body.AuthorizeURL, "https://cloud.example.test/oauth2/authorize?") || !strings.Contains(body.AuthorizeURL, "client_id=termbridge-local") || !strings.Contains(body.AuthorizeURL, "redirect_uri=http%3A%2F%2Flocalhost%3A9031%2Fcloud%2Foauth%2Fcallback") || !strings.Contains(body.AuthorizeURL, "response_type=code") || !strings.Contains(body.AuthorizeURL, "scope=openid+email+profile") || !strings.Contains(body.AuthorizeURL, "state=") {
+	if !strings.HasPrefix(body.AuthorizeURL, "https://cloud.example.test/oauth2/authorize?") || !strings.Contains(body.AuthorizeURL, "client_id=termbridge-local") || !strings.Contains(body.AuthorizeURL, "redirect_uri=http%3A%2F%2Flocalhost%3A9030%2Fcloud%2Foauth%2Fcallback") || !strings.Contains(body.AuthorizeURL, "response_type=code") || !strings.Contains(body.AuthorizeURL, "scope=openid+email+profile") || !strings.Contains(body.AuthorizeURL, "state=") {
 		t.Fatalf("authorize_url = %q", body.AuthorizeURL)
 	}
 }

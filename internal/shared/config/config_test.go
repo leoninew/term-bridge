@@ -70,7 +70,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Agent.ListenUrl != "http://127.0.0.1:9030" {
 		t.Fatalf("Agent.ListenUrl = %q, want default listen URL", cfg.Agent.ListenUrl)
 	}
-	if cfg.Agent.PublicUrl != "http://localhost:9031" {
+	if cfg.Agent.PublicUrl != "http://localhost:9030" {
 		t.Fatalf("Agent.PublicUrl = %q, want local frontend URL", cfg.Agent.PublicUrl)
 	}
 	if cfg.Agent.APIBaseURL != "" {
@@ -88,7 +88,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Cloud.GateUrl != "" {
 		t.Fatalf("Cloud.GateUrl = %q, want empty by default", cfg.Cloud.GateUrl)
 	}
-	if cfg.Cloud.OAuth.ClientID != "termbridge-local" || cfg.Cloud.OAuth.ClientSecret != "" || cfg.Cloud.OAuth.RedirectURL != "http://localhost:9031/cloud/oauth/callback" {
+	if cfg.Cloud.OAuth.ClientID != "termbridge-local" || cfg.Cloud.OAuth.ClientSecret != "" || cfg.Cloud.OAuth.RedirectURL != "http://localhost:9030/cloud/oauth/callback" {
 		t.Fatalf("Cloud.OAuth = %#v", cfg.Cloud.OAuth)
 	}
 	if !reflect.DeepEqual(cfg.Cloud.OAuth.Scopes, []string{"openid", "email", "profile"}) {
@@ -206,7 +206,7 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	if cfg.Base == nil {
 		t.Fatal("Base = nil, want YAML-only baseline config")
 	}
-	if cfg.Base.LogLevel != "info" || cfg.Base.Agent.PublicUrl != "http://localhost:9031" {
+	if cfg.Base.LogLevel != "info" || cfg.Base.Agent.PublicUrl != "http://localhost:9030" {
 		t.Fatalf("Base = %#v, want default YAML values", cfg.Base)
 	}
 }
@@ -453,6 +453,25 @@ func TestLoadRejectsInvalidAgentAPIBaseURL(t *testing.T) {
 	}
 	if !apperrors.IsConfig(err) {
 		t.Fatalf("Load() error = %T, want config error", err)
+	}
+}
+
+func TestLoadAllowsPathAPIBaseURLForDevProxy(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeEnvConfig(t, cwd, "develop", "agent:\n  listen_url: http://127.0.0.1:9031\n  public_url: http://localhost:9030\n  api_base_url: /agent-api/\ncloud:\n  listen_url: http://127.0.0.1:9032\n  public_url: http://localhost:9030\n  api_base_url: /cloud-api/\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Agent.ListenUrl != "http://127.0.0.1:9031" || cfg.Agent.APIBaseURL != "/agent-api" {
+		t.Fatalf("Agent dev proxy config = %#v", cfg.Agent)
+	}
+	if cfg.Cloud.ListenUrl != "http://127.0.0.1:9032" || cfg.Cloud.APIBaseURL != "/cloud-api" {
+		t.Fatalf("Cloud dev proxy config = %#v", cfg.Cloud)
 	}
 }
 

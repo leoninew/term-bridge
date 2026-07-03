@@ -222,7 +222,7 @@ func TestRunAgentStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 		}
 	}))
 	defer cloudGate.Close()
-	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: " + cloudGate.URL + "\n  oauth:\n    client_id: termbridge-local\n    redirect_url: http://localhost:9031/cloud/oauth/callback\n"
+	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: " + cloudGate.URL + "\n  oauth:\n    client_id: termbridge-local\n    redirect_url: http://localhost:9030/cloud/oauth/callback\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
 	if err := os.MkdirAll(filepath.Join(cwd, ".termbridge"), 0o755); err != nil {

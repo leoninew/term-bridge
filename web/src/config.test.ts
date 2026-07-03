@@ -21,6 +21,17 @@ describe('runtime config', () => {
     expect(buildApiUrl('/api/health')).toBe('https://api.example.com/api/health')
   })
 
+  it('uses separate agent and cloud API base URLs', () => {
+    vi.stubGlobal('window', {
+      __CONFIG__: { agentApiBaseUrl: '/agent-api/', cloudApiBaseUrl: '/cloud-api/' },
+    })
+
+    expect(getApiBaseUrl('agent')).toBe('/agent-api')
+    expect(getApiBaseUrl('cloud')).toBe('/cloud-api')
+    expect(buildApiUrl('/api/health', 'agent')).toBe('/agent-api/api/health')
+    expect(buildApiUrl('/api/devices', 'cloud')).toBe('/cloud-api/api/devices')
+  })
+
   it('builds websocket URLs from runtime API base URL', () => {
     vi.stubGlobal('window', { __CONFIG__: { apiBaseUrl: 'https://api.example.com' } })
 
@@ -34,6 +45,14 @@ describe('runtime config', () => {
 
     expect(buildApiWebSocketUrl('/api/sessions/session-1/ws')).toBe(
       'ws://127.0.0.1:9030/api/sessions/session-1/ws',
+    )
+  })
+
+  it('keeps path-based websocket URLs for Vite dev proxy', () => {
+    vi.stubGlobal('window', { __CONFIG__: { cloudApiBaseUrl: '/cloud-api' } })
+
+    expect(buildApiWebSocketUrl('/api/devices/device-1/sessions/session-1/ws', 'cloud')).toBe(
+      '/cloud-api/api/devices/device-1/sessions/session-1/ws',
     )
   })
 })

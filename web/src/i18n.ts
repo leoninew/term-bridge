@@ -145,7 +145,7 @@ export const messages = {
       connectGuideTitle: '连接本机设备',
       connectGuideDescription:
         '在要加入账号的机器上打开 local dashboard，再从那里发起 Cloud Gate 授权。',
-      connectStepServe: '在目标机器上启动 termbridge agent。'
+      connectStepServe: '在目标机器上启动 termbridge agent。',
       connectStepCloud: '在本机 dashboard 打开连接 Cloud Gate 流程，并使用当前云端账号授权。',
       connectStepRefresh: '绑定完成后回到此页面刷新设备列表。',
       connectedAt: '连接时间：{value}',
@@ -354,7 +354,7 @@ export const messages = {
       connectGuideTitle: 'Connect a local device',
       connectGuideDescription:
         'Open the local dashboard on the machine you want to add, then start Cloud Gate authorization from there.',
-      connectStepServe: 'Start termbridge agent on the target machine.'
+      connectStepServe: 'Start termbridge agent on the target machine.',
       connectStepCloud:
         'From the local dashboard, open the Cloud Gate connection flow and authorize with this cloud account.',
       connectStepRefresh: 'Return here and refresh the device list after binding completes.',

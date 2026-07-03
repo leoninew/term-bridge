@@ -1,5 +1,5 @@
 import type { ListResp } from '../../protocol/terminal'
-import { apiClient } from '../api/client'
+import { agentApiClient, cloudApiClient } from '../api/client'
 
 export type DeviceSummary = {
   id: string
@@ -67,7 +67,7 @@ export type ListDevicesResp = ListResp<DeviceSummary>
 
 export async function authMe(): Promise<AuthMeResp> {
   try {
-    const response = await apiClient.get<AuthMeResp>('/api/auth/me')
+    const response = await agentApiClient.get<AuthMeResp>('/api/auth/me')
     return response.data
   } catch (err) {
     if (isUnauthorizedApiError(err)) {
@@ -78,28 +78,28 @@ export async function authMe(): Promise<AuthMeResp> {
 }
 
 export async function authLogin(email: string, password: string): Promise<TokenResp> {
-  const response = await apiClient.post<TokenResp>('/api/auth/login', { email, password })
+  const response = await cloudApiClient.post<TokenResp>('/api/auth/login', { email, password })
   return response.data
 }
 
 export async function authLogout(): Promise<void> {
-  await apiClient.post('/api/auth/logout')
+  await cloudApiClient.post('/api/auth/logout')
 }
 
 export async function authRegister(email: string, password: string): Promise<void> {
-  await apiClient.post('/api/auth/register', { email, password })
+  await cloudApiClient.post('/api/auth/register', { email, password })
 }
 
 export async function authVerifyEmail(email: string, code: string): Promise<void> {
-  await apiClient.post('/api/auth/email/verify', { email, code })
+  await cloudApiClient.post('/api/auth/email/verify', { email, code })
 }
 
 export async function authResendVerification(email: string): Promise<void> {
-  await apiClient.post('/api/auth/email/verification/resend', { email })
+  await cloudApiClient.post('/api/auth/email/verification/resend', { email })
 }
 
 export async function authPasswordResetRequest(email: string): Promise<void> {
-  await apiClient.post('/api/auth/password-reset/request', { email })
+  await cloudApiClient.post('/api/auth/password-reset/request', { email })
 }
 
 export async function authPasswordResetConfirm(
@@ -107,7 +107,7 @@ export async function authPasswordResetConfirm(
   code: string,
   newPassword: string,
 ): Promise<void> {
-  await apiClient.post('/api/auth/password-reset/confirm', {
+  await cloudApiClient.post('/api/auth/password-reset/confirm', {
     email,
     code,
     new_password: newPassword,
@@ -118,19 +118,22 @@ export async function authChangePassword(
   currentPassword: string,
   newPassword: string,
 ): Promise<void> {
-  await apiClient.post('/api/auth/password/change', {
+  await cloudApiClient.post('/api/auth/password/change', {
     current_password: currentPassword,
     new_password: newPassword,
   })
 }
 
 export async function authGoogleURL(): Promise<string> {
-  const response = await apiClient.get<GoogleAuthURLResp>('/api/auth/google')
+  const response = await cloudApiClient.get<GoogleAuthURLResp>('/api/auth/google')
   return response.data.auth_url
 }
 
 export async function authGoogleCallback(code: string, state: string): Promise<TokenResp> {
-  const response = await apiClient.post<TokenResp>('/api/auth/google/callback', { code, state })
+  const response = await cloudApiClient.post<TokenResp>('/api/auth/google/callback', {
+    code,
+    state,
+  })
   return response.data
 }
 
@@ -139,7 +142,7 @@ export function cloudOAuthStartURL(): string {
 }
 
 export async function cloudOAuthStart(redirect?: string): Promise<string> {
-  const response = await apiClient.get<CloudOAuthStartResp>('/api/cloud-oauth/start', {
+  const response = await agentApiClient.get<CloudOAuthStartResp>('/api/cloud-oauth/start', {
     params: redirect ? { redirect } : undefined,
   })
   return response.data.authorize_url
@@ -149,7 +152,7 @@ export async function cloudOAuthCallback(
   code: string,
   state: string,
 ): Promise<CloudOAuthCallbackResp> {
-  const response = await apiClient.post<CloudOAuthCallbackResp>('/api/cloud-oauth/callback', {
+  const response = await agentApiClient.post<CloudOAuthCallbackResp>('/api/cloud-oauth/callback', {
     code,
     state,
   })
@@ -161,18 +164,18 @@ export async function cloudOAuthAuthorize(
   redirectUri: string,
   state: string,
 ): Promise<string> {
-  const response = await apiClient.get<CloudOAuthAuthorizeResp>('/api/cloud-oauth/authorize', {
+  const response = await cloudApiClient.get<CloudOAuthAuthorizeResp>('/api/cloud-oauth/authorize', {
     params: { client_id: clientId, redirect_uri: redirectUri, state },
   })
   return response.data.redirect_url
 }
 
 export async function deleteDevice(deviceId: string): Promise<void> {
-  await apiClient.delete(`/api/devices/${encodeURIComponent(deviceId)}`)
+  await cloudApiClient.delete(`/api/devices/${encodeURIComponent(deviceId)}`)
 }
 
 export async function listDevices(): Promise<DeviceSummary[]> {
-  const response = await apiClient.get<ListDevicesResp>('/api/devices')
+  const response = await cloudApiClient.get<ListDevicesResp>('/api/devices')
   return response.data.items
 }
 

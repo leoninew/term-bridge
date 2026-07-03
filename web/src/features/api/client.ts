@@ -5,7 +5,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios'
 import type { ApiErrorResp } from '../../protocol/terminal'
-import { runtimeConfig } from '../../config'
+import { runtimeConfig, type ApiTarget } from '../../config'
 import { useGatewayStore } from '../../store/gateway'
 import { router } from '../../router'
 
@@ -41,39 +41,46 @@ export class ApiContractMismatchError extends Error {
 }
 
 export const apiClient = axios.create()
+export const agentApiClient = apiClient
+export const cloudApiClient = axios.create()
 
-apiClient.interceptors.request.use((cfg) => {
-  cfg.baseURL = runtimeConfig.apiBaseUrl
-  return cfg
-})
+configureApiClient(apiClient, 'agent')
+configureApiClient(cloudApiClient, 'cloud')
 
-apiClient.interceptors.request.use((cfg) => {
-  ensureRequestId(cfg)
-  const gateway = useGatewayStore()
-  if (gateway.token) {
-    const headers = AxiosHeaders.from(cfg.headers)
-    headers.set('Authorization', `Bearer ${gateway.token}`)
-    cfg.headers = headers
-  }
-  return cfg
-})
+function configureApiClient(client: typeof apiClient, target: ApiTarget): void {
+  client.interceptors.request.use((cfg) => {
+    cfg.baseURL = target === 'cloud' ? runtimeConfig.cloudApiBaseUrl : runtimeConfig.agentApiBaseUrl
+    return cfg
+  })
 
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error: AxiosError) => {
-    if (!error.response) {
-      return Promise.reject(error)
+  client.interceptors.request.use((cfg) => {
+    ensureRequestId(cfg)
+    const gateway = useGatewayStore()
+    if (gateway.token) {
+      const headers = AxiosHeaders.from(cfg.headers)
+      headers.set('Authorization', `Bearer ${gateway.token}`)
+      cfg.headers = headers
     }
-    if (error.response.status === 401) {
-      const gateway = useGatewayStore()
-      gateway.clearToken()
-      if (gateway.capabilities?.mode !== 'local' && router.currentRoute.value.name !== 'login') {
-        router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
+    return cfg
+  })
+
+  client.interceptors.response.use(
+    (response) => response,
+    (error: AxiosError) => {
+      if (!error.response) {
+        return Promise.reject(error)
       }
-    }
-    return Promise.reject(errorFromResponse(error.response))
-  },
-)
+      if (error.response.status === 401) {
+        const gateway = useGatewayStore()
+        gateway.clearToken()
+        if (gateway.capabilities?.mode !== 'local' && router.currentRoute.value.name !== 'login') {
+          router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
+        }
+      }
+      return Promise.reject(errorFromResponse(error.response))
+    },
+  )
+}
 
 export function ensureRequestId(config: InternalAxiosRequestConfig): void {
   const headers = AxiosHeaders.from(config.headers)

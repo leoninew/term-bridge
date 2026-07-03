@@ -938,7 +938,7 @@ func validateHTTPServerConfig(prefix string, listenURL string, publicURL string,
 		}
 	}
 	if apiBaseURL != "" {
-		if err := validateHTTPURL(prefix+".api_base_url", apiBaseURL, false); err != nil {
+		if err := validateAPIBaseURL(prefix+".api_base_url", apiBaseURL); err != nil {
 			return err
 		}
 	}
@@ -948,6 +948,16 @@ func validateHTTPServerConfig(prefix string, listenURL string, publicURL string,
 		}
 	}
 	return nil
+}
+
+func validateAPIBaseURL(key string, value string) error {
+	if strings.HasPrefix(value, "/") {
+		if strings.HasPrefix(value, "//") {
+			return apperrors.Config("invalid "+key, fmt.Errorf("must not be a protocol-relative URL"))
+		}
+		return nil
+	}
+	return validateHTTPURL(key, value, false)
 }
 
 func validateHTTPURL(key string, value string, requirePort bool) error {

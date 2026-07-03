@@ -6,12 +6,19 @@ export default defineConfig({
   plugins: [vue(), tailwindcss()],
   server: {
     host: 'localhost',
-    port: 9031,
+    port: 9030,
     proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:9030',
+      '/agent-api': {
+        target: 'http://127.0.0.1:9031',
         changeOrigin: true,
         ws: true,
+        rewrite: (path) => path.replace(/^\/agent-api/, ''),
+      },
+      '/cloud-api': {
+        target: 'http://127.0.0.1:9032',
+        changeOrigin: true,
+        ws: true,
+        rewrite: (path) => path.replace(/^\/cloud-api/, ''),
       },
     },
   },
