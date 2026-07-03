@@ -23,14 +23,15 @@ User -> Device -> Workspace -> Session -> Terminal
 
 ## 当前状态
 
-当前重点是本地 Gate、local direct runtime path 和统一 `/sessions` 工作台：
+当前重点是拆分本地 agent 与 cloud 后端入口，并保留 local direct runtime path 和统一 `/sessions` 工作台：
 
-- `termbridge serve` 启动后端 Gate 和本地 runtime。
+- `termbridge agent` 启动本地 agent 后端、本机 runtime 与 PTY 能力。
+- `termbridge cloud` 启动云端门户后端。
 - Browser 通过 `/sessions` 选择 workspace、session 并 attach terminal。
 - 本地开发采用前后端分离。
 - 镜像交付采用前后端一体：Go 服务提供后端 API 和已构建的前端静态资源。
 
-Cloud Gate PoC 阶段仍是验证态，不是生产发布态。Browser login 已切到 `/api/auth/*` 用户系统；本地模式仍支持配置里的 `admin/admin` shortcut，远程 Gate 模式要求配置 Google OAuth 与 Resend。device 绑定、pairing、credential rotation 后续再补。
+Cloud Gate PoC 阶段仍是验证态，不是生产发布态。Browser login 已切到 `/api/auth/*` 用户系统；agent 本地入口仍支持配置里的 `admin/admin` shortcut，cloud 入口要求配置 Google OAuth 与 Resend。device 绑定、pairing、credential rotation 后续再补。
 
 ## 开发依赖
 
@@ -115,22 +116,21 @@ configs/config.yaml
 TERMBRIDGE_ + 配置 key 大写，并将 . 转为 __
 ```
 
-本地开发示例：
+本地 agent 开发示例：
 
 ```dotenv
-TERMBRIDGE_SERVER__LISTEN_URL=http://127.0.0.1:9030
+TERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:9030
 TERMBRIDGE_RUNTIME__STATE_DIR=.termbridge
-TERMBRIDGE_SERVER__MODE=local
-TERMBRIDGE_SERVER__STATIC_DIR=
-TERMBRIDGE_SERVER__PUBLIC_URL=http://localhost:9031
+TERMBRIDGE_AGENT__STATIC_DIR=
+TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost:9031
 ```
 
 镜像内置静态资源示例：
 
 ```dotenv
-TERMBRIDGE_SERVER__LISTEN_URL=http://0.0.0.0:80
-TERMBRIDGE_SERVER__STATIC_DIR=/opt/termbridge/web/dist
-TERMBRIDGE_SERVER__PUBLIC_URL=http://localhost
+TERMBRIDGE_AGENT__LISTEN_URL=http://0.0.0.0:80
+TERMBRIDGE_AGENT__STATIC_DIR=/opt/termbridge/web/dist
+TERMBRIDGE_AGENT__PUBLIC_URL=http://localhost
 TERMBRIDGE_RUNTIME__STATE_DIR=/var/lib/termbridge
 ```
 
@@ -151,9 +151,9 @@ TERMBRIDGE_RESEND__API_KEY=
 TERMBRIDGE_RESEND__FROM_EMAIL=
 ```
 
-`server.mode` 决定运行模式：`local` 使用本地控制台与 local direct runtime path；`cloud` 用于云端门户部署，启动时会要求 Google OAuth 与 Resend 配置齐全。
+运行角色由 CLI 子命令选择：`termbridge agent` 启动本地 agent 后端与本机控制台能力，`termbridge cloud` 启动云端门户后端。配置文件不再通过 `server.mode` 选择角色。
 
-设备身份由 `termbridge serve` 在 `<runtime.state_dir>/agent.json` 中生成并读取；业务运行中变化的配置不会写回 `configs/config.yaml`。
+设备身份由 `termbridge agent` 在 `<runtime.state_dir>/agent.json` 中生成并读取；业务运行中变化的配置不会写回 `configs/config.yaml`。
 
 ## 当前边界
 

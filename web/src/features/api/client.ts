@@ -18,13 +18,14 @@ export class ApiClientError extends Error {
   readonly details?: unknown
 
   constructor(status: number, response: ApiErrorResp) {
+    const requestId = response.request_id || response.requestId || ''
     super(
-      `API request failed (${status} ${response.code}, requestId: ${response.requestId}): ${response.error}`,
+      `API request failed (${status} ${response.code}, requestId: ${requestId}): ${response.error}`,
     )
     this.name = 'ApiClientError'
     this.status = status
     this.code = response.code
-    this.requestId = response.requestId
+    this.requestId = requestId
     this.details = response.details
   }
 }
@@ -113,7 +114,7 @@ function isApiErrorResp(value: unknown): value is ApiErrorResp {
   return (
     typeof candidate.code === 'string' &&
     typeof candidate.error === 'string' &&
-    typeof candidate.requestId === 'string'
+    (typeof candidate.request_id === 'string' || typeof candidate.requestId === 'string')
   )
 }
 

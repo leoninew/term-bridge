@@ -66,7 +66,7 @@ describe('api client', () => {
 
   it('turns structured error responses into ApiClientError', () => {
     const err = errorFromResponse(
-      response(503, { code: 'device_offline', error: 'Device is offline.', requestId: 'req_123' }),
+      response(503, { code: 'device_offline', error: 'Device is offline.', request_id: 'req_123' }),
     )
 
     expect(err).toBeInstanceOf(ApiClientError)

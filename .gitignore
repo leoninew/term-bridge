@@ -10,3 +10,4 @@ logs/
 !/.env.example
 .pomelo-pw/output/
 tmp/
+gen/

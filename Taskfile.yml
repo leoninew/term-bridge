@@ -78,23 +78,25 @@ tasks:
       - chmod +x {{.PACKAGE_ROOT}}/start.sh
       - cd bin/package && zip -r ../TermBridge-windows-x64.zip TermBridge
 
+  agent:
+    desc: Run database migrations and start local agent server
+    cmds:
+      - go run cmd/termbridge/main.go migrate agent
+      - go run cmd/termbridge/main.go agent {{.CLI_ARGS}}
+
+  cloud:
+    desc: Run database migrations and start cloud backend
+    cmds:
+      - go run cmd/termbridge/main.go migrate cloud
+      - go run cmd/termbridge/main.go cloud {{.CLI_ARGS}}
+
   exec:
     desc: Run local command through termbridge exec
     cmds:
       - go run cmd/termbridge/main.go exec -- {{.CLI_ARGS}}
 
   web:
-    desc: Start web frontend on localhost:9031, proxying to serve backend
+    desc: Start web frontend on localhost:9031
     dir: web
     cmds:
       - yarn dev
-
-  serve:
-    desc: Start unified backend with Air hot reload
-    cmds:
-      - air -c .air.toml
-
-  migrate:
-    desc: Run database migrations
-    cmds:
-      - go run cmd/termbridge/main.go migrate

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"termbridge-go/internal/transport/cli"
+	"termbridge-go/cmd/termbridge/cli"
 )
 
 func main() {

@@ -58,7 +58,8 @@ export type ServerControlMessage =
 export type ApiErrorResp<TDetails = unknown> = {
   code: string
   error: string
-  requestId: string
+  request_id: string
+  requestId?: string
   details?: TDetails
 }
 

@@ -4,7 +4,7 @@ tmp_dir = "bin/air/serve"
 [build]
 cmd = "go build -o bin/air/serve/termbridge.exe ./cmd/termbridge"
 entrypoint = "bin/air/serve/termbridge.exe"
-args_bin = ["serve"]
+args_bin = ["agent"]
 include_ext = ["go", "yaml", "yml", "toml"]
 exclude_dir = [".git", ".termbridge", "bin", "docs", "logs", "vendor", "web"]
 exclude_file = []

@@ -1,0 +1,20 @@
+package api
+
+import cloudauth "termbridge-go/internal/cloud/auth"
+
+type UserView = cloudauth.UserView
+
+type Capabilities = cloudauth.Capabilities
+
+type AuthResult = cloudauth.Result
+
+const ProviderLocalAdmin = "local_admin"
+
+var (
+	ErrInvalidCredentials  = cloudauth.ErrInvalidCredentials
+	ErrEmailNotVerified    = cloudauth.ErrEmailNotVerified
+	ErrEmailAlreadyUsed    = cloudauth.ErrEmailAlreadyUsed
+	ErrCodeInvalid         = cloudauth.ErrCodeInvalid
+	ErrCodeCooldown        = cloudauth.ErrCodeCooldown
+	ErrProviderUnsupported = cloudauth.ErrProviderUnsupported
+)
