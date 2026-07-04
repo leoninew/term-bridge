@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	apperrors "termbridge-go/internal/shared/errors"
+	apperrors "termbridge-go/internal/shared/common/errors"
 )
 
 func TestParseExecCommandWithDefaultCwd(t *testing.T) {
@@ -340,7 +340,7 @@ func TestRunCommandCreatesLogStateAndReturnsCommandExitCode(t *testing.T) {
 	if len(matches) != 0 {
 		t.Fatalf("exit.json matches = %#v, want none", matches)
 	}
-	if _, err := os.Stat(filepath.Join(cwd, ".termbridge", "termbridge.db")); err != nil {
+	if _, err := os.Stat(filepath.Join(cwd, ".termbridge", "agent.db")); err != nil {
 		t.Fatalf("runtime database missing: %v", err)
 	}
 	historyMatches, err := filepath.Glob(filepath.Join(cwd, ".termbridge", "devices", "*", "workspaces", "*", "sessions", "*", "history.log"))

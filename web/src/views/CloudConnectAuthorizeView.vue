@@ -15,7 +15,7 @@
   import { useRoute, useRouter } from 'vue-router'
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../components/session/ToastHost.vue'
-  import { cloudOAuthAuthorize } from '../features/gateway/api'
+  import { cloudOAuthAuthorize } from '../features/cloud/api'
   import { useNotificationsStore } from '../store/notifications'
 
   const { t } = useI18n()
@@ -32,14 +32,14 @@
         t('gateway.connectFailed'),
         new Error('missing client_id, redirect_uri or state'),
       )
-      await router.replace({ name: 'dashboard' })
+      await router.replace({ name: 'agent-dashboard' })
       return
     }
     try {
       window.location.href = await cloudOAuthAuthorize(clientId, redirectUri, state)
     } catch (err) {
       notifications.notifyError(t('gateway.connectFailed'), err)
-      await router.replace({ name: 'dashboard' })
+      await router.replace({ name: 'agent-dashboard' })
     }
   })
 </script>

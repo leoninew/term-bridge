@@ -9,8 +9,8 @@ import (
 
 	"github.com/pressly/goose/v3"
 
-	"termbridge-go/internal/agent/migrations"
-	apperrors "termbridge-go/internal/shared/errors"
+	apperrors "termbridge-go/internal/shared/common/errors"
+	"termbridge-go/migrations/agent"
 )
 
 func Migrate(ctx context.Context, db *sql.DB, driver string) error {
@@ -68,10 +68,8 @@ func validateRuntimeSchemaState(ctx context.Context, db *sql.DB, driver string) 
 	if err != nil {
 		return apperrors.Config("inspect agent schema state", err)
 	}
-	if workspaces || sessions || sessionRuns {
-		if !(workspaces && sessions && sessionRuns) {
-			return apperrors.Config("invalid agent schema state", fmt.Errorf("runtime tables are partially present"))
-		}
+	if (workspaces || sessions || sessionRuns) && (!workspaces || !sessions || !sessionRuns) {
+		return apperrors.Config("invalid agent schema state", fmt.Errorf("runtime tables are partially present"))
 	}
 	devices, err := tableExists(ctx, db, driver, "devices")
 	if err != nil {
@@ -130,7 +128,7 @@ func columnExists(ctx context.Context, db *sql.DB, driver string, table string, 
 		if err != nil {
 			return false, err
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var cid int
 			var name string

@@ -4,7 +4,7 @@ package termbridge.common.v1;
 
 import "google/protobuf/struct.proto";
 
-option go_package = "termbridge-go/internal/gen/proto/termbridge/common/v1;commonv1";
+option go_package = "termbridge-go/internal/shared/dto/proto/termbridge/common/v1;commonv1";
 
 message ErrorResp {
   string code = 1;

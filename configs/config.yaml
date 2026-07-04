@@ -46,6 +46,13 @@ agent:
   # 是否在 agent API 错误响应中暴露内部错误细节。
   # 仅建议本地调试打开；生产保持 false。
   expose_errors: false
+  # Agent 独立数据库，与 cloud 分离，避免 migration 校验误报部分表存在。
+  database:
+    driver: sqlite
+    sqlite:
+      path: .termbridge/agent.db
+    mysql:
+      dsn: ""
 
 # Cloud HTTP/API server 与 connection 配置。
 # baseline 面向云端同源部署：cloud 自己提供 Web/API，同源 /api，不使用本地 Vite proxy path。
@@ -78,13 +85,13 @@ cloud:
       - email
       - profile
 
-# Database
-database:
-  driver: sqlite
-  sqlite:
-    path: .termbridge/termbridge.db
-  mysql:
-    dsn: ""
+  # Cloud 独立数据库，与 agent 分离，避免 migration 校验误报部分表存在。
+  database:
+    driver: sqlite
+    sqlite:
+      path: .termbridge/cloud.db
+    mysql:
+      dsn: ""
 
 # Auth
 auth:

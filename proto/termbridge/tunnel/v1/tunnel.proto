@@ -5,7 +5,7 @@ package termbridge.tunnel.v1;
 import "termbridge/common/v1/common.proto";
 import "termbridge/runtime/v1/runtime.proto";
 
-option go_package = "termbridge-go/internal/gen/proto/termbridge/tunnel/v1;tunnelv1";
+option go_package = "termbridge-go/internal/shared/dto/proto/termbridge/tunnel/v1;tunnelv1";
 
 message TunnelFrame {
   string stream_id = 1;

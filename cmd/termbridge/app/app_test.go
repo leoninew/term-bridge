@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	agent "termbridge-go/internal/agent/application"
-	"termbridge-go/internal/agent/domain/process"
-	"termbridge-go/internal/agent/runner"
-	apperrors "termbridge-go/internal/shared/errors"
-	httpserver "termbridge-go/internal/shared/http/server"
+	"termbridge-go/internal/agent/application/task/runner"
+	agent "termbridge-go/internal/agent/application/user"
+	"termbridge-go/internal/agent/model/task/process"
+	httpserver "termbridge-go/internal/shared/api/server"
+	apperrors "termbridge-go/internal/shared/common/errors"
 )
 
 func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
@@ -113,7 +113,7 @@ func TestRunMigrateRunsAgentDatabaseMigrations(t *testing.T) {
 		t.Fatalf("Result.Cwd = %q, want %q", result.Cwd, cwd)
 	}
 	db := openRuntimeDB(t, cwd)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	assertTableCount(t, db, "devices", 0)
 	assertTableCount(t, db, "workspaces", 0)
 	assertTableCount(t, db, "sessions", 0)
@@ -446,7 +446,7 @@ func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {
 func assertRuntimeDBCounts(t *testing.T, cwd string, wantWorkspaces int, wantSessions int, wantRuns int) {
 	t.Helper()
 	db := openRuntimeDB(t, cwd)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	assertTableCount(t, db, "workspaces", wantWorkspaces)
 	assertTableCount(t, db, "sessions", wantSessions)
 	assertTableCount(t, db, "session_runs", wantRuns)
@@ -455,7 +455,7 @@ func assertRuntimeDBCounts(t *testing.T, cwd string, wantWorkspaces int, wantSes
 func assertSessionExitCode(t *testing.T, cwd string, want int) {
 	t.Helper()
 	db := openRuntimeDB(t, cwd)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	var payload string
 	if err := db.QueryRow(`SELECT exit_json FROM session_runs ORDER BY updated_at DESC LIMIT 1`).Scan(&payload); err != nil {
 		t.Fatalf("query exit_json error = %v", err)
@@ -468,7 +468,7 @@ func assertSessionExitCode(t *testing.T, cwd string, want int) {
 func assertSessionState(t *testing.T, cwd string, want string) {
 	t.Helper()
 	db := openRuntimeDB(t, cwd)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	var got string
 	if err := db.QueryRow(`SELECT current_state FROM sessions ORDER BY updated_at DESC LIMIT 1`).Scan(&got); err != nil {
 		t.Fatalf("query current_state error = %v", err)
@@ -491,7 +491,7 @@ func assertTableCount(t *testing.T, db *sql.DB, table string, want int) {
 
 func openRuntimeDB(t *testing.T, cwd string) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("sqlite", filepath.Join(cwd, ".termbridge", "termbridge.db"))
+	db, err := sql.Open("sqlite", filepath.Join(cwd, ".termbridge", "agent.db"))
 	if err != nil {
 		t.Fatalf("Open runtime sqlite error = %v", err)
 	}

@@ -20,7 +20,7 @@
   import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
   import type { SessionSummary } from '../../protocol/terminal'
-  import type { CloudSessionSummary, DeviceSummary } from '../../features/gateway/api'
+  import type { CloudSessionSummary, DeviceSummary } from '../../features/types'
 
   const props = defineProps<{
     session: SessionSummary | null

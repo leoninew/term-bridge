@@ -1,16 +1,15 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { readStorageValue, removeStorageValue, writeStorageValue } from './storage'
-import {
-  authLogin,
-  authMe,
-  listDevices,
-  type AuthCapabilities,
-  type CloudSessionSummary,
-  type DeviceSummary,
-  type TokenResp,
-  type UserInfo,
-} from '../features/gateway/api'
+import { authMe } from '../features/agent/api'
+import { authLogin, listDevices } from '../features/cloud/api'
+import type {
+  AuthCapabilities,
+  CloudSessionSummary,
+  DeviceSummary,
+  TokenResp,
+  UserInfo,
+} from '../features/types'
 import type { RuntimeTarget } from '../features/runtimeTarget'
 
 const TOKEN_KEY = 'termbridge_gateway_token'

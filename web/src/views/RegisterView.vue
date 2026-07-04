@@ -49,7 +49,7 @@
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRouter, RouterLink } from 'vue-router'
-  import { authGoogleURL, authRegister } from '../features/gateway/api'
+  import { authGoogleURL, authRegister } from '../features/cloud/api'
   const { t } = useI18n()
   const router = useRouter()
   const email = ref('')

@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"termbridge-go/cmd/termbridge/app"
-	apperrors "termbridge-go/internal/shared/errors"
-	"termbridge-go/internal/shared/version"
+	apperrors "termbridge-go/internal/shared/common/errors"
+	"termbridge-go/internal/shared/common/utils/version"
 )
 
 type CommandKind string
@@ -61,7 +61,7 @@ func Run(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int
 	}
 
 	if options.ShowVersion {
-		fmt.Fprintln(stdout, version.String())
+		_, _ = fmt.Fprintln(stdout, version.String())
 		return apperrors.ExitSuccess
 	}
 
@@ -94,8 +94,8 @@ func Run(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int
 	if err != nil {
 		printError(stderr, err)
 		if apperrors.KindOf(err) == apperrors.KindRuntime {
-			fmt.Fprintf(stderr, "cwd: %s\n", result.Cwd)
-			fmt.Fprintf(stderr, "command: %s\n", strings.Join(result.Command, " "))
+			_, _ = fmt.Fprintf(stderr, "cwd: %s\n", result.Cwd)
+			_, _ = fmt.Fprintf(stderr, "command: %s\n", strings.Join(result.Command, " "))
 		}
 		return apperrors.ExitCode(err)
 	}
@@ -267,63 +267,63 @@ func isCommand(arg string) bool {
 }
 
 func PrintUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  termbridge [options] <command> [command options]")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Commands:")
-	fmt.Fprintln(w, "  agent      start local agent server, runtime, and optional cloud connector")
-	fmt.Fprintln(w, "  cloud      start cloud API, device binding, and tunnel ingress")
-	fmt.Fprintln(w, "  exec       run a command through a PTY")
-	fmt.Fprintln(w, "  workspace  list workspaces")
-	fmt.Fprintln(w, "  session    list sessions")
-	fmt.Fprintln(w, "  migrate    run role-specific database migrations")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Options:")
-	fmt.Fprintln(w, "  --cwd <dir>     working directory for TermBridge; defaults to current directory")
-	fmt.Fprintln(w, "  --version       show version")
-	fmt.Fprintln(w, "  --help          show help")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Config files:")
-	fmt.Fprintln(w, "  TermBridge reads configs/config.yaml from --cwd/current directory.")
-	fmt.Fprintln(w, "  Set TERMBRIDGE_ENV=<env> to also read configs/config.<env>.yaml and .env.<env>.")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Examples:")
-	fmt.Fprintln(w, "  termbridge agent")
-	fmt.Fprintln(w, "  termbridge cloud")
-	fmt.Fprintln(w, "  termbridge migrate agent")
-	fmt.Fprintln(w, "  termbridge migrate cloud")
-	fmt.Fprintln(w, "  termbridge exec -- claude")
-	fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- codex")
-	fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- pwsh")
+	_, _ = fmt.Fprintln(w, "Usage:")
+	_, _ = fmt.Fprintln(w, "  termbridge [options] <command> [command options]")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Commands:")
+	_, _ = fmt.Fprintln(w, "  agent      start local agent server, runtime, and optional cloud connector")
+	_, _ = fmt.Fprintln(w, "  cloud      start cloud API, device binding, and tunnel ingress")
+	_, _ = fmt.Fprintln(w, "  exec       run a command through a PTY")
+	_, _ = fmt.Fprintln(w, "  workspace  list workspaces")
+	_, _ = fmt.Fprintln(w, "  session    list sessions")
+	_, _ = fmt.Fprintln(w, "  migrate    run role-specific database migrations")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Options:")
+	_, _ = fmt.Fprintln(w, "  --cwd <dir>     working directory for TermBridge; defaults to current directory")
+	_, _ = fmt.Fprintln(w, "  --version       show version")
+	_, _ = fmt.Fprintln(w, "  --help          show help")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Config files:")
+	_, _ = fmt.Fprintln(w, "  TermBridge reads configs/config.yaml from --cwd/current directory.")
+	_, _ = fmt.Fprintln(w, "  Set TERMBRIDGE_ENV=<env> to also read configs/config.<env>.yaml and .env.<env>.")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Examples:")
+	_, _ = fmt.Fprintln(w, "  termbridge agent")
+	_, _ = fmt.Fprintln(w, "  termbridge cloud")
+	_, _ = fmt.Fprintln(w, "  termbridge migrate agent")
+	_, _ = fmt.Fprintln(w, "  termbridge migrate cloud")
+	_, _ = fmt.Fprintln(w, "  termbridge exec -- claude")
+	_, _ = fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- codex")
+	_, _ = fmt.Fprintln(w, "  termbridge --cwd D:\\project exec -- pwsh")
 }
 
 func PrintExecUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  termbridge [options] exec [exec options] -- <command> [args...]")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Options:")
-	fmt.Fprintln(w, "  --help          show exec help")
+	_, _ = fmt.Fprintln(w, "Usage:")
+	_, _ = fmt.Fprintln(w, "  termbridge [options] exec [exec options] -- <command> [args...]")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Options:")
+	_, _ = fmt.Fprintln(w, "  --help          show exec help")
 }
 
 func PrintRoleUsage(w io.Writer, command string) {
-	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintf(w, "  termbridge [options] %s\n", command)
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "%s starts the %s business entry.\n", command, command)
-	fmt.Fprintln(w, "Listen settings and role-specific dependencies are read from config.")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Options:")
-	fmt.Fprintln(w, "  --help          show help")
+	_, _ = fmt.Fprintln(w, "Usage:")
+	_, _ = fmt.Fprintf(w, "  termbridge [options] %s\n", command)
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "%s starts the %s business entry.\n", command, command)
+	_, _ = fmt.Fprintln(w, "Listen settings and role-specific dependencies are read from config.")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Options:")
+	_, _ = fmt.Fprintln(w, "  --help          show help")
 }
 
 func PrintMigrateUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  termbridge [options] migrate <agent|cloud>")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Options:")
-	fmt.Fprintln(w, "  --help          show migrate help")
+	_, _ = fmt.Fprintln(w, "Usage:")
+	_, _ = fmt.Fprintln(w, "  termbridge [options] migrate <agent|cloud>")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Options:")
+	_, _ = fmt.Fprintln(w, "  --help          show migrate help")
 }
 
 func printError(w io.Writer, err error) {
-	fmt.Fprintf(w, "error: %s\n\n", apperrors.FormatUser(err))
+	_, _ = fmt.Fprintf(w, "error: %s\n\n", apperrors.FormatUser(err))
 }

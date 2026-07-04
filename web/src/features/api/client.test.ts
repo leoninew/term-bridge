@@ -13,7 +13,7 @@ import {
 
 vi.mock('../../router', () => ({
   router: {
-    currentRoute: { value: { name: 'sessions' } },
+    currentRoute: { value: { name: 'agent-sessions' } },
     push: vi.fn(),
   },
 }))

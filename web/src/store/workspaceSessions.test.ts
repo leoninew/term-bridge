@@ -1,22 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { WorkspaceTreeSummary } from '../protocol/terminal'
+import type { SessionRuntimeApi } from '../features/sessions/runtime'
 import { useWorkspaceSessionsStore } from './workspaceSessions'
 
-const mocks = vi.hoisted(() => ({
+const runtimeApi = {
   listWorkspaceTree: vi.fn(),
   updateWorkspaceOrder: vi.fn(),
   updateSessionOrder: vi.fn(),
-}))
-
-vi.mock('../features/workspaces/api', () => ({
-  listWorkspaceTree: mocks.listWorkspaceTree,
-  updateWorkspaceOrder: mocks.updateWorkspaceOrder,
-}))
-
-vi.mock('../features/sessions/api', () => ({
-  updateSessionOrder: mocks.updateSessionOrder,
-}))
+} as unknown as SessionRuntimeApi
 
 const target = { mode: 'cloud' as const, deviceId: 'device-1' }
 
@@ -153,11 +145,11 @@ describe('useWorkspaceSessionsStore', () => {
     const error = new Error('failed')
 
     store.applyWorkspaceTree(workspaceTree)
-    mocks.updateWorkspaceOrder.mockRejectedValueOnce(error)
+    vi.mocked(runtimeApi.updateWorkspaceOrder).mockRejectedValueOnce(error)
 
-    await expect(store.reorderWorkspaces(target, ['workspace-2', 'workspace-1'])).rejects.toThrow(
-      error,
-    )
+    await expect(
+      store.reorderWorkspaces(target, runtimeApi, ['workspace-2', 'workspace-1']),
+    ).rejects.toThrow(error)
     expect(store.workspaceTree.map((workspace) => workspace.id)).toEqual([
       'workspace-1',
       'workspace-2',
@@ -168,14 +160,14 @@ describe('useWorkspaceSessionsStore', () => {
     const store = useWorkspaceSessionsStore()
 
     store.applyWorkspaceTree(workspaceTree)
-    mocks.updateSessionOrder.mockResolvedValueOnce([
+    vi.mocked(runtimeApi.updateSessionOrder).mockResolvedValueOnce([
       workspaceTree[0].children[1],
       workspaceTree[0].children[0],
     ])
 
-    await store.reorderSessions(target, 'workspace-1', ['session-2', 'session-1'])
+    await store.reorderSessions(target, runtimeApi, 'workspace-1', ['session-2', 'session-1'])
 
-    expect(mocks.updateSessionOrder).toHaveBeenCalledWith(target, 'workspace-1', [
+    expect(runtimeApi.updateSessionOrder).toHaveBeenCalledWith('workspace-1', [
       'session-2',
       'session-1',
     ])
@@ -191,10 +183,10 @@ describe('useWorkspaceSessionsStore', () => {
     const error = new Error('failed')
 
     store.applyWorkspaceTree(workspaceTree)
-    mocks.updateSessionOrder.mockRejectedValueOnce(error)
+    vi.mocked(runtimeApi.updateSessionOrder).mockRejectedValueOnce(error)
 
     await expect(
-      store.reorderSessions(target, 'workspace-1', ['session-2', 'session-1']),
+      store.reorderSessions(target, runtimeApi, 'workspace-1', ['session-2', 'session-1']),
     ).rejects.toThrow(error)
     expect(store.workspaceTree[0].children.map((session) => session.id)).toEqual([
       'session-1',

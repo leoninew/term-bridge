@@ -9,35 +9,34 @@ tasks:
       - task --list
 
   install:
-    desc: Install web and Go dependencies
+    desc: Install web and Go dependencies, plus proto tooling into ./bin
+    env:
+      GOBIN: '{{.TASKFILE_DIR}}/bin'
+      PATH: '{{.TASKFILE_DIR}}/bin:${PATH}'
     cmds:
+      - mkdir -p bin
+      - go install github.com/bufbuild/buf/cmd/buf@v1.65.0
+      - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
       - cd web && yarn install
       - go mod download
       - go mod tidy
 
-  run:
-    desc: Start web, agent, and cloud development servers together
+  proto:
+    desc: Generate Go and frontend TypeScript code from proto files via buf
     cmds:
-      - uv run python scripts/run.py
-
-  clean:
-    desc: Remove build outputs
-    cmds:
-      - cmd: rm -rf web/dist bin
-        platforms: [linux, darwin]
-      - cmd: pwsh -NoProfile -Command "Remove-Item -Recurse -Force web/dist, bin -ErrorAction SilentlyContinue"
-        platforms: [windows]
+      - ./bin/buf dep update
+      - ./bin/buf generate
+      - cd web && ../bin/buf generate ../proto --template buf.gen.yaml
 
   check:
     desc: Run frontend and backend checks
     cmds:
       - cd web && yarn typecheck
+      - cd web && yarn format
       - cd web && yarn lint
-      - cd web && yarn format:check
-      - cd web && yarn test
-      - go fmt ./cmd/... ./internal/...
-      - go vet ./cmd/... ./internal/...
-      - go test ./cmd/... ./internal/...
+      - ./bin/golangci-lint fmt ./cmd/... ./internal/...
+      - ./bin/golangci-lint run ./cmd/... ./internal/...
 
   test:
     desc: Run frontend and backend unit tests
@@ -45,38 +44,11 @@ tasks:
       - cd web && yarn test
       - go test ./cmd/... ./internal/...
 
-  build:
-    desc: Build web frontend and termbridge image
+  web:
+    desc: Start web frontend on localhost:9030
+    dir: web
     cmds:
-      - cmd: mkdir -p bin
-        platforms: [linux, darwin]
-      - cmd: pwsh -NoProfile -Command "New-Item -ItemType Directory -Force bin | Out-Null"
-        platforms: [windows]
-      - go build -o bin/termbridge.exe ./cmd/termbridge
-
-  docker:
-    desc: Build web frontend and termbridge image
-    cmds:
-      - docker build -f Dockerfile.cn -t termbridge .
-
-  package:
-    desc: Build Windows x64 portable zip package
-    vars:
-      PACKAGE_ROOT: bin/package/TermBridge
-      PACKAGE_ZIP: bin/TermBridge-windows-x64.zip
-    cmds:
-      - rm -rf bin/package {{.PACKAGE_ZIP}}
-      - mkdir -p {{.PACKAGE_ROOT}}/web {{.PACKAGE_ROOT}}/configs
-      - cd web && yarn build
-      - env GOOS=windows GOARCH=amd64 go build -o {{.PACKAGE_ROOT}}/termbridge.exe ./cmd/termbridge
-      - cp -R web/dist/. {{.PACKAGE_ROOT}}/web/
-      - cp configs/config.yaml {{.PACKAGE_ROOT}}/configs/config.yaml
-      - cp .env.example {{.PACKAGE_ROOT}}/.env.example
-      - cp scripts/package/.env.local {{.PACKAGE_ROOT}}/.env.local
-      - cp scripts/package/start.cmd {{.PACKAGE_ROOT}}/start.cmd
-      - cp scripts/package/start.sh {{.PACKAGE_ROOT}}/start.sh
-      - chmod +x {{.PACKAGE_ROOT}}/start.sh
-      - cd bin/package && zip -r ../TermBridge-windows-x64.zip TermBridge
+      - yarn dev
 
   agent:
     desc: Run database migrations and start local agent server
@@ -107,8 +79,42 @@ tasks:
     cmds:
       - go run cmd/termbridge/main.go exec -- {{.CLI_ARGS}}
 
-  web:
-    desc: Start web frontend on localhost:9030
-    dir: web
+  run:
+    desc: Start web, agent, and cloud development servers together
     cmds:
-      - yarn dev
+      - uv run python scripts/run.py
+
+  build:
+    desc: Build web frontend and termbridge image
+    cmds:
+      - mkdir -p bin
+      - go build -o bin/termbridge ./cmd/termbridge
+
+  docker:
+    desc: Build web frontend and termbridge image
+    cmds:
+      - docker build -f Dockerfile.cn -t termbridge .
+
+  package:
+    desc: Build Windows x64 portable zip package
+    vars:
+      PACKAGE_ROOT: bin/package/TermBridge
+      PACKAGE_ZIP: bin/TermBridge-windows-x64.zip
+    cmds:
+      - rm -rf bin/package {{.PACKAGE_ZIP}}
+      - mkdir -p {{.PACKAGE_ROOT}}/web {{.PACKAGE_ROOT}}/configs
+      - cd web && yarn build
+      - env GOOS=windows GOARCH=amd64 go build -o {{.PACKAGE_ROOT}}/termbridge.exe ./cmd/termbridge
+      - cp -R web/dist/. {{.PACKAGE_ROOT}}/web/
+      - cp configs/config.yaml {{.PACKAGE_ROOT}}/configs/config.yaml
+      - cp .env.example {{.PACKAGE_ROOT}}/.env.example
+      - cp scripts/package/.env.local {{.PACKAGE_ROOT}}/.env.local
+      - cp scripts/package/start.cmd {{.PACKAGE_ROOT}}/start.cmd
+      - cp scripts/package/start.sh {{.PACKAGE_ROOT}}/start.sh
+      - chmod +x {{.PACKAGE_ROOT}}/start.sh
+      - cd bin/package && zip -r ../TermBridge-windows-x64.zip TermBridge
+
+  clean:
+    desc: Remove build outputs
+    cmds:
+      - rm -rf web/dist bin

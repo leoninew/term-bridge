@@ -1,6 +1,6 @@
-version: v1
+version: v2
 plugins:
-  - name: go
-    out: internal/gen/proto
+  - local: bin/protoc-gen-go
+    out: internal/shared/dto/proto
     opt:
       - paths=source_relative

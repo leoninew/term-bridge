@@ -5,7 +5,7 @@ import vue from 'eslint-plugin-vue'
 
 export default tseslint.config(
   {
-    ignores: ['dist', 'node_modules'],
+    ignores: ['dist', 'node_modules', 'src/gen/proto/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -19,10 +19,11 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.{ts,vue}'],
+    files: ['**/*.{ts,vue,mjs}'],
     languageOptions: {
       globals: {
         console: 'readonly',
+        process: 'readonly',
         window: 'readonly',
         document: 'readonly',
         WebSocket: 'readonly',

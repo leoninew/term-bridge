@@ -138,7 +138,7 @@
   import SessionStatusBar from './SessionStatusBar.vue'
   import TerminalPane from './TerminalPane.vue'
   import type { ServerControlMessage, SessionSummary } from '../../protocol/terminal'
-  import type { CloudSessionSummary, DeviceSummary } from '../../features/gateway/api'
+  import type { CloudSessionSummary, DeviceSummary } from '../../features/types'
   import type { OpenSessionTab } from '../../store/workbench'
 
   const props = defineProps<{

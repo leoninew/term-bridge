@@ -18,8 +18,12 @@
 
   onMounted(async () => {
     await gateway.initializeAuth()
-    if (gateway.capabilities?.mode === 'local' || gateway.authenticated) {
-      await router.replace({ name: 'dashboard' })
+    if (gateway.capabilities?.mode === 'local') {
+      await router.replace({ name: 'agent-dashboard' })
+      return
+    }
+    if (gateway.authenticated) {
+      await router.replace({ name: 'cloud-dashboard' })
       return
     }
     await router.replace({ name: 'login' })

@@ -4,7 +4,7 @@ package termbridge.runtime.v1;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "termbridge-go/internal/gen/proto/termbridge/runtime/v1;runtimev1";
+option go_package = "termbridge-go/internal/shared/dto/proto/termbridge/runtime/v1;runtimev1";
 
 message Workspace {
   string id = 1;

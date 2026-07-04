@@ -7,20 +7,20 @@ import (
 	"strings"
 	"time"
 
-	agentserver "termbridge-go/internal/agent/app"
-	agentapp "termbridge-go/internal/agent/application"
-	"termbridge-go/internal/agent/domain/process"
-	"termbridge-go/internal/agent/history"
+	agentserver "termbridge-go/internal/agent/application/bootstrap"
+	"termbridge-go/internal/agent/application/task/runner"
+	agentapp "termbridge-go/internal/agent/application/user"
 	agentdb "termbridge-go/internal/agent/infrastructure/database"
-	"termbridge-go/internal/agent/pty/gopty"
-	"termbridge-go/internal/agent/runner"
-	cloudserver "termbridge-go/internal/cloud/app"
+	"termbridge-go/internal/agent/infrastructure/pty/gopty"
+	"termbridge-go/internal/agent/infrastructure/storage/history"
+	"termbridge-go/internal/agent/model/task/process"
+	cloudserver "termbridge-go/internal/cloud/application/bootstrap"
 	clouddb "termbridge-go/internal/cloud/infrastructure/database"
-	"termbridge-go/internal/shared/config"
-	basedb "termbridge-go/internal/shared/database"
-	apperrors "termbridge-go/internal/shared/errors"
-	httpserver "termbridge-go/internal/shared/http/server"
-	"termbridge-go/internal/shared/logging"
+	httpserver "termbridge-go/internal/shared/api/server"
+	apperrors "termbridge-go/internal/shared/common/errors"
+	"termbridge-go/internal/shared/infrastructure/config"
+	basedb "termbridge-go/internal/shared/infrastructure/database"
+	"termbridge-go/internal/shared/infrastructure/logger"
 )
 
 type CommandKind string
@@ -128,7 +128,7 @@ func Run(ctx context.Context, options Options) (Result, error) {
 		logger.Info("termbridge cloud command parsed", "cwd", cfg.Cwd, "server_listen_url", cfg.Cloud.ListenUrl, "config", cfg.DefaultConfigFile)
 		return runCloud(ctx, cfg, logger.Slog, options)
 	case CommandMigrate:
-		logger.Info("termbridge migrate command parsed", "cwd", cfg.Cwd, "database_driver", cfg.Database.Driver, "config", cfg.DefaultConfigFile, "role", options.Command.MigrateRole)
+		logger.Info("termbridge migrate command parsed", "cwd", cfg.Cwd, "config", cfg.DefaultConfigFile, "role", options.Command.MigrateRole)
 		return runMigrate(ctx, cfg, options.Command.MigrateRole)
 	default:
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("missing command")
@@ -145,11 +145,12 @@ func logLoadedConfigFiles(logger *slog.Logger, paths []string) {
 }
 
 func runMigrate(ctx context.Context, cfg config.Config, role string) (Result, error) {
-	db, err := basedb.Open(ctx, cfg.Database.Driver, cfg.Database.SQLite.Path, cfg.Database.MySQL.DSN)
+	database := selectRoleDatabase(cfg, role)
+	db, err := basedb.Open(ctx, database.Driver, database.SQLite.Path, database.MySQL.DSN)
 	if err != nil {
 		return Result{Cwd: cfg.Cwd}, err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	switch strings.TrimSpace(role) {
 	case "agent":
 		if err := agentdb.Migrate(ctx, db.DB, db.Driver); err != nil {
@@ -163,6 +164,15 @@ func runMigrate(ctx context.Context, cfg config.Config, role string) (Result, er
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("migrate requires role: termbridge migrate agent|cloud")
 	}
 	return Result{Cwd: cfg.Cwd}, nil
+}
+
+func selectRoleDatabase(cfg config.Config, role string) config.DatabaseConfig {
+	switch strings.TrimSpace(role) {
+	case "cloud":
+		return cfg.Cloud.Database
+	default:
+		return cfg.Agent.Database
+	}
 }
 
 func runExec(ctx context.Context, cfg config.Config, logger *slog.Logger, options Options) (Result, error) {
@@ -218,9 +228,9 @@ func agentConfig(cfg config.Config) agentserver.Config {
 		},
 		Gate: agentserver.GateConfig{API: agentserver.GateAPIConfig{ExposeErrors: cfg.Agent.ExposeErrors}},
 		Database: agentserver.DatabaseConfig{
-			Driver: cfg.Database.Driver,
-			SQLite: agentserver.SQLiteConfig{Path: cfg.Database.SQLite.Path},
-			MySQL:  agentserver.MySQLConfig{DSN: cfg.Database.MySQL.DSN},
+			Driver: cfg.Agent.Database.Driver,
+			SQLite: agentserver.SQLiteConfig{Path: cfg.Agent.Database.SQLite.Path},
+			MySQL:  agentserver.MySQLConfig{DSN: cfg.Agent.Database.MySQL.DSN},
 		},
 		Auth: agentserver.AuthConfig{
 			Username: cfg.Auth.LocalAdmin.Username,
@@ -254,9 +264,9 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 		},
 		Gate: cloudserver.GateConfig{API: cloudserver.GateAPIConfig{ExposeErrors: cfg.Cloud.ExposeErrors}},
 		Database: cloudserver.DatabaseConfig{
-			Driver: cfg.Database.Driver,
-			SQLite: cloudserver.SQLiteConfig{Path: cfg.Database.SQLite.Path},
-			MySQL:  cloudserver.MySQLConfig{DSN: cfg.Database.MySQL.DSN},
+			Driver: cfg.Cloud.Database.Driver,
+			SQLite: cloudserver.SQLiteConfig{Path: cfg.Cloud.Database.SQLite.Path},
+			MySQL:  cloudserver.MySQLConfig{DSN: cfg.Cloud.Database.MySQL.DSN},
 		},
 		Auth: cloudserver.AuthConfig{
 			JWTTTL: cfg.Auth.JWTTTL,

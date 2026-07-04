@@ -9,8 +9,8 @@ import (
 
 	"github.com/pressly/goose/v3"
 
-	"termbridge-go/internal/cloud/migrations"
-	apperrors "termbridge-go/internal/shared/errors"
+	apperrors "termbridge-go/internal/shared/common/errors"
+	"termbridge-go/migrations/cloud"
 )
 
 func Migrate(ctx context.Context, db *sql.DB, driver string) error {
@@ -132,7 +132,7 @@ func columnExists(ctx context.Context, db *sql.DB, driver string, table string, 
 		if err != nil {
 			return false, err
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var cid int
 			var name string

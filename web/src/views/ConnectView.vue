@@ -36,7 +36,7 @@
   import { useRoute } from 'vue-router'
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../components/session/ToastHost.vue'
-  import { cloudOAuthStartURL } from '../features/gateway/api'
+  import { cloudOAuthStartURL } from '../features/agent/api'
   import { useNotificationsStore } from '../store/notifications'
 
   const { t } = useI18n()

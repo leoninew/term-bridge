@@ -25,7 +25,7 @@
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRouter } from 'vue-router'
-  import { authPasswordResetRequest } from '../features/gateway/api'
+  import { authPasswordResetRequest } from '../features/cloud/api'
   const { t } = useI18n()
   const router = useRouter()
   const email = ref('')

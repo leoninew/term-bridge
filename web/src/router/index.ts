@@ -75,14 +75,24 @@ export const router = createRouter({
       component: () => import('../views/CloudConnectAuthorizeView.vue'),
     },
     {
-      path: '/dashboard',
-      name: 'dashboard',
-      component: () => import('../views/DashboardView.vue'),
+      path: '/agent/dashboard',
+      name: 'agent-dashboard',
+      component: () => import('../views/AgentDashboardView.vue'),
     },
     {
-      path: '/sessions',
-      name: 'sessions',
-      component: () => import('../views/SessionsView.vue'),
+      path: '/agent/sessions',
+      name: 'agent-sessions',
+      component: () => import('../views/AgentSessionsView.vue'),
+    },
+    {
+      path: '/cloud/dashboard',
+      name: 'cloud-dashboard',
+      component: () => import('../views/CloudDashboardView.vue'),
+    },
+    {
+      path: '/cloud/devices/:deviceId/sessions',
+      name: 'cloud-sessions',
+      component: () => import('../views/CloudSessionsView.vue'),
     },
     {
       path: '/settings',

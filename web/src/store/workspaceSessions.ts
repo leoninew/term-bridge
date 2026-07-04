@@ -6,8 +6,7 @@ import type {
   WorkspaceTreeSession,
   WorkspaceTreeSummary,
 } from '../protocol/terminal'
-import { updateSessionOrder } from '../features/sessions/api'
-import { listWorkspaceTree, updateWorkspaceOrder } from '../features/workspaces/api'
+import type { SessionRuntimeApi } from '../features/sessions/runtime'
 import type { RuntimeTarget } from '../features/runtimeTarget'
 
 export type RemovedSessionSummary = Pick<SessionSummary, 'id' | 'workspace_id'>
@@ -28,13 +27,13 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
     workspaceTree.value = []
   }
 
-  async function refresh(target: RuntimeTarget | null) {
+  async function refresh(target: RuntimeTarget | null, runtimeApi: SessionRuntimeApi) {
     if (!target) {
       return
     }
     loading.value = true
     try {
-      const response = await listWorkspaceTree(target)
+      const response = await runtimeApi.listWorkspaceTree()
       applyWorkspaceTree(response.data)
     } finally {
       loading.value = false
@@ -120,14 +119,18 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
     return removedSessions
   }
 
-  async function reorderWorkspaces(target: RuntimeTarget | null, workspaceIds: string[]) {
+  async function reorderWorkspaces(
+    target: RuntimeTarget | null,
+    runtimeApi: SessionRuntimeApi,
+    workspaceIds: string[],
+  ) {
     if (!target) {
       return
     }
     const previousTree = workspaceTree.value
     workspaceTree.value = orderWorkspaceTree(previousTree, workspaceIds)
     try {
-      const orderedWorkspaces = await updateWorkspaceOrder(target, workspaceIds)
+      const orderedWorkspaces = await runtimeApi.updateWorkspaceOrder(workspaceIds)
       workspaceTree.value = orderWorkspaceTree(
         workspaceTree.value,
         orderedWorkspaces.map((workspace) => workspace.id),
@@ -140,6 +143,7 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
 
   async function reorderSessions(
     target: RuntimeTarget | null,
+    runtimeApi: SessionRuntimeApi,
     workspaceId: string,
     sessionIds: string[],
   ) {
@@ -149,7 +153,7 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
     const previousTree = workspaceTree.value
     workspaceTree.value = orderWorkspaceSessions(previousTree, workspaceId, sessionIds)
     try {
-      const orderedSessions = await updateSessionOrder(target, workspaceId, sessionIds)
+      const orderedSessions = await runtimeApi.updateSessionOrder(workspaceId, sessionIds)
       workspaceTree.value = replaceWorkspaceSessions(
         workspaceTree.value,
         workspaceId,

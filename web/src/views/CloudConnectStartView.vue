@@ -15,7 +15,7 @@
   import { useRoute, useRouter } from 'vue-router'
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../components/session/ToastHost.vue'
-  import { cloudOAuthStart } from '../features/gateway/api'
+  import { cloudOAuthStart } from '../features/agent/api'
   import { useNotificationsStore } from '../store/notifications'
 
   const { t } = useI18n()
@@ -29,7 +29,7 @@
       window.location.replace(await cloudOAuthStart(redirect))
     } catch (err) {
       notifications.notifyError(t('gateway.connectFailed'), err)
-      await router.replace({ name: 'dashboard' })
+      await router.replace({ name: 'agent-dashboard' })
     }
   })
 </script>

@@ -7,9 +7,12 @@ const mocks = vi.hoisted(() => ({
   listDevices: vi.fn(),
 }))
 
-vi.mock('../features/gateway/api', () => ({
-  authLogin: vi.fn(),
+vi.mock('../features/agent/api', () => ({
   authMe: mocks.authMe,
+}))
+
+vi.mock('../features/cloud/api', () => ({
+  authLogin: vi.fn(),
   listDevices: mocks.listDevices,
 }))
 

@@ -15,7 +15,7 @@
   import { useRoute, useRouter } from 'vue-router'
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../components/session/ToastHost.vue'
-  import { authGoogleCallback } from '../features/gateway/api'
+  import { authGoogleCallback } from '../features/cloud/api'
   import { readStorageValue, removeStorageValue } from '../store/storage'
   import { useGatewayStore } from '../store/gateway'
   import { useNotificationsStore } from '../store/notifications'
@@ -32,7 +32,7 @@
     removeStorageValue(OAUTH_REDIRECT_KEY)
     return redirect && redirect.startsWith('/') && !redirect.startsWith('//')
       ? redirect
-      : { name: 'dashboard' }
+      : { name: 'cloud-dashboard' }
   }
 
   onMounted(async () => {

@@ -11,7 +11,7 @@ import (
 
 func TestMigrateCreatesCloudIdentitySchemaOnly(t *testing.T) {
 	db := openTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := Migrate(context.Background(), db, "sqlite"); err != nil {
 		t.Fatalf("Migrate() error = %v", err)
@@ -33,7 +33,7 @@ func TestMigrateCreatesCloudIdentitySchemaOnly(t *testing.T) {
 
 func TestMigrateRejectsPartialCloudSchemaState(t *testing.T) {
 	db := openTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if _, err := db.Exec(`CREATE TABLE users (id TEXT PRIMARY KEY)`); err != nil {
 		t.Fatalf("create partial schema table: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestMigrateRejectsPartialCloudSchemaState(t *testing.T) {
 
 func TestMigrateRejectsDeviceWithoutPublicKey(t *testing.T) {
 	db := openTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if _, err := db.Exec(`CREATE TABLE users (id TEXT PRIMARY KEY)`); err != nil {
 		t.Fatalf("create users table: %v", err)
 	}
@@ -91,7 +91,7 @@ func openTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("sql.Open() error = %v", err)
 	}
 	if _, err := db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
-		db.Close()
+		_ = db.Close()
 		t.Fatalf("enable foreign keys: %v", err)
 	}
 	return db
@@ -117,7 +117,7 @@ func testColumnExists(t *testing.T, db *sql.DB, table string, column string) boo
 	if err != nil {
 		t.Fatalf("table_info(%s): %v", table, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var cid int
 		var name string

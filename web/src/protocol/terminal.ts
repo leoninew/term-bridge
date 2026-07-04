@@ -1,3 +1,14 @@
+import type { ErrorResp as ProtoErrorResp } from '../gen/proto/termbridge/common/v1/common'
+import type {
+  CreateSessionReq as ProtoCreateSessionReq,
+  CreateSessionResp as ProtoCreateSessionResp,
+  RerunSessionReq as ProtoRerunSessionReq,
+  SessionSummary as ProtoSessionSummary,
+  UpdateSessionReq as ProtoUpdateSessionReq,
+  Workspace as ProtoWorkspace,
+  WorkspaceTreeNode as ProtoWorkspaceTreeNode,
+} from '../gen/proto/termbridge/runtime/v1/runtime'
+
 export const terminalSubprotocol = 'termbridge.terminal.v1'
 export const minTerminalCols = 1
 export const maxTerminalCols = 1000
@@ -55,12 +66,9 @@ export type ServerControlMessage =
   | { type: 'error'; code: string; message: string; error?: string }
   | { type: 'pong'; nonce: string }
 
-export type ApiErrorResp<TDetails = unknown> = {
-  code: string
-  error: string
-  request_id: string
-  requestId?: string
+export type ApiErrorResp<TDetails = unknown> = Omit<ProtoErrorResp, 'details'> & {
   details?: TDetails
+  requestId?: string
 }
 
 export type ListResp<T> = {
@@ -74,22 +82,16 @@ export type PaginatedResp<T> = ListResp<T> & {
   total_pages: number
 }
 
-export type WorkspaceSummary = {
-  id: string
-  name: string
-  path: string
+export type WorkspaceSummary = Omit<ProtoWorkspace, 'updated_at'> & {
   updated_at: string
 }
 
-export type SessionSummary = {
-  id: string
-  name: string
-  workspace_id: string
-  command: string
-  cwd: string
+export type SessionSummary = Omit<
+  ProtoSessionSummary,
+  'lifecycle_state' | 'attachment_state' | 'updated_at'
+> & {
   lifecycle_state: LifecycleState
   attachment_state?: AttachmentState
-  exit_code?: number
   updated_at: string
 }
 
@@ -97,31 +99,22 @@ export type WorkspaceTreeSession = Omit<SessionSummary, 'workspace_id'> & {
   workspace_id?: string
 }
 
-export type WorkspaceTreeSummary = WorkspaceSummary & {
+export type WorkspaceTreeSummary = Omit<ProtoWorkspaceTreeNode, 'children' | 'updated_at'> & {
+  updated_at: string
   children: WorkspaceTreeSession[]
 }
 
-export type CreateSessionReq = {
+export type CreateSessionReq = Omit<ProtoCreateSessionReq, 'workspace_id'> & {
   workspace_id?: string
-  name: string
-  cwd: string
-  command: string[]
-  cols: number
-  rows: number
 }
 
-export type UpdateSessionReq = {
+export type UpdateSessionReq = Pick<ProtoUpdateSessionReq, 'name'> & {
   name: string
 }
 
-export type RerunSessionReq = {
-  cols: number
-  rows: number
-}
+export type RerunSessionReq = Pick<ProtoRerunSessionReq, 'cols' | 'rows'>
 
-export type CreateSessionResp = {
-  session_id: string
-  workspace_id: string
+export type CreateSessionResp = Omit<ProtoCreateSessionResp, 'state'> & {
   state: LifecycleState
 }
 

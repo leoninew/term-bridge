@@ -38,7 +38,7 @@
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
-  import { authResendVerification, authVerifyEmail } from '../features/gateway/api'
+  import { authResendVerification, authVerifyEmail } from '../features/cloud/api'
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()

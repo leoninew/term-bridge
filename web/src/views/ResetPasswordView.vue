@@ -37,7 +37,7 @@
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
-  import { authPasswordResetConfirm } from '../features/gateway/api'
+  import { authPasswordResetConfirm } from '../features/cloud/api'
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
