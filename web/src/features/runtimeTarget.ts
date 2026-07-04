@@ -1,14 +1,14 @@
 import type { ApiTarget } from '../config'
 
-export type RuntimeTarget = { mode: 'local' } | { mode: 'cloud'; deviceId: string }
+export type RuntimeTarget = { mode: 'agent' } | { mode: 'cloud'; deviceId: string }
 
 export function runtimeApiTarget(target: RuntimeTarget): ApiTarget {
-  return target.mode === 'local' ? 'agent' : 'cloud'
+  return target.mode
 }
 
 export function runtimePath(target: RuntimeTarget, path: string): string {
-  if (target.mode === 'local') {
-    return `/api${path}`
+  if (target.mode === 'agent') {
+    return path
   }
-  return `/api/devices/${encodeURIComponent(target.deviceId)}${path}`
+  return `/devices/${encodeURIComponent(target.deviceId)}${path}`
 }

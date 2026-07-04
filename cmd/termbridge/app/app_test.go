@@ -60,7 +60,7 @@ func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
 	if gotTerminalOutput != stdout {
 		t.Fatalf("TerminalOutput = %#v, want original stdout", gotTerminalOutput)
 	}
-	if got := globOne(t, filepath.Join(cwd, ".termbridge", "devices", "*", "workspaces", "*", "sessions", "*", "history.log")); got == "" {
+	if got := globOne(t, filepath.Join(cwd, "data", "history", "*.log")); got == "" {
 		t.Fatal("history.log was not created")
 	}
 	assertRuntimeDBCounts(t, cwd, 1, 1, 1)
@@ -90,7 +90,7 @@ func TestRunReturnsRuntimeErrorFromRunnerAndMarksFailed(t *testing.T) {
 	if len(result.Command) != 1 || result.Command[0] != "pwsh" {
 		t.Fatalf("Result.Command = %#v", result.Command)
 	}
-	stateFile := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "state.json"))
+	stateFile := globOne(t, filepath.Join(cwd, "data", "workspaces", "*", "sessions", "*", "state.json"))
 	if stateFile != "" {
 		t.Fatalf("state.json was created: %s", stateFile)
 	}
@@ -118,8 +118,15 @@ func TestRunMigrateRunsAgentDatabaseMigrations(t *testing.T) {
 	assertTableCount(t, db, "workspaces", 0)
 	assertTableCount(t, db, "sessions", 0)
 	assertTableCount(t, db, "session_runs", 0)
-	if got := globOne(t, filepath.Join(cwd, ".termbridge", "devices", "*", "private_key.pem")); got != "" {
+	if got := globOne(t, filepath.Join(cwd, "data", "private_key.pem")); got != "" {
 		t.Fatalf("migrate created device private key: %s", got)
+	}
+}
+
+func TestRoleCORSAllowedOriginsIncludesPublicURL(t *testing.T) {
+	origins := roleCORSAllowedOrigins("http://localhost:9030/", []string{"https://app.example.com"})
+	if len(origins) != 2 || origins[0] != "http://localhost:9030" || origins[1] != "https://app.example.com" {
+		t.Fatalf("origins = %#v", origins)
 	}
 }
 
@@ -132,11 +139,11 @@ func TestRunAgentStartsBackendAndConnectorFromConfig(t *testing.T) {
 	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: http://termbridge.lvh.me\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
-	if err := os.MkdirAll(filepath.Join(cwd, ".termbridge"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(cwd, "data"), 0o755); err != nil {
 		t.Fatalf("MkdirAll(state dir) error = %v", err)
 	}
 	identityContent := "{\n  \"auth\": {\n    \"username\": \"admin\",\n    \"password\": \"admin\"\n  }\n}\n"
-	if err := os.WriteFile(filepath.Join(cwd, ".termbridge", "device.json"), []byte(identityContent), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(cwd, "data", "device.json"), []byte(identityContent), 0o600); err != nil {
 		t.Fatalf("WriteFile(identity) error = %v", err)
 	}
 	oldRunBackendServer := runBackendServer
@@ -180,7 +187,7 @@ func TestRunAgentStartsBackendAndConnectorFromConfig(t *testing.T) {
 		t.Fatal("runBackendServer was not called")
 	}
 	healthResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(healthResponse, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+	gotServer.ServeHTTP(healthResponse, httptest.NewRequest(http.MethodGet, "/agent-api/health", nil))
 	if healthResponse.Code != http.StatusOK || !strings.Contains(healthResponse.Body.String(), `"status":"ok"`) {
 		t.Fatalf("health response = %d %s", healthResponse.Code, healthResponse.Body.String())
 	}
@@ -202,14 +209,14 @@ func TestRunAgentStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 	var reportSeen bool
 	cloudGate := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/cloud-oauth/exchange":
+		case "/cloud-api/cloud-oauth/exchange":
 			if r.Method != http.MethodPost {
 				http.NotFound(w, r)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"access_token":"cloud-token"}`))
-		case "/api/devices/current":
+		case "/cloud-api/devices/current":
 			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer cloud-token" {
 				http.NotFound(w, r)
 				return
@@ -225,11 +232,11 @@ func TestRunAgentStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: " + cloudGate.URL + "\n  oauth:\n    client_id: termbridge-local\n    redirect_url: http://localhost:9030/cloud/oauth/callback\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
-	if err := os.MkdirAll(filepath.Join(cwd, ".termbridge"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(cwd, "data"), 0o755); err != nil {
 		t.Fatalf("MkdirAll(state dir) error = %v", err)
 	}
 	identityContent := "{\n  \"auth\": {\n    \"username\": \"admin\",\n    \"password\": \"admin\"\n  }\n}\n"
-	if err := os.WriteFile(filepath.Join(cwd, ".termbridge", "device.json"), []byte(identityContent), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(cwd, "data", "device.json"), []byte(identityContent), 0o600); err != nil {
 		t.Fatalf("WriteFile(identity) error = %v", err)
 	}
 	oldRunBackendServer := runBackendServer
@@ -267,7 +274,7 @@ func TestRunAgentStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 	})
 
 	startResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(startResponse, httptest.NewRequest(http.MethodGet, "/api/cloud-oauth/start", nil))
+	gotServer.ServeHTTP(startResponse, httptest.NewRequest(http.MethodGet, "/agent-api/cloud-oauth/start", nil))
 	if startResponse.Code != http.StatusOK {
 		t.Fatalf("cloud oauth start status = %d; body=%s", startResponse.Code, startResponse.Body.String())
 	}
@@ -284,7 +291,7 @@ func TestRunAgentStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 	}
 
 	callbackResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(callbackResponse, httptest.NewRequest(http.MethodPost, "/api/cloud-oauth/callback", strings.NewReader(`{"code":"code-1","state":"`+state+`"}`)))
+	gotServer.ServeHTTP(callbackResponse, httptest.NewRequest(http.MethodPost, "/agent-api/cloud-oauth/callback", strings.NewReader(`{"code":"code-1","state":"`+state+`"}`)))
 	if callbackResponse.Code != http.StatusOK {
 		t.Fatalf("cloud oauth callback status = %d; body=%s", callbackResponse.Code, callbackResponse.Body.String())
 	}
@@ -338,11 +345,11 @@ func TestRunExecUsesConfiguredStateDirAndHistoryLimits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	defaultState := globOne(t, filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "session.json"))
+	defaultState := globOne(t, filepath.Join(cwd, "data", "workspaces", "*", "sessions", "*", "session.json"))
 	if defaultState != "" {
-		t.Fatalf("default .termbridge state was created despite configured state_dir: %s", defaultState)
+		t.Fatalf("default data state was created despite configured state_dir: %s", defaultState)
 	}
-	historyPath := globOne(t, filepath.Join(configuredStateDir, "devices", "*", "workspaces", "*", "sessions", "*", "history.log"))
+	historyPath := globOne(t, filepath.Join(configuredStateDir, "history", "*.log"))
 	if historyPath == "" {
 		t.Fatal("configured state dir history.log was not created")
 	}
@@ -491,7 +498,7 @@ func assertTableCount(t *testing.T, db *sql.DB, table string, want int) {
 
 func openRuntimeDB(t *testing.T, cwd string) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("sqlite", filepath.Join(cwd, ".termbridge", "agent.db"))
+	db, err := sql.Open("sqlite", filepath.Join(cwd, "data", "agent.db"))
 	if err != nil {
 		t.Fatalf("Open runtime sqlite error = %v", err)
 	}

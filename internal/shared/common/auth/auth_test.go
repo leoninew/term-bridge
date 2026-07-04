@@ -74,7 +74,7 @@ func TestVerifyRejectsWrongSecret(t *testing.T) {
 func TestAuthenticatedRequest(t *testing.T) {
 	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
 	token, _ := a.SignToken("admin")
-	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
+	request := httptest.NewRequest(http.MethodGet, "/cloud-api/devices", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	if !a.Authenticated(request) {
 		t.Fatal("Authenticated() = false, want true")
@@ -83,7 +83,7 @@ func TestAuthenticatedRequest(t *testing.T) {
 
 func TestAuthenticatedRejectsMissingToken(t *testing.T) {
 	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
-	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
+	request := httptest.NewRequest(http.MethodGet, "/cloud-api/devices", nil)
 	if a.Authenticated(request) {
 		t.Fatal("Authenticated() = true, want false")
 	}
@@ -97,7 +97,7 @@ func TestMiddlewareRejectsUnauthenticated(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	})
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/devices", nil))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/cloud-api/devices", nil))
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", response.Code)
 	}
@@ -106,7 +106,7 @@ func TestMiddlewareRejectsUnauthenticated(t *testing.T) {
 func TestUsernameFromRequest(t *testing.T) {
 	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
 	token, _ := a.SignToken("admin")
-	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
+	request := httptest.NewRequest(http.MethodGet, "/cloud-api/devices", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	if got := a.UsernameFromRequest(request); got != "admin" {
 		t.Fatalf("UsernameFromRequest() = %q, want admin", got)
@@ -115,7 +115,7 @@ func TestUsernameFromRequest(t *testing.T) {
 
 func TestUsernameFromRequestWithoutToken(t *testing.T) {
 	a := NewAuther(Credentials{Username: "admin", Password: "admin"}, NewTokenService(testJWTKeyOne))
-	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
+	request := httptest.NewRequest(http.MethodGet, "/cloud-api/devices", nil)
 	if got := a.UsernameFromRequest(request); got != "" {
 		t.Fatalf("UsernameFromRequest() = %q, want empty", got)
 	}

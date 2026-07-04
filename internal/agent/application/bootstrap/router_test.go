@@ -26,7 +26,7 @@ func TestBackendHandlerServesStaticFilesWithSPAFallbackAndKeepsAPIRoutes(t *test
 	}
 	apiHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/health":
+		case "/agent-api/health":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"status":"agent"}`))
 		default:
@@ -43,7 +43,7 @@ func TestBackendHandlerServesStaticFilesWithSPAFallbackAndKeepsAPIRoutes(t *test
 		{path: "/sessions", want: "<html>app</html>"},
 		{path: "/settings", want: "<html>app</html>"},
 		{path: "/assets/app.js", want: "console.log('app')"},
-		{path: "/api/health", want: `{"status":"agent"}`},
+		{path: "/agent-api/health", want: `{"status":"agent"}`},
 	}
 	for _, tc := range cases {
 		response := httptest.NewRecorder()
@@ -54,9 +54,9 @@ func TestBackendHandlerServesStaticFilesWithSPAFallbackAndKeepsAPIRoutes(t *test
 	}
 
 	apiResponse := httptest.NewRecorder()
-	handler.ServeHTTP(apiResponse, httptest.NewRequest(http.MethodGet, "/api/missing", nil))
+	handler.ServeHTTP(apiResponse, httptest.NewRequest(http.MethodGet, "/agent-api/missing", nil))
 	if apiResponse.Code != http.StatusNotFound || strings.Contains(apiResponse.Body.String(), "<html>app</html>") {
-		t.Fatalf("/api/missing = %d %q, want API 404 without SPA fallback", apiResponse.Code, apiResponse.Body.String())
+		t.Fatalf("/agent-api/missing = %d %q, want API 404 without SPA fallback", apiResponse.Code, apiResponse.Body.String())
 	}
 }
 
@@ -66,7 +66,7 @@ func TestBackendHandlerInjectsRuntimeConfigIntoIndexHTML(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte(index), 0o644); err != nil {
 		t.Fatalf("WriteFile(index) error = %v", err)
 	}
-	handler := backendHandler(Config{Server: ServerConfig{StaticDir: staticDir, APIBaseURL: "https://api.example.com/"}}, slog.Default(), http.NotFoundHandler())
+	handler := backendHandler(Config{Server: ServerConfig{StaticDir: staticDir, APIBaseURL: "https://agent.example.com/"}}, slog.Default(), http.NotFoundHandler())
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -77,7 +77,7 @@ func TestBackendHandlerInjectsRuntimeConfigIntoIndexHTML(t *testing.T) {
 	if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 		t.Fatalf("Content-Type = %q", got)
 	}
-	want := `<script>window.__CONFIG__ = {"apiBaseUrl":"https://api.example.com"};</script>`
+	want := `<script>window.__CONFIG__ = {"agentApiBaseUrl":"https://agent.example.com","frontendMode":"agent"};</script>`
 	if !strings.Contains(response.Body.String(), want) {
 		t.Fatalf("runtime config missing: %s", response.Body.String())
 	}
@@ -87,7 +87,7 @@ func TestBackendHandlerLogsUnifiedRequests(t *testing.T) {
 	var logBuffer bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logBuffer, nil))
 	apiHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/health" {
+		if r.URL.Path != "/agent-api/health" {
 			http.NotFound(w, r)
 			return
 		}
@@ -96,7 +96,7 @@ func TestBackendHandlerLogsUnifiedRequests(t *testing.T) {
 	})
 	handler := backendHandler(Config{LogHTTP: LogHTTPConfig{RequestBodyLimit: 4096, ResponseBodyLimit: 4096}}, logger, apiHandler)
 
-	request := httptest.NewRequest(http.MethodGet, "/api/health?x=1", nil)
+	request := httptest.NewRequest(http.MethodGet, "/agent-api/health?x=1", nil)
 	request.Header.Set("User-Agent", "test-agent")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -110,7 +110,7 @@ func TestBackendHandlerLogsUnifiedRequests(t *testing.T) {
 	assertBackendLogValue(t, started, "msg", "request started")
 	assertBackendLogValue(t, completed, "msg", "request completed")
 	assertBackendLogValue(t, started, "method", http.MethodGet)
-	assertBackendLogValue(t, started, "path", "/api/health")
+	assertBackendLogValue(t, started, "path", "/agent-api/health")
 	assertBackendLogValue(t, started, "query", "x=1")
 	assertBackendLogNumber(t, completed, "status", http.StatusOK)
 	assertBackendLogValue(t, completed, "response_body", response.Body.String())
@@ -125,7 +125,7 @@ func TestBackendHandlerAppliesCORSOnlyToAPIRoutes(t *testing.T) {
 	}))
 
 	apiResponse := httptest.NewRecorder()
-	apiRequest := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
+	apiRequest := httptest.NewRequest(http.MethodOptions, "/agent-api/health", nil)
 	apiRequest.Header.Set("Origin", "https://app.example.com")
 	handler.ServeHTTP(apiResponse, apiRequest)
 	if apiResponse.Code != http.StatusNoContent || apiResponse.Header().Get("Access-Control-Allow-Origin") != "https://app.example.com" {

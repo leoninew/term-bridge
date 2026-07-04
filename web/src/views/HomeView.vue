@@ -10,18 +10,21 @@
   import { onMounted } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRouter } from 'vue-router'
+  import { useAppModeStore } from '../store/appMode'
   import { useGatewayStore } from '../store/gateway'
 
   const { t } = useI18n()
   const router = useRouter()
+  const appMode = useAppModeStore()
   const gateway = useGatewayStore()
 
   onMounted(async () => {
-    await gateway.initializeAuth()
-    if (gateway.capabilities?.mode === 'local') {
+    if (appMode.effectiveMode === 'agent') {
+      await gateway.initializeAuth()
       await router.replace({ name: 'agent-dashboard' })
       return
     }
+    await gateway.initializeAuth()
     if (gateway.authenticated) {
       await router.replace({ name: 'cloud-dashboard' })
       return

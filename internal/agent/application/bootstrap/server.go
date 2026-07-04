@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -53,7 +52,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 	if err != nil {
 		return apperrors.Config("invalid jwt.secret_key", err)
 	}
-	authService := agentapi.NewLocalAuthService(agentapi.LocalAuthConfig{Username: cfg.Auth.Username, Password: cfg.Auth.Password}, tokens)
+	authService := agentapi.NewLocalAuthService(tokens)
 
 	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: cfg.Runtime.StateDir})
 	if err != nil {
@@ -62,7 +61,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 	if _, err := deviceRepository.UpsertLocalDevice(ctx, agentdevice.Device{ID: device.Id, Name: device.Name, PublicKey: device.PublicKey}); err != nil {
 		return apperrors.Runtime("upsert local device", err)
 	}
-	runtimeAccess := agentapp.WebTerminalAccess{Registry: newWebTerminalRegistry(cfg, logger, state.NewDBStore(db.DB, db.Driver, filepath.Join(cfg.Runtime.StateDir, "devices", device.Id), device.Id))}
+	runtimeAccess := agentapp.WebTerminalAccess{Registry: newWebTerminalRegistry(cfg, logger, state.NewDBStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id))}
 
 	serveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -92,7 +91,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 					errCh <- nil
 					return
 				}
-				logger.Warn("termbridge agent connector failed; local dashboard remains available", "target", connector.Config().ConnectUrl, "error", err)
+				logger.Warn("termbridge agent connector failed; agent dashboard remains available", "target", connector.Config().ConnectUrl, "error", err)
 				select {
 				case <-serveCtx.Done():
 					errCh <- nil
@@ -176,7 +175,7 @@ func normalizeServeError(err error) error {
 }
 
 func newAgentConnector(cfg Config, connectURL string, runtimeAccess agentapp.RuntimeAccess, device agentapp.Device, logger *slog.Logger) *agentapp.Client {
-	client := agentapp.New(agentapp.Config{ConnectUrl: connectURL, Username: cfg.Auth.Username, Password: cfg.Auth.Password, StateDir: cfg.Runtime.StateDir, Runtime: runtimeAccess, Logger: logger})
+	client := agentapp.New(agentapp.Config{ConnectUrl: connectURL, StateDir: cfg.Runtime.StateDir, Runtime: runtimeAccess, Logger: logger})
 	client.SetDevice(device)
 	return client
 }

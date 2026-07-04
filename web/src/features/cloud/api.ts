@@ -29,7 +29,7 @@ export type UpdateSessionOrderResp = ListResp<WorkspaceTreeSession>
 
 export async function authMeViaCloud(): Promise<AuthMeResp> {
   try {
-    const response = await cloudApiClient.get<AuthMeResp>('/api/auth/me')
+    const response = await cloudApiClient.get<AuthMeResp>('/auth/me')
     return response.data
   } catch (err) {
     if (isUnauthorizedApiError(err)) {
@@ -40,28 +40,28 @@ export async function authMeViaCloud(): Promise<AuthMeResp> {
 }
 
 export async function authLogin(email: string, password: string): Promise<TokenResp> {
-  const response = await cloudApiClient.post<TokenResp>('/api/auth/login', { email, password })
+  const response = await cloudApiClient.post<TokenResp>('/auth/login', { email, password })
   return response.data
 }
 
 export async function authLogout(): Promise<void> {
-  await cloudApiClient.post('/api/auth/logout')
+  await cloudApiClient.post('/auth/logout')
 }
 
 export async function authRegister(email: string, password: string): Promise<void> {
-  await cloudApiClient.post('/api/auth/register', { email, password })
+  await cloudApiClient.post('/auth/register', { email, password })
 }
 
 export async function authVerifyEmail(email: string, code: string): Promise<void> {
-  await cloudApiClient.post('/api/auth/email/verify', { email, code })
+  await cloudApiClient.post('/auth/email/verify', { email, code })
 }
 
 export async function authResendVerification(email: string): Promise<void> {
-  await cloudApiClient.post('/api/auth/email/verification/resend', { email })
+  await cloudApiClient.post('/auth/email/verification/resend', { email })
 }
 
 export async function authPasswordResetRequest(email: string): Promise<void> {
-  await cloudApiClient.post('/api/auth/password-reset/request', { email })
+  await cloudApiClient.post('/auth/password-reset/request', { email })
 }
 
 export async function authPasswordResetConfirm(
@@ -69,7 +69,7 @@ export async function authPasswordResetConfirm(
   code: string,
   newPassword: string,
 ): Promise<void> {
-  await cloudApiClient.post('/api/auth/password-reset/confirm', {
+  await cloudApiClient.post('/auth/password-reset/confirm', {
     email,
     code,
     new_password: newPassword,
@@ -80,19 +80,19 @@ export async function authChangePassword(
   currentPassword: string,
   newPassword: string,
 ): Promise<void> {
-  await cloudApiClient.post('/api/auth/password/change', {
+  await cloudApiClient.post('/auth/password/change', {
     current_password: currentPassword,
     new_password: newPassword,
   })
 }
 
 export async function authGoogleURL(): Promise<string> {
-  const response = await cloudApiClient.get<GoogleAuthURLResp>('/api/auth/google')
+  const response = await cloudApiClient.get<GoogleAuthURLResp>('/auth/google')
   return response.data.auth_url
 }
 
 export async function authGoogleCallback(code: string, state: string): Promise<TokenResp> {
-  const response = await cloudApiClient.post<TokenResp>('/api/auth/google/callback', {
+  const response = await cloudApiClient.post<TokenResp>('/auth/google/callback', {
     code,
     state,
   })
@@ -104,18 +104,18 @@ export async function cloudOAuthAuthorize(
   redirectUri: string,
   state: string,
 ): Promise<string> {
-  const response = await cloudApiClient.get<CloudOAuthAuthorizeResp>('/api/cloud-oauth/authorize', {
+  const response = await cloudApiClient.get<CloudOAuthAuthorizeResp>('/cloud-oauth/authorize', {
     params: { client_id: clientId, redirect_uri: redirectUri, state },
   })
   return response.data.redirect_url
 }
 
 export async function deleteDevice(deviceId: string): Promise<void> {
-  await cloudApiClient.delete(`/api/devices/${encodeURIComponent(deviceId)}`)
+  await cloudApiClient.delete(`/devices/${encodeURIComponent(deviceId)}`)
 }
 
 export async function listDevices(): Promise<DeviceSummary[]> {
-  const response = await cloudApiClient.get<ListDevicesResp>('/api/devices')
+  const response = await cloudApiClient.get<ListDevicesResp>('/devices')
   return response.data.items
 }
 
@@ -263,7 +263,7 @@ function cloudRuntimePath(target: RuntimeTarget, path: string): string {
   if (target.mode !== 'cloud') {
     throw new Error('cloud runtime API requires a cloud target')
   }
-  return `/api/devices/${encodeURIComponent(target.deviceId)}${path}`
+  return `/devices/${encodeURIComponent(target.deviceId)}${path}`
 }
 
 function offline(response: AxiosResponse): boolean {

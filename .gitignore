@@ -1,7 +1,5 @@
 .DS_Store
 
-bin/
-logs/
 .termbridge/
 /configs/config.*.yaml
 !/configs/config.yaml
@@ -10,5 +8,9 @@ logs/
 /.env.*
 !/.env.example
 .pomelo-pw/output/
-tmp/
+
 gen/
+
+data/
+bin/
+logs/

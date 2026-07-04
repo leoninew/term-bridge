@@ -1,18 +1,18 @@
 root = "."
-tmp_dir = "bin/air/serve"
+tmp_dir = "bin/air/cloud"
 
 [build]
-cmd = "go build -o bin/air/serve/termbridge.exe ./cmd/termbridge"
-entrypoint = "bin/air/serve/termbridge.exe"
-args_bin = ["agent"]
+cmd = "go build -o bin/air/cloud/termbridge.exe ./cmd/termbridge"
+entrypoint = "bin/air/cloud/termbridge.exe"
+args_bin = ["cloud"]
 include_ext = ["go", "yaml", "yml", "toml"]
-exclude_dir = [".git", ".termbridge", "bin", "docs", "logs", "vendor", "web"]
+exclude_dir = [".git", ".termbridge", "bin", "data", "docs", "logs", "vendor", "web"]
 exclude_file = []
 exclude_regex = ["_test.go"]
 exclude_unchanged = false
 follow_symlink = false
 kill_delay = "500ms"
-log = "air-serve-build.log"
+log = "air-cloud-build.log"
 poll = false
 poll_interval = 500
 rerun = false

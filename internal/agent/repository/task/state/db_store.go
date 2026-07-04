@@ -442,7 +442,7 @@ func (s DBStore) BeginSessionRun(workspaceId string, sessionId string, size proc
 }
 
 func (s DBStore) HistoryPath(workspaceId string, sessionId string) string {
-	return filepath.Join(s.SessionDir(workspaceId, sessionId), "history.log")
+	return filepath.Join(s.root, "history", sessionId+".log")
 }
 
 func (s DBStore) ListWorkspaces() ([]workspace.Workspace, []Warning, error) {

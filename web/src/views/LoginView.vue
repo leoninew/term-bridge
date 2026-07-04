@@ -31,6 +31,7 @@
   import LoginPanel from '../components/session/LoginPanel.vue'
   import ToastHost from '../components/session/ToastHost.vue'
   import { authGoogleURL } from '../features/cloud/api'
+  import { useAppModeStore } from '../store/appMode'
   import { writeStorageValue } from '../store/storage'
   import { useGatewayStore } from '../store/gateway'
   import { useNotificationsStore } from '../store/notifications'
@@ -38,15 +39,20 @@
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
+  const appMode = useAppModeStore()
   const gateway = useGatewayStore()
   const notifications = useNotificationsStore()
   const googleLoggingIn = ref(false)
   const OAUTH_REDIRECT_KEY = 'termbridge.oauth_redirect'
 
   onMounted(async () => {
+    if (!appMode.allowsMode('cloud')) {
+      await router.replace({ name: appMode.dashboardRouteName() })
+      return
+    }
     await gateway.initializeAuth()
-    if (gateway.capabilities?.mode === 'local') {
-      await router.replace({ name: 'agent-dashboard' })
+    if (gateway.authenticated) {
+      await router.replace(redirectAfterLogin())
     }
   })
 

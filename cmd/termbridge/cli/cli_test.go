@@ -333,17 +333,17 @@ func TestRunCommandCreatesLogStateAndReturnsCommandExitCode(t *testing.T) {
 	if info.Size() == 0 {
 		t.Fatal("log file is empty")
 	}
-	matches, err := filepath.Glob(filepath.Join(cwd, ".termbridge", "workspaces", "*", "sessions", "*", "exit.json"))
+	matches, err := filepath.Glob(filepath.Join(cwd, "data", "workspaces", "*", "sessions", "*", "exit.json"))
 	if err != nil {
 		t.Fatalf("Glob() error = %v", err)
 	}
 	if len(matches) != 0 {
 		t.Fatalf("exit.json matches = %#v, want none", matches)
 	}
-	if _, err := os.Stat(filepath.Join(cwd, ".termbridge", "agent.db")); err != nil {
+	if _, err := os.Stat(filepath.Join(cwd, "data", "agent.db")); err != nil {
 		t.Fatalf("runtime database missing: %v", err)
 	}
-	historyMatches, err := filepath.Glob(filepath.Join(cwd, ".termbridge", "devices", "*", "workspaces", "*", "sessions", "*", "history.log"))
+	historyMatches, err := filepath.Glob(filepath.Join(cwd, "data", "history", "*.log"))
 	if err != nil {
 		t.Fatalf("Glob() error = %v", err)
 	}

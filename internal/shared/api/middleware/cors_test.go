@@ -7,7 +7,7 @@ import (
 )
 
 func TestCORSNoopWhenNotConfigured(t *testing.T) {
-	recorder := serveCORSRequest(t, nil, http.MethodGet, "/api/health", "https://app.example.com")
+	recorder := serveCORSRequest(t, nil, http.MethodGet, "/agent-api/health", "https://app.example.com")
 
 	if recorder.Header().Get("Access-Control-Allow-Origin") != "" {
 		t.Fatalf("expected no cors origin header, got %s", recorder.Header().Get("Access-Control-Allow-Origin"))
@@ -18,7 +18,7 @@ func TestCORSNoopWhenNotConfigured(t *testing.T) {
 }
 
 func TestCORSAllowsSingleOrigin(t *testing.T) {
-	recorder := serveCORSRequest(t, []string{"https://app.example.com"}, http.MethodGet, "/api/health", "https://app.example.com")
+	recorder := serveCORSRequest(t, []string{"https://app.example.com"}, http.MethodGet, "/agent-api/health", "https://app.example.com")
 
 	assertCORSHeaders(t, recorder, "https://app.example.com")
 	if recorder.Code != http.StatusOK {
@@ -27,7 +27,7 @@ func TestCORSAllowsSingleOrigin(t *testing.T) {
 }
 
 func TestCORSAllowsMultipleOrigins(t *testing.T) {
-	recorder := serveCORSRequest(t, []string{"https://app.example.com", "https://preview.example.com"}, http.MethodGet, "/api/health", "https://preview.example.com")
+	recorder := serveCORSRequest(t, []string{"https://app.example.com", "https://preview.example.com"}, http.MethodGet, "/agent-api/health", "https://preview.example.com")
 
 	assertCORSHeaders(t, recorder, "https://preview.example.com")
 	if recorder.Code != http.StatusOK {
@@ -36,7 +36,7 @@ func TestCORSAllowsMultipleOrigins(t *testing.T) {
 }
 
 func TestCORSNormalizesConfiguredTrailingSlash(t *testing.T) {
-	recorder := serveCORSRequest(t, []string{" https://app.example.com/ "}, http.MethodGet, "/api/health", "https://app.example.com")
+	recorder := serveCORSRequest(t, []string{" https://app.example.com/ "}, http.MethodGet, "/agent-api/health", "https://app.example.com")
 
 	assertCORSHeaders(t, recorder, "https://app.example.com")
 	if recorder.Code != http.StatusOK {
@@ -45,7 +45,7 @@ func TestCORSNormalizesConfiguredTrailingSlash(t *testing.T) {
 }
 
 func TestCORSAllowedPreflightReturnsNoContent(t *testing.T) {
-	recorder := serveCORSRequest(t, []string{"https://app.example.com"}, http.MethodOptions, "/api/health", "https://app.example.com")
+	recorder := serveCORSRequest(t, []string{"https://app.example.com"}, http.MethodOptions, "/agent-api/health", "https://app.example.com")
 
 	assertCORSHeaders(t, recorder, "https://app.example.com")
 	if recorder.Code != http.StatusNoContent {
@@ -54,7 +54,7 @@ func TestCORSAllowedPreflightReturnsNoContent(t *testing.T) {
 }
 
 func TestCORSDeniedPreflightReturnsForbidden(t *testing.T) {
-	recorder := serveCORSRequest(t, []string{"https://app.example.com"}, http.MethodOptions, "/api/health", "https://evil.example.test")
+	recorder := serveCORSRequest(t, []string{"https://app.example.com"}, http.MethodOptions, "/agent-api/health", "https://evil.example.test")
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected status 403, got %d", recorder.Code)
@@ -76,7 +76,7 @@ func TestCORSIgnoresNonAPIPaths(t *testing.T) {
 }
 
 func TestCORSIgnoresRequestsWithoutOrigin(t *testing.T) {
-	recorder := serveCORSRequest(t, []string{"https://app.example.com"}, http.MethodOptions, "/api/health", "")
+	recorder := serveCORSRequest(t, []string{"https://app.example.com"}, http.MethodOptions, "/agent-api/health", "")
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected downstream status 200, got %d", recorder.Code)
@@ -101,7 +101,7 @@ func serveCORSRequest(t *testing.T, allowedOrigins []string, method string, path
 }
 
 func testAPIPath(path string) bool {
-	return path == "/api/health"
+	return path == "/agent-api/health"
 }
 
 func assertCORSHeaders(t *testing.T, recorder *httptest.ResponseRecorder, origin string) {

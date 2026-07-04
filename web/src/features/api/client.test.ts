@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import {
   ApiClientError,
   ApiContractMismatchError,
+  agentApiClient,
   apiClient,
   cloudApiClient,
   ensureRequestId,
@@ -34,7 +35,7 @@ function requestConfig(headers?: Record<string, string>): InternalAxiosRequestCo
   return {
     headers: AxiosHeaders.from(headers ?? {}),
     method: 'get',
-    url: '/api/test',
+    url: '/test',
   } as InternalAxiosRequestConfig
 }
 
@@ -89,10 +90,13 @@ describe('api client', () => {
     expect(err).toBeInstanceOf(ApiContractMismatchError)
   })
 
-  it('uses runtime API base URL for requests', async () => {
-    vi.stubGlobal('window', { __CONFIG__: { apiBaseUrl: 'https://api.example.com/' } })
+  it('uses agent API base URL for agent requests', async () => {
+    vi.stubGlobal('window', {
+      localStorage: globalThis.localStorage,
+      __CONFIG__: { agentApiBaseUrl: 'https://agent.example.com/' },
+    })
 
-    const result = await apiClient.get<string>('/api/history', {
+    const result = await apiClient.get<string>('/history', {
       adapter: async (config) => ({
         data: config.baseURL,
         status: 200,
@@ -102,16 +106,17 @@ describe('api client', () => {
       }),
     })
 
-    expect(result.data).toBe('https://api.example.com')
+    expect(result.data).toBe('https://agent.example.com')
     vi.unstubAllGlobals()
   })
 
   it('uses cloud API base URL for cloud requests', async () => {
     vi.stubGlobal('window', {
+      localStorage: globalThis.localStorage,
       __CONFIG__: { agentApiBaseUrl: '/agent-api', cloudApiBaseUrl: '/cloud-api' },
     })
 
-    const result = await cloudApiClient.get<string>('/api/devices', {
+    const result = await cloudApiClient.get<string>('/devices', {
       adapter: async (config) => ({
         data: config.baseURL,
         status: 200,
@@ -125,8 +130,50 @@ describe('api client', () => {
     vi.unstubAllGlobals()
   })
 
+  it('sends only the token for the requested API target', async () => {
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: vi.fn((key: string) => {
+          if (key === 'termbridge_agent_token') return 'agent-token'
+          if (key === 'termbridge_cloud_token') return 'cloud-token'
+          return null
+        }),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+        clear: vi.fn(),
+        length: 0,
+        key: vi.fn(),
+      },
+      __CONFIG__: { agentApiBaseUrl: '/agent-api', cloudApiBaseUrl: '/cloud-api' },
+    })
+    setActivePinia(createPinia())
+
+    const agentResult = await agentApiClient.get<string>('/auth/me', {
+      adapter: async (config) => ({
+        data: String(AxiosHeaders.from(config.headers).get('Authorization')),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      }),
+    })
+    const cloudResult = await cloudApiClient.get<string>('/auth/me', {
+      adapter: async (config) => ({
+        data: String(AxiosHeaders.from(config.headers).get('Authorization')),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      }),
+    })
+
+    expect(agentResult.data).toBe('Bearer agent-token')
+    expect(cloudResult.data).toBe('Bearer cloud-token')
+    vi.unstubAllGlobals()
+  })
+
   it('does not parse successful text responses as JSON', async () => {
-    const result = await apiClient.get<string>('/api/history', {
+    const result = await apiClient.get<string>('/history', {
       responseType: 'text',
       adapter: async (config) => ({
         data: 'terminal history',

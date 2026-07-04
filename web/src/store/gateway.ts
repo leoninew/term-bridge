@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { readStorageValue, removeStorageValue, writeStorageValue } from './storage'
-import { authMe } from '../features/agent/api'
-import { authLogin, listDevices } from '../features/cloud/api'
+import { authLoginViaAgent, authMe } from '../features/agent/api'
+import { authLogin, authMeViaCloud, listDevices } from '../features/cloud/api'
+import { useAppModeStore } from './appMode'
 import type {
   AuthCapabilities,
   CloudSessionSummary,
@@ -11,15 +12,18 @@ import type {
   UserInfo,
 } from '../features/types'
 import type { RuntimeTarget } from '../features/runtimeTarget'
+import type { ApiTarget } from '../config'
 
-const TOKEN_KEY = 'termbridge_gateway_token'
+const AGENT_TOKEN_KEY = 'termbridge_agent_token'
+const CLOUD_TOKEN_KEY = 'termbridge_cloud_token'
 
 type InitializeAuthOptions = {
   force?: boolean
 }
 
 export const useGatewayStore = defineStore('gateway', () => {
-  const token = ref<string | null>(readStorageValue(TOKEN_KEY))
+  const agentToken = ref<string | null>(readStorageValue(AGENT_TOKEN_KEY))
+  const cloudToken = ref<string | null>(readStorageValue(CLOUD_TOKEN_KEY))
   const authInitialized = ref(false)
   const authenticated = ref(false)
   const loggingIn = ref(false)
@@ -30,52 +34,104 @@ export const useGatewayStore = defineStore('gateway', () => {
   const cloudSession = ref<CloudSessionSummary | null>(null)
   const devices = ref<DeviceSummary[]>([])
   const selectedDeviceId = ref('')
+  const token = computed(() => {
+    const appMode = useAppModeStore()
+    return tokenForTarget(appMode.effectiveMode)
+  })
   const runtimeTarget = computed<RuntimeTarget | null>(() => {
-    if (capabilities.value?.mode === 'local') {
-      return { mode: 'local' }
+    const appMode = useAppModeStore()
+    if (appMode.effectiveMode === 'agent') {
+      return { mode: 'agent' }
     }
     return selectedDeviceId.value ? { mode: 'cloud', deviceId: selectedDeviceId.value } : null
   })
   const currentDevice = computed<DeviceSummary | CloudSessionSummary | null>(() => {
-    if (capabilities.value?.mode === 'local') {
+    const appMode = useAppModeStore()
+    if (appMode.effectiveMode === 'agent') {
       return devices.value[0] ?? cloudSession.value
     }
     return devices.value.find((device) => device.id === selectedDeviceId.value) ?? null
   })
   let initializedToken: string | null | undefined
+  let initializedMode: 'agent' | 'cloud' | undefined
 
-  function setToken(newToken: string) {
-    token.value = newToken
-    writeStorageValue(TOKEN_KEY, newToken)
+  function setAgentToken(newToken: string) {
+    agentToken.value = newToken
+    writeStorageValue(AGENT_TOKEN_KEY, newToken)
+    resetAuthState()
+  }
+
+  function setCloudToken(newToken: string) {
+    cloudToken.value = newToken
+    writeStorageValue(CLOUD_TOKEN_KEY, newToken)
     resetAuthState()
     resetDeviceState()
   }
 
-  function clearToken() {
-    token.value = null
-    removeStorageValue(TOKEN_KEY)
+  function clearAgentToken() {
+    agentToken.value = null
+    removeStorageValue(AGENT_TOKEN_KEY)
+    resetAuthState()
+  }
+
+  function clearCloudToken() {
+    cloudToken.value = null
+    removeStorageValue(CLOUD_TOKEN_KEY)
     resetAuthState()
     resetDeviceState()
+  }
+
+  function clearTokenForTarget(target: ApiTarget) {
+    if (target === 'agent') {
+      clearAgentToken()
+      return
+    }
+    clearCloudToken()
+  }
+
+  function tokenForTarget(target: ApiTarget): string | null {
+    return target === 'agent' ? agentToken.value : cloudToken.value
+  }
+
+  async function ensureAgentToken() {
+    if (agentToken.value) {
+      return
+    }
+    const response: TokenResp = await authLoginViaAgent()
+    setAgentToken(response.access_token)
   }
 
   async function initializeAuth(options: InitializeAuthOptions = {}) {
-    if (!options.force && authInitialized.value && initializedToken === token.value) {
+    const appMode = useAppModeStore()
+    const mode = appMode.effectiveMode
+    if (mode === 'agent') {
+      await ensureAgentToken()
+    }
+    const currentToken = tokenForTarget(mode)
+    if (
+      !options.force &&
+      authInitialized.value &&
+      initializedToken === currentToken &&
+      initializedMode === mode
+    ) {
       return
     }
     try {
-      const me = await authMe()
+      const me = mode === 'cloud' ? await authMeViaCloud() : await authMe()
       authenticated.value = me.authenticated
       user.value = me.user ?? null
       capabilities.value = me.capabilities ?? null
       cloudSession.value = me.cloud_session ?? null
       usernameInput.value = me.user?.email || usernameInput.value
-      initializedToken = token.value
+      initializedToken = currentToken
+      initializedMode = mode
     } catch (err) {
       authenticated.value = false
       user.value = null
       capabilities.value = null
       cloudSession.value = null
       initializedToken = undefined
+      initializedMode = undefined
       throw err
     } finally {
       authInitialized.value = true
@@ -89,7 +145,7 @@ export const useGatewayStore = defineStore('gateway', () => {
     loggingIn.value = true
     try {
       const response: TokenResp = await authLogin(usernameInput.value, passwordInput.value)
-      setToken(response.access_token)
+      setCloudToken(response.access_token)
       passwordInput.value = ''
     } finally {
       loggingIn.value = false
@@ -125,6 +181,7 @@ export const useGatewayStore = defineStore('gateway', () => {
     capabilities.value = null
     cloudSession.value = null
     initializedToken = undefined
+    initializedMode = undefined
   }
 
   function resetDeviceState() {
@@ -134,6 +191,8 @@ export const useGatewayStore = defineStore('gateway', () => {
 
   return {
     token,
+    agentToken,
+    cloudToken,
     authInitialized,
     authenticated,
     loggingIn,
@@ -146,8 +205,13 @@ export const useGatewayStore = defineStore('gateway', () => {
     selectedDeviceId,
     runtimeTarget,
     currentDevice,
-    setToken,
-    clearToken,
+    setAgentToken,
+    setCloudToken,
+    clearAgentToken,
+    clearCloudToken,
+    clearTokenForTarget,
+    tokenForTarget,
+    ensureAgentToken,
     initializeAuth,
     login,
     loadDevices,

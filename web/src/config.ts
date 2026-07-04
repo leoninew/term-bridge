@@ -1,9 +1,15 @@
 export type ApiTarget = 'agent' | 'cloud'
+export type FrontendMode = 'agent' | 'cloud' | 'hybrid'
 
 export interface RuntimeConfig {
-  apiBaseUrl?: string
   agentApiBaseUrl?: string
   cloudApiBaseUrl?: string
+  frontendMode?: FrontendMode
+}
+
+const defaultApiBaseUrls: Record<ApiTarget, string> = {
+  agent: '/agent-api',
+  cloud: '/cloud-api',
 }
 
 declare global {
@@ -12,42 +18,33 @@ declare global {
   }
 }
 
+export function getFrontendMode(): FrontendMode {
+  const runtimeConfig = typeof window !== 'undefined' ? window.__CONFIG__ : undefined
+  const mode = runtimeConfig?.frontendMode || import.meta.env.VITE_FRONTEND_MODE || 'agent'
+  return isFrontendMode(mode) ? mode : 'agent'
+}
+
 export function getApiBaseUrl(target: ApiTarget = 'agent'): string {
   const runtimeConfig = typeof window !== 'undefined' ? window.__CONFIG__ : undefined
-  if (target === 'cloud') {
-    return normalizeBaseUrl(
-      runtimeConfig?.cloudApiBaseUrl ||
-        import.meta.env.VITE_CLOUD_API_BASE_URL ||
-        runtimeConfig?.apiBaseUrl ||
-        import.meta.env.VITE_API_BASE_URL ||
-        '',
-    )
-  }
-  return normalizeBaseUrl(
-    runtimeConfig?.agentApiBaseUrl ||
-      runtimeConfig?.apiBaseUrl ||
-      import.meta.env.VITE_AGENT_API_BASE_URL ||
-      import.meta.env.VITE_API_BASE_URL ||
-      '',
-  )
+  const value =
+    target === 'cloud'
+      ? runtimeConfig?.cloudApiBaseUrl || import.meta.env.VITE_CLOUD_API_BASE_URL
+      : runtimeConfig?.agentApiBaseUrl || import.meta.env.VITE_AGENT_API_BASE_URL
+  return normalizeBaseUrl(value || defaultApiBaseUrls[target])
 }
 
 export function buildApiUrl(path: string, target: ApiTarget = 'agent'): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  const apiBaseUrl = getApiBaseUrl(target)
-  return apiBaseUrl ? `${apiBaseUrl}${normalizedPath}` : normalizedPath
+  return `${getApiBaseUrl(target)}${normalizedPath}`
 }
 
 export function buildApiWebSocketUrl(path: string, target: ApiTarget = 'agent'): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  const apiBaseUrl = getApiBaseUrl(target)
-  if (!apiBaseUrl) {
-    return normalizedPath
+  const targetBaseUrl = getApiBaseUrl(target)
+  if (targetBaseUrl.startsWith('/')) {
+    return `${targetBaseUrl}${normalizedPath}`
   }
-  if (apiBaseUrl.startsWith('/')) {
-    return `${apiBaseUrl}${normalizedPath}`
-  }
-  const url = new URL(`${apiBaseUrl}${normalizedPath}`)
+  const url = new URL(`${targetBaseUrl}${normalizedPath}`)
   if (url.protocol === 'https:') {
     url.protocol = 'wss:'
   } else if (url.protocol === 'http:') {
@@ -56,13 +53,17 @@ export function buildApiWebSocketUrl(path: string, target: ApiTarget = 'agent'):
   return url.toString()
 }
 
+function isFrontendMode(value: string): value is FrontendMode {
+  return value === 'agent' || value === 'cloud' || value === 'hybrid'
+}
+
 function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '')
 }
 
 export const runtimeConfig = {
-  get apiBaseUrl() {
-    return getApiBaseUrl()
+  get frontendMode() {
+    return getFrontendMode()
   },
   get agentApiBaseUrl() {
     return getApiBaseUrl('agent')

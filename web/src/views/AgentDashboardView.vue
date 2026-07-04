@@ -4,7 +4,7 @@
       <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <header class="flex items-center justify-between gap-3">
           <h1 class="text-xl font-semibold text-[var(--color-text-strong)]">
-            {{ t('dashboard.localTitle') }}
+            {{ t('dashboard.agentTitle') }}
           </h1>
         </header>
 
@@ -21,7 +21,7 @@
             <span
               class="min-w-0 flex-1 truncate text-base font-medium text-[var(--color-text-strong)]"
             >
-              {{ t('dashboard.localModeAction') }}
+              {{ t('dashboard.agentModeAction') }}
             </span>
           </RouterLink>
 

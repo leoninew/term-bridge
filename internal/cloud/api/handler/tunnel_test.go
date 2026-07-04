@@ -27,7 +27,7 @@ func TestAgentTunnelRegistersDevice(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, server.URL, nil)
 	req.SetBasicAuth("admin", "admin")
 	requestHeader.Set("Authorization", req.Header.Get("Authorization"))
-	conn, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
+	conn, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/cloud-api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
 	if err != nil {
 		t.Fatalf("Dial() error = %v", err)
 	}
@@ -62,7 +62,7 @@ func TestDevicesEndpointReturnsRegisteredDevices(t *testing.T) {
 	handler := New(testCloudConfig())
 	handler.registry.Register("dev-1", "local", time.Now().UTC())
 	loginResponse := httptest.NewRecorder()
-	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", stringsReader(`{"username":"admin","password":"admin"}`)))
+	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", stringsReader(`{"username":"admin","password":"admin"}`)))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d", loginResponse.Code)
 	}
@@ -72,7 +72,7 @@ func TestDevicesEndpointReturnsRegisteredDevices(t *testing.T) {
 	if err := json.Unmarshal(loginResponse.Body.Bytes(), &tokenResp); err != nil {
 		t.Fatalf("decode token response: %v", err)
 	}
-	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
+	request := httptest.NewRequest(http.MethodGet, "/cloud-api/devices", nil)
 	request.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)

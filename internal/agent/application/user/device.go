@@ -54,8 +54,7 @@ func LoadOrCreateDevice(options DeviceOptions) (Device, error) {
 	if err != nil {
 		return Device{}, err
 	}
-	deviceDir := filepath.Join(options.StateDir, "devices", safeDeviceSegment(identity.Id))
-	keys, err := loadOrCreateDeviceKeys(deviceDir)
+	keys, err := loadOrCreateDeviceKeys(options.StateDir)
 	if err != nil {
 		return Device{}, err
 	}
@@ -142,7 +141,7 @@ func ensurePublicKeyFile(path string, publicKey ed25519.PublicKey) error {
 }
 
 func LoadDevicePrivateKey(stateDir string, deviceId string) (ed25519.PrivateKey, error) {
-	return readPrivateKey(filepath.Join(stateDir, "devices", safeDeviceSegment(deviceId), PrivateKeyFileName))
+	return readPrivateKey(filepath.Join(stateDir, PrivateKeyFileName))
 }
 
 func LoadDevicePublicKey(stateDir string, deviceId string) (ed25519.PublicKey, error) {

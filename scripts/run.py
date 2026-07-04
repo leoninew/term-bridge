@@ -173,13 +173,13 @@ def main() -> int:
         DevProcess(
             name="agent 服务",
             cwd=ROOT_DIR,
-            command=[command_path("air"), "-c", ".air.toml"],
+            command=[command_path("air"), "-c", ".air.agent.toml"],
             env=env,
         ),
         DevProcess(
             name="cloud 服务",
             cwd=ROOT_DIR,
-            command=[command_path("go"), "run", "cmd/termbridge/main.go", "cloud"],
+            command=[command_path("air"), "-c", ".air.cloud.toml"],
             env=env,
         ),
         DevProcess(

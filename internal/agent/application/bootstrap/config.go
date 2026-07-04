@@ -60,9 +60,7 @@ type MySQLConfig struct {
 }
 
 type AuthConfig struct {
-	Username string
-	Password string
-	JWTTTL   time.Duration
+	JWTTTL time.Duration
 }
 
 type JWTConfig struct {

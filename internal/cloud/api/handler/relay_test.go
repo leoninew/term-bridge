@@ -48,9 +48,9 @@ func TestBrowserAPIRelay(t *testing.T) {
 		path string
 		want string
 	}{
-		{"/api/devices/dev-1/workspaces/tree", "Workspace"},
-		{"/api/devices/dev-1/workspaces/ws-1/sessions", "sess-1"},
-		{"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
+		{"/cloud-api/devices/dev-1/workspaces/tree", "Workspace"},
+		{"/cloud-api/devices/dev-1/workspaces/ws-1/sessions", "sess-1"},
+		{"/cloud-api/devices/dev-1/workspaces/ws-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
 	} {
 		request := httptest.NewRequest(http.MethodGet, tc.path, nil)
 		request.Header.Set(requestIdHeader, "req_test_relay")
@@ -71,7 +71,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 func loginToken(t *testing.T, handler *Handler) string {
 	t.Helper()
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
 	if response.Code != http.StatusOK {
 		t.Fatalf("login status = %d; body=%s", response.Code, response.Body.String())
 	}
@@ -102,7 +102,7 @@ func runFakeAgent(t *testing.T, ctx context.Context, serverUrl string, respond f
 	req, _ := http.NewRequest(http.MethodGet, serverUrl, nil)
 	req.SetBasicAuth("admin", "admin")
 	requestHeader.Set("Authorization", req.Header.Get("Authorization"))
-	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
+	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/cloud-api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
 	if err != nil {
 		t.Errorf("Dial() error = %v", err)
 		return

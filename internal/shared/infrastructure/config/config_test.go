@@ -57,7 +57,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.LogHTTP.RequestBodyLimit != 4096 || cfg.LogHTTP.ResponseBodyLimit != 4096 {
 		t.Fatalf("LogHTTP = %#v", cfg.LogHTTP)
 	}
-	wantStateDir := filepath.Join(cwd, ".termbridge")
+	wantStateDir := filepath.Join(cwd, "data")
 	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(wantStateDir) {
 		t.Fatalf("StateDir = %q, want %q", cfg.Runtime.StateDir, wantStateDir)
 	}
@@ -94,8 +94,8 @@ func TestLoadDefaults(t *testing.T) {
 	if !reflect.DeepEqual(cfg.Cloud.OAuth.Scopes, []string{"openid", "email", "profile"}) {
 		t.Fatalf("Cloud.OAuth.Scopes = %#v", cfg.Cloud.OAuth.Scopes)
 	}
-	if cfg.Auth.Username != DefaultAuthUsername || cfg.Auth.Password != DefaultAuthPassword {
-		t.Fatalf("Auth = %#v, want default PoC auth", cfg.Auth)
+	if cfg.Auth.LocalAdmin.Username != DefaultAuthUsername || cfg.Auth.LocalAdmin.Password != DefaultAuthPassword {
+		t.Fatalf("Auth.LocalAdmin = %#v, want default PoC auth", cfg.Auth.LocalAdmin)
 	}
 	if cfg.Agent.StaticDir != "" {
 		t.Fatalf("Agent.StaticDir = %q, want empty", cfg.Agent.StaticDir)

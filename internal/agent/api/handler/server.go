@@ -22,8 +22,6 @@ import (
 )
 
 type Config struct {
-	Username               string
-	Password               string
 	JWTSecret              []byte
 	DebugErrors            bool
 	Logger                 *slog.Logger
@@ -91,7 +89,7 @@ type Handler struct {
 
 func New(config Config) *Handler {
 	config = normalizeConfig(config)
-	handler := &Handler{config: config, auth: auth.NewAuther(auth.Credentials{Username: config.Username, Password: config.Password}, auth.NewTokenService(config.JWTSecret)), authService: config.AuthService, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
+	handler := &Handler{config: config, auth: auth.NewAuther(auth.Credentials{}, auth.NewTokenService(config.JWTSecret)), authService: config.AuthService, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
 	if config.LocalRuntime != nil {
 		handler.localRuntime = localRuntimeEndpoint{runtime: config.LocalRuntime, handler: handler}
 	}
@@ -102,23 +100,24 @@ func (h *Handler) Handler() http.Handler {
 	mux := http.NewServeMux()
 	h.registerCommonRoutes(mux)
 	h.registerAgentRoutes(mux)
-	mux.HandleFunc("/api", h.writeNotFound)
-	mux.HandleFunc("/api/", h.writeNotFound)
+	mux.HandleFunc("/agent-api", h.writeNotFound)
+	mux.HandleFunc("/agent-api/", h.writeNotFound)
 	return mux
 }
 
 func (h *Handler) registerCommonRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/health", h.handleHealth)
-	mux.HandleFunc("/api/auth/logout", h.authMiddleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
-	mux.HandleFunc("/api/auth/me", h.handleAuthMe)
+	mux.HandleFunc("/agent-api/health", h.handleHealth)
+	mux.HandleFunc("/agent-api/auth/login", h.handleAuthLogin)
+	mux.HandleFunc("/agent-api/auth/logout", h.authMiddleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
+	mux.HandleFunc("/agent-api/auth/me", h.handleAuthMe)
 }
 
 func (h *Handler) registerAgentRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/cloud-oauth/start", h.handleCloudOAuthStart)
-	mux.HandleFunc("/api/cloud-oauth/callback", h.handleCloudOAuthCallback)
-	mux.HandleFunc("/api/workspaces", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
-	mux.HandleFunc("/api/workspaces/", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
-	mux.HandleFunc("/api/sessions", h.authMiddleware(http.HandlerFunc(h.handleLocalSessions)).ServeHTTP)
+	mux.HandleFunc("/agent-api/cloud-oauth/start", h.handleCloudOAuthStart)
+	mux.HandleFunc("/agent-api/cloud-oauth/callback", h.handleCloudOAuthCallback)
+	mux.HandleFunc("/agent-api/workspaces", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
+	mux.HandleFunc("/agent-api/workspaces/", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
+	mux.HandleFunc("/agent-api/sessions", h.authMiddleware(http.HandlerFunc(h.handleLocalSessions)).ServeHTTP)
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { h.Handler().ServeHTTP(w, r) }
@@ -129,6 +128,32 @@ func (s *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, HealthResp{Status: "ok"})
+}
+
+func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if s.authService != nil {
+		result, err := s.authService.Login(r.Context(), "", "")
+		if err != nil {
+			s.writeUnauthorized(w, r)
+			return
+		}
+		writeJSON(w, http.StatusOK, TokenResp{AccessToken: result.Token, TokenType: "bearer"})
+		return
+	}
+	if s.auth == nil {
+		s.writeUnauthorized(w, r)
+		return
+	}
+	token, err := s.auth.SignToken("local-agent")
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, "Failed to sign token", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, TokenResp{AccessToken: token, TokenType: "bearer"})
 }
 
 func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +191,15 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 
 func (s *Handler) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r)
+		if s.authService != nil {
+			if _, ok := s.claimsFromRequest(r); !ok {
+				s.writeUnauthorized(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
+		s.auth.Middleware(next, s.writeUnauthorized).ServeHTTP(w, r)
 	})
 }
 func (s *Handler) cloudOAuthEnabled() bool {
@@ -270,7 +303,7 @@ func (s *Handler) handleCloudOAuthCallback(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Handler) handleLocalWorkspaces(w http.ResponseWriter, r *http.Request) {
-	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/workspaces"), "/")
+	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/agent-api/workspaces"), "/")
 	parts := []string{"", "workspaces"}
 	if path != "" {
 		parts = append(parts, strings.Split(path, "/")...)
@@ -279,7 +312,7 @@ func (s *Handler) handleLocalWorkspaces(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Handler) handleLocalSessions(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/api/sessions" {
+	if r.URL.Path != "/agent-api/sessions" {
 		s.writeNotFound(w, r)
 		return
 	}
@@ -534,7 +567,7 @@ func (s *Handler) completeCloudOAuthLogin(ctx context.Context, code string, atte
 	if err != nil {
 		return CloudSessionSummary{}, err
 	}
-	exchangeURL := gateURL + "/api/cloud-oauth/exchange"
+	exchangeURL := gateURL + "/cloud-api/cloud-oauth/exchange"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, exchangeURL, bytes.NewReader(body))
 	if err != nil {
 		return CloudSessionSummary{}, err
@@ -559,7 +592,7 @@ func (s *Handler) completeCloudOAuthLogin(ctx context.Context, code string, atte
 	if err != nil {
 		return CloudSessionSummary{}, err
 	}
-	reportURL := gateURL + "/api/devices/current"
+	reportURL := gateURL + "/cloud-api/devices/current"
 	reportReq, err := http.NewRequestWithContext(ctx, http.MethodPost, reportURL, bytes.NewReader(reportBody))
 	if err != nil {
 		return CloudSessionSummary{}, err

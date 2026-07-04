@@ -178,7 +178,7 @@ func TestDBStoreOrdersWorkspacesAndSessions(t *testing.T) {
 
 func TestDBStoreHistoryPathRemainsFileBackedTerminalOutput(t *testing.T) {
 	store, _ := newTestDBStore(t)
-	want := filepath.Join(store.SessionDir("workspace-1", "session-1"), "history.log")
+	want := filepath.Join(store.root, "history", "session-1.log")
 	if got := store.HistoryPath("workspace-1", "session-1"); got != want {
 		t.Fatalf("HistoryPath() = %q, want %q", got, want)
 	}

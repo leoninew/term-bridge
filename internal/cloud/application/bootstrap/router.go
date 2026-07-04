@@ -16,9 +16,9 @@ import (
 
 func backendHandler(cfg Config, logger *slog.Logger, apiHandler http.Handler) http.Handler {
 	mux := http.NewServeMux()
-	apiHandler = transportmiddleware.CORSForPaths(cfg.Server.CORSAllowedOrigins, apiPath)(apiHandler)
-	mux.Handle("/api", apiHandler)
-	mux.Handle("/api/", apiHandler)
+	cloudAPIHandler := transportmiddleware.CORSForPaths(cfg.Server.CORSAllowedOrigins, apiPath)(apiHandler)
+	mux.Handle("/cloud-api", cloudAPIHandler)
+	mux.Handle("/cloud-api/", cloudAPIHandler)
 	if cfg.Server.StaticDir != "" {
 		mux.Handle("/", staticHandler(cfg.Server.StaticDir, cfg.Server.APIBaseURL))
 	}
@@ -91,10 +91,8 @@ func serveIndexHTML(w http.ResponseWriter, r *http.Request, indexPath string, ap
 }
 
 func injectRuntimeConfig(content []byte, apiBaseURL string) []byte {
-	configValue := map[string]string{}
-	if strings.TrimSpace(apiBaseURL) != "" {
-		configValue["apiBaseUrl"] = strings.TrimRight(strings.TrimSpace(apiBaseURL), "/")
-	}
+	configValue := map[string]string{"frontendMode": "cloud"}
+	configValue["cloudApiBaseUrl"] = normalizeRuntimeAPIBaseURL(apiBaseURL, "/cloud-api")
 	configJSON, err := json.Marshal(configValue)
 	if err != nil {
 		panic("marshal runtime config: " + err.Error())
@@ -111,6 +109,13 @@ func injectRuntimeConfig(content []byte, apiBaseURL string) []byte {
 	return content
 }
 
+func normalizeRuntimeAPIBaseURL(value string, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return strings.TrimRight(strings.TrimSpace(value), "/")
+}
+
 func apiPath(path string) bool {
-	return path == "/api" || strings.HasPrefix(path, "/api/")
+	return path == "/cloud-api" || strings.HasPrefix(path, "/cloud-api/")
 }

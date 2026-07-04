@@ -29,7 +29,7 @@
   import type { SessionRuntimeApi } from '../features/sessions/runtime'
   import type { RuntimeTarget } from '../features/runtimeTarget'
 
-  const runtimeTarget: RuntimeTarget = { mode: 'local' }
+  const runtimeTarget: RuntimeTarget = { mode: 'agent' }
   const runtimeApi: SessionRuntimeApi = {
     createSession,
     getSession,

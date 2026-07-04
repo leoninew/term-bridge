@@ -26,7 +26,6 @@ export type UserInfo = ProtoUser & {
 
 export type AuthCapabilities = {
   // proto 未覆盖 capabilities；待补充 AuthMeResp proto 字段后迁移。
-  mode: 'local' | 'cloud'
   providers: string[]
   password_reset_enabled: boolean
   email_verification_enabled: boolean

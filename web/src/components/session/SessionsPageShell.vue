@@ -8,7 +8,7 @@
     </section>
 
     <SplitterGroup
-      v-else-if="gateway.capabilities?.mode === 'local' || gateway.authenticated"
+      v-else-if="isAgentMode || gateway.authenticated"
       direction="horizontal"
       class="flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
     >
@@ -166,12 +166,12 @@
   const deletingSessionId = ref<string | null>(null)
   const removingWorkspaceId = ref<string | null>(null)
 
-  const isLocalMode = computed(() => gateway.capabilities?.mode === 'local')
+  const isAgentMode = computed(() => props.runtimeTarget.mode === 'agent')
   const userActionDisabled = computed(
-    () => isLocalMode.value && !gateway.capabilities?.cloud_oauth_enabled,
+    () => isAgentMode.value && !gateway.capabilities?.cloud_oauth_enabled,
   )
   const userActionLabel = computed(() =>
-    isLocalMode.value ? t('dashboard.signInWithOAuth') : t('dashboard.signIn'),
+    isAgentMode.value ? t('dashboard.signInWithOAuth') : t('dashboard.signIn'),
   )
   const userDisplayName = computed(
     () => gateway.user?.display_name || gateway.user?.email || t('dashboard.signedIn'),
@@ -192,7 +192,7 @@
       props.runtimeTarget,
       session.workspace_id,
       session.id,
-      gateway.token ?? undefined,
+      gateway.tokenForTarget(props.runtimeTarget.mode) ?? undefined,
     )
   })
 
@@ -219,7 +219,7 @@
     if (gateway.authenticated) {
       return
     }
-    if (isLocalMode.value) {
+    if (isAgentMode.value) {
       if (props.startCloudOAuthUrl && gateway.capabilities?.cloud_oauth_enabled) {
         window.location.href = props.startCloudOAuthUrl()
       }
@@ -234,11 +234,11 @@
     } catch {
       // ignore logout API errors — clear local state anyway
     }
-    gateway.clearToken()
+    gateway.clearTokenForTarget(props.runtimeTarget.mode)
     gateway.passwordInput = ''
     workspaceSessions.reset()
     workbench.resetForSourceChange()
-    await router.replace({ name: 'login' })
+    await router.replace(isAgentMode.value ? { name: 'agent-dashboard' } : { name: 'login' })
   }
 
   async function startSession() {

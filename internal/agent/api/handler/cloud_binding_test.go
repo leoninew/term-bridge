@@ -19,11 +19,11 @@ func testLocalDevice() agentapp.Device {
 	return agentapp.Device{Id: "dev-1", Name: "local-device"}
 }
 
-func TestCloudOAuthStartReturnsAuthorizeURLInLocalMode(t *testing.T) {
+func TestCloudOAuthStartReturnsAuthorizeURLInAgentMode(t *testing.T) {
 	authService := newTestAuthService(sharedauth.NewTokenService(testJWTKey))
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: newTestCloudOAuthAttemptStore(t.TempDir()), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL, Scopes: []string{"openid", "email", "profile"}}, LocalDevice: testLocalDevice()})
 
-	request := httptest.NewRequest(http.MethodGet, "/api/cloud-oauth/start", nil)
+	request := httptest.NewRequest(http.MethodGet, "/agent-api/cloud-oauth/start", nil)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
@@ -47,7 +47,7 @@ func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	handler.setLocalCloudSession(CloudSessionSummary{GateURL: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: connectedAt})
 
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil))
 	if response.Code != http.StatusOK {
 		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
 	}
@@ -69,6 +69,45 @@ func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	}
 }
 
+func TestAgentLoginIssuesLocalTokenAndProtectsBusinessRoutes(t *testing.T) {
+	authService := NewLocalAuthService(sharedauth.NewTokenService(testJWTKey))
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService})
+
+	unauthorized := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/agent-api/workspaces", nil))
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated workspaces status = %d, want 401; body=%s", unauthorized.Code, unauthorized.Body.String())
+	}
+
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/agent-api/auth/login", nil))
+	if loginResponse.Code != http.StatusOK {
+		t.Fatalf("login status = %d, want 200; body=%s", loginResponse.Code, loginResponse.Body.String())
+	}
+	var tokenResp TokenResp
+	if err := json.Unmarshal(loginResponse.Body.Bytes(), &tokenResp); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+	if tokenResp.AccessToken == "" || tokenResp.TokenType != "bearer" {
+		t.Fatalf("token response = %#v", tokenResp)
+	}
+
+	meRequest := httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil)
+	meRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
+	meResponse := httptest.NewRecorder()
+	handler.ServeHTTP(meResponse, meRequest)
+	if meResponse.Code != http.StatusOK {
+		t.Fatalf("auth me status = %d, want 200; body=%s", meResponse.Code, meResponse.Body.String())
+	}
+	var me AuthMeResp
+	if err := json.Unmarshal(meResponse.Body.Bytes(), &me); err != nil {
+		t.Fatalf("decode auth me response: %v", err)
+	}
+	if !me.Authenticated || me.User == nil || me.User.ID != "local-agent" || me.User.DisplayName == "" {
+		t.Fatalf("auth me = %#v", me)
+	}
+}
+
 func TestAuthMeDoesNotPersistLocalCloudSessionAcrossHandlerRestart(t *testing.T) {
 	authService := newTestAuthService(sharedauth.NewTokenService(testJWTKey))
 	stateDir := t.TempDir()
@@ -77,7 +116,7 @@ func TestAuthMeDoesNotPersistLocalCloudSessionAcrossHandlerRestart(t *testing.T)
 
 	second := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudOAuthAttemptStore: newTestCloudOAuthAttemptStore(stateDir), CloudGateURL: "https://cloud.example.test", CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectURL: registeredCloudOAuthRedirectURL}})
 	response := httptest.NewRecorder()
-	second.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
+	second.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil))
 	if response.Code != http.StatusOK {
 		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
 	}

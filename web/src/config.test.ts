@@ -1,24 +1,34 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildApiUrl, buildApiWebSocketUrl, getApiBaseUrl } from './config'
+import { buildApiUrl, buildApiWebSocketUrl, getApiBaseUrl, getFrontendMode } from './config'
 
 describe('runtime config', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  it('uses same-origin API paths when runtime api base URL is empty', () => {
+  it('uses explicit agent and cloud API paths by default', () => {
     vi.stubGlobal('window', { __CONFIG__: {} })
 
-    expect(getApiBaseUrl()).toBe('')
-    expect(buildApiUrl('/api/health')).toBe('/api/health')
-    expect(buildApiWebSocketUrl('/api/sessions/session-1/ws')).toBe('/api/sessions/session-1/ws')
+    expect(getApiBaseUrl('agent')).toBe('/agent-api')
+    expect(getApiBaseUrl('cloud')).toBe('/cloud-api')
+    expect(buildApiUrl('/health', 'agent')).toBe('/agent-api/health')
+    expect(buildApiWebSocketUrl('/sessions/session-1/ws', 'agent')).toBe(
+      '/agent-api/sessions/session-1/ws',
+    )
   })
 
-  it('uses runtime API base URL and trims a trailing slash', () => {
-    vi.stubGlobal('window', { __CONFIG__: { apiBaseUrl: 'https://api.example.com/' } })
+  it('uses runtime target API base URLs and trims trailing slashes', () => {
+    vi.stubGlobal('window', {
+      __CONFIG__: {
+        agentApiBaseUrl: 'https://agent.example.com/',
+        cloudApiBaseUrl: 'https://cloud.example.com/',
+      },
+    })
 
-    expect(getApiBaseUrl()).toBe('https://api.example.com')
-    expect(buildApiUrl('/api/health')).toBe('https://api.example.com/api/health')
+    expect(getApiBaseUrl('agent')).toBe('https://agent.example.com')
+    expect(getApiBaseUrl('cloud')).toBe('https://cloud.example.com')
+    expect(buildApiUrl('/health', 'agent')).toBe('https://agent.example.com/health')
+    expect(buildApiUrl('/devices', 'cloud')).toBe('https://cloud.example.com/devices')
   })
 
   it('uses separate agent and cloud API base URLs', () => {
@@ -28,31 +38,43 @@ describe('runtime config', () => {
 
     expect(getApiBaseUrl('agent')).toBe('/agent-api')
     expect(getApiBaseUrl('cloud')).toBe('/cloud-api')
-    expect(buildApiUrl('/api/health', 'agent')).toBe('/agent-api/api/health')
-    expect(buildApiUrl('/api/devices', 'cloud')).toBe('/cloud-api/api/devices')
+    expect(buildApiUrl('/health', 'agent')).toBe('/agent-api/health')
+    expect(buildApiUrl('/devices', 'cloud')).toBe('/cloud-api/devices')
   })
 
-  it('builds websocket URLs from runtime API base URL', () => {
-    vi.stubGlobal('window', { __CONFIG__: { apiBaseUrl: 'https://api.example.com' } })
+  it('builds websocket URLs from target runtime API base URL', () => {
+    vi.stubGlobal('window', { __CONFIG__: { agentApiBaseUrl: 'https://agent.example.com' } })
 
-    expect(buildApiWebSocketUrl('/api/sessions/session-1/ws?token=t1')).toBe(
-      'wss://api.example.com/api/sessions/session-1/ws?token=t1',
+    expect(buildApiWebSocketUrl('/sessions/session-1/ws?token=t1', 'agent')).toBe(
+      'wss://agent.example.com/sessions/session-1/ws?token=t1',
     )
   })
 
   it('converts http API base URL to ws websocket URL', () => {
-    vi.stubGlobal('window', { __CONFIG__: { apiBaseUrl: 'http://127.0.0.1:9030' } })
+    vi.stubGlobal('window', { __CONFIG__: { agentApiBaseUrl: 'http://127.0.0.1:9030' } })
 
-    expect(buildApiWebSocketUrl('/api/sessions/session-1/ws')).toBe(
-      'ws://127.0.0.1:9030/api/sessions/session-1/ws',
+    expect(buildApiWebSocketUrl('/sessions/session-1/ws', 'agent')).toBe(
+      'ws://127.0.0.1:9030/sessions/session-1/ws',
     )
   })
 
   it('keeps path-based websocket URLs for Vite dev proxy', () => {
     vi.stubGlobal('window', { __CONFIG__: { cloudApiBaseUrl: '/cloud-api' } })
 
-    expect(buildApiWebSocketUrl('/api/devices/device-1/sessions/session-1/ws', 'cloud')).toBe(
-      '/cloud-api/api/devices/device-1/sessions/session-1/ws',
+    expect(buildApiWebSocketUrl('/devices/device-1/sessions/session-1/ws', 'cloud')).toBe(
+      '/cloud-api/devices/device-1/sessions/session-1/ws',
     )
+  })
+
+  it('reads frontend mode from runtime config', () => {
+    vi.stubGlobal('window', { __CONFIG__: { frontendMode: 'hybrid' } })
+
+    expect(getFrontendMode()).toBe('hybrid')
+  })
+
+  it('falls back to agent mode when frontend mode is invalid', () => {
+    vi.stubGlobal('window', { __CONFIG__: { frontendMode: 'invalid' } })
+
+    expect(getFrontendMode()).toBe('agent')
   })
 })

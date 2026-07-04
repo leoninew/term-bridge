@@ -72,11 +72,11 @@ export const messages = {
       continueWithGoogle: '使用 Google 继续',
       googleSigningIn: '正在完成 Google 登录…',
       googleLoginFailed: 'Google 登录失败',
-      localLoginTitle: '本机模式无需登录',
-      localLoginDescription:
-        '当前 Web 运行在 local mode，本机 dashboard 和 workbench 不需要 TermBridge 账号认证。账号登录请在 Cloud Gate 完成。',
-      localLoginBackToDashboard: '返回本机 dashboard',
-      localLoginConnectCloud: '连接云端账号',
+      agentLoginTitle: 'Agent 模式无需登录',
+      agentLoginDescription:
+        '当前 Web 运行在 agent mode，Agent dashboard 和 workbench 不需要 TermBridge 账号认证。账号登录请在 Cloud Gate 完成。',
+      agentLoginBackToDashboard: '返回 Agent dashboard',
+      agentLoginConnectCloud: '连接云端账号',
       connectTitle: '连接当前设备到 Cloud Gate',
       connectDescription: '将当前设备连接到固定 Cloud Gate，完成云端账号授权后返回本机。',
       connectCloud: '连接 Cloud Gate',
@@ -103,9 +103,9 @@ export const messages = {
       kicker: '设备管理',
       title: '我的设备',
       description: '查看当前账号可访问的设备，选择在线设备进入工作台，或连接一台新设备。',
-      localKicker: '本机 TermBridge',
-      localTitle: '本机 Dashboard',
-      localDescription: '直接管理这台机器上的 workspace 和 session；连接云端账号是可选能力。',
+      agentKicker: 'TermBridge Agent',
+      agentTitle: 'Agent Dashboard',
+      agentDescription: '直接管理这台机器上的 workspace 和 session；连接云端账号是可选能力。',
       addDevice: '添加设备',
       refreshDevices: '刷新设备',
       refreshing: '刷新中…',
@@ -115,11 +115,11 @@ export const messages = {
       devicesDescription: '只有在线设备可以进入工作台。离线设备会保留在列表中，便于确认绑定状态。',
       openWorkbench: '进入工作台',
       offlineAction: '设备离线',
-      localDeviceTitle: '当前本机设备',
-      localDeviceDescription:
-        'local mode 不要求浏览器登录。你可以直接进入本机 workbench，或连接 Cloud Gate 后让云端账号看到这台设备。',
-      localModeAction: '本机模式',
-      localModeDescription: '直接进入本机 workspace 和 session，不需要浏览器账号登录。',
+      agentDeviceTitle: '当前 Agent 设备',
+      agentDeviceDescription:
+        'Agent mode 不要求浏览器登录。你可以直接进入 Agent workbench，或连接 Cloud Gate 后让云端账号看到这台设备。',
+      agentModeAction: 'Agent 模式',
+      agentModeDescription: '直接进入 Agent workspace 和 session，不需要浏览器账号登录。',
       cloudModeAction: '云端模式',
       cloudModeDescription: '连接 Cloud Gate，让云端账号看到并管理这台本机设备。',
       cloudModeDisabledDescription: '请先配置 Cloud Gate OAuth client 后再连接云端账号。',
@@ -129,7 +129,7 @@ export const messages = {
       notSignedIn: '未登录',
       signIn: '点击登录',
       signInWithOAuth: '点击进行 OAuth2 验证',
-      openLocalWorkbench: '进入本机工作台',
+      openAgentWorkbench: '进入 Agent 工作台',
       connectCloudAccount: '连接云端账号',
       reconnectCloudAccount: '重新连接云端账号',
       cloudAccountConnected: '已连接云端',
@@ -144,9 +144,9 @@ export const messages = {
       cloudConnectionConnectedAt: '连接时间',
       connectGuideTitle: '连接本机设备',
       connectGuideDescription:
-        '在要加入账号的机器上打开 local dashboard，再从那里发起 Cloud Gate 授权。',
+        '在要加入账号的机器上打开 Agent dashboard，再从那里发起 Cloud Gate 授权。',
       connectStepServe: '在目标机器上启动 termbridge agent。',
-      connectStepCloud: '在本机 dashboard 打开连接 Cloud Gate 流程，并使用当前云端账号授权。',
+      connectStepCloud: '在 Agent dashboard 打开连接 Cloud Gate 流程，并使用当前云端账号授权。',
       connectStepRefresh: '绑定完成后回到此页面刷新设备列表。',
       connectedAt: '连接时间：{value}',
       lastSeenAt: '最后在线：{value}',
@@ -271,11 +271,11 @@ export const messages = {
       continueWithGoogle: 'Continue with Google',
       googleSigningIn: 'Completing Google sign-in…',
       googleLoginFailed: 'Google sign-in failed',
-      localLoginTitle: 'Local mode does not require sign-in',
-      localLoginDescription:
-        'This web runtime is in local mode. The local dashboard and workbench do not require a TermBridge account. Complete account sign-in on Cloud Gate instead.',
-      localLoginBackToDashboard: 'Back to local dashboard',
-      localLoginConnectCloud: 'Connect cloud account',
+      agentLoginTitle: 'Agent mode does not require sign-in',
+      agentLoginDescription:
+        'This web runtime is in agent mode. The Agent dashboard and workbench do not require a TermBridge account. Complete account sign-in on Cloud Gate instead.',
+      agentLoginBackToDashboard: 'Back to Agent dashboard',
+      agentLoginConnectCloud: 'Connect cloud account',
       connectTitle: 'Connect this device to Cloud Gate',
       connectDescription:
         'Connect this device to the configured Cloud Gate, then return here after cloud account authorization.',
@@ -305,9 +305,9 @@ export const messages = {
       title: 'My devices',
       description:
         'Review devices available to this account, open an online device in the workbench, or connect a new device.',
-      localKicker: 'Local TermBridge',
-      localTitle: 'Local dashboard',
-      localDescription:
+      agentKicker: 'TermBridge Agent',
+      agentTitle: 'Agent dashboard',
+      agentDescription:
         'Manage workspaces and sessions on this machine directly. Connecting a cloud account is optional.',
       addDevice: 'Add device',
       refreshDevices: 'Refresh devices',
@@ -320,12 +320,12 @@ export const messages = {
         'Only online devices can open the workbench. Offline devices stay visible so you can confirm their binding status.',
       openWorkbench: 'Open workbench',
       offlineAction: 'Device offline',
-      localDeviceTitle: 'Current local device',
-      localDeviceDescription:
-        'Local mode does not require browser sign-in. Open the local workbench directly, or connect Cloud Gate so your cloud account can see this device.',
-      localModeAction: 'Local mode',
-      localModeDescription:
-        'Open local workspaces and sessions directly without browser account sign-in.',
+      agentDeviceTitle: 'Current Agent device',
+      agentDeviceDescription:
+        'Agent mode does not require browser sign-in. Open the Agent workbench directly, or connect Cloud Gate so your cloud account can see this device.',
+      agentModeAction: 'Agent mode',
+      agentModeDescription:
+        'Open Agent workspaces and sessions directly without browser account sign-in.',
       cloudModeAction: 'Cloud mode',
       cloudModeDescription:
         'Connect Cloud Gate so your cloud account can see and manage this local device.',
@@ -337,7 +337,7 @@ export const messages = {
       notSignedIn: 'Not signed in',
       signIn: 'Click to sign in',
       signInWithOAuth: 'Click to verify with OAuth2',
-      openLocalWorkbench: 'Open local workbench',
+      openAgentWorkbench: 'Open Agent workbench',
       connectCloudAccount: 'Connect cloud account',
       reconnectCloudAccount: 'Reconnect cloud account',
       cloudAccountConnected: 'Cloud connected',
@@ -353,10 +353,10 @@ export const messages = {
       cloudConnectionConnectedAt: 'Connected at',
       connectGuideTitle: 'Connect a local device',
       connectGuideDescription:
-        'Open the local dashboard on the machine you want to add, then start Cloud Gate authorization from there.',
+        'Open the Agent dashboard on the machine you want to add, then start Cloud Gate authorization from there.',
       connectStepServe: 'Start termbridge agent on the target machine.',
       connectStepCloud:
-        'From the local dashboard, open the Cloud Gate connection flow and authorize with this cloud account.',
+        'From the Agent dashboard, open the Cloud Gate connection flow and authorize with this cloud account.',
       connectStepRefresh: 'Return here and refresh the device list after binding completes.',
       connectedAt: 'Connected at: {value}',
       lastSeenAt: 'Last seen: {value}',

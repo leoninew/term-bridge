@@ -155,33 +155,33 @@ func (h *Handler) Handler() http.Handler {
 	mux := http.NewServeMux()
 	h.registerCommonRoutes(mux)
 	h.registerCloudRoutes(mux)
-	mux.HandleFunc("/api", h.writeNotFound)
-	mux.HandleFunc("/api/", h.writeNotFound)
+	mux.HandleFunc("/cloud-api", h.writeNotFound)
+	mux.HandleFunc("/cloud-api/", h.writeNotFound)
 	return mux
 }
 
 func (h *Handler) registerCommonRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/health", h.handleHealth)
-	mux.HandleFunc("/api/auth/logout", h.authMiddleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
-	mux.HandleFunc("/api/auth/me", h.handleAuthMe)
+	mux.HandleFunc("/cloud-api/health", h.handleHealth)
+	mux.HandleFunc("/cloud-api/auth/logout", h.authMiddleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
+	mux.HandleFunc("/cloud-api/auth/me", h.handleAuthMe)
 }
 
 func (h *Handler) registerCloudRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/auth/login", h.handleAuthLogin)
-	mux.HandleFunc("/api/auth/register", h.handleRegister)
-	mux.HandleFunc("/api/auth/email/verify", h.handleVerifyEmail)
-	mux.HandleFunc("/api/auth/email/verification/resend", h.handleResendVerification)
-	mux.HandleFunc("/api/auth/password/change", h.authMiddleware(http.HandlerFunc(h.handleChangePassword)).ServeHTTP)
-	mux.HandleFunc("/api/auth/password-reset/request", h.handlePasswordResetRequest)
-	mux.HandleFunc("/api/auth/password-reset/confirm", h.handlePasswordResetConfirm)
-	mux.HandleFunc("/api/auth/google", h.handleGoogleAuth)
-	mux.HandleFunc("/api/auth/google/callback", h.handleGoogleCallback)
-	mux.HandleFunc("/api/cloud-oauth/authorize", h.handleCloudOAuthAuthorize)
-	mux.HandleFunc("/api/cloud-oauth/exchange", h.handleCloudOAuthExchange)
-	mux.HandleFunc("/api/devices", h.authMiddleware(http.HandlerFunc(h.handleDevices)).ServeHTTP)
-	mux.HandleFunc("/api/devices/current", h.authMiddleware(http.HandlerFunc(h.handleCurrentDevice)).ServeHTTP)
-	mux.HandleFunc("/api/devices/", h.authMiddleware(http.HandlerFunc(h.handleDevice)).ServeHTTP)
-	mux.HandleFunc("/api/agent/tunnel", h.handleAgentTunnel)
+	mux.HandleFunc("/cloud-api/auth/login", h.handleAuthLogin)
+	mux.HandleFunc("/cloud-api/auth/register", h.handleRegister)
+	mux.HandleFunc("/cloud-api/auth/email/verify", h.handleVerifyEmail)
+	mux.HandleFunc("/cloud-api/auth/email/verification/resend", h.handleResendVerification)
+	mux.HandleFunc("/cloud-api/auth/password/change", h.authMiddleware(http.HandlerFunc(h.handleChangePassword)).ServeHTTP)
+	mux.HandleFunc("/cloud-api/auth/password-reset/request", h.handlePasswordResetRequest)
+	mux.HandleFunc("/cloud-api/auth/password-reset/confirm", h.handlePasswordResetConfirm)
+	mux.HandleFunc("/cloud-api/auth/google", h.handleGoogleAuth)
+	mux.HandleFunc("/cloud-api/auth/google/callback", h.handleGoogleCallback)
+	mux.HandleFunc("/cloud-api/cloud-oauth/authorize", h.handleCloudOAuthAuthorize)
+	mux.HandleFunc("/cloud-api/cloud-oauth/exchange", h.handleCloudOAuthExchange)
+	mux.HandleFunc("/cloud-api/devices", h.authMiddleware(http.HandlerFunc(h.handleDevices)).ServeHTTP)
+	mux.HandleFunc("/cloud-api/devices/current", h.authMiddleware(http.HandlerFunc(h.handleCurrentDevice)).ServeHTTP)
+	mux.HandleFunc("/cloud-api/devices/", h.authMiddleware(http.HandlerFunc(h.handleDevice)).ServeHTTP)
+	mux.HandleFunc("/cloud-api/agent/tunnel", h.handleAgentTunnel)
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { h.Handler().ServeHTTP(w, r) }
@@ -568,7 +568,7 @@ func (s *Handler) handleCurrentDevice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/api/devices" {
+	if r.URL.Path != "/cloud-api/devices" {
 		s.writeNotFound(w, r)
 		return
 	}
@@ -584,7 +584,7 @@ func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, ListDevicesResp{Items: devices})
 }
 func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
-	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/devices/"), "/")
+	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/cloud-api/devices/"), "/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 1 && parts[0] != "" && r.Method == http.MethodDelete {
 		s.handleDeleteDevice(w, r, parts[0])

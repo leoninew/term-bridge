@@ -28,18 +28,18 @@ history:
 
 # Runtime 状态目录
 runtime:
-  state_dir: .termbridge
+  state_dir: data
 
 # Agent HTTP/API server 配置。
-# baseline 面向最终本机运行：agent 自己提供 Web/API，同源 /api，不依赖 Vite dev proxy。
+# baseline 面向最终本机运行：agent 自己提供 Web/API，对浏览器暴露 /agent-api，不依赖 Vite dev proxy。
 agent:
   # termbridge agent 暴露的本机 Web/API 地址。
   listen_url: http://127.0.0.1:9030
   # Web 静态资源目录；为空时只提供 API，打包或部署场景可指向已构建前端目录。
   static_dir: ""
-  # 浏览器访问 agent 前端/setup 的地址，用于 local dashboard 与云端授权回跳。
+  # 浏览器访问 agent 前端/setup 的地址，用于 Agent dashboard 与云端授权回跳。
   public_url: http://localhost:9030
-  # 前端运行时 API base URL；空值表示同源 /api。
+  # 前端运行时 Agent API base URL；空值表示同源 /agent-api。
   api_base_url: ""
   # 跨域 API Origin allowlist；空列表表示不开放跨域。
   cors_allowed_origins: []
@@ -50,12 +50,12 @@ agent:
   database:
     driver: sqlite
     sqlite:
-      path: .termbridge/agent.db
+      path: data/agent.db
     mysql:
       dsn: ""
 
 # Cloud HTTP/API server 与 connection 配置。
-# baseline 面向云端同源部署：cloud 自己提供 Web/API，同源 /api，不使用本地 Vite proxy path。
+# baseline 面向云端同源部署：cloud 自己提供 Web/API，对浏览器暴露 /cloud-api，不使用本地 Vite proxy path。
 cloud:
   # termbridge cloud 暴露的云端 Web/API 地址。
   listen_url: http://127.0.0.1:9030
@@ -63,7 +63,7 @@ cloud:
   static_dir: ""
   # 浏览器访问 cloud 前端的地址。
   public_url: http://localhost:9030
-  # 前端运行时 API base URL；空值表示同源 /api。
+  # 前端运行时 Cloud API base URL；空值表示同源 /cloud-api。
   api_base_url: ""
   # 跨域 API Origin allowlist；空列表表示不开放跨域。
   cors_allowed_origins: []
@@ -74,7 +74,7 @@ cloud:
   # 本地 /cloud/oauth/start 会按 OAuth2 client 配置跳转到该地址完成云端账号授权。
   gate_url: ""
 
-  # TermBridge Cloud OAuth2 client 配置。local mode 作为 Cloud Gate 的 OAuth2 client，
+  # TermBridge Cloud OAuth2 client 配置。Agent 作为 Cloud Gate 的 OAuth2 client，
   # redirect_url 指向本机 /cloud/oauth/callback。
   oauth:
     client_id: termbridge-local
@@ -89,7 +89,7 @@ cloud:
   database:
     driver: sqlite
     sqlite:
-      path: .termbridge/cloud.db
+      path: data/cloud.db
     mysql:
       dsn: ""
 

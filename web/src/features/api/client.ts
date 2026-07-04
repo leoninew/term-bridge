@@ -6,6 +6,7 @@ import axios, {
 } from 'axios'
 import type { ApiErrorResp } from '../../protocol/terminal'
 import { runtimeConfig, type ApiTarget } from '../../config'
+import { useAppModeStore } from '../../store/appMode'
 import { useGatewayStore } from '../../store/gateway'
 import { router } from '../../router'
 
@@ -56,9 +57,10 @@ function configureApiClient(client: typeof apiClient, target: ApiTarget): void {
   client.interceptors.request.use((cfg) => {
     ensureRequestId(cfg)
     const gateway = useGatewayStore()
-    if (gateway.token) {
+    const token = gateway.tokenForTarget(target)
+    if (token) {
       const headers = AxiosHeaders.from(cfg.headers)
-      headers.set('Authorization', `Bearer ${gateway.token}`)
+      headers.set('Authorization', `Bearer ${token}`)
       cfg.headers = headers
     }
     return cfg
@@ -72,8 +74,9 @@ function configureApiClient(client: typeof apiClient, target: ApiTarget): void {
       }
       if (error.response.status === 401) {
         const gateway = useGatewayStore()
-        gateway.clearToken()
-        if (gateway.capabilities?.mode !== 'local' && router.currentRoute.value.name !== 'login') {
+        const appMode = useAppModeStore()
+        gateway.clearTokenForTarget(target)
+        if (target === 'cloud' && appMode.allowsMode('cloud') && router.currentRoute.value.name !== 'login') {
           router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
         }
       }

@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -61,7 +60,7 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 	if _, err := deviceRepository.UpsertLocalDevice(ctx, agentdevice.Device{ID: device.Id, Name: device.Name, PublicKey: device.PublicKey}); err != nil {
 		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("upsert local device", err)
 	}
-	store := state.NewDBStore(db.DB, db.Driver, filepath.Join(cfg.Runtime.StateDir, "devices", device.Id), device.Id)
+	store := state.NewDBStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id)
 	resolver := workspaceapp.Resolver{Store: store}
 	ws, err := resolver.Resolve(cfg.Cwd)
 	if err != nil {
@@ -264,7 +263,7 @@ func runtimeStateStore(ctx context.Context, cfg Config) (state.DBStore, func(), 
 		cleanup()
 		return state.DBStore{}, func() {}, apperrors.Runtime("upsert local device", err)
 	}
-	return state.NewDBStore(db.DB, db.Driver, filepath.Join(cfg.Runtime.StateDir, "devices", device.Id), device.Id), cleanup, nil
+	return state.NewDBStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id), cleanup, nil
 }
 
 func processEnv() []string {

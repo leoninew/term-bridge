@@ -1,18 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { useAppModeStore } from './appMode'
 import { useGatewayStore } from './gateway'
 
 const mocks = vi.hoisted(() => ({
+  authLoginViaAgent: vi.fn(),
   authMe: vi.fn(),
+  authMeViaCloud: vi.fn(),
   listDevices: vi.fn(),
 }))
 
 vi.mock('../features/agent/api', () => ({
+  authLoginViaAgent: mocks.authLoginViaAgent,
   authMe: mocks.authMe,
 }))
 
 vi.mock('../features/cloud/api', () => ({
   authLogin: vi.fn(),
+  authMeViaCloud: mocks.authMeViaCloud,
   listDevices: mocks.listDevices,
 }))
 
@@ -33,15 +38,15 @@ function storageMock(): Storage {
 describe('gateway store', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.stubGlobal('window', { localStorage: storageMock() })
+    mocks.authLoginViaAgent.mockResolvedValue({ access_token: 'agent-token', token_type: 'bearer' })
+    vi.stubGlobal('window', { localStorage: storageMock(), __CONFIG__: {} })
     setActivePinia(createPinia())
   })
 
-  it('loads local mode capabilities without requiring a token', async () => {
+  it('logs into agent locally before loading agent capabilities', async () => {
     mocks.authMe.mockResolvedValueOnce({
       authenticated: false,
       capabilities: {
-        mode: 'local',
         providers: [],
         password_reset_enabled: false,
         email_verification_enabled: false,
@@ -54,17 +59,18 @@ describe('gateway store', () => {
     await store.initializeAuth()
 
     expect(store.authenticated).toBe(false)
-    expect(store.capabilities?.mode).toBe('local')
-    expect(store.runtimeTarget).toEqual({ mode: 'local' })
+    expect(store.runtimeTarget).toEqual({ mode: 'agent' })
     expect(store.cloudSession).toBeNull()
+    expect(store.agentToken).toBe('agent-token')
+    expect(mocks.authLoginViaAgent).toHaveBeenCalledTimes(1)
     expect(mocks.authMe).toHaveBeenCalledTimes(1)
+    expect(mocks.authMeViaCloud).not.toHaveBeenCalled()
   })
 
-  it('keeps local cloud session separate from browser authentication', async () => {
+  it('keeps agent cloud session separate from browser authentication', async () => {
     mocks.authMe.mockResolvedValueOnce({
       authenticated: false,
       capabilities: {
-        mode: 'local',
         providers: [],
         password_reset_enabled: false,
         email_verification_enabled: false,
@@ -74,7 +80,7 @@ describe('gateway store', () => {
       cloud_session: {
         gate_url: 'https://cloud.example.test',
         device_id: 'dev-1',
-        device_name: 'local-device',
+        device_name: 'agent-device',
         connected_at: '2026-06-29T10:00:00Z',
       },
     })
@@ -84,12 +90,56 @@ describe('gateway store', () => {
 
     expect(store.authenticated).toBe(false)
     expect(store.cloudSession?.gate_url).toBe('https://cloud.example.test')
-    expect(store.cloudSession?.device_name).toBe('local-device')
+    expect(store.cloudSession?.device_name).toBe('agent-device')
     expect(store.currentDevice).toEqual(store.cloudSession)
 
-    store.clearToken()
+    store.clearAgentToken()
 
     expect(store.cloudSession).toBeNull()
+  })
+
+  it('uses cloud auth endpoint when active mode is cloud', async () => {
+    vi.stubGlobal('window', { localStorage: storageMock(), __CONFIG__: { frontendMode: 'cloud' } })
+    const appMode = useAppModeStore()
+    appMode.setActiveMode('cloud')
+    mocks.authMeViaCloud.mockResolvedValueOnce({
+      authenticated: true,
+      user: {
+        id: 'user-1',
+        email: 'user@example.test',
+        display_name: 'User',
+        provider: 'email',
+        email_verified: true,
+      },
+      capabilities: {
+        providers: ['email'],
+        password_reset_enabled: true,
+        email_verification_enabled: true,
+        account_auth_enabled: true,
+        cloud_oauth_enabled: false,
+      },
+    })
+    const store = useGatewayStore()
+
+    await store.initializeAuth()
+
+    expect(store.authenticated).toBe(true)
+    expect(store.user?.email).toBe('user@example.test')
+    expect(mocks.authLoginViaAgent).not.toHaveBeenCalled()
+    expect(mocks.authMeViaCloud).toHaveBeenCalledTimes(1)
+    expect(mocks.authMe).not.toHaveBeenCalled()
+  })
+
+  it('stores agent and cloud tokens separately', async () => {
+    const store = useGatewayStore()
+
+    store.setAgentToken('agent-token')
+    store.setCloudToken('cloud-token')
+
+    expect(store.tokenForTarget('agent')).toBe('agent-token')
+    expect(store.tokenForTarget('cloud')).toBe('cloud-token')
+    expect(window.localStorage.getItem('termbridge_agent_token')).toBe('agent-token')
+    expect(window.localStorage.getItem('termbridge_cloud_token')).toBe('cloud-token')
   })
 
   it('keeps dashboard in no-device state when cloud user has no devices', async () => {
@@ -103,6 +153,9 @@ describe('gateway store', () => {
   })
 
   it('auto-selects the only online device for dashboard workbench entry', async () => {
+    vi.stubGlobal('window', { localStorage: storageMock(), __CONFIG__: { frontendMode: 'cloud' } })
+    const appMode = useAppModeStore()
+    appMode.setActiveMode('cloud')
     mocks.listDevices.mockResolvedValueOnce([
       {
         id: 'dev-1',

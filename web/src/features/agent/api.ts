@@ -29,7 +29,7 @@ export type UpdateSessionOrderResp = ListResp<WorkspaceTreeSession>
 
 export async function authMe(): Promise<AuthMeResp> {
   try {
-    const response = await agentApiClient.get<AuthMeResp>('/api/auth/me')
+    const response = await agentApiClient.get<AuthMeResp>('/auth/me')
     return response.data
   } catch (err) {
     if (isUnauthorizedApiError(err)) {
@@ -39,8 +39,13 @@ export async function authMe(): Promise<AuthMeResp> {
   }
 }
 
+export async function authLoginViaAgent(): Promise<TokenResp> {
+  const response = await agentApiClient.post<TokenResp>('/auth/login')
+  return response.data
+}
+
 export async function authLogout(): Promise<void> {
-  await agentApiClient.post('/api/auth/logout')
+  await agentApiClient.post('/auth/logout')
 }
 
 export function cloudOAuthStartURL(): string {
@@ -48,7 +53,7 @@ export function cloudOAuthStartURL(): string {
 }
 
 export async function cloudOAuthStart(redirect?: string): Promise<string> {
-  const response = await agentApiClient.get<CloudOAuthStartResp>('/api/cloud-oauth/start', {
+  const response = await agentApiClient.get<CloudOAuthStartResp>('/cloud-oauth/start', {
     params: redirect ? { redirect } : undefined,
   })
   return response.data.authorize_url
@@ -58,7 +63,7 @@ export async function cloudOAuthCallback(
   code: string,
   state: string,
 ): Promise<CloudOAuthCallbackResp> {
-  const response = await agentApiClient.post<CloudOAuthCallbackResp>('/api/cloud-oauth/callback', {
+  const response = await agentApiClient.post<CloudOAuthCallbackResp>('/cloud-oauth/callback', {
     code,
     state,
   })
@@ -177,7 +182,7 @@ export async function deleteWorkspace(workspaceId: string): Promise<void> {
 }
 
 function agentRuntimePath(path: string): string {
-  return `/api${path}`
+  return path
 }
 
 function offline(response: AxiosResponse): boolean {

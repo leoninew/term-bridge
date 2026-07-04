@@ -224,7 +224,7 @@ func agentConfig(cfg config.Config) agentserver.Config {
 			ListenURL:          cfg.Agent.ListenUrl,
 			StaticDir:          cfg.Agent.StaticDir,
 			APIBaseURL:         cfg.Agent.APIBaseURL,
-			CORSAllowedOrigins: append([]string(nil), cfg.Agent.CORSAllowedOrigins...),
+			CORSAllowedOrigins: roleCORSAllowedOrigins(cfg.Agent.PublicUrl, cfg.Agent.CORSAllowedOrigins),
 		},
 		Gate: agentserver.GateConfig{API: agentserver.GateAPIConfig{ExposeErrors: cfg.Agent.ExposeErrors}},
 		Database: agentserver.DatabaseConfig{
@@ -232,12 +232,8 @@ func agentConfig(cfg config.Config) agentserver.Config {
 			SQLite: agentserver.SQLiteConfig{Path: cfg.Agent.Database.SQLite.Path},
 			MySQL:  agentserver.MySQLConfig{DSN: cfg.Agent.Database.MySQL.DSN},
 		},
-		Auth: agentserver.AuthConfig{
-			Username: cfg.Auth.LocalAdmin.Username,
-			Password: cfg.Auth.LocalAdmin.Password,
-			JWTTTL:   cfg.Auth.JWTTTL,
-		},
-		JWT: agentserver.JWTConfig{SecretKey: cfg.JWT.SecretKey},
+		Auth: agentserver.AuthConfig{JWTTTL: cfg.Auth.JWTTTL},
+		JWT:  agentserver.JWTConfig{SecretKey: cfg.JWT.SecretKey},
 		Cloud: agentserver.CloudConnectorConfig{
 			GateURL: cfg.Cloud.GateUrl,
 			OAuth: agentserver.CloudOAuthConfig{
@@ -250,6 +246,15 @@ func agentConfig(cfg config.Config) agentserver.Config {
 	}
 }
 
+func roleCORSAllowedOrigins(publicURL string, configuredOrigins []string) []string {
+	origins := make([]string, 0, len(configuredOrigins)+1)
+	if origin := strings.TrimRight(strings.TrimSpace(publicURL), "/"); origin != "" {
+		origins = append(origins, origin)
+	}
+	origins = append(origins, configuredOrigins...)
+	return origins
+}
+
 func cloudConfig(cfg config.Config) cloudserver.Config {
 	return cloudserver.Config{
 		LogHTTP: cloudserver.LogHTTPConfig{
@@ -260,7 +265,7 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 			ListenURL:          cfg.Cloud.ListenUrl,
 			StaticDir:          cfg.Cloud.StaticDir,
 			APIBaseURL:         cfg.Cloud.APIBaseURL,
-			CORSAllowedOrigins: append([]string(nil), cfg.Cloud.CORSAllowedOrigins...),
+			CORSAllowedOrigins: roleCORSAllowedOrigins(cfg.Cloud.PublicUrl, cfg.Cloud.CORSAllowedOrigins),
 		},
 		Gate: cloudserver.GateConfig{API: cloudserver.GateAPIConfig{ExposeErrors: cfg.Cloud.ExposeErrors}},
 		Database: cloudserver.DatabaseConfig{

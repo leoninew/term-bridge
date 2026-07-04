@@ -45,7 +45,7 @@
     }
     try {
       const response = await authGoogleCallback(code, state)
-      gateway.setToken(response.access_token)
+      gateway.setCloudToken(response.access_token)
       await router.replace(redirectAfterLogin())
     } catch (err) {
       notifications.notifyError(t('gateway.googleLoginFailed'), err)

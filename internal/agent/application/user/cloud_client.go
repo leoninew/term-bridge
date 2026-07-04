@@ -22,8 +22,6 @@ import (
 
 type Config struct {
 	ConnectUrl string
-	Username   string
-	Password   string
 	StateDir   string
 	Runtime    RuntimeAccess
 	Logger     *slog.Logger
@@ -482,7 +480,7 @@ func (c *Client) tunnelHeader(device Device) (http.Header, error) {
 	if err != nil {
 		return nil, err
 	}
-	return tunnel.SignedTunnelHeader(http.MethodGet, "/api/agent/tunnel", c.config.ConnectUrl, device.Id, privateKey, time.Now(), "")
+	return tunnel.SignedTunnelHeader(http.MethodGet, "/cloud-api/agent/tunnel", c.config.ConnectUrl, device.Id, privateKey, time.Now(), "")
 }
 
 func (c *Client) Config() Config {
@@ -505,7 +503,7 @@ func tunnelUrl(base string) string {
 		parsed.Scheme = "wss"
 	}
 	if parsed.Path == "" || parsed.Path == "/" {
-		parsed.Path = "/api/agent/tunnel"
+		parsed.Path = "/cloud-api/agent/tunnel"
 	}
 	return parsed.String()
 }

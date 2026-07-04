@@ -16,7 +16,7 @@ func testCloudConfig() Config {
 func TestHealth(t *testing.T) {
 	server := New(testCloudConfig())
 	response := httptest.NewRecorder()
-	server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/cloud-api/health", nil))
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", response.Code)
 	}
@@ -28,14 +28,14 @@ func TestHealth(t *testing.T) {
 func TestAuthEndpoints(t *testing.T) {
 	server := New(testCloudConfig())
 	devicesResponse := httptest.NewRecorder()
-	server.ServeHTTP(devicesResponse, httptest.NewRequest(http.MethodGet, "/api/devices", nil))
+	server.ServeHTTP(devicesResponse, httptest.NewRequest(http.MethodGet, "/cloud-api/devices", nil))
 	if devicesResponse.Code != http.StatusUnauthorized {
 		t.Fatalf("unauthenticated devices status = %d, want 401", devicesResponse.Code)
 	}
 	assertAPIError(t, devicesResponse, http.StatusUnauthorized, errorCodeUnauthorized)
 
 	loginResponse := httptest.NewRecorder()
-	server.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
+	server.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d, want 200; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
@@ -50,7 +50,7 @@ func TestAuthEndpoints(t *testing.T) {
 		t.Fatal("access_token is empty")
 	}
 
-	meRequest := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	meRequest := httptest.NewRequest(http.MethodGet, "/cloud-api/auth/me", nil)
 	meRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	meResponse := httptest.NewRecorder()
 	server.ServeHTTP(meResponse, meRequest)
@@ -58,7 +58,7 @@ func TestAuthEndpoints(t *testing.T) {
 		t.Fatalf("me status = %d, want 200; body=%s", meResponse.Code, meResponse.Body.String())
 	}
 
-	logoutRequest := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	logoutRequest := httptest.NewRequest(http.MethodPost, "/cloud-api/auth/logout", nil)
 	logoutRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	logoutResponse := httptest.NewRecorder()
 	server.ServeHTTP(logoutResponse, logoutRequest)
@@ -66,7 +66,7 @@ func TestAuthEndpoints(t *testing.T) {
 		t.Fatalf("logout status = %d, want 204", logoutResponse.Code)
 	}
 
-	devicesRequestAfterExpired := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
+	devicesRequestAfterExpired := httptest.NewRequest(http.MethodGet, "/cloud-api/devices", nil)
 	devicesRequestAfterExpired.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	devicesResponseAfterExpired := httptest.NewRecorder()
 	server.ServeHTTP(devicesResponseAfterExpired, devicesRequestAfterExpired)
@@ -85,28 +85,28 @@ func TestAuthEndpoints(t *testing.T) {
 func TestLoginRejectsBadPassword(t *testing.T) {
 	server := New(testCloudConfig())
 	response := httptest.NewRecorder()
-	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"bad"}`)))
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"bad"}`)))
 	assertAPIError(t, response, http.StatusUnauthorized, errorCodeUnauthorized)
 }
 
 func TestLoginRejectsInvalidJSON(t *testing.T) {
 	server := New(testCloudConfig())
 	response := httptest.NewRecorder()
-	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username"`)))
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(`{"username"`)))
 	assertAPIError(t, response, http.StatusBadRequest, errorCodeBadRequest)
 }
 
 func TestHealthRejectsUnsupportedMethod(t *testing.T) {
 	server := New(testCloudConfig())
 	response := httptest.NewRecorder()
-	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/health", nil))
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/health", nil))
 	assertAPIError(t, response, http.StatusMethodNotAllowed, errorCodeMethodNotAllowed)
 }
 
 func TestUnknownAPIPathReturnsStructuredNotFound(t *testing.T) {
 	server := New(testCloudConfig())
 	response := httptest.NewRecorder()
-	server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/missing", nil))
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/cloud-api/missing", nil))
 	assertAPIError(t, response, http.StatusNotFound, errorCodeNotFound)
 }
 

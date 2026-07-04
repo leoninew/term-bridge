@@ -31,7 +31,7 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 	token := loginToken(t, handler)
 	header := http.Header{}
 	header.Set("Authorization", "Bearer "+token)
-	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/cloud-api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		t.Fatalf("browser Dial() error = %v", err)
 	}
@@ -44,7 +44,7 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 	if !bytes.Equal(output, wantOutput) {
 		t.Fatalf("terminal output = %q, want %q", output, wantOutput)
 	}
-	_, response, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	_, response, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/cloud-api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err == nil {
 		t.Fatal("second writer Dial() error = nil, want conflict")
 	}
@@ -73,7 +73,7 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, input
 	req, _ := http.NewRequest(http.MethodGet, serverUrl, nil)
 	req.SetBasicAuth("admin", "admin")
 	requestHeader.Set("Authorization", req.Header.Get("Authorization"))
-	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
+	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/cloud-api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
 	if err != nil {
 		t.Errorf("Dial() error = %v", err)
 		return
@@ -130,7 +130,7 @@ func TestAgentDisconnectSendsStructuredTerminalError(t *testing.T) {
 	token := loginToken(t, handler)
 	header := http.Header{}
 	header.Set("Authorization", "Bearer "+token)
-	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/cloud-api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		t.Fatalf("browser Dial() error = %v", err)
 	}
@@ -160,7 +160,7 @@ func TestAgentDisconnectSendsStructuredTerminalError(t *testing.T) {
 func TestRouteUnavailable(t *testing.T) {
 	handler := New(testCloudConfig())
 	token := loginToken(t, handler)
-	request := httptest.NewRequest(http.MethodGet, "/api/devices/missing/workspaces/ws-1/sessions", nil)
+	request := httptest.NewRequest(http.MethodGet, "/cloud-api/devices/missing/workspaces/ws-1/sessions", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)

@@ -17,13 +17,13 @@ describe('sessions runtime helpers', () => {
   it('builds same-origin terminal websocket path by default', () => {
     vi.stubGlobal('window', { __CONFIG__: {} })
 
-    expect(terminalWsUrl({ mode: 'local' }, 'workspace 1', 'session 1')).toBe(
-      '/api/workspaces/workspace%201/sessions/session%201/ws',
+    expect(terminalWsUrl({ mode: 'agent' }, 'workspace 1', 'session 1')).toBe(
+      '/agent-api/workspaces/workspace%201/sessions/session%201/ws',
     )
   })
 
   it('builds split-origin terminal websocket URL with token and size', () => {
-    vi.stubGlobal('window', { __CONFIG__: { apiBaseUrl: 'https://api.example.com' } })
+    vi.stubGlobal('window', { __CONFIG__: { cloudApiBaseUrl: 'https://cloud.example.com' } })
 
     expect(
       terminalWsUrl(
@@ -34,7 +34,7 @@ describe('sessions runtime helpers', () => {
         { cols: 500, rows: 0 },
       ),
     ).toBe(
-      'wss://api.example.com/api/devices/device%2F1/workspaces/workspace-1/sessions/session-1/ws?token=token-1&cols=500&rows=1',
+      'wss://cloud.example.com/devices/device%2F1/workspaces/workspace-1/sessions/session-1/ws?token=token-1&cols=500&rows=1',
     )
   })
 })
