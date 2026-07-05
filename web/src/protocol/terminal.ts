@@ -1,13 +1,7 @@
-import type { ErrorResp as ProtoErrorResp } from '../gen/proto/termbridge/common/v1/common'
 import type {
-  CreateSessionReq as ProtoCreateSessionReq,
-  CreateSessionResp as ProtoCreateSessionResp,
-  RerunSessionReq as ProtoRerunSessionReq,
-  SessionSummary as ProtoSessionSummary,
-  UpdateSessionReq as ProtoUpdateSessionReq,
-  Workspace as ProtoWorkspace,
-  WorkspaceTreeNode as ProtoWorkspaceTreeNode,
-} from '../gen/proto/termbridge/runtime/v1/runtime'
+  ClientControlMessage,
+  ServerControlMessage,
+} from '../gen/proto/termbridge/terminal/v1/terminal'
 
 export const terminalSubprotocol = 'termbridge.terminal.v1'
 export const minTerminalCols = 1
@@ -35,89 +29,6 @@ export function fitSafeTerminalSize(size: TerminalSize): TerminalSize {
   })
 }
 
-export type LifecycleState = 'running' | 'stopped' | 'failed'
-export type AttachmentState = 'unattached' | 'attached' | 'detached' | 'reattaching'
-
-export type ClientControlMessage =
-  | { type: 'hello' }
-  | { type: 'resize'; cols: number; rows: number }
-  | { type: 'detach' }
-  | { type: 'ping'; nonce: string }
-
-export type ServerControlMessage =
-  | {
-      type: 'started'
-      session_id: string
-      workspace_id: string
-      state: LifecycleState
-      lifecycle_state?: LifecycleState
-      attachment_state?: AttachmentState
-    }
-  | { type: 'replay_started' }
-  | { type: 'replay_finished'; truncated?: boolean }
-  | {
-      type: 'state'
-      state?: LifecycleState
-      lifecycle_state?: LifecycleState
-      attachment_state?: AttachmentState
-      reason?: string
-    }
-  | { type: 'exited'; exit_code: number; state: 'stopped' | 'failed' }
-  | { type: 'error'; code: string; message: string; error?: string }
-  | { type: 'pong'; nonce: string }
-
-export type ApiErrorResp<TDetails = unknown> = Omit<ProtoErrorResp, 'details'> & {
-  details?: TDetails
-  requestId?: string
-}
-
-export type ListResp<T> = {
-  items: T[]
-}
-
-export type PaginatedResp<T> = ListResp<T> & {
-  total: number
-  page: number
-  page_size: number
-  total_pages: number
-}
-
-export type WorkspaceSummary = Omit<ProtoWorkspace, 'updated_at'> & {
-  updated_at: string
-}
-
-export type SessionSummary = Omit<
-  ProtoSessionSummary,
-  'lifecycle_state' | 'attachment_state' | 'updated_at'
-> & {
-  lifecycle_state: LifecycleState
-  attachment_state?: AttachmentState
-  updated_at: string
-}
-
-export type WorkspaceTreeSession = Omit<SessionSummary, 'workspace_id'> & {
-  workspace_id?: string
-}
-
-export type WorkspaceTreeSummary = Omit<ProtoWorkspaceTreeNode, 'children' | 'updated_at'> & {
-  updated_at: string
-  children: WorkspaceTreeSession[]
-}
-
-export type CreateSessionReq = Omit<ProtoCreateSessionReq, 'workspace_id'> & {
-  workspace_id?: string
-}
-
-export type UpdateSessionReq = Pick<ProtoUpdateSessionReq, 'name'> & {
-  name: string
-}
-
-export type RerunSessionReq = Pick<ProtoRerunSessionReq, 'cols' | 'rows'>
-
-export type CreateSessionResp = Omit<ProtoCreateSessionResp, 'state'> & {
-  state: LifecycleState
-}
-
 export function encodeControl(message: ClientControlMessage): string {
   return JSON.stringify(message)
 }
@@ -129,7 +40,11 @@ export function decodeControl(data: string): ServerControlMessage {
   }
   switch (parsed.type) {
     case 'started':
-      if (!parsed.session_id || !parsed.workspace_id || !parsed.state) {
+      if (
+        !parsed.session_id ||
+        !parsed.workspace_id ||
+        (!parsed.state && !parsed.lifecycle_state)
+      ) {
         throw new Error('invalid started message')
       }
       break
@@ -139,7 +54,7 @@ export function decodeControl(data: string): ServerControlMessage {
       }
       break
     case 'exited':
-      if (typeof parsed.exit_code !== 'number' || !parsed.state) {
+      if (typeof parsed.exit_code !== 'number' || (!parsed.state && !parsed.lifecycle_state)) {
         throw new Error('invalid exited message')
       }
       break
@@ -157,7 +72,7 @@ export function decodeControl(data: string): ServerControlMessage {
     case 'replay_finished':
       break
     default:
-      throw new Error(`unknown server control message ${(parsed as { type: string }).type}`)
+      throw new Error(`unknown server control message ${parsed.type}`)
   }
   return parsed
 }

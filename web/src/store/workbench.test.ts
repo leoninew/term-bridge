@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import type { SessionSummary } from '../protocol/terminal'
+import type { SessionSummary } from '../gen/proto/termbridge/runtime/v1/runtime'
 import type { SessionRuntimeApi } from '../features/sessions/runtime'
 import { useWorkbenchStore } from './workbench'
 
@@ -17,6 +17,7 @@ function session(overrides: Partial<SessionSummary> = {}): SessionSummary {
     command: 'bash',
     cwd: '/work/one',
     lifecycle_state: 'stopped',
+    attachment_state: '',
     updated_at: '2026-06-24T00:00:00Z',
     ...overrides,
   }

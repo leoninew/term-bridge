@@ -932,10 +932,8 @@ func (x *GetSessionResp) GetSession() *SessionSummary {
 
 type RerunSessionReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Cols          int32                  `protobuf:"varint,3,opt,name=cols,proto3" json:"cols,omitempty"`
-	Rows          int32                  `protobuf:"varint,4,opt,name=rows,proto3" json:"rows,omitempty"`
+	Cols          int32                  `protobuf:"varint,1,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows          int32                  `protobuf:"varint,2,opt,name=rows,proto3" json:"rows,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -970,20 +968,6 @@ func (*RerunSessionReq) Descriptor() ([]byte, []int) {
 	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{17}
 }
 
-func (x *RerunSessionReq) GetWorkspaceId() string {
-	if x != nil {
-		return x.WorkspaceId
-	}
-	return ""
-}
-
-func (x *RerunSessionReq) GetSessionId() string {
-	if x != nil {
-		return x.SessionId
-	}
-	return ""
-}
-
 func (x *RerunSessionReq) GetCols() int32 {
 	if x != nil {
 		return x.Cols
@@ -998,18 +982,76 @@ func (x *RerunSessionReq) GetRows() int32 {
 	return 0
 }
 
-type UpdateSessionReq struct {
+type RerunWorkspaceSessionReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Name          *string                `protobuf:"bytes,3,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Request       *RerunSessionReq       `protobuf:"bytes,3,opt,name=request,proto3" json:"request,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RerunWorkspaceSessionReq) Reset() {
+	*x = RerunWorkspaceSessionReq{}
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RerunWorkspaceSessionReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RerunWorkspaceSessionReq) ProtoMessage() {}
+
+func (x *RerunWorkspaceSessionReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RerunWorkspaceSessionReq.ProtoReflect.Descriptor instead.
+func (*RerunWorkspaceSessionReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *RerunWorkspaceSessionReq) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *RerunWorkspaceSessionReq) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RerunWorkspaceSessionReq) GetRequest() *RerunSessionReq {
+	if x != nil {
+		return x.Request
+	}
+	return nil
+}
+
+type UpdateSessionReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          *string                `protobuf:"bytes,1,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateSessionReq) Reset() {
 	*x = UpdateSessionReq{}
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[18]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1021,7 +1063,7 @@ func (x *UpdateSessionReq) String() string {
 func (*UpdateSessionReq) ProtoMessage() {}
 
 func (x *UpdateSessionReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[18]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1034,21 +1076,7 @@ func (x *UpdateSessionReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSessionReq.ProtoReflect.Descriptor instead.
 func (*UpdateSessionReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{18}
-}
-
-func (x *UpdateSessionReq) GetWorkspaceId() string {
-	if x != nil {
-		return x.WorkspaceId
-	}
-	return ""
-}
-
-func (x *UpdateSessionReq) GetSessionId() string {
-	if x != nil {
-		return x.SessionId
-	}
-	return ""
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *UpdateSessionReq) GetName() string {
@@ -1056,6 +1084,66 @@ func (x *UpdateSessionReq) GetName() string {
 		return *x.Name
 	}
 	return ""
+}
+
+type UpdateWorkspaceSessionReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Request       *UpdateSessionReq      `protobuf:"bytes,3,opt,name=request,proto3" json:"request,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateWorkspaceSessionReq) Reset() {
+	*x = UpdateWorkspaceSessionReq{}
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateWorkspaceSessionReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateWorkspaceSessionReq) ProtoMessage() {}
+
+func (x *UpdateWorkspaceSessionReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateWorkspaceSessionReq.ProtoReflect.Descriptor instead.
+func (*UpdateWorkspaceSessionReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *UpdateWorkspaceSessionReq) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *UpdateWorkspaceSessionReq) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *UpdateWorkspaceSessionReq) GetRequest() *UpdateSessionReq {
+	if x != nil {
+		return x.Request
+	}
+	return nil
 }
 
 type UpdateSessionResp struct {
@@ -1067,7 +1155,7 @@ type UpdateSessionResp struct {
 
 func (x *UpdateSessionResp) Reset() {
 	*x = UpdateSessionResp{}
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[19]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1079,7 +1167,7 @@ func (x *UpdateSessionResp) String() string {
 func (*UpdateSessionResp) ProtoMessage() {}
 
 func (x *UpdateSessionResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[19]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1092,7 +1180,7 @@ func (x *UpdateSessionResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSessionResp.ProtoReflect.Descriptor instead.
 func (*UpdateSessionResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{19}
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *UpdateSessionResp) GetSession() *SessionSummary {
@@ -1110,7 +1198,7 @@ type DeleteSessionResp struct {
 
 func (x *DeleteSessionResp) Reset() {
 	*x = DeleteSessionResp{}
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[20]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1122,7 +1210,7 @@ func (x *DeleteSessionResp) String() string {
 func (*DeleteSessionResp) ProtoMessage() {}
 
 func (x *DeleteSessionResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[20]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1135,7 +1223,7 @@ func (x *DeleteSessionResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSessionResp.ProtoReflect.Descriptor instead.
 func (*DeleteSessionResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{20}
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{22}
 }
 
 type CloseSessionResp struct {
@@ -1147,7 +1235,7 @@ type CloseSessionResp struct {
 
 func (x *CloseSessionResp) Reset() {
 	*x = CloseSessionResp{}
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[21]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1159,7 +1247,7 @@ func (x *CloseSessionResp) String() string {
 func (*CloseSessionResp) ProtoMessage() {}
 
 func (x *CloseSessionResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[21]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1172,7 +1260,7 @@ func (x *CloseSessionResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseSessionResp.ProtoReflect.Descriptor instead.
 func (*CloseSessionResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{21}
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *CloseSessionResp) GetSession() *SessionSummary {
@@ -1184,15 +1272,14 @@ func (x *CloseSessionResp) GetSession() *SessionSummary {
 
 type UpdateSessionOrderReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	SessionIds    []string               `protobuf:"bytes,2,rep,name=session_ids,json=sessionIds,proto3" json:"session_ids,omitempty"`
+	SessionIds    []string               `protobuf:"bytes,1,rep,name=session_ids,json=sessionIds,proto3" json:"session_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateSessionOrderReq) Reset() {
 	*x = UpdateSessionOrderReq{}
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[22]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1204,7 +1291,7 @@ func (x *UpdateSessionOrderReq) String() string {
 func (*UpdateSessionOrderReq) ProtoMessage() {}
 
 func (x *UpdateSessionOrderReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[22]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1217,17 +1304,62 @@ func (x *UpdateSessionOrderReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSessionOrderReq.ProtoReflect.Descriptor instead.
 func (*UpdateSessionOrderReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{22}
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{24}
 }
 
-func (x *UpdateSessionOrderReq) GetWorkspaceId() string {
+func (x *UpdateSessionOrderReq) GetSessionIds() []string {
+	if x != nil {
+		return x.SessionIds
+	}
+	return nil
+}
+
+type WorkspaceSessionOrderReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	SessionIds    []string               `protobuf:"bytes,2,rep,name=session_ids,json=sessionIds,proto3" json:"session_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkspaceSessionOrderReq) Reset() {
+	*x = WorkspaceSessionOrderReq{}
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkspaceSessionOrderReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkspaceSessionOrderReq) ProtoMessage() {}
+
+func (x *WorkspaceSessionOrderReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkspaceSessionOrderReq.ProtoReflect.Descriptor instead.
+func (*WorkspaceSessionOrderReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *WorkspaceSessionOrderReq) GetWorkspaceId() string {
 	if x != nil {
 		return x.WorkspaceId
 	}
 	return ""
 }
 
-func (x *UpdateSessionOrderReq) GetSessionIds() []string {
+func (x *WorkspaceSessionOrderReq) GetSessionIds() []string {
 	if x != nil {
 		return x.SessionIds
 	}
@@ -1243,7 +1375,7 @@ type UpdateSessionOrderResp struct {
 
 func (x *UpdateSessionOrderResp) Reset() {
 	*x = UpdateSessionOrderResp{}
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[23]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1255,7 +1387,7 @@ func (x *UpdateSessionOrderResp) String() string {
 func (*UpdateSessionOrderResp) ProtoMessage() {}
 
 func (x *UpdateSessionOrderResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[23]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1268,7 +1400,7 @@ func (x *UpdateSessionOrderResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSessionOrderResp.ProtoReflect.Descriptor instead.
 func (*UpdateSessionOrderResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{23}
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *UpdateSessionOrderResp) GetItems() []*SessionSummary {
@@ -1280,15 +1412,13 @@ func (x *UpdateSessionOrderResp) GetItems() []*SessionSummary {
 
 type ReadHistoryReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ReadHistoryReq) Reset() {
 	*x = ReadHistoryReq{}
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[24]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1300,7 +1430,7 @@ func (x *ReadHistoryReq) String() string {
 func (*ReadHistoryReq) ProtoMessage() {}
 
 func (x *ReadHistoryReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[24]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1313,17 +1443,55 @@ func (x *ReadHistoryReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadHistoryReq.ProtoReflect.Descriptor instead.
 func (*ReadHistoryReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{24}
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{27}
 }
 
-func (x *ReadHistoryReq) GetWorkspaceId() string {
+type ReadWorkspaceSessionHistoryReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadWorkspaceSessionHistoryReq) Reset() {
+	*x = ReadWorkspaceSessionHistoryReq{}
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadWorkspaceSessionHistoryReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadWorkspaceSessionHistoryReq) ProtoMessage() {}
+
+func (x *ReadWorkspaceSessionHistoryReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadWorkspaceSessionHistoryReq.ProtoReflect.Descriptor instead.
+func (*ReadWorkspaceSessionHistoryReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ReadWorkspaceSessionHistoryReq) GetWorkspaceId() string {
 	if x != nil {
 		return x.WorkspaceId
 	}
 	return ""
 }
 
-func (x *ReadHistoryReq) GetSessionId() string {
+func (x *ReadWorkspaceSessionHistoryReq) GetSessionId() string {
 	if x != nil {
 		return x.SessionId
 	}
@@ -1339,7 +1507,7 @@ type ReadHistoryResp struct {
 
 func (x *ReadHistoryResp) Reset() {
 	*x = ReadHistoryResp{}
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[25]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1351,7 +1519,7 @@ func (x *ReadHistoryResp) String() string {
 func (*ReadHistoryResp) ProtoMessage() {}
 
 func (x *ReadHistoryResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[25]
+	mi := &file_termbridge_runtime_v1_runtime_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1364,7 +1532,7 @@ func (x *ReadHistoryResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadHistoryResp.ProtoReflect.Descriptor instead.
 func (*ReadHistoryResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{25}
+	return file_termbridge_runtime_v1_runtime_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ReadHistoryResp) GetText() string {
@@ -1439,31 +1607,39 @@ const file_termbridge_runtime_v1_runtime_proto_rawDesc = "" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\"Q\n" +
 	"\x0eGetSessionResp\x12?\n" +
-	"\asession\x18\x01 \x01(\v2%.termbridge.runtime.v1.SessionSummaryR\asession\"{\n" +
-	"\x0fRerunSessionReq\x12!\n" +
+	"\asession\x18\x01 \x01(\v2%.termbridge.runtime.v1.SessionSummaryR\asession\"9\n" +
+	"\x0fRerunSessionReq\x12\x12\n" +
+	"\x04cols\x18\x01 \x01(\x05R\x04cols\x12\x12\n" +
+	"\x04rows\x18\x02 \x01(\x05R\x04rows\"\x9e\x01\n" +
+	"\x18RerunWorkspaceSessionReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x12\n" +
-	"\x04cols\x18\x03 \x01(\x05R\x04cols\x12\x12\n" +
-	"\x04rows\x18\x04 \x01(\x05R\x04rows\"v\n" +
-	"\x10UpdateSessionReq\x12!\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12@\n" +
+	"\arequest\x18\x03 \x01(\v2&.termbridge.runtime.v1.RerunSessionReqR\arequest\"4\n" +
+	"\x10UpdateSessionReq\x12\x17\n" +
+	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01B\a\n" +
+	"\x05_name\"\xa0\x01\n" +
+	"\x19UpdateWorkspaceSessionReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x17\n" +
-	"\x04name\x18\x03 \x01(\tH\x00R\x04name\x88\x01\x01B\a\n" +
-	"\x05_name\"T\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12A\n" +
+	"\arequest\x18\x03 \x01(\v2'.termbridge.runtime.v1.UpdateSessionReqR\arequest\"T\n" +
 	"\x11UpdateSessionResp\x12?\n" +
 	"\asession\x18\x01 \x01(\v2%.termbridge.runtime.v1.SessionSummaryR\asession\"\x13\n" +
 	"\x11DeleteSessionResp\"S\n" +
 	"\x10CloseSessionResp\x12?\n" +
-	"\asession\x18\x01 \x01(\v2%.termbridge.runtime.v1.SessionSummaryR\asession\"[\n" +
-	"\x15UpdateSessionOrderReq\x12!\n" +
+	"\asession\x18\x01 \x01(\v2%.termbridge.runtime.v1.SessionSummaryR\asession\"8\n" +
+	"\x15UpdateSessionOrderReq\x12\x1f\n" +
+	"\vsession_ids\x18\x01 \x03(\tR\n" +
+	"sessionIds\"^\n" +
+	"\x18WorkspaceSessionOrderReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1f\n" +
 	"\vsession_ids\x18\x02 \x03(\tR\n" +
 	"sessionIds\"U\n" +
 	"\x16UpdateSessionOrderResp\x12;\n" +
-	"\x05items\x18\x01 \x03(\v2%.termbridge.runtime.v1.SessionSummaryR\x05items\"R\n" +
-	"\x0eReadHistoryReq\x12!\n" +
+	"\x05items\x18\x01 \x03(\v2%.termbridge.runtime.v1.SessionSummaryR\x05items\"\x10\n" +
+	"\x0eReadHistoryReq\"b\n" +
+	"\x1eReadWorkspaceSessionHistoryReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\"%\n" +
@@ -1482,54 +1658,60 @@ func file_termbridge_runtime_v1_runtime_proto_rawDescGZIP() []byte {
 	return file_termbridge_runtime_v1_runtime_proto_rawDescData
 }
 
-var file_termbridge_runtime_v1_runtime_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_termbridge_runtime_v1_runtime_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_termbridge_runtime_v1_runtime_proto_goTypes = []any{
-	(*Workspace)(nil),                // 0: termbridge.runtime.v1.Workspace
-	(*WorkspaceTreeNode)(nil),        // 1: termbridge.runtime.v1.WorkspaceTreeNode
-	(*SessionSummary)(nil),           // 2: termbridge.runtime.v1.SessionSummary
-	(*ListWorkspacesReq)(nil),        // 3: termbridge.runtime.v1.ListWorkspacesReq
-	(*ListWorkspacesResp)(nil),       // 4: termbridge.runtime.v1.ListWorkspacesResp
-	(*WorkspaceTreeReq)(nil),         // 5: termbridge.runtime.v1.WorkspaceTreeReq
-	(*WorkspaceTreeResp)(nil),        // 6: termbridge.runtime.v1.WorkspaceTreeResp
-	(*UpdateWorkspaceOrderReq)(nil),  // 7: termbridge.runtime.v1.UpdateWorkspaceOrderReq
-	(*UpdateWorkspaceOrderResp)(nil), // 8: termbridge.runtime.v1.UpdateWorkspaceOrderResp
-	(*DeleteWorkspaceReq)(nil),       // 9: termbridge.runtime.v1.DeleteWorkspaceReq
-	(*DeleteWorkspaceResp)(nil),      // 10: termbridge.runtime.v1.DeleteWorkspaceResp
-	(*CreateSessionReq)(nil),         // 11: termbridge.runtime.v1.CreateSessionReq
-	(*CreateSessionResp)(nil),        // 12: termbridge.runtime.v1.CreateSessionResp
-	(*WorkspaceSessionsReq)(nil),     // 13: termbridge.runtime.v1.WorkspaceSessionsReq
-	(*WorkspaceSessionsResp)(nil),    // 14: termbridge.runtime.v1.WorkspaceSessionsResp
-	(*WorkspaceSessionReq)(nil),      // 15: termbridge.runtime.v1.WorkspaceSessionReq
-	(*GetSessionResp)(nil),           // 16: termbridge.runtime.v1.GetSessionResp
-	(*RerunSessionReq)(nil),          // 17: termbridge.runtime.v1.RerunSessionReq
-	(*UpdateSessionReq)(nil),         // 18: termbridge.runtime.v1.UpdateSessionReq
-	(*UpdateSessionResp)(nil),        // 19: termbridge.runtime.v1.UpdateSessionResp
-	(*DeleteSessionResp)(nil),        // 20: termbridge.runtime.v1.DeleteSessionResp
-	(*CloseSessionResp)(nil),         // 21: termbridge.runtime.v1.CloseSessionResp
-	(*UpdateSessionOrderReq)(nil),    // 22: termbridge.runtime.v1.UpdateSessionOrderReq
-	(*UpdateSessionOrderResp)(nil),   // 23: termbridge.runtime.v1.UpdateSessionOrderResp
-	(*ReadHistoryReq)(nil),           // 24: termbridge.runtime.v1.ReadHistoryReq
-	(*ReadHistoryResp)(nil),          // 25: termbridge.runtime.v1.ReadHistoryResp
-	(*timestamppb.Timestamp)(nil),    // 26: google.protobuf.Timestamp
+	(*Workspace)(nil),                      // 0: termbridge.runtime.v1.Workspace
+	(*WorkspaceTreeNode)(nil),              // 1: termbridge.runtime.v1.WorkspaceTreeNode
+	(*SessionSummary)(nil),                 // 2: termbridge.runtime.v1.SessionSummary
+	(*ListWorkspacesReq)(nil),              // 3: termbridge.runtime.v1.ListWorkspacesReq
+	(*ListWorkspacesResp)(nil),             // 4: termbridge.runtime.v1.ListWorkspacesResp
+	(*WorkspaceTreeReq)(nil),               // 5: termbridge.runtime.v1.WorkspaceTreeReq
+	(*WorkspaceTreeResp)(nil),              // 6: termbridge.runtime.v1.WorkspaceTreeResp
+	(*UpdateWorkspaceOrderReq)(nil),        // 7: termbridge.runtime.v1.UpdateWorkspaceOrderReq
+	(*UpdateWorkspaceOrderResp)(nil),       // 8: termbridge.runtime.v1.UpdateWorkspaceOrderResp
+	(*DeleteWorkspaceReq)(nil),             // 9: termbridge.runtime.v1.DeleteWorkspaceReq
+	(*DeleteWorkspaceResp)(nil),            // 10: termbridge.runtime.v1.DeleteWorkspaceResp
+	(*CreateSessionReq)(nil),               // 11: termbridge.runtime.v1.CreateSessionReq
+	(*CreateSessionResp)(nil),              // 12: termbridge.runtime.v1.CreateSessionResp
+	(*WorkspaceSessionsReq)(nil),           // 13: termbridge.runtime.v1.WorkspaceSessionsReq
+	(*WorkspaceSessionsResp)(nil),          // 14: termbridge.runtime.v1.WorkspaceSessionsResp
+	(*WorkspaceSessionReq)(nil),            // 15: termbridge.runtime.v1.WorkspaceSessionReq
+	(*GetSessionResp)(nil),                 // 16: termbridge.runtime.v1.GetSessionResp
+	(*RerunSessionReq)(nil),                // 17: termbridge.runtime.v1.RerunSessionReq
+	(*RerunWorkspaceSessionReq)(nil),       // 18: termbridge.runtime.v1.RerunWorkspaceSessionReq
+	(*UpdateSessionReq)(nil),               // 19: termbridge.runtime.v1.UpdateSessionReq
+	(*UpdateWorkspaceSessionReq)(nil),      // 20: termbridge.runtime.v1.UpdateWorkspaceSessionReq
+	(*UpdateSessionResp)(nil),              // 21: termbridge.runtime.v1.UpdateSessionResp
+	(*DeleteSessionResp)(nil),              // 22: termbridge.runtime.v1.DeleteSessionResp
+	(*CloseSessionResp)(nil),               // 23: termbridge.runtime.v1.CloseSessionResp
+	(*UpdateSessionOrderReq)(nil),          // 24: termbridge.runtime.v1.UpdateSessionOrderReq
+	(*WorkspaceSessionOrderReq)(nil),       // 25: termbridge.runtime.v1.WorkspaceSessionOrderReq
+	(*UpdateSessionOrderResp)(nil),         // 26: termbridge.runtime.v1.UpdateSessionOrderResp
+	(*ReadHistoryReq)(nil),                 // 27: termbridge.runtime.v1.ReadHistoryReq
+	(*ReadWorkspaceSessionHistoryReq)(nil), // 28: termbridge.runtime.v1.ReadWorkspaceSessionHistoryReq
+	(*ReadHistoryResp)(nil),                // 29: termbridge.runtime.v1.ReadHistoryResp
+	(*timestamppb.Timestamp)(nil),          // 30: google.protobuf.Timestamp
 }
 var file_termbridge_runtime_v1_runtime_proto_depIdxs = []int32{
-	26, // 0: termbridge.runtime.v1.Workspace.updated_at:type_name -> google.protobuf.Timestamp
-	26, // 1: termbridge.runtime.v1.WorkspaceTreeNode.updated_at:type_name -> google.protobuf.Timestamp
+	30, // 0: termbridge.runtime.v1.Workspace.updated_at:type_name -> google.protobuf.Timestamp
+	30, // 1: termbridge.runtime.v1.WorkspaceTreeNode.updated_at:type_name -> google.protobuf.Timestamp
 	2,  // 2: termbridge.runtime.v1.WorkspaceTreeNode.children:type_name -> termbridge.runtime.v1.SessionSummary
-	26, // 3: termbridge.runtime.v1.SessionSummary.updated_at:type_name -> google.protobuf.Timestamp
+	30, // 3: termbridge.runtime.v1.SessionSummary.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: termbridge.runtime.v1.ListWorkspacesResp.items:type_name -> termbridge.runtime.v1.Workspace
 	1,  // 5: termbridge.runtime.v1.WorkspaceTreeResp.items:type_name -> termbridge.runtime.v1.WorkspaceTreeNode
 	0,  // 6: termbridge.runtime.v1.UpdateWorkspaceOrderResp.items:type_name -> termbridge.runtime.v1.Workspace
 	2,  // 7: termbridge.runtime.v1.WorkspaceSessionsResp.items:type_name -> termbridge.runtime.v1.SessionSummary
 	2,  // 8: termbridge.runtime.v1.GetSessionResp.session:type_name -> termbridge.runtime.v1.SessionSummary
-	2,  // 9: termbridge.runtime.v1.UpdateSessionResp.session:type_name -> termbridge.runtime.v1.SessionSummary
-	2,  // 10: termbridge.runtime.v1.CloseSessionResp.session:type_name -> termbridge.runtime.v1.SessionSummary
-	2,  // 11: termbridge.runtime.v1.UpdateSessionOrderResp.items:type_name -> termbridge.runtime.v1.SessionSummary
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	17, // 9: termbridge.runtime.v1.RerunWorkspaceSessionReq.request:type_name -> termbridge.runtime.v1.RerunSessionReq
+	19, // 10: termbridge.runtime.v1.UpdateWorkspaceSessionReq.request:type_name -> termbridge.runtime.v1.UpdateSessionReq
+	2,  // 11: termbridge.runtime.v1.UpdateSessionResp.session:type_name -> termbridge.runtime.v1.SessionSummary
+	2,  // 12: termbridge.runtime.v1.CloseSessionResp.session:type_name -> termbridge.runtime.v1.SessionSummary
+	2,  // 13: termbridge.runtime.v1.UpdateSessionOrderResp.items:type_name -> termbridge.runtime.v1.SessionSummary
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_termbridge_runtime_v1_runtime_proto_init() }
@@ -1538,14 +1720,14 @@ func file_termbridge_runtime_v1_runtime_proto_init() {
 		return
 	}
 	file_termbridge_runtime_v1_runtime_proto_msgTypes[2].OneofWrappers = []any{}
-	file_termbridge_runtime_v1_runtime_proto_msgTypes[18].OneofWrappers = []any{}
+	file_termbridge_runtime_v1_runtime_proto_msgTypes[19].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_termbridge_runtime_v1_runtime_proto_rawDesc), len(file_termbridge_runtime_v1_runtime_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

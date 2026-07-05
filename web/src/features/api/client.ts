@@ -4,7 +4,7 @@ import axios, {
   type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from 'axios'
-import type { ApiErrorResp } from '../../protocol/terminal'
+import type { ErrorResp } from '../../gen/proto/termbridge/common/v1/common'
 import { runtimeConfig, type ApiTarget } from '../../config'
 import { useAppModeStore } from '../../store/appMode'
 import { useGatewayStore } from '../../store/gateway'
@@ -18,8 +18,8 @@ export class ApiClientError extends Error {
   readonly requestId: string
   readonly details?: unknown
 
-  constructor(status: number, response: ApiErrorResp) {
-    const requestId = response.request_id || response.requestId || ''
+  constructor(status: number, response: ErrorResp) {
+    const requestId = response.request_id || ''
     super(
       `API request failed (${status} ${response.code}, requestId: ${requestId}): ${response.error}`,
     )
@@ -76,7 +76,11 @@ function configureApiClient(client: typeof apiClient, target: ApiTarget): void {
         const gateway = useGatewayStore()
         const appMode = useAppModeStore()
         gateway.clearTokenForTarget(target)
-        if (target === 'cloud' && appMode.allowsMode('cloud') && router.currentRoute.value.name !== 'login') {
+        if (
+          target === 'cloud' &&
+          appMode.allowsMode('cloud') &&
+          router.currentRoute.value.name !== 'login'
+        ) {
           router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
         }
       }
@@ -95,7 +99,7 @@ export function ensureRequestId(config: InternalAxiosRequestConfig): void {
 
 export function errorFromResponse(response: AxiosResponse): Error {
   const body = parseErrorBody(response.data)
-  if (!isApiErrorResp(body)) {
+  if (!isErrorResp(body)) {
     return new ApiContractMismatchError(response.status)
   }
   return new ApiClientError(response.status, body)
@@ -116,15 +120,15 @@ function parseErrorBody(data: unknown): unknown {
   }
 }
 
-function isApiErrorResp(value: unknown): value is ApiErrorResp {
+function isErrorResp(value: unknown): value is ErrorResp {
   if (!value || typeof value !== 'object') {
     return false
   }
-  const candidate = value as Partial<ApiErrorResp>
+  const candidate = value as Partial<ErrorResp>
   return (
     typeof candidate.code === 'string' &&
     typeof candidate.error === 'string' &&
-    (typeof candidate.request_id === 'string' || typeof candidate.requestId === 'string')
+    typeof candidate.request_id === 'string'
   )
 }
 

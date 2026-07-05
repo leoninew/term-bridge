@@ -48,7 +48,7 @@
     AlertDialogRoot,
     AlertDialogTitle,
   } from 'reka-ui'
-  import type { WorkspaceSummary } from '../../protocol/terminal'
+  import type { Workspace as WorkspaceSummary } from '../../gen/proto/termbridge/runtime/v1/runtime'
 
   defineProps<{
     open: boolean

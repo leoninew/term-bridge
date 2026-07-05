@@ -42,7 +42,7 @@ func (e tunnelRuntimeEndpoint) JSON(ctx context.Context, method string, params a
 }
 
 func (e tunnelRuntimeEndpoint) History(ctx context.Context, workspaceId string, sessionId string, requestId string) (string, bool, error) {
-	request := &tunnelv1.TunnelFrame{RequestId: requestId, Payload: &tunnelv1.TunnelFrame_ReadHistoryReq{ReadHistoryReq: &runtimev1.ReadHistoryReq{WorkspaceId: workspaceId, SessionId: sessionId}}}
+	request := &tunnelv1.TunnelFrame{RequestId: requestId, Payload: &tunnelv1.TunnelFrame_ReadHistoryReq{ReadHistoryReq: &runtimev1.ReadWorkspaceSessionHistoryReq{WorkspaceId: workspaceId, SessionId: sessionId}}}
 	response, err := e.route.request(ctx, request)
 	if err != nil {
 		return "", false, err
@@ -91,7 +91,7 @@ func runtimeRequestFrame(method string, params any, requestId string) (*tunnelv1
 		if !ok {
 			return nil, fmt.Errorf("session_order params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_UpdateSessionOrderReq{UpdateSessionOrderReq: &runtimev1.UpdateSessionOrderReq{WorkspaceId: req.WorkspaceId, SessionIds: req.SessionIds}}
+		frame.Payload = &tunnelv1.TunnelFrame_UpdateSessionOrderReq{UpdateSessionOrderReq: &runtimev1.WorkspaceSessionOrderReq{WorkspaceId: req.WorkspaceId, SessionIds: req.SessionIds}}
 	case "create_session":
 		req, ok := params.(CreateSessionReq)
 		if !ok {
@@ -103,7 +103,7 @@ func runtimeRequestFrame(method string, params any, requestId string) (*tunnelv1
 		if !ok {
 			return nil, fmt.Errorf("rerun_session params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_RerunSessionReq{RerunSessionReq: &runtimev1.RerunSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId, Cols: int32(req.Request.Cols), Rows: int32(req.Request.Rows)}}
+		frame.Payload = &tunnelv1.TunnelFrame_RerunSessionReq{RerunSessionReq: &runtimev1.RerunWorkspaceSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId, Request: &runtimev1.RerunSessionReq{Cols: int32(req.Request.Cols), Rows: int32(req.Request.Rows)}}}
 	case "get_session":
 		req, ok := params.(WorkspaceSessionReq)
 		if !ok {
@@ -116,7 +116,7 @@ func runtimeRequestFrame(method string, params any, requestId string) (*tunnelv1
 			return nil, fmt.Errorf("update_session params have type %T", params)
 		}
 		name := req.Request.Name
-		frame.Payload = &tunnelv1.TunnelFrame_UpdateSessionReq{UpdateSessionReq: &runtimev1.UpdateSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId, Name: &name}}
+		frame.Payload = &tunnelv1.TunnelFrame_UpdateSessionReq{UpdateSessionReq: &runtimev1.UpdateWorkspaceSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId, Request: &runtimev1.UpdateSessionReq{Name: &name}}}
 	case "delete_session":
 		req, ok := params.(WorkspaceSessionReq)
 		if !ok {

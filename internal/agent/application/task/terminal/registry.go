@@ -104,7 +104,7 @@ const (
 
 type Outbound struct {
 	Kind   OutboundKind
-	Text   terminalproto.ServerMessage
+	Text   *terminalproto.ServerMessage
 	Binary []byte
 }
 
@@ -817,7 +817,7 @@ func (c *Client) CloseSession() error {
 	return c.runtime.closeSession("client_close")
 }
 
-func (c *Client) SendControl(message terminalproto.ServerMessage) bool {
+func (c *Client) SendControl(message *terminalproto.ServerMessage) bool {
 	return c.enqueue(Outbound{Kind: OutboundText, Text: message})
 }
 

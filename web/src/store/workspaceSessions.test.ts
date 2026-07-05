@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import type { WorkspaceTreeSummary } from '../protocol/terminal'
+import type { WorkspaceTreeNode as WorkspaceTreeSummary } from '../gen/proto/termbridge/runtime/v1/runtime'
 import type { SessionRuntimeApi } from '../features/sessions/runtime'
 import { useWorkspaceSessionsStore } from './workspaceSessions'
 
@@ -21,18 +21,22 @@ const workspaceTree: WorkspaceTreeSummary[] = [
     children: [
       {
         id: 'session-1',
+        workspace_id: 'workspace-1',
         name: 'Shell',
         command: 'bash',
         cwd: '/work/one',
         lifecycle_state: 'running',
+        attachment_state: '',
         updated_at: '2026-06-24T00:00:00Z',
       },
       {
         id: 'session-2',
+        workspace_id: 'workspace-1',
         name: 'Build',
         command: 'npm run build',
         cwd: '/work/one',
         lifecycle_state: 'stopped',
+        attachment_state: '',
         updated_at: '2026-06-24T00:00:01Z',
       },
     ],
@@ -79,6 +83,7 @@ describe('useWorkspaceSessionsStore', () => {
         command: 'bash',
         cwd: '/work/one',
         lifecycle_state: 'running',
+        attachment_state: '',
         updated_at: '2026-06-24T00:00:00Z',
       },
       {
@@ -88,6 +93,7 @@ describe('useWorkspaceSessionsStore', () => {
         command: 'npm run build',
         cwd: '/work/one',
         lifecycle_state: 'stopped',
+        attachment_state: '',
         updated_at: '2026-06-24T00:00:01Z',
       },
     ])
@@ -107,6 +113,7 @@ describe('useWorkspaceSessionsStore', () => {
         command: 'zsh',
         cwd: '/work/one',
         lifecycle_state: 'stopped',
+        attachment_state: '',
         updated_at: '2026-06-24T00:00:01Z',
       }),
     ).toBe(true)
@@ -123,6 +130,7 @@ describe('useWorkspaceSessionsStore', () => {
         command: 'bash',
         cwd: '/tmp',
         lifecycle_state: 'running',
+        attachment_state: '',
         updated_at: '2026-06-24T00:00:02Z',
       }),
     ).toBe(false)

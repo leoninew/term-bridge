@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { SessionSummary } from '../protocol/terminal'
+import type { SessionSummary } from '../gen/proto/termbridge/runtime/v1/runtime'
 import type { SessionRuntimeApi } from '../features/sessions/runtime'
 import type { RuntimeTarget } from '../features/runtimeTarget'
 import { errorMessage } from './notifications'

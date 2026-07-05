@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ClientControlMessage } from '../../protocol/terminal'
+import type { ClientControlMessage } from '../../gen/proto/termbridge/terminal/v1/terminal'
 import { useTerminalSocket } from './useTerminalSocket'
 
 class FakeWebSocket {
@@ -63,7 +63,7 @@ describe('useTerminalSocket', () => {
   it('sends a deferred resize after hello when the socket opens', () => {
     const terminal = useTerminalSocket(vi.fn(), vi.fn(), vi.fn())
 
-    terminal.sendControl({ type: 'resize', cols: 120, rows: 32 })
+    terminal.sendControl({ type: 'resize', cols: 120, rows: 32, nonce: '' })
     terminal.connect('/agent-api/sessions/session-1/ws')
 
     const socket = FakeWebSocket.instances[0]
@@ -72,24 +72,24 @@ describe('useTerminalSocket', () => {
     socket.open()
 
     expect(sentControls(socket)).toEqual([
-      { type: 'hello' },
-      { type: 'resize', cols: 120, rows: 32 },
+      { type: 'hello', cols: 0, rows: 0, nonce: '' },
+      { type: 'resize', cols: 120, rows: 32, nonce: '' },
     ])
   })
 
   it('keeps only the latest deferred resize before connection opens', () => {
     const terminal = useTerminalSocket(vi.fn(), vi.fn(), vi.fn())
 
-    terminal.sendControl({ type: 'resize', cols: 100, rows: 24 })
-    terminal.sendControl({ type: 'resize', cols: 140, rows: 40 })
+    terminal.sendControl({ type: 'resize', cols: 100, rows: 24, nonce: '' })
+    terminal.sendControl({ type: 'resize', cols: 140, rows: 40, nonce: '' })
     terminal.connect('/agent-api/sessions/session-1/ws')
 
     const socket = FakeWebSocket.instances[0]
     socket.open()
 
     expect(sentControls(socket)).toEqual([
-      { type: 'hello' },
-      { type: 'resize', cols: 140, rows: 40 },
+      { type: 'hello', cols: 0, rows: 0, nonce: '' },
+      { type: 'resize', cols: 140, rows: 40, nonce: '' },
     ])
   })
 
@@ -99,14 +99,14 @@ describe('useTerminalSocket', () => {
     terminal.connect('/agent-api/sessions/session-1/ws')
     const socket = FakeWebSocket.instances[0]
 
-    terminal.sendControl({ type: 'resize', cols: 132, rows: 35 })
+    terminal.sendControl({ type: 'resize', cols: 132, rows: 35, nonce: '' })
     expect(socket.sent).toEqual([])
 
     socket.open()
 
     expect(sentControls(socket)).toEqual([
-      { type: 'hello' },
-      { type: 'resize', cols: 132, rows: 35 },
+      { type: 'hello', cols: 0, rows: 0, nonce: '' },
+      { type: 'resize', cols: 132, rows: 35, nonce: '' },
     ])
   })
 
@@ -117,16 +117,16 @@ describe('useTerminalSocket', () => {
     const firstSocket = FakeWebSocket.instances[0]
     firstSocket.open()
 
-    terminal.sendControl({ type: 'resize', cols: 150, rows: 45 })
+    terminal.sendControl({ type: 'resize', cols: 150, rows: 45, nonce: '' })
     expect(sentControls(firstSocket)).toEqual([
-      { type: 'hello' },
-      { type: 'resize', cols: 150, rows: 45 },
+      { type: 'hello', cols: 0, rows: 0, nonce: '' },
+      { type: 'resize', cols: 150, rows: 45, nonce: '' },
     ])
 
     terminal.connect('/agent-api/sessions/session-1/ws')
     const secondSocket = FakeWebSocket.instances[1]
     secondSocket.open()
 
-    expect(sentControls(secondSocket)).toEqual([{ type: 'hello' }])
+    expect(sentControls(secondSocket)).toEqual([{ type: 'hello', cols: 0, rows: 0, nonce: '' }])
   })
 })

@@ -11,7 +11,7 @@ func TestDecodeClientAcceptsResize(t *testing.T) {
 		t.Fatalf("DecodeClient() error = %v", err)
 	}
 	if message.Type != TypeResize || message.Cols != 120 || message.Rows != 32 {
-		t.Fatalf("message = %#v", message)
+		t.Fatalf("resize control message = %#v, want type resize with 120x32", message)
 	}
 }
 
@@ -66,7 +66,7 @@ func TestDecodeClientRejectsLargeControlMessage(t *testing.T) {
 }
 
 func TestEncodeServerRejectsUnknownType(t *testing.T) {
-	_, err := EncodeServer(ServerMessage{Type: "bogus"})
+	_, err := EncodeServer(&ServerMessage{Type: "bogus"})
 	if err == nil {
 		t.Fatal("EncodeServer() error = nil, want error")
 	}

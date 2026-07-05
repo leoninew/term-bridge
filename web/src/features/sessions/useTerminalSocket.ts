@@ -1,11 +1,9 @@
 import { ref, shallowRef } from 'vue'
-import {
-  decodeControl,
-  encodeControl,
-  terminalSubprotocol,
-  type ClientControlMessage,
-  type ServerControlMessage,
-} from '../../protocol/terminal'
+import { decodeControl, encodeControl, terminalSubprotocol } from '../../protocol/terminal'
+import type {
+  ClientControlMessage,
+  ServerControlMessage,
+} from '../../gen/proto/termbridge/terminal/v1/terminal'
 import {
   diagnosticWebSocketPath,
   logTerminalDiagnostic,
@@ -23,7 +21,7 @@ export function useTerminalSocket(
   const error = ref<string | null>(null)
   let binaryMessageCount = 0
   let controlMessageCount = 0
-  let pendingResize: Extract<ClientControlMessage, { type: 'resize' }> | null = null
+  let pendingResize: ClientControlMessage | null = null
 
   function connect(url: string) {
     close()
@@ -38,7 +36,7 @@ export function useTerminalSocket(
     next.onopen = () => {
       status.value = 'connected'
       logTerminalDiagnostic('socket.open', { path: diagnosticWebSocketPath(wsUrl) })
-      sendControl({ type: 'hello' })
+      sendControl({ type: 'hello', cols: 0, rows: 0, nonce: '' })
       if (pendingResize) {
         sendControl(pendingResize)
       }

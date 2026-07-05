@@ -44,7 +44,8 @@
   import { TabsContent } from 'reka-ui'
   import HistoryTerminalView from '../terminal/HistoryTerminalView.vue'
   import TerminalView from '../terminal/TerminalView.vue'
-  import type { ServerControlMessage, SessionSummary } from '../../protocol/terminal'
+  import type { SessionSummary } from '../../gen/proto/termbridge/runtime/v1/runtime'
+  import type { ServerControlMessage } from '../../gen/proto/termbridge/terminal/v1/terminal'
   import type { OpenSessionTab } from '../../store/workbench'
 
   defineProps<{

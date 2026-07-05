@@ -389,9 +389,9 @@
   import { themes, useThemeStore, type AppTheme } from '../../store/theme'
   import type {
     SessionSummary,
-    WorkspaceSummary,
-    WorkspaceTreeSummary,
-  } from '../../protocol/terminal'
+    Workspace as WorkspaceSummary,
+    WorkspaceTreeNode as WorkspaceTreeSummary,
+  } from '../../gen/proto/termbridge/runtime/v1/runtime'
 
   type WorkspaceTreeItem = {
     kind: 'workspace'

@@ -1,15 +1,14 @@
 import { buildApiWebSocketUrl } from '../../config'
-import {
-  clampTerminalSize,
-  type CreateSessionReq,
-  type CreateSessionResp,
-  type RerunSessionReq,
-  type SessionSummary,
-  type UpdateSessionReq,
-  type WorkspaceSummary,
-  type WorkspaceTreeSession,
-  type WorkspaceTreeSummary,
-} from '../../protocol/terminal'
+import { clampTerminalSize } from '../../protocol/terminal'
+import type {
+  CreateSessionReq,
+  CreateSessionResp,
+  RerunSessionReq,
+  SessionSummary,
+  UpdateSessionReq,
+  Workspace,
+  WorkspaceTreeNode,
+} from '../../gen/proto/termbridge/runtime/v1/runtime'
 import { runtimeApiTarget, runtimePath, type RuntimeTarget } from '../runtimeTarget'
 
 export type ApiResult<T> = {
@@ -33,9 +32,9 @@ export type SessionRuntimeApi = {
     sessionId: string,
     request: RerunSessionReq,
   ): Promise<CreateSessionResp>
-  updateSessionOrder(workspaceId: string, sessionIds: string[]): Promise<WorkspaceTreeSession[]>
-  listWorkspaceTree(): Promise<ApiResult<WorkspaceTreeSummary[]>>
-  updateWorkspaceOrder(workspaceIds: string[]): Promise<WorkspaceSummary[]>
+  updateSessionOrder(workspaceId: string, sessionIds: string[]): Promise<SessionSummary[]>
+  listWorkspaceTree(): Promise<ApiResult<WorkspaceTreeNode[]>>
+  updateWorkspaceOrder(workspaceIds: string[]): Promise<Workspace[]>
   deleteWorkspace(workspaceId: string): Promise<void>
 }
 

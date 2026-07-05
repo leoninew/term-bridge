@@ -3,6 +3,8 @@ package terminalproto
 import (
 	"encoding/json"
 	"fmt"
+
+	terminalv1 "termbridge-go/internal/shared/dto/proto/termbridge/terminal/v1"
 )
 
 const (
@@ -30,49 +32,32 @@ const (
 	MaxPingNonceBytes   = 256
 )
 
-type ClientMessage struct {
-	Type  string `json:"type"`
-	Cols  int    `json:"cols,omitempty"`
-	Rows  int    `json:"rows,omitempty"`
-	Nonce string `json:"nonce,omitempty"`
-}
+type ClientMessage = terminalv1.ClientControlMessage
+type ServerMessage = terminalv1.ServerControlMessage
 
-type ServerMessage struct {
-	Type            string `json:"type"`
-	SessionId       string `json:"session_id,omitempty"`
-	WorkspaceId     string `json:"workspace_id,omitempty"`
-	State           string `json:"state,omitempty"`
-	LifecycleState  string `json:"lifecycle_state,omitempty"`
-	AttachmentState string `json:"attachment_state,omitempty"`
-	Reason          string `json:"reason,omitempty"`
-	ExitCode        *int   `json:"exit_code,omitempty"`
-	Code            string `json:"code,omitempty"`
-	Message         string `json:"message,omitempty"`
-	Error           string `json:"error,omitempty"`
-	Nonce           string `json:"nonce,omitempty"`
-	Truncated       *bool  `json:"truncated,omitempty"`
-}
-
-func DecodeClient(data []byte) (ClientMessage, error) {
+func DecodeClient(data []byte) (*ClientMessage, error) {
 	if len(data) > MaxJSONMessageBytes {
-		return ClientMessage{}, fmt.Errorf("control message too large: %d bytes", len(data))
+		return nil, fmt.Errorf("control message too large: %d bytes", len(data))
 	}
-	var message ClientMessage
-	if err := json.Unmarshal(data, &message); err != nil {
-		return ClientMessage{}, fmt.Errorf("decode control message: %w", err)
+	message := &ClientMessage{}
+	if err := json.Unmarshal(data, message); err != nil {
+		return nil, fmt.Errorf("decode control message: %w", err)
 	}
 	if err := ValidateClient(message); err != nil {
-		return ClientMessage{}, err
+		return nil, err
 	}
 	return message, nil
 }
 
-func ValidateClient(message ClientMessage) error {
+func ValidateClient(message *ClientMessage) error {
+	if message == nil {
+		return fmt.Errorf("missing control message")
+	}
 	switch message.Type {
 	case TypeHello, TypeDetach:
 		return nil
 	case TypeResize:
-		return ValidateSize(message.Cols, message.Rows)
+		return ValidateSize(int(message.Cols), int(message.Rows))
 	case TypePing:
 		if len([]byte(message.Nonce)) > MaxPingNonceBytes {
 			return fmt.Errorf("ping nonce too large")
@@ -93,14 +78,14 @@ func ValidateSize(cols int, rows int) error {
 	return nil
 }
 
-func EncodeServer(message ServerMessage) ([]byte, error) {
+func EncodeServer(message *ServerMessage) ([]byte, error) {
 	if err := validateServer(message); err != nil {
 		return nil, err
 	}
 	return json.Marshal(message)
 }
 
-func MustEncodeServer(message ServerMessage) []byte {
+func MustEncodeServer(message *ServerMessage) []byte {
 	data, err := EncodeServer(message)
 	if err != nil {
 		panic(err)
@@ -108,7 +93,10 @@ func MustEncodeServer(message ServerMessage) []byte {
 	return data
 }
 
-func validateServer(message ServerMessage) error {
+func validateServer(message *ServerMessage) error {
+	if message == nil {
+		return fmt.Errorf("missing server message")
+	}
 	switch message.Type {
 	case TypeStarted:
 		if message.SessionId == "" || message.WorkspaceId == "" || message.State == "" && message.LifecycleState == "" {

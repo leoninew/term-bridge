@@ -2,10 +2,9 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type {
   SessionSummary,
-  WorkspaceSummary,
-  WorkspaceTreeSession,
-  WorkspaceTreeSummary,
-} from '../protocol/terminal'
+  Workspace as WorkspaceSummary,
+  WorkspaceTreeNode as WorkspaceTreeSummary,
+} from '../gen/proto/termbridge/runtime/v1/runtime'
 import type { SessionRuntimeApi } from '../features/sessions/runtime'
 import type { RuntimeTarget } from '../features/runtimeTarget'
 
@@ -192,17 +191,8 @@ function sessionsForWorkspace(workspace: WorkspaceTreeSummary): SessionSummary[]
   }))
 }
 
-function sessionSummaryForWorkspaceTree(session: SessionSummary) {
-  return {
-    id: session.id,
-    name: session.name,
-    command: session.command,
-    cwd: session.cwd,
-    lifecycle_state: session.lifecycle_state,
-    attachment_state: session.attachment_state,
-    exit_code: session.exit_code,
-    updated_at: session.updated_at,
-  }
+function sessionSummaryForWorkspaceTree(session: SessionSummary): SessionSummary {
+  return session
 }
 
 function workspaceSummaryFromTree(workspace: WorkspaceTreeSummary): WorkspaceSummary {
@@ -247,7 +237,7 @@ function orderWorkspaceSessions(
 function replaceWorkspaceSessions(
   tree: WorkspaceTreeSummary[],
   workspaceId: string,
-  sessions: WorkspaceTreeSession[],
+  sessions: SessionSummary[],
 ) {
   return tree.map((workspace) =>
     workspace.id === workspaceId ? { ...workspace, children: sessions } : workspace,

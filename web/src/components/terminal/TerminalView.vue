@@ -8,7 +8,8 @@
 
 <script setup lang="ts">
   import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-  import { clampTerminalSize, type ServerControlMessage } from '../../protocol/terminal'
+  import { clampTerminalSize } from '../../protocol/terminal'
+  import type { ServerControlMessage } from '../../gen/proto/termbridge/terminal/v1/terminal'
   import { logTerminalDiagnostic, logTerminalDiagnosticError } from './diagnostics'
   import { createXterm } from './useXterm'
   import { useTerminalSocket } from '../../features/sessions/useTerminalSocket'
@@ -99,6 +100,7 @@
           type: 'resize',
           cols: lastTerminalSize.cols,
           rows: lastTerminalSize.rows,
+          nonce: '',
         })
       },
       { source: 'live', sessionId: props.sessionId },

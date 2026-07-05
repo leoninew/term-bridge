@@ -126,12 +126,15 @@
   import { useTerminalSize } from '../../composable/useTerminalSize'
   import { terminalWsUrl, type SessionRuntimeApi } from '../../features/sessions/runtime'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
-  import type { CloudSessionSummary, DeviceSummary } from '../../features/types'
   import type {
-    ServerControlMessage,
+    CloudSessionSummary,
+    DeviceSummary,
+  } from '../../gen/proto/termbridge/cloud/v1/cloud'
+  import type {
     SessionSummary,
-    WorkspaceSummary,
-  } from '../../protocol/terminal'
+    Workspace as WorkspaceSummary,
+  } from '../../gen/proto/termbridge/runtime/v1/runtime'
+  import type { ServerControlMessage } from '../../gen/proto/termbridge/terminal/v1/terminal'
   import { useGatewayStore } from '../../store/gateway'
   import { useNotificationsStore } from '../../store/notifications'
   import { useWorkbenchStore } from '../../store/workbench'
@@ -143,7 +146,6 @@
     dashboardRouteName: string
     loginRedirect: string
     currentDevice?: DeviceSummary | CloudSessionSummary | null
-    startCloudOAuthUrl?: () => string
     logout: () => Promise<void>
   }>()
 
@@ -169,7 +171,7 @@
   const isAgentMode = computed(() => props.runtimeTarget.mode === 'agent')
   const userActionDisabled = computed(() => false)
   const userActionLabel = computed(() =>
-    isAgentMode.value ? t('dashboard.signInWithOAuth') : t('dashboard.signIn'),
+    isAgentMode.value ? t('dashboard.connectCloudDeviceAction') : t('dashboard.signIn'),
   )
   const userDisplayName = computed(
     () => gateway.user?.display_name || gateway.user?.email || t('dashboard.signedIn'),
@@ -218,9 +220,7 @@
       return
     }
     if (isAgentMode.value) {
-      if (props.startCloudOAuthUrl) {
-        window.location.href = props.startCloudOAuthUrl()
-      }
+      await router.push({ name: props.dashboardRouteName })
       return
     }
     await router.push({ name: 'login', query: { redirect: props.loginRedirect } })
@@ -260,7 +260,7 @@
         rows: size.rows,
       })
       const created = await props.runtimeApi.createSession(draft.value.workspaceId, {
-        ...(draft.value.workspaceId ? { workspace_id: draft.value.workspaceId } : {}),
+        workspace_id: draft.value.workspaceId ?? '',
         name: draft.value.name,
         cwd: draft.value.cwd,
         command: draft.value.command,

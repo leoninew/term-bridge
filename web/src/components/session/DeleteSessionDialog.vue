@@ -52,7 +52,7 @@
     AlertDialogRoot,
     AlertDialogTitle,
   } from 'reka-ui'
-  import type { SessionSummary } from '../../protocol/terminal'
+  import type { SessionSummary } from '../../gen/proto/termbridge/runtime/v1/runtime'
 
   defineProps<{
     open: boolean

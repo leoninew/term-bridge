@@ -203,7 +203,7 @@ func (x *TunnelFrame) GetGetSessionReq() *v1.WorkspaceSessionReq {
 	return nil
 }
 
-func (x *TunnelFrame) GetRerunSessionReq() *v1.RerunSessionReq {
+func (x *TunnelFrame) GetRerunSessionReq() *v1.RerunWorkspaceSessionReq {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_RerunSessionReq); ok {
 			return x.RerunSessionReq
@@ -212,7 +212,7 @@ func (x *TunnelFrame) GetRerunSessionReq() *v1.RerunSessionReq {
 	return nil
 }
 
-func (x *TunnelFrame) GetUpdateSessionReq() *v1.UpdateSessionReq {
+func (x *TunnelFrame) GetUpdateSessionReq() *v1.UpdateWorkspaceSessionReq {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_UpdateSessionReq); ok {
 			return x.UpdateSessionReq
@@ -239,7 +239,7 @@ func (x *TunnelFrame) GetDeleteSessionReq() *v1.WorkspaceSessionReq {
 	return nil
 }
 
-func (x *TunnelFrame) GetReadHistoryReq() *v1.ReadHistoryReq {
+func (x *TunnelFrame) GetReadHistoryReq() *v1.ReadWorkspaceSessionHistoryReq {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_ReadHistoryReq); ok {
 			return x.ReadHistoryReq
@@ -257,7 +257,7 @@ func (x *TunnelFrame) GetUpdateWorkspaceOrderReq() *v1.UpdateWorkspaceOrderReq {
 	return nil
 }
 
-func (x *TunnelFrame) GetUpdateSessionOrderReq() *v1.UpdateSessionOrderReq {
+func (x *TunnelFrame) GetUpdateSessionOrderReq() *v1.WorkspaceSessionOrderReq {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_UpdateSessionOrderReq); ok {
 			return x.UpdateSessionOrderReq
@@ -496,11 +496,11 @@ type TunnelFrame_GetSessionReq struct {
 }
 
 type TunnelFrame_RerunSessionReq struct {
-	RerunSessionReq *v1.RerunSessionReq `protobuf:"bytes,105,opt,name=rerun_session_req,json=rerunSessionReq,proto3,oneof"`
+	RerunSessionReq *v1.RerunWorkspaceSessionReq `protobuf:"bytes,105,opt,name=rerun_session_req,json=rerunSessionReq,proto3,oneof"`
 }
 
 type TunnelFrame_UpdateSessionReq struct {
-	UpdateSessionReq *v1.UpdateSessionReq `protobuf:"bytes,106,opt,name=update_session_req,json=updateSessionReq,proto3,oneof"`
+	UpdateSessionReq *v1.UpdateWorkspaceSessionReq `protobuf:"bytes,106,opt,name=update_session_req,json=updateSessionReq,proto3,oneof"`
 }
 
 type TunnelFrame_CloseSessionReq struct {
@@ -512,7 +512,7 @@ type TunnelFrame_DeleteSessionReq struct {
 }
 
 type TunnelFrame_ReadHistoryReq struct {
-	ReadHistoryReq *v1.ReadHistoryReq `protobuf:"bytes,109,opt,name=read_history_req,json=readHistoryReq,proto3,oneof"`
+	ReadHistoryReq *v1.ReadWorkspaceSessionHistoryReq `protobuf:"bytes,109,opt,name=read_history_req,json=readHistoryReq,proto3,oneof"`
 }
 
 type TunnelFrame_UpdateWorkspaceOrderReq struct {
@@ -520,7 +520,7 @@ type TunnelFrame_UpdateWorkspaceOrderReq struct {
 }
 
 type TunnelFrame_UpdateSessionOrderReq struct {
-	UpdateSessionOrderReq *v1.UpdateSessionOrderReq `protobuf:"bytes,111,opt,name=update_session_order_req,json=updateSessionOrderReq,proto3,oneof"`
+	UpdateSessionOrderReq *v1.WorkspaceSessionOrderReq `protobuf:"bytes,111,opt,name=update_session_order_req,json=updateSessionOrderReq,proto3,oneof"`
 }
 
 type TunnelFrame_DeleteWorkspaceReq struct {
@@ -1173,7 +1173,7 @@ var File_termbridge_tunnel_v1_tunnel_proto protoreflect.FileDescriptor
 
 const file_termbridge_tunnel_v1_tunnel_proto_rawDesc = "" +
 	"\n" +
-	"!termbridge/tunnel/v1/tunnel.proto\x12\x14termbridge.tunnel.v1\x1a!termbridge/common/v1/common.proto\x1a#termbridge/runtime/v1/runtime.proto\"\xce\x19\n" +
+	"!termbridge/tunnel/v1/tunnel.proto\x12\x14termbridge.tunnel.v1\x1a!termbridge/common/v1/common.proto\x1a#termbridge/runtime/v1/runtime.proto\"\xf3\x19\n" +
 	"\vTunnelFrame\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12\x1d\n" +
 	"\n" +
@@ -1187,14 +1187,14 @@ const file_termbridge_tunnel_v1_tunnel_proto_rawDesc = "" +
 	"\x12workspace_tree_req\x18e \x01(\v2'.termbridge.runtime.v1.WorkspaceTreeReqH\x00R\x10workspaceTreeReq\x12c\n" +
 	"\x16workspace_sessions_req\x18f \x01(\v2+.termbridge.runtime.v1.WorkspaceSessionsReqH\x00R\x14workspaceSessionsReq\x12W\n" +
 	"\x12create_session_req\x18g \x01(\v2'.termbridge.runtime.v1.CreateSessionReqH\x00R\x10createSessionReq\x12T\n" +
-	"\x0fget_session_req\x18h \x01(\v2*.termbridge.runtime.v1.WorkspaceSessionReqH\x00R\rgetSessionReq\x12T\n" +
-	"\x11rerun_session_req\x18i \x01(\v2&.termbridge.runtime.v1.RerunSessionReqH\x00R\x0frerunSessionReq\x12W\n" +
-	"\x12update_session_req\x18j \x01(\v2'.termbridge.runtime.v1.UpdateSessionReqH\x00R\x10updateSessionReq\x12X\n" +
+	"\x0fget_session_req\x18h \x01(\v2*.termbridge.runtime.v1.WorkspaceSessionReqH\x00R\rgetSessionReq\x12]\n" +
+	"\x11rerun_session_req\x18i \x01(\v2/.termbridge.runtime.v1.RerunWorkspaceSessionReqH\x00R\x0frerunSessionReq\x12`\n" +
+	"\x12update_session_req\x18j \x01(\v20.termbridge.runtime.v1.UpdateWorkspaceSessionReqH\x00R\x10updateSessionReq\x12X\n" +
 	"\x11close_session_req\x18k \x01(\v2*.termbridge.runtime.v1.WorkspaceSessionReqH\x00R\x0fcloseSessionReq\x12Z\n" +
-	"\x12delete_session_req\x18l \x01(\v2*.termbridge.runtime.v1.WorkspaceSessionReqH\x00R\x10deleteSessionReq\x12Q\n" +
-	"\x10read_history_req\x18m \x01(\v2%.termbridge.runtime.v1.ReadHistoryReqH\x00R\x0ereadHistoryReq\x12m\n" +
-	"\x1aupdate_workspace_order_req\x18n \x01(\v2..termbridge.runtime.v1.UpdateWorkspaceOrderReqH\x00R\x17updateWorkspaceOrderReq\x12g\n" +
-	"\x18update_session_order_req\x18o \x01(\v2,.termbridge.runtime.v1.UpdateSessionOrderReqH\x00R\x15updateSessionOrderReq\x12]\n" +
+	"\x12delete_session_req\x18l \x01(\v2*.termbridge.runtime.v1.WorkspaceSessionReqH\x00R\x10deleteSessionReq\x12a\n" +
+	"\x10read_history_req\x18m \x01(\v25.termbridge.runtime.v1.ReadWorkspaceSessionHistoryReqH\x00R\x0ereadHistoryReq\x12m\n" +
+	"\x1aupdate_workspace_order_req\x18n \x01(\v2..termbridge.runtime.v1.UpdateWorkspaceOrderReqH\x00R\x17updateWorkspaceOrderReq\x12j\n" +
+	"\x18update_session_order_req\x18o \x01(\v2/.termbridge.runtime.v1.WorkspaceSessionOrderReqH\x00R\x15updateSessionOrderReq\x12]\n" +
 	"\x14delete_workspace_req\x18p \x01(\v2).termbridge.runtime.v1.DeleteWorkspaceReqH\x00R\x12deleteWorkspaceReq\x12^\n" +
 	"\x14list_workspaces_resp\x18\xc8\x01 \x01(\v2).termbridge.runtime.v1.ListWorkspacesRespH\x00R\x12listWorkspacesResp\x12[\n" +
 	"\x13workspace_tree_resp\x18\xc9\x01 \x01(\v2(.termbridge.runtime.v1.WorkspaceTreeRespH\x00R\x11workspaceTreeResp\x12g\n" +
@@ -1260,41 +1260,41 @@ func file_termbridge_tunnel_v1_tunnel_proto_rawDescGZIP() []byte {
 
 var file_termbridge_tunnel_v1_tunnel_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_termbridge_tunnel_v1_tunnel_proto_goTypes = []any{
-	(*TunnelFrame)(nil),                 // 0: termbridge.tunnel.v1.TunnelFrame
-	(*Hello)(nil),                       // 1: termbridge.tunnel.v1.Hello
-	(*HelloAck)(nil),                    // 2: termbridge.tunnel.v1.HelloAck
-	(*Ping)(nil),                        // 3: termbridge.tunnel.v1.Ping
-	(*Pong)(nil),                        // 4: termbridge.tunnel.v1.Pong
-	(*TerminalAttachReq)(nil),           // 5: termbridge.tunnel.v1.TerminalAttachReq
-	(*TerminalInput)(nil),               // 6: termbridge.tunnel.v1.TerminalInput
-	(*TerminalOutput)(nil),              // 7: termbridge.tunnel.v1.TerminalOutput
-	(*TerminalResize)(nil),              // 8: termbridge.tunnel.v1.TerminalResize
-	(*TerminalClosed)(nil),              // 9: termbridge.tunnel.v1.TerminalClosed
-	(*Close)(nil),                       // 10: termbridge.tunnel.v1.Close
-	(*v1.ListWorkspacesReq)(nil),        // 11: termbridge.runtime.v1.ListWorkspacesReq
-	(*v1.WorkspaceTreeReq)(nil),         // 12: termbridge.runtime.v1.WorkspaceTreeReq
-	(*v1.WorkspaceSessionsReq)(nil),     // 13: termbridge.runtime.v1.WorkspaceSessionsReq
-	(*v1.CreateSessionReq)(nil),         // 14: termbridge.runtime.v1.CreateSessionReq
-	(*v1.WorkspaceSessionReq)(nil),      // 15: termbridge.runtime.v1.WorkspaceSessionReq
-	(*v1.RerunSessionReq)(nil),          // 16: termbridge.runtime.v1.RerunSessionReq
-	(*v1.UpdateSessionReq)(nil),         // 17: termbridge.runtime.v1.UpdateSessionReq
-	(*v1.ReadHistoryReq)(nil),           // 18: termbridge.runtime.v1.ReadHistoryReq
-	(*v1.UpdateWorkspaceOrderReq)(nil),  // 19: termbridge.runtime.v1.UpdateWorkspaceOrderReq
-	(*v1.UpdateSessionOrderReq)(nil),    // 20: termbridge.runtime.v1.UpdateSessionOrderReq
-	(*v1.DeleteWorkspaceReq)(nil),       // 21: termbridge.runtime.v1.DeleteWorkspaceReq
-	(*v1.ListWorkspacesResp)(nil),       // 22: termbridge.runtime.v1.ListWorkspacesResp
-	(*v1.WorkspaceTreeResp)(nil),        // 23: termbridge.runtime.v1.WorkspaceTreeResp
-	(*v1.WorkspaceSessionsResp)(nil),    // 24: termbridge.runtime.v1.WorkspaceSessionsResp
-	(*v1.CreateSessionResp)(nil),        // 25: termbridge.runtime.v1.CreateSessionResp
-	(*v1.GetSessionResp)(nil),           // 26: termbridge.runtime.v1.GetSessionResp
-	(*v1.UpdateSessionResp)(nil),        // 27: termbridge.runtime.v1.UpdateSessionResp
-	(*v1.CloseSessionResp)(nil),         // 28: termbridge.runtime.v1.CloseSessionResp
-	(*v1.DeleteSessionResp)(nil),        // 29: termbridge.runtime.v1.DeleteSessionResp
-	(*v1.ReadHistoryResp)(nil),          // 30: termbridge.runtime.v1.ReadHistoryResp
-	(*v1.UpdateWorkspaceOrderResp)(nil), // 31: termbridge.runtime.v1.UpdateWorkspaceOrderResp
-	(*v1.UpdateSessionOrderResp)(nil),   // 32: termbridge.runtime.v1.UpdateSessionOrderResp
-	(*v1.DeleteWorkspaceResp)(nil),      // 33: termbridge.runtime.v1.DeleteWorkspaceResp
-	(*v11.ErrorResp)(nil),               // 34: termbridge.common.v1.ErrorResp
+	(*TunnelFrame)(nil),                       // 0: termbridge.tunnel.v1.TunnelFrame
+	(*Hello)(nil),                             // 1: termbridge.tunnel.v1.Hello
+	(*HelloAck)(nil),                          // 2: termbridge.tunnel.v1.HelloAck
+	(*Ping)(nil),                              // 3: termbridge.tunnel.v1.Ping
+	(*Pong)(nil),                              // 4: termbridge.tunnel.v1.Pong
+	(*TerminalAttachReq)(nil),                 // 5: termbridge.tunnel.v1.TerminalAttachReq
+	(*TerminalInput)(nil),                     // 6: termbridge.tunnel.v1.TerminalInput
+	(*TerminalOutput)(nil),                    // 7: termbridge.tunnel.v1.TerminalOutput
+	(*TerminalResize)(nil),                    // 8: termbridge.tunnel.v1.TerminalResize
+	(*TerminalClosed)(nil),                    // 9: termbridge.tunnel.v1.TerminalClosed
+	(*Close)(nil),                             // 10: termbridge.tunnel.v1.Close
+	(*v1.ListWorkspacesReq)(nil),              // 11: termbridge.runtime.v1.ListWorkspacesReq
+	(*v1.WorkspaceTreeReq)(nil),               // 12: termbridge.runtime.v1.WorkspaceTreeReq
+	(*v1.WorkspaceSessionsReq)(nil),           // 13: termbridge.runtime.v1.WorkspaceSessionsReq
+	(*v1.CreateSessionReq)(nil),               // 14: termbridge.runtime.v1.CreateSessionReq
+	(*v1.WorkspaceSessionReq)(nil),            // 15: termbridge.runtime.v1.WorkspaceSessionReq
+	(*v1.RerunWorkspaceSessionReq)(nil),       // 16: termbridge.runtime.v1.RerunWorkspaceSessionReq
+	(*v1.UpdateWorkspaceSessionReq)(nil),      // 17: termbridge.runtime.v1.UpdateWorkspaceSessionReq
+	(*v1.ReadWorkspaceSessionHistoryReq)(nil), // 18: termbridge.runtime.v1.ReadWorkspaceSessionHistoryReq
+	(*v1.UpdateWorkspaceOrderReq)(nil),        // 19: termbridge.runtime.v1.UpdateWorkspaceOrderReq
+	(*v1.WorkspaceSessionOrderReq)(nil),       // 20: termbridge.runtime.v1.WorkspaceSessionOrderReq
+	(*v1.DeleteWorkspaceReq)(nil),             // 21: termbridge.runtime.v1.DeleteWorkspaceReq
+	(*v1.ListWorkspacesResp)(nil),             // 22: termbridge.runtime.v1.ListWorkspacesResp
+	(*v1.WorkspaceTreeResp)(nil),              // 23: termbridge.runtime.v1.WorkspaceTreeResp
+	(*v1.WorkspaceSessionsResp)(nil),          // 24: termbridge.runtime.v1.WorkspaceSessionsResp
+	(*v1.CreateSessionResp)(nil),              // 25: termbridge.runtime.v1.CreateSessionResp
+	(*v1.GetSessionResp)(nil),                 // 26: termbridge.runtime.v1.GetSessionResp
+	(*v1.UpdateSessionResp)(nil),              // 27: termbridge.runtime.v1.UpdateSessionResp
+	(*v1.CloseSessionResp)(nil),               // 28: termbridge.runtime.v1.CloseSessionResp
+	(*v1.DeleteSessionResp)(nil),              // 29: termbridge.runtime.v1.DeleteSessionResp
+	(*v1.ReadHistoryResp)(nil),                // 30: termbridge.runtime.v1.ReadHistoryResp
+	(*v1.UpdateWorkspaceOrderResp)(nil),       // 31: termbridge.runtime.v1.UpdateWorkspaceOrderResp
+	(*v1.UpdateSessionOrderResp)(nil),         // 32: termbridge.runtime.v1.UpdateSessionOrderResp
+	(*v1.DeleteWorkspaceResp)(nil),            // 33: termbridge.runtime.v1.DeleteWorkspaceResp
+	(*v11.ErrorResp)(nil),                     // 34: termbridge.common.v1.ErrorResp
 }
 var file_termbridge_tunnel_v1_tunnel_proto_depIdxs = []int32{
 	1,  // 0: termbridge.tunnel.v1.TunnelFrame.hello:type_name -> termbridge.tunnel.v1.Hello
@@ -1306,13 +1306,13 @@ var file_termbridge_tunnel_v1_tunnel_proto_depIdxs = []int32{
 	13, // 6: termbridge.tunnel.v1.TunnelFrame.workspace_sessions_req:type_name -> termbridge.runtime.v1.WorkspaceSessionsReq
 	14, // 7: termbridge.tunnel.v1.TunnelFrame.create_session_req:type_name -> termbridge.runtime.v1.CreateSessionReq
 	15, // 8: termbridge.tunnel.v1.TunnelFrame.get_session_req:type_name -> termbridge.runtime.v1.WorkspaceSessionReq
-	16, // 9: termbridge.tunnel.v1.TunnelFrame.rerun_session_req:type_name -> termbridge.runtime.v1.RerunSessionReq
-	17, // 10: termbridge.tunnel.v1.TunnelFrame.update_session_req:type_name -> termbridge.runtime.v1.UpdateSessionReq
+	16, // 9: termbridge.tunnel.v1.TunnelFrame.rerun_session_req:type_name -> termbridge.runtime.v1.RerunWorkspaceSessionReq
+	17, // 10: termbridge.tunnel.v1.TunnelFrame.update_session_req:type_name -> termbridge.runtime.v1.UpdateWorkspaceSessionReq
 	15, // 11: termbridge.tunnel.v1.TunnelFrame.close_session_req:type_name -> termbridge.runtime.v1.WorkspaceSessionReq
 	15, // 12: termbridge.tunnel.v1.TunnelFrame.delete_session_req:type_name -> termbridge.runtime.v1.WorkspaceSessionReq
-	18, // 13: termbridge.tunnel.v1.TunnelFrame.read_history_req:type_name -> termbridge.runtime.v1.ReadHistoryReq
+	18, // 13: termbridge.tunnel.v1.TunnelFrame.read_history_req:type_name -> termbridge.runtime.v1.ReadWorkspaceSessionHistoryReq
 	19, // 14: termbridge.tunnel.v1.TunnelFrame.update_workspace_order_req:type_name -> termbridge.runtime.v1.UpdateWorkspaceOrderReq
-	20, // 15: termbridge.tunnel.v1.TunnelFrame.update_session_order_req:type_name -> termbridge.runtime.v1.UpdateSessionOrderReq
+	20, // 15: termbridge.tunnel.v1.TunnelFrame.update_session_order_req:type_name -> termbridge.runtime.v1.WorkspaceSessionOrderReq
 	21, // 16: termbridge.tunnel.v1.TunnelFrame.delete_workspace_req:type_name -> termbridge.runtime.v1.DeleteWorkspaceReq
 	22, // 17: termbridge.tunnel.v1.TunnelFrame.list_workspaces_resp:type_name -> termbridge.runtime.v1.ListWorkspacesResp
 	23, // 18: termbridge.tunnel.v1.TunnelFrame.workspace_tree_resp:type_name -> termbridge.runtime.v1.WorkspaceTreeResp

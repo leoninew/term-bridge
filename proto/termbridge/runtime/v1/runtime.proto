@@ -92,16 +92,24 @@ message GetSessionResp {
 }
 
 message RerunSessionReq {
+  int32 cols = 1;
+  int32 rows = 2;
+}
+
+message RerunWorkspaceSessionReq {
   string workspace_id = 1;
   string session_id = 2;
-  int32 cols = 3;
-  int32 rows = 4;
+  RerunSessionReq request = 3;
 }
 
 message UpdateSessionReq {
+  optional string name = 1;
+}
+
+message UpdateWorkspaceSessionReq {
   string workspace_id = 1;
   string session_id = 2;
-  optional string name = 3;
+  UpdateSessionReq request = 3;
 }
 
 message UpdateSessionResp {
@@ -115,6 +123,10 @@ message CloseSessionResp {
 }
 
 message UpdateSessionOrderReq {
+  repeated string session_ids = 1;
+}
+
+message WorkspaceSessionOrderReq {
   string workspace_id = 1;
   repeated string session_ids = 2;
 }
@@ -123,7 +135,9 @@ message UpdateSessionOrderResp {
   repeated SessionSummary items = 1;
 }
 
-message ReadHistoryReq {
+message ReadHistoryReq {}
+
+message ReadWorkspaceSessionHistoryReq {
   string workspace_id = 1;
   string session_id = 2;
 }

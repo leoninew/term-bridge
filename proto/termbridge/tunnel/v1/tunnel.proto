@@ -22,13 +22,13 @@ message TunnelFrame {
     termbridge.runtime.v1.WorkspaceSessionsReq workspace_sessions_req = 102;
     termbridge.runtime.v1.CreateSessionReq create_session_req = 103;
     termbridge.runtime.v1.WorkspaceSessionReq get_session_req = 104;
-    termbridge.runtime.v1.RerunSessionReq rerun_session_req = 105;
-    termbridge.runtime.v1.UpdateSessionReq update_session_req = 106;
+    termbridge.runtime.v1.RerunWorkspaceSessionReq rerun_session_req = 105;
+    termbridge.runtime.v1.UpdateWorkspaceSessionReq update_session_req = 106;
     termbridge.runtime.v1.WorkspaceSessionReq close_session_req = 107;
     termbridge.runtime.v1.WorkspaceSessionReq delete_session_req = 108;
-    termbridge.runtime.v1.ReadHistoryReq read_history_req = 109;
+    termbridge.runtime.v1.ReadWorkspaceSessionHistoryReq read_history_req = 109;
     termbridge.runtime.v1.UpdateWorkspaceOrderReq update_workspace_order_req = 110;
-    termbridge.runtime.v1.UpdateSessionOrderReq update_session_order_req = 111;
+    termbridge.runtime.v1.WorkspaceSessionOrderReq update_session_order_req = 111;
     termbridge.runtime.v1.DeleteWorkspaceReq delete_workspace_req = 112;
 
     termbridge.runtime.v1.ListWorkspacesResp list_workspaces_resp = 200;

@@ -86,7 +86,7 @@ func localRuntimeRequestFrame(method string, params any, requestId string) (*tun
 		if !ok {
 			return nil, fmt.Errorf("session_order params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_UpdateSessionOrderReq{UpdateSessionOrderReq: &runtimev1.UpdateSessionOrderReq{WorkspaceId: req.WorkspaceId, SessionIds: req.SessionIds}}
+		frame.Payload = &tunnelv1.TunnelFrame_UpdateSessionOrderReq{UpdateSessionOrderReq: &runtimev1.WorkspaceSessionOrderReq{WorkspaceId: req.WorkspaceId, SessionIds: req.SessionIds}}
 	case "create_session":
 		req, ok := params.(terminalapp.CreateSessionReq)
 		if !ok {
@@ -98,7 +98,7 @@ func localRuntimeRequestFrame(method string, params any, requestId string) (*tun
 		if !ok {
 			return nil, fmt.Errorf("rerun_session params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_RerunSessionReq{RerunSessionReq: &runtimev1.RerunSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId, Cols: int32(req.Request.Cols), Rows: int32(req.Request.Rows)}}
+		frame.Payload = &tunnelv1.TunnelFrame_RerunSessionReq{RerunSessionReq: &runtimev1.RerunWorkspaceSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId, Request: &runtimev1.RerunSessionReq{Cols: int32(req.Request.Cols), Rows: int32(req.Request.Rows)}}}
 	case "get_session":
 		req, ok := params.(terminalapp.WorkspaceSessionReq)
 		if !ok {
@@ -111,7 +111,7 @@ func localRuntimeRequestFrame(method string, params any, requestId string) (*tun
 			return nil, fmt.Errorf("update_session params have type %T", params)
 		}
 		name := req.Request.Name
-		frame.Payload = &tunnelv1.TunnelFrame_UpdateSessionReq{UpdateSessionReq: &runtimev1.UpdateSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId, Name: &name}}
+		frame.Payload = &tunnelv1.TunnelFrame_UpdateSessionReq{UpdateSessionReq: &runtimev1.UpdateWorkspaceSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId, Request: &runtimev1.UpdateSessionReq{Name: &name}}}
 	case "delete_session":
 		req, ok := params.(terminalapp.WorkspaceSessionReq)
 		if !ok {
@@ -156,7 +156,7 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 	cols, rows, hasAttachSize, sizeErr := terminalAttachSizeFromQuery(r)
 	if sizeErr != nil {
 		s.config.Logger.Warn("terminal attach size invalid", "workspace_id", workspaceId, "session_id", sessionId, "error", sizeErr)
-		_ = writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: sizeErr.Error()})
+		_ = writeTerminalControl(conn, &terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: sizeErr.Error()})
 		return nil
 	}
 
@@ -186,21 +186,23 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 			case websocket.MessageText:
 				message, err := terminalproto.DecodeClient(data)
 				if err != nil {
-					_ = writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: err.Error()})
+					_ = writeTerminalControl(conn, &terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: err.Error()})
 					continue
 				}
 				switch message.Type {
 				case terminalproto.TypeHello:
 					continue
 				case terminalproto.TypeResize:
-					if err := stream.Resize(message.Cols, message.Rows); err != nil {
-						s.config.Logger.Warn("terminal resize failed", "workspace_id", workspaceId, "session_id", sessionId, "cols", message.Cols, "rows", message.Rows, "error", err)
+					cols := int(message.Cols)
+					rows := int(message.Rows)
+					if err := stream.Resize(cols, rows); err != nil {
+						s.config.Logger.Warn("terminal resize failed", "workspace_id", workspaceId, "session_id", sessionId, "cols", cols, "rows", rows, "error", err)
 					}
 				case terminalproto.TypeDetach:
 					stream.Detach("browser_detached")
 					return
 				case terminalproto.TypePing:
-					_ = writeTerminalControl(conn, terminalproto.ServerMessage{Type: terminalproto.TypePong, Nonce: message.Nonce})
+					_ = writeTerminalControl(conn, &terminalproto.ServerMessage{Type: terminalproto.TypePong, Nonce: message.Nonce})
 				}
 			case websocket.MessageBinary:
 				if err := stream.WriteInput(data); err != nil {

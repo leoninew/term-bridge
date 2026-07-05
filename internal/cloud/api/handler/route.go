@@ -110,7 +110,7 @@ func (r *agentRoute) closeTerminals(reason string) {
 	r.terms = map[string]*terminalRelay{}
 	r.mu.Unlock()
 	for _, term := range terms {
-		_ = writeTerminalControl(term.browser, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "device_disconnected", Message: reason})
+		_ = writeTerminalControl(term.browser, &terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "device_disconnected", Message: reason})
 		_ = term.browser.Close(websocket.StatusGoingAway, reason)
 		closeOnce(term.done)
 	}
@@ -129,7 +129,7 @@ func (t *terminalRelay) dispatch(frame *tunnelv1.TunnelFrame) bool {
 		if t.logger != nil {
 			t.logger.Warn("terminal stream error", "session_id", t.sessionId, "stream_id", frame.GetStreamId(), "message", message)
 		}
-		_ = writeTerminalControl(t.browser, terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "terminal_stream_error", Message: message})
+		_ = writeTerminalControl(t.browser, &terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "terminal_stream_error", Message: message})
 		_ = t.browser.Close(websocket.StatusNormalClosure, "terminal closed")
 		closeOnce(t.done)
 		return true
