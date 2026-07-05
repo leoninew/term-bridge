@@ -16,11 +16,11 @@ import (
 
 func backendHandler(cfg Config, logger *slog.Logger, apiHandler http.Handler) http.Handler {
 	mux := http.NewServeMux()
-	cloudAPIHandler := transportmiddleware.CORSForPaths(cfg.Server.CORSAllowedOrigins, apiPath)(apiHandler)
+	cloudAPIHandler := transportmiddleware.CorsForPaths(cfg.Server.CorsAllowedOrigins, apiPath)(apiHandler)
 	mux.Handle("/cloud-api", cloudAPIHandler)
 	mux.Handle("/cloud-api/", cloudAPIHandler)
 	if cfg.Server.StaticDir != "" {
-		mux.Handle("/", staticHandler(cfg.Server.StaticDir, cfg.Server.APIBaseURL))
+		mux.Handle("/", staticHandler(cfg.Server.StaticDir, cfg.Server.ApiBaseUrl))
 	}
 	return requestlog.Middleware(logger, requestlog.Config{RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit})(mux)
 }

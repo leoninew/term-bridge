@@ -17,7 +17,7 @@ import (
 	"termbridge-go/internal/shared/common/utils/idgen"
 )
 
-type DBStore struct {
+type DbStore struct {
 	db       *sql.DB
 	driver   string
 	root     string
@@ -33,23 +33,23 @@ type dbSessionRow struct {
 	runUpdatedAt time.Time
 }
 
-func NewDBStore(db *sql.DB, driver string, root string, deviceId string) DBStore {
-	return DBStore{db: db, driver: strings.ToLower(strings.TrimSpace(driver)), root: root, deviceId: strings.TrimSpace(deviceId)}
+func NewDbStore(db *sql.DB, driver string, root string, deviceId string) DbStore {
+	return DbStore{db: db, driver: strings.ToLower(strings.TrimSpace(driver)), root: root, deviceId: strings.TrimSpace(deviceId)}
 }
 
-func (s DBStore) WorkspaceRoot() string {
+func (s DbStore) WorkspaceRoot() string {
 	return filepath.Join(s.root, "workspaces")
 }
 
-func (s DBStore) WorkspaceDir(workspaceId string) string {
+func (s DbStore) WorkspaceDir(workspaceId string) string {
 	return filepath.Join(s.WorkspaceRoot(), workspaceId)
 }
 
-func (s DBStore) SessionDir(workspaceId string, sessionId string) string {
+func (s DbStore) SessionDir(workspaceId string, sessionId string) string {
 	return filepath.Join(s.WorkspaceDir(workspaceId), "sessions", sessionId)
 }
 
-func (s DBStore) SaveWorkspace(value workspace.Workspace) error {
+func (s DbStore) SaveWorkspace(value workspace.Workspace) error {
 	if err := s.validate(); err != nil {
 		return err
 	}
@@ -107,11 +107,11 @@ func (s DBStore) SaveWorkspace(value workspace.Workspace) error {
 	return tx.Commit()
 }
 
-func (s DBStore) LoadWorkspace(workspaceId string) (workspace.Workspace, error) {
+func (s DbStore) LoadWorkspace(workspaceId string) (workspace.Workspace, error) {
 	return s.FindWorkspaceById(workspaceId)
 }
 
-func (s DBStore) FindWorkspaceByPath(path string) (workspace.Workspace, error) {
+func (s DbStore) FindWorkspaceByPath(path string) (workspace.Workspace, error) {
 	if err := s.validate(); err != nil {
 		return workspace.Workspace{}, err
 	}
@@ -127,7 +127,7 @@ func (s DBStore) FindWorkspaceByPath(path string) (workspace.Workspace, error) {
 	return s.populateWorkspace(ws)
 }
 
-func (s DBStore) FindWorkspaceById(workspaceId string) (workspace.Workspace, error) {
+func (s DbStore) FindWorkspaceById(workspaceId string) (workspace.Workspace, error) {
 	if err := s.validate(); err != nil {
 		return workspace.Workspace{}, err
 	}
@@ -142,7 +142,7 @@ func (s DBStore) FindWorkspaceById(workspaceId string) (workspace.Workspace, err
 	return s.populateWorkspace(ws)
 }
 
-func (s DBStore) SaveSession(value session.Session) error {
+func (s DbStore) SaveSession(value session.Session) error {
 	if err := s.validate(); err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ func (s DBStore) SaveSession(value session.Session) error {
 	return tx.Commit()
 }
 
-func (s DBStore) LoadSession(workspaceId string, sessionId string) (session.Session, error) {
+func (s DbStore) LoadSession(workspaceId string, sessionId string) (session.Session, error) {
 	row, err := s.loadSessionRow(strings.TrimSpace(workspaceId), strings.TrimSpace(sessionId))
 	if err != nil {
 		return session.Session{}, err
@@ -215,21 +215,81 @@ func (s DBStore) LoadSession(workspaceId string, sessionId string) (session.Sess
 	return row.session, nil
 }
 
-func (s DBStore) UpdateSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error) {
-	value, err := s.LoadSession(workspaceId, sessionId)
+func (s DbStore) UpdateSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error) {
+	if err := s.validate(); err != nil {
+		return session.Session{}, err
+	}
+	workspaceId = strings.TrimSpace(workspaceId)
+	sessionId = strings.TrimSpace(sessionId)
+	ctx := context.Background()
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return session.Session{}, err
 	}
+	defer func() { _ = tx.Rollback() }()
+	if exists, err := s.activeWorkspaceExistsTx(ctx, tx, workspaceId); err != nil {
+		return session.Session{}, err
+	} else if !exists {
+		return session.Session{}, os.ErrNotExist
+	}
+	var value session.Session
+	var commandJSON, historyJSON string
+	var createdAt, updatedAt any
+	row := tx.QueryRowContext(ctx, `SELECT id,workspace_id,name,launch_cwd,command_json,history_json,created_at,updated_at FROM sessions WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL`, sessionId, workspaceId, s.deviceId)
+	if err := row.Scan(&value.Id, &value.WorkspaceId, &value.Name, &value.LaunchCwd, &commandJSON, &historyJSON, &createdAt, &updatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return session.Session{}, os.ErrNotExist
+		}
+		return session.Session{}, err
+	}
+	value.SchemaVersion = session.SchemaVersion
+	if err := json.Unmarshal([]byte(commandJSON), &value.Command); err != nil {
+		return session.Session{}, fmt.Errorf("decode session command: %w", err)
+	}
+	if err := json.Unmarshal([]byte(historyJSON), &value.History); err != nil {
+		return session.Session{}, fmt.Errorf("decode session history: %w", err)
+	}
+	value.CreatedAt, err = dbScanTime(createdAt)
+	if err != nil {
+		return session.Session{}, err
+	}
+	originalUpdatedAt, err := dbScanTime(updatedAt)
+	if err != nil {
+		return session.Session{}, err
+	}
+	value.UpdatedAt = originalUpdatedAt
 	if err := update(&value); err != nil {
 		return session.Session{}, err
 	}
-	if err := s.SaveSession(value); err != nil {
+	value.Id = strings.TrimSpace(value.Id)
+	value.WorkspaceId = strings.TrimSpace(value.WorkspaceId)
+	value.Name = strings.TrimSpace(value.Name)
+	value.LaunchCwd = strings.TrimSpace(value.LaunchCwd)
+	if value.Id != sessionId || value.WorkspaceId != workspaceId {
+		return session.Session{}, errors.New("session update cannot change id or workspace id")
+	}
+	if value.Name == "" {
+		return session.Session{}, errors.New("session name is required")
+	}
+	commandJSON, err = marshalJSON(value.Command)
+	if err != nil {
+		return session.Session{}, fmt.Errorf("marshal session command: %w", err)
+	}
+	historyJSON, err = marshalJSON(value.History)
+	if err != nil {
+		return session.Session{}, fmt.Errorf("marshal session history: %w", err)
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE sessions SET name=?, launch_cwd=?, command_json=?, history_json=?, updated_at=? WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL AND updated_at=?`, value.Name, value.LaunchCwd, commandJSON, historyJSON, s.storeTime(value.UpdatedAt), value.Id, value.WorkspaceId, s.deviceId, s.storeTime(originalUpdatedAt))
+	if err != nil {
 		return session.Session{}, err
 	}
-	return value, nil
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return session.Session{}, errors.New("session was updated concurrently")
+	}
+	return value, tx.Commit()
 }
 
-func (s DBStore) DeleteSession(workspaceId string, sessionId string) error {
+func (s DbStore) DeleteSession(workspaceId string, sessionId string) error {
 	if err := s.validate(); err != nil {
 		return err
 	}
@@ -256,7 +316,7 @@ func (s DBStore) DeleteSession(workspaceId string, sessionId string) error {
 	return tx.Commit()
 }
 
-func (s DBStore) DeleteWorkspace(workspaceId string) error {
+func (s DbStore) DeleteWorkspace(workspaceId string) error {
 	if err := s.validate(); err != nil {
 		return err
 	}
@@ -284,7 +344,7 @@ func (s DBStore) DeleteWorkspace(workspaceId string) error {
 	return tx.Commit()
 }
 
-func (s DBStore) SaveState(workspaceId string, sessionId string, value session.StateRecord) error {
+func (s DbStore) SaveState(workspaceId string, sessionId string, value session.StateRecord) error {
 	if !value.State.Valid() {
 		return fmt.Errorf("invalid lifecycle state %q", value.State)
 	}
@@ -304,13 +364,14 @@ func (s DBStore) SaveState(workspaceId string, sessionId string, value session.S
 	if _, err := tx.ExecContext(ctx, `UPDATE session_runs SET state=?, state_reason=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, string(value.State), value.Reason, s.storeTime(value.UpdatedAt), runId); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE sessions SET current_state=?, current_state_reason=?, updated_at=? WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL`, string(value.State), value.Reason, s.storeTime(value.UpdatedAt), strings.TrimSpace(sessionId), strings.TrimSpace(workspaceId), s.deviceId); err != nil {
+	_, err = tx.ExecContext(ctx, `UPDATE sessions SET current_state=?, current_state_reason=?, updated_at=? WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL`, string(value.State), value.Reason, s.storeTime(value.UpdatedAt), strings.TrimSpace(sessionId), strings.TrimSpace(workspaceId), s.deviceId)
+	if err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-func (s DBStore) LoadState(workspaceId string, sessionId string) (session.StateRecord, error) {
+func (s DbStore) LoadState(workspaceId string, sessionId string) (session.StateRecord, error) {
 	row := s.db.QueryRowContext(context.Background(), `SELECT current_state,current_state_reason,updated_at FROM sessions WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL`, strings.TrimSpace(sessionId), strings.TrimSpace(workspaceId), s.deviceId)
 	var stateText, reason string
 	var updatedAt any
@@ -328,11 +389,22 @@ func (s DBStore) LoadState(workspaceId string, sessionId string) (session.StateR
 	return stateRecord, nil
 }
 
-func (s DBStore) SaveProcess(workspaceId string, sessionId string, value process.Record) error {
-	updatedAt := value.StartedAt
+func (s DbStore) SaveProcess(workspaceId string, sessionId string, value process.Record) error {
+	return s.SaveProcessState(workspaceId, sessionId, value, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: value.StartedAt})
+}
+
+func (s DbStore) SaveProcessState(workspaceId string, sessionId string, value process.Record, stateRecord session.StateRecord) error {
+	if !stateRecord.State.Valid() {
+		return fmt.Errorf("invalid lifecycle state %q", stateRecord.State)
+	}
+	updatedAt := stateRecord.UpdatedAt
+	if updatedAt.IsZero() {
+		updatedAt = value.StartedAt
+	}
 	if updatedAt.IsZero() {
 		updatedAt = time.Now().UTC()
 	}
+	stateRecord.UpdatedAt = updatedAt
 	processJSON, err := marshalJSON(value)
 	if err != nil {
 		return fmt.Errorf("marshal process record: %w", err)
@@ -343,22 +415,24 @@ func (s DBStore) SaveProcess(workspaceId string, sessionId string, value process
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	runId, err := s.ensureCurrentRunTx(ctx, tx, workspaceId, sessionId, true, nil, updatedAt)
+	workspaceId = strings.TrimSpace(workspaceId)
+	sessionId = strings.TrimSpace(sessionId)
+	runId, err := s.ensureCurrentRunTx(ctx, tx, workspaceId, sessionId, stateRecord.State == session.StateRunning, nil, updatedAt)
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE session_runs SET process_json=?, state=?, state_reason=?, started_at=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, processJSON, string(session.StateRunning), "process_started", s.storeNullableTime(value.StartedAt), s.storeTime(updatedAt), runId)
+	_, err = tx.ExecContext(ctx, `UPDATE session_runs SET process_json=?, state=?, state_reason=?, started_at=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, processJSON, string(stateRecord.State), stateRecord.Reason, s.storeNullableTime(value.StartedAt), s.storeTime(updatedAt), runId)
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE sessions SET current_state=?, current_state_reason=?, updated_at=? WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL`, string(session.StateRunning), "process_started", s.storeTime(updatedAt), strings.TrimSpace(sessionId), strings.TrimSpace(workspaceId), s.deviceId)
+	_, err = tx.ExecContext(ctx, `UPDATE sessions SET current_state=?, current_state_reason=?, updated_at=? WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL`, string(stateRecord.State), stateRecord.Reason, s.storeTime(updatedAt), sessionId, workspaceId, s.deviceId)
 	if err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-func (s DBStore) LoadProcess(workspaceId string, sessionId string) (process.Record, error) {
+func (s DbStore) LoadProcess(workspaceId string, sessionId string) (process.Record, error) {
 	var payload string
 	err := s.db.QueryRowContext(context.Background(), `SELECT COALESCE(sr.process_json,'{}') FROM sessions sess JOIN session_runs sr ON sr.id=sess.current_run_id WHERE sess.id=? AND sess.workspace_id=? AND sess.device_id=? AND sess.deleted_at IS NULL AND sr.deleted_at IS NULL`, strings.TrimSpace(sessionId), strings.TrimSpace(workspaceId), s.deviceId).Scan(&payload)
 	if err != nil {
@@ -377,14 +451,52 @@ func (s DBStore) LoadProcess(workspaceId string, sessionId string) (process.Reco
 	return record, nil
 }
 
-func (s DBStore) SaveExit(workspaceId string, sessionId string, value process.ExitRecord) error {
-	updatedAt := value.EndedAt
+func (s DbStore) SaveExit(workspaceId string, sessionId string, value process.ExitRecord) error {
+	return s.SaveExitState(workspaceId, sessionId, value, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: value.Reason, UpdatedAt: value.EndedAt})
+}
+
+func (s DbStore) SaveExitState(workspaceId string, sessionId string, value process.ExitRecord, stateRecord session.StateRecord) error {
+	return s.saveSessionExitState(workspaceId, sessionId, nil, value, stateRecord)
+}
+
+func (s DbStore) SaveSessionExitState(value session.Session, exit process.ExitRecord, stateRecord session.StateRecord) error {
+	return s.saveSessionExitState(value.WorkspaceId, value.Id, &value, exit, stateRecord)
+}
+
+func (s DbStore) saveSessionExitState(workspaceId string, sessionId string, sessionValue *session.Session, exit process.ExitRecord, stateRecord session.StateRecord) error {
+	if !stateRecord.State.Valid() {
+		return fmt.Errorf("invalid lifecycle state %q", stateRecord.State)
+	}
+	updatedAt := stateRecord.UpdatedAt
+	if updatedAt.IsZero() {
+		updatedAt = exit.EndedAt
+	}
 	if updatedAt.IsZero() {
 		updatedAt = time.Now().UTC()
 	}
-	exitJSON, err := marshalJSON(value)
+	stateRecord.UpdatedAt = updatedAt
+	exitJSON, err := marshalJSON(exit)
 	if err != nil {
 		return fmt.Errorf("marshal exit record: %w", err)
+	}
+	var commandJSON string
+	var historyJSON string
+	if sessionValue != nil {
+		sessionValue.Id = strings.TrimSpace(sessionValue.Id)
+		sessionValue.WorkspaceId = strings.TrimSpace(sessionValue.WorkspaceId)
+		sessionValue.Name = strings.TrimSpace(sessionValue.Name)
+		sessionValue.LaunchCwd = strings.TrimSpace(sessionValue.LaunchCwd)
+		if sessionValue.Id == "" || sessionValue.WorkspaceId == "" || sessionValue.Name == "" {
+			return errors.New("session id, workspace id and name are required")
+		}
+		commandJSON, err = marshalJSON(sessionValue.Command)
+		if err != nil {
+			return fmt.Errorf("marshal session command: %w", err)
+		}
+		historyJSON, err = marshalJSON(sessionValue.History)
+		if err != nil {
+			return fmt.Errorf("marshal session history: %w", err)
+		}
 	}
 	ctx := context.Background()
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -392,22 +504,33 @@ func (s DBStore) SaveExit(workspaceId string, sessionId string, value process.Ex
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if sessionValue != nil {
+		result, err := tx.ExecContext(ctx, `UPDATE sessions SET name=?, launch_cwd=?, command_json=?, history_json=?, updated_at=? WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL`, sessionValue.Name, sessionValue.LaunchCwd, commandJSON, historyJSON, s.storeTime(updatedAt), sessionValue.Id, sessionValue.WorkspaceId, s.deviceId)
+		if err != nil {
+			return err
+		}
+		if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+			return os.ErrNotExist
+		}
+	}
+	workspaceId = strings.TrimSpace(workspaceId)
+	sessionId = strings.TrimSpace(sessionId)
 	runId, err := s.ensureCurrentRunTx(ctx, tx, workspaceId, sessionId, false, nil, updatedAt)
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE session_runs SET exit_json=?, state=?, state_reason=?, ended_at=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, exitJSON, string(session.StateStopped), value.Reason, s.storeNullableTime(value.EndedAt), s.storeTime(updatedAt), runId)
+	_, err = tx.ExecContext(ctx, `UPDATE session_runs SET exit_json=?, state=?, state_reason=?, ended_at=?, updated_at=? WHERE id=? AND deleted_at IS NULL`, exitJSON, string(stateRecord.State), stateRecord.Reason, s.storeNullableTime(exit.EndedAt), s.storeTime(updatedAt), runId)
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE sessions SET current_state=?, current_state_reason=?, updated_at=? WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL`, string(session.StateStopped), value.Reason, s.storeTime(updatedAt), strings.TrimSpace(sessionId), strings.TrimSpace(workspaceId), s.deviceId)
+	_, err = tx.ExecContext(ctx, `UPDATE sessions SET current_state=?, current_state_reason=?, updated_at=? WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL`, string(stateRecord.State), stateRecord.Reason, s.storeTime(updatedAt), strings.TrimSpace(sessionId), strings.TrimSpace(workspaceId), s.deviceId)
 	if err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-func (s DBStore) LoadExit(workspaceId string, sessionId string) (process.ExitRecord, error) {
+func (s DbStore) LoadExit(workspaceId string, sessionId string) (process.ExitRecord, error) {
 	var payload string
 	err := s.db.QueryRowContext(context.Background(), `SELECT COALESCE(sr.exit_json,'{}') FROM sessions sess JOIN session_runs sr ON sr.id=sess.current_run_id WHERE sess.id=? AND sess.workspace_id=? AND sess.device_id=? AND sess.deleted_at IS NULL AND sr.deleted_at IS NULL`, strings.TrimSpace(sessionId), strings.TrimSpace(workspaceId), s.deviceId).Scan(&payload)
 	if err != nil {
@@ -426,7 +549,7 @@ func (s DBStore) LoadExit(workspaceId string, sessionId string) (process.ExitRec
 	return record, nil
 }
 
-func (s DBStore) BeginSessionRun(workspaceId string, sessionId string, size process.TerminalSize) error {
+func (s DbStore) BeginSessionRun(workspaceId string, sessionId string, size process.TerminalSize) error {
 	ctx := context.Background()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -441,11 +564,11 @@ func (s DBStore) BeginSessionRun(workspaceId string, sessionId string, size proc
 	return tx.Commit()
 }
 
-func (s DBStore) HistoryPath(workspaceId string, sessionId string) string {
+func (s DbStore) HistoryPath(workspaceId string, sessionId string) string {
 	return filepath.Join(s.root, "history", sessionId+".log")
 }
 
-func (s DBStore) ListWorkspaces() ([]workspace.Workspace, []Warning, error) {
+func (s DbStore) ListWorkspaces() ([]workspace.Workspace, []Warning, error) {
 	if err := s.validate(); err != nil {
 		return nil, nil, err
 	}
@@ -478,7 +601,7 @@ func (s DBStore) ListWorkspaces() ([]workspace.Workspace, []Warning, error) {
 	return values, nil, nil
 }
 
-func (s DBStore) ListSessionsByWorkspaceId(workspaceId string) ([]session.View, []Warning, error) {
+func (s DbStore) ListSessionsByWorkspaceId(workspaceId string) ([]session.View, []Warning, error) {
 	if _, err := s.FindWorkspaceById(workspaceId); err != nil {
 		return nil, nil, err
 	}
@@ -486,12 +609,12 @@ func (s DBStore) ListSessionsByWorkspaceId(workspaceId string) ([]session.View, 
 	return views, nil, err
 }
 
-func (s DBStore) ListSessions() ([]session.View, []Warning, error) {
+func (s DbStore) ListSessions() ([]session.View, []Warning, error) {
 	views, err := s.listSessionViews(`WHERE sess.device_id=? AND sess.deleted_at IS NULL`, s.deviceId)
 	return views, nil, err
 }
 
-func (s DBStore) UpdateWorkspaceOrder(workspaceIds []string, now time.Time) ([]workspace.Workspace, error) {
+func (s DbStore) UpdateWorkspaceOrder(workspaceIds []string, now time.Time) ([]workspace.Workspace, error) {
 	workspaces, _, err := s.ListWorkspaces()
 	if err != nil {
 		return nil, err
@@ -518,7 +641,7 @@ func (s DBStore) UpdateWorkspaceOrder(workspaceIds []string, now time.Time) ([]w
 	return updated, err
 }
 
-func (s DBStore) UpdateSessionOrder(workspaceId string, sessionIds []string, now time.Time) ([]session.View, []Warning, error) {
+func (s DbStore) UpdateSessionOrder(workspaceId string, sessionIds []string, now time.Time) ([]session.View, []Warning, error) {
 	views, _, err := s.ListSessionsByWorkspaceId(workspaceId)
 	if err != nil {
 		return nil, nil, err
@@ -548,7 +671,7 @@ func (s DBStore) UpdateSessionOrder(workspaceId string, sessionIds []string, now
 	return updated, warnings, err
 }
 
-func (s DBStore) validate() error {
+func (s DbStore) validate() error {
 	if s.db == nil {
 		return errors.New("database is required")
 	}
@@ -558,7 +681,7 @@ func (s DBStore) validate() error {
 	return nil
 }
 
-func (s DBStore) populateWorkspace(ws workspace.Workspace) (workspace.Workspace, error) {
+func (s DbStore) populateWorkspace(ws workspace.Workspace) (workspace.Workspace, error) {
 	views, err := s.listSessionViews(`WHERE sess.workspace_id=? AND sess.device_id=? AND sess.deleted_at IS NULL`, ws.Id, s.deviceId)
 	if err != nil {
 		return workspace.Workspace{}, err
@@ -576,7 +699,7 @@ func (s DBStore) populateWorkspace(ws workspace.Workspace) (workspace.Workspace,
 	return ws, nil
 }
 
-func (s DBStore) sessionNodeFromView(view session.View) (workspace.SessionNode, error) {
+func (s DbStore) sessionNodeFromView(view session.View) (workspace.SessionNode, error) {
 	state := workspaceStateFromSession(view.State)
 	node := workspace.SessionNode{
 		Id:        view.Session.Id,
@@ -615,7 +738,7 @@ func (s DBStore) sessionNodeFromView(view session.View) (workspace.SessionNode, 
 	return node, nil
 }
 
-func (s DBStore) scanWorkspace(scanner interface{ Scan(dest ...any) error }) (workspace.Workspace, error) {
+func (s DbStore) scanWorkspace(scanner interface{ Scan(dest ...any) error }) (workspace.Workspace, error) {
 	var ws workspace.Workspace
 	var createdAt, updatedAt any
 	if err := scanner.Scan(&ws.Id, &ws.Name, &ws.Path, &createdAt, &updatedAt); err != nil {
@@ -634,7 +757,7 @@ func (s DBStore) scanWorkspace(scanner interface{ Scan(dest ...any) error }) (wo
 	return ws, nil
 }
 
-func (s DBStore) loadSessionRow(workspaceId string, sessionId string) (dbSessionRow, error) {
+func (s DbStore) loadSessionRow(workspaceId string, sessionId string) (dbSessionRow, error) {
 	rows, err := s.listSessionRows(`WHERE sess.id=? AND sess.workspace_id=? AND sess.device_id=? AND sess.deleted_at IS NULL`, strings.TrimSpace(sessionId), strings.TrimSpace(workspaceId), s.deviceId)
 	if err != nil {
 		return dbSessionRow{}, err
@@ -645,7 +768,7 @@ func (s DBStore) loadSessionRow(workspaceId string, sessionId string) (dbSession
 	return rows[0], nil
 }
 
-func (s DBStore) listSessionViews(where string, args ...any) ([]session.View, error) {
+func (s DbStore) listSessionViews(where string, args ...any) ([]session.View, error) {
 	rows, err := s.listSessionRows(where, args...)
 	if err != nil {
 		return nil, err
@@ -669,7 +792,7 @@ func (s DBStore) listSessionViews(where string, args ...any) ([]session.View, er
 	return views, nil
 }
 
-func (s DBStore) listSessionRows(where string, args ...any) ([]dbSessionRow, error) {
+func (s DbStore) listSessionRows(where string, args ...any) ([]dbSessionRow, error) {
 	query := `SELECT sess.id,sess.workspace_id,sess.name,sess.launch_cwd,sess.command_json,sess.history_json,sess.current_state,sess.current_state_reason,sess.current_run_id,sess.created_at,sess.updated_at,COALESCE(sr.process_json,'{}'),COALESCE(sr.exit_json,'{}'),COALESCE(sr.updated_at,sess.updated_at) FROM sessions sess LEFT JOIN session_runs sr ON sr.id=sess.current_run_id AND sr.deleted_at IS NULL ` + where + ` ORDER BY sess.sort_order ASC, sess.created_at ASC, sess.name ASC, sess.id ASC`
 	rows, err := s.db.QueryContext(context.Background(), query, args...)
 	if err != nil {
@@ -714,7 +837,7 @@ func (s DBStore) listSessionRows(where string, args ...any) ([]dbSessionRow, err
 	return out, rows.Err()
 }
 
-func (s DBStore) activeWorkspaceExistsTx(ctx context.Context, tx *sql.Tx, workspaceId string) (bool, error) {
+func (s DbStore) activeWorkspaceExistsTx(ctx context.Context, tx *sql.Tx, workspaceId string) (bool, error) {
 	var existing string
 	err := tx.QueryRowContext(ctx, `SELECT id FROM workspaces WHERE id=? AND device_id=? AND deleted_at IS NULL`, strings.TrimSpace(workspaceId), s.deviceId).Scan(&existing)
 	if err == nil {
@@ -726,7 +849,7 @@ func (s DBStore) activeWorkspaceExistsTx(ctx context.Context, tx *sql.Tx, worksp
 	return false, err
 }
 
-func (s DBStore) activeSessionExistsTx(ctx context.Context, tx *sql.Tx, workspaceId string, sessionId string) (bool, error) {
+func (s DbStore) activeSessionExistsTx(ctx context.Context, tx *sql.Tx, workspaceId string, sessionId string) (bool, error) {
 	var existing string
 	err := tx.QueryRowContext(ctx, `SELECT id FROM sessions WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL`, strings.TrimSpace(sessionId), strings.TrimSpace(workspaceId), s.deviceId).Scan(&existing)
 	if err == nil {
@@ -738,7 +861,7 @@ func (s DBStore) activeSessionExistsTx(ctx context.Context, tx *sql.Tx, workspac
 	return false, err
 }
 
-func (s DBStore) ensureCurrentRunTx(ctx context.Context, tx *sql.Tx, workspaceId string, sessionId string, appendIfTerminal bool, size *process.TerminalSize, now time.Time) (string, error) {
+func (s DbStore) ensureCurrentRunTx(ctx context.Context, tx *sql.Tx, workspaceId string, sessionId string, appendIfTerminal bool, size *process.TerminalSize, now time.Time) (string, error) {
 	workspaceId = strings.TrimSpace(workspaceId)
 	sessionId = strings.TrimSpace(sessionId)
 	var currentRunId, stateText, commandJSON string
@@ -776,7 +899,7 @@ func (s DBStore) ensureCurrentRunTx(ctx context.Context, tx *sql.Tx, workspaceId
 	return runId, nil
 }
 
-func (s DBStore) nextWorkspaceOrderTx(ctx context.Context, tx *sql.Tx) (int, error) {
+func (s DbStore) nextWorkspaceOrderTx(ctx context.Context, tx *sql.Tx) (int, error) {
 	var order sql.NullInt64
 	if err := tx.QueryRowContext(ctx, `SELECT MAX(sort_order)+1 FROM workspaces WHERE device_id=?`, s.deviceId).Scan(&order); err != nil {
 		return 0, err
@@ -787,7 +910,7 @@ func (s DBStore) nextWorkspaceOrderTx(ctx context.Context, tx *sql.Tx) (int, err
 	return int(order.Int64), nil
 }
 
-func (s DBStore) nextSessionOrderTx(ctx context.Context, tx *sql.Tx, workspaceId string) (int, error) {
+func (s DbStore) nextSessionOrderTx(ctx context.Context, tx *sql.Tx, workspaceId string) (int, error) {
 	var order sql.NullInt64
 	if err := tx.QueryRowContext(ctx, `SELECT MAX(sort_order)+1 FROM sessions WHERE workspace_id=? AND device_id=?`, workspaceId, s.deviceId).Scan(&order); err != nil {
 		return 0, err
@@ -798,7 +921,7 @@ func (s DBStore) nextSessionOrderTx(ctx context.Context, tx *sql.Tx, workspaceId
 	return int(order.Int64), nil
 }
 
-func (s DBStore) nextRunSequenceTx(ctx context.Context, tx *sql.Tx, sessionId string) (int, error) {
+func (s DbStore) nextRunSequenceTx(ctx context.Context, tx *sql.Tx, sessionId string) (int, error) {
 	var sequence sql.NullInt64
 	if err := tx.QueryRowContext(ctx, `SELECT MAX(sequence)+1 FROM session_runs WHERE session_id=? AND device_id=?`, sessionId, s.deviceId).Scan(&sequence); err != nil {
 		return 0, err
@@ -809,7 +932,7 @@ func (s DBStore) nextRunSequenceTx(ctx context.Context, tx *sql.Tx, sessionId st
 	return int(sequence.Int64), nil
 }
 
-func (s DBStore) storeTime(value time.Time) any {
+func (s DbStore) storeTime(value time.Time) any {
 	value = value.UTC()
 	if s.driver == "sqlite" {
 		return value.Format(time.RFC3339Nano)
@@ -817,7 +940,7 @@ func (s DBStore) storeTime(value time.Time) any {
 	return value
 }
 
-func (s DBStore) storeNullableTime(value time.Time) any {
+func (s DbStore) storeNullableTime(value time.Time) any {
 	if value.IsZero() {
 		return nil
 	}

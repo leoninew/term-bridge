@@ -185,6 +185,22 @@ func (s Store) SaveProcess(workspaceId string, sessionId string, value process.R
 	})
 }
 
+func (s Store) SaveProcessState(workspaceId string, sessionId string, value process.Record, stateRecord session.StateRecord) error {
+	return s.updateSessionNode(workspaceId, sessionId, func(node *workspace.SessionNode) error {
+		record := workspaceProcessFromProcess(value)
+		node.CurrentRun.Process = &record
+		node.State = workspaceStateFromSession(stateRecord)
+		if !stateRecord.UpdatedAt.IsZero() {
+			node.UpdatedAt = stateRecord.UpdatedAt
+		} else if !value.StartedAt.IsZero() {
+			node.UpdatedAt = value.StartedAt
+		} else {
+			node.UpdatedAt = time.Now().UTC()
+		}
+		return nil
+	})
+}
+
 func (s Store) LoadProcess(workspaceId string, sessionId string) (process.Record, error) {
 	node, err := s.loadSessionNode(workspaceId, sessionId)
 	if err != nil {
@@ -202,6 +218,42 @@ func (s Store) SaveExit(workspaceId string, sessionId string, value process.Exit
 		node.CurrentRun.Exit = &record
 		if !value.EndedAt.IsZero() {
 			node.UpdatedAt = value.EndedAt
+		} else {
+			node.UpdatedAt = time.Now().UTC()
+		}
+		return nil
+	})
+}
+
+func (s Store) SaveExitState(workspaceId string, sessionId string, value process.ExitRecord, stateRecord session.StateRecord) error {
+	return s.updateSessionNode(workspaceId, sessionId, func(node *workspace.SessionNode) error {
+		record := workspaceExitFromProcess(value)
+		node.CurrentRun.Exit = &record
+		node.State = workspaceStateFromSession(stateRecord)
+		if !stateRecord.UpdatedAt.IsZero() {
+			node.UpdatedAt = stateRecord.UpdatedAt
+		} else if !value.EndedAt.IsZero() {
+			node.UpdatedAt = value.EndedAt
+		} else {
+			node.UpdatedAt = time.Now().UTC()
+		}
+		return nil
+	})
+}
+
+func (s Store) SaveSessionExitState(value session.Session, exit process.ExitRecord, stateRecord session.StateRecord) error {
+	return s.updateSessionNode(value.WorkspaceId, value.Id, func(node *workspace.SessionNode) error {
+		record := workspaceExitFromProcess(exit)
+		node.Name = value.Name
+		node.LaunchCwd = value.LaunchCwd
+		node.Command = workspace.CommandRecord{Executable: value.Command.Executable, Command: value.Command.Command, Args: append([]string(nil), value.Command.Args...), EnvStrategy: value.Command.EnvStrategy, EnvCount: value.Command.EnvCount}
+		node.History = workspace.HistoryRecord{Path: value.History.Path, MaxLines: value.History.MaxLines, MaxBytes: value.History.MaxBytes, MaxLineBytes: value.History.MaxLineBytes, Truncated: value.History.Truncated}
+		node.CurrentRun.Exit = &record
+		node.State = workspaceStateFromSession(stateRecord)
+		if !stateRecord.UpdatedAt.IsZero() {
+			node.UpdatedAt = stateRecord.UpdatedAt
+		} else if !exit.EndedAt.IsZero() {
+			node.UpdatedAt = exit.EndedAt
 		} else {
 			node.UpdatedAt = time.Now().UTC()
 		}

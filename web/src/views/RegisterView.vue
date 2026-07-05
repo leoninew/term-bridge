@@ -49,7 +49,7 @@
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRouter, RouterLink } from 'vue-router'
-  import { authGoogleURL, authRegister } from '../features/cloud/api'
+  import { authGoogleUrl, authRegister } from '../features/cloud/api'
   const { t } = useI18n()
   const router = useRouter()
   const email = ref('')
@@ -72,7 +72,7 @@
     }
     googleSubmitting.value = true
     try {
-      window.location.href = await authGoogleURL()
+      window.location.href = await authGoogleUrl()
     } finally {
       googleSubmitting.value = false
     }

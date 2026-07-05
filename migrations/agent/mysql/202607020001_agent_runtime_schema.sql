@@ -1,12 +1,4 @@
 -- +goose Up
-CREATE TABLE IF NOT EXISTS devices (
-  id VARCHAR(128) PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  public_key TEXT NOT NULL,
-  created_at DATETIME(6) NOT NULL,
-  updated_at DATETIME(6) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS workspaces (
   id VARCHAR(32) PRIMARY KEY,
   device_id VARCHAR(128) NOT NULL,
@@ -17,7 +9,6 @@ CREATE TABLE IF NOT EXISTS workspaces (
   created_at DATETIME(6) NOT NULL,
   updated_at DATETIME(6) NOT NULL,
   deleted_at DATETIME(6) NULL,
-  CONSTRAINT fk_workspaces_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
   INDEX idx_workspaces_device_deleted (device_id, deleted_at),
   INDEX idx_workspaces_device_path (device_id, path),
   INDEX idx_workspaces_device_order (device_id, sort_order),
@@ -40,7 +31,6 @@ CREATE TABLE IF NOT EXISTS sessions (
   updated_at DATETIME(6) NOT NULL,
   deleted_at DATETIME(6) NULL,
   CONSTRAINT fk_sessions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_sessions_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
   INDEX idx_sessions_workspace_deleted (workspace_id, deleted_at),
   INDEX idx_sessions_workspace_order (workspace_id, sort_order),
   INDEX idx_sessions_device_deleted (device_id, deleted_at),
@@ -66,7 +56,6 @@ CREATE TABLE IF NOT EXISTS session_runs (
   deleted_at DATETIME(6) NULL,
   CONSTRAINT fk_session_runs_session FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
   CONSTRAINT fk_session_runs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_session_runs_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
   INDEX idx_session_runs_session_sequence (session_id, sequence),
   INDEX idx_session_runs_session_deleted (session_id, deleted_at),
   INDEX idx_session_runs_workspace_deleted (workspace_id, deleted_at),
@@ -78,4 +67,3 @@ CREATE TABLE IF NOT EXISTS session_runs (
 DROP TABLE IF EXISTS session_runs;
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS workspaces;
-DROP TABLE IF EXISTS devices;

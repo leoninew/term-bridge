@@ -43,16 +43,9 @@ describe('gateway store', () => {
     setActivePinia(createPinia())
   })
 
-  it('logs into agent locally before loading agent capabilities', async () => {
+  it('logs into agent locally before loading agent auth state', async () => {
     mocks.authMe.mockResolvedValueOnce({
       authenticated: false,
-      capabilities: {
-        providers: [],
-        password_reset_enabled: false,
-        email_verification_enabled: false,
-        account_auth_enabled: false,
-        cloud_oauth_enabled: false,
-      },
     })
     const store = useGatewayStore()
 
@@ -70,13 +63,6 @@ describe('gateway store', () => {
   it('keeps agent cloud session separate from browser authentication', async () => {
     mocks.authMe.mockResolvedValueOnce({
       authenticated: false,
-      capabilities: {
-        providers: [],
-        password_reset_enabled: false,
-        email_verification_enabled: false,
-        account_auth_enabled: false,
-        cloud_oauth_enabled: true,
-      },
       cloud_session: {
         gate_url: 'https://cloud.example.test',
         device_id: 'dev-1',
@@ -110,13 +96,6 @@ describe('gateway store', () => {
         display_name: 'User',
         provider: 'email',
         email_verified: true,
-      },
-      capabilities: {
-        providers: ['email'],
-        password_reset_enabled: true,
-        email_verification_enabled: true,
-        account_auth_enabled: true,
-        cloud_oauth_enabled: false,
       },
     })
     const store = useGatewayStore()

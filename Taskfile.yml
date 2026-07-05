@@ -118,3 +118,6 @@ tasks:
     desc: Remove build outputs
     cmds:
       - rm -rf web/dist bin
+      - rm -rf data/agent.db*
+      - rm -rf data/cloud.db*
+      - rm -rf data/history

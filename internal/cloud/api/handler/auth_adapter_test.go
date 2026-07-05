@@ -18,12 +18,8 @@ func (s testAuthService) Login(ctx context.Context, email, password string) (Aut
 	return AuthResult{}, ErrInvalidCredentials
 }
 
-func (s testAuthService) Capabilities() Capabilities {
-	return Capabilities{Providers: []string{"email"}, AccountAuthEnabled: true}
-}
-
 func (s testAuthService) UserFromClaims(ctx context.Context, claims sharedauth.Claims) (UserView, error) {
-	return UserView{ID: claims.Sub, Email: claims.Email, DisplayName: claims.Email, Provider: claims.Provider, EmailVerified: true}, nil
+	return UserView{Id: claims.Sub, Email: claims.Email, DisplayName: claims.Email, Provider: claims.Provider, EmailVerified: true}, nil
 }
 
 func (s testAuthService) Register(ctx context.Context, email, password string) error {
@@ -60,8 +56,8 @@ func (s testAuthService) GoogleCallback(ctx context.Context, code, state string)
 
 func (s testAuthService) IssueUserToken(ctx context.Context, userID string) (AuthResult, error) {
 	email := userID + "@example.test"
-	user := UserView{ID: userID, Email: email, DisplayName: email, Provider: "email", EmailVerified: true}
-	token, err := s.tokens.Sign(sharedauth.Claims{Sub: user.ID, Email: user.Email, Provider: user.Provider})
+	user := UserView{Id: userID, Email: email, DisplayName: email, Provider: "email", EmailVerified: true}
+	token, err := s.tokens.Sign(sharedauth.Claims{Sub: user.Id, Email: user.Email, Provider: user.Provider})
 	if err != nil {
 		return AuthResult{}, err
 	}

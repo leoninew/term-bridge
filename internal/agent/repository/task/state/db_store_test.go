@@ -141,6 +141,72 @@ func TestDBStoreAppendsRunForRerun(t *testing.T) {
 	}
 }
 
+func TestDBStoreSavesProcessAndRunningStateTogether(t *testing.T) {
+	store, _ := newTestDBStore(t)
+	now := time.Date(2026, 7, 5, 10, 0, 0, 0, time.UTC)
+	ws := workspace.Workspace{SchemaVersion: workspace.SchemaVersion, Id: "workspace-1", Name: "project", Path: t.TempDir(), CreatedAt: now, UpdatedAt: now}
+	if err := store.SaveWorkspace(ws); err != nil {
+		t.Fatalf("SaveWorkspace() error = %v", err)
+	}
+	sess := session.Session{SchemaVersion: session.SchemaVersion, Id: "session-1", WorkspaceId: ws.Id, Name: "shell", LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "bash"}, History: session.HistoryRecord{Path: "history.log"}, CreatedAt: now, UpdatedAt: now}
+	if err := store.SaveSession(sess); err != nil {
+		t.Fatalf("SaveSession() error = %v", err)
+	}
+
+	stateRecord := session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: now.Add(time.Second)}
+	if err := store.SaveProcessState(ws.Id, sess.Id, process.Record{SchemaVersion: 1, Pid: 789, StartedAt: now.Add(time.Second)}, stateRecord); err != nil {
+		t.Fatalf("SaveProcessState() error = %v", err)
+	}
+
+	gotState, err := store.LoadState(ws.Id, sess.Id)
+	if err != nil {
+		t.Fatalf("LoadState() error = %v", err)
+	}
+	if gotState.State != session.StateRunning || gotState.Reason != "process_started" {
+		t.Fatalf("state = %#v, want running process_started", gotState)
+	}
+	processRecord, err := store.LoadProcess(ws.Id, sess.Id)
+	if err != nil {
+		t.Fatalf("LoadProcess() error = %v", err)
+	}
+	if processRecord.Pid != 789 {
+		t.Fatalf("process pid = %d, want 789", processRecord.Pid)
+	}
+}
+
+func TestDBStoreSavesExitAndFinalStateTogether(t *testing.T) {
+	store, _ := newTestDBStore(t)
+	now := time.Date(2026, 7, 5, 11, 0, 0, 0, time.UTC)
+	ws := workspace.Workspace{SchemaVersion: workspace.SchemaVersion, Id: "workspace-1", Name: "project", Path: t.TempDir(), CreatedAt: now, UpdatedAt: now}
+	if err := store.SaveWorkspace(ws); err != nil {
+		t.Fatalf("SaveWorkspace() error = %v", err)
+	}
+	sess := session.Session{SchemaVersion: session.SchemaVersion, Id: "session-1", WorkspaceId: ws.Id, Name: "shell", LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "bash"}, History: session.HistoryRecord{Path: "history.log"}, CreatedAt: now, UpdatedAt: now}
+	if err := store.SaveSession(sess); err != nil {
+		t.Fatalf("SaveSession() error = %v", err)
+	}
+
+	stateRecord := session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "user_process_exited", UpdatedAt: now.Add(time.Second)}
+	if err := store.SaveExitState(ws.Id, sess.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: 1, Reason: "user_process_exited", StartedAt: now, EndedAt: now.Add(time.Second)}, stateRecord); err != nil {
+		t.Fatalf("SaveExitState() error = %v", err)
+	}
+
+	gotState, err := store.LoadState(ws.Id, sess.Id)
+	if err != nil {
+		t.Fatalf("LoadState() error = %v", err)
+	}
+	if gotState.State != session.StateFailed || gotState.Reason != "user_process_exited" {
+		t.Fatalf("state = %#v, want failed user_process_exited", gotState)
+	}
+	exitRecord, err := store.LoadExit(ws.Id, sess.Id)
+	if err != nil {
+		t.Fatalf("LoadExit() error = %v", err)
+	}
+	if exitRecord.ExitCode != 1 {
+		t.Fatalf("exit code = %d, want 1", exitRecord.ExitCode)
+	}
+}
+
 func TestDBStoreOrdersWorkspacesAndSessions(t *testing.T) {
 	store, _ := newTestDBStore(t)
 	now := time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
@@ -184,7 +250,7 @@ func TestDBStoreHistoryPathRemainsFileBackedTerminalOutput(t *testing.T) {
 	}
 }
 
-func newTestDBStore(t *testing.T) (DBStore, *sql.DB) {
+func newTestDBStore(t *testing.T) (DbStore, *sql.DB) {
 	t.Helper()
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
@@ -194,23 +260,21 @@ func newTestDBStore(t *testing.T) (DBStore, *sql.DB) {
 	t.Cleanup(func() { _ = db.Close() })
 	statements := []string{
 		`PRAGMA foreign_keys = ON`,
-		`CREATE TABLE devices (id TEXT PRIMARY KEY, name TEXT NOT NULL, public_key TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
-		`CREATE TABLE workspaces (id TEXT PRIMARY KEY, device_id TEXT NOT NULL, name TEXT NOT NULL, path TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT NULL, FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE)`,
+		`CREATE TABLE workspaces (id TEXT PRIMARY KEY, device_id TEXT NOT NULL, name TEXT NOT NULL, path TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT NULL)`,
 		`CREATE INDEX idx_workspaces_device_deleted ON workspaces(device_id, deleted_at)`,
 		`CREATE INDEX idx_workspaces_device_path ON workspaces(device_id, path)`,
 		`CREATE INDEX idx_workspaces_device_order ON workspaces(device_id, sort_order)`,
-		`CREATE TABLE sessions (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, device_id TEXT NOT NULL, name TEXT NOT NULL, launch_cwd TEXT NOT NULL, command_json TEXT NOT NULL, history_json TEXT NOT NULL, current_state TEXT NOT NULL, current_state_reason TEXT NOT NULL DEFAULT '', current_run_id TEXT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE, FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE)`,
+		`CREATE TABLE sessions (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, device_id TEXT NOT NULL, name TEXT NOT NULL, launch_cwd TEXT NOT NULL, command_json TEXT NOT NULL, history_json TEXT NOT NULL, current_state TEXT NOT NULL, current_state_reason TEXT NOT NULL DEFAULT '', current_run_id TEXT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`,
 		`CREATE INDEX idx_sessions_workspace_deleted ON sessions(workspace_id, deleted_at)`,
 		`CREATE INDEX idx_sessions_workspace_order ON sessions(workspace_id, sort_order)`,
 		`CREATE INDEX idx_sessions_device_deleted ON sessions(device_id, deleted_at)`,
-		`CREATE TABLE session_runs (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, workspace_id TEXT NOT NULL, device_id TEXT NOT NULL, sequence INTEGER NOT NULL, command_json TEXT NOT NULL, terminal_size_json TEXT NOT NULL DEFAULT '{}', process_json TEXT NOT NULL DEFAULT '{}', exit_json TEXT NOT NULL DEFAULT '{}', state TEXT NOT NULL, state_reason TEXT NOT NULL DEFAULT '', started_at TEXT NULL, ended_at TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT NULL, FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE, FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE)`,
+		`CREATE TABLE session_runs (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, workspace_id TEXT NOT NULL, device_id TEXT NOT NULL, sequence INTEGER NOT NULL, command_json TEXT NOT NULL, terminal_size_json TEXT NOT NULL DEFAULT '{}', process_json TEXT NOT NULL DEFAULT '{}', exit_json TEXT NOT NULL DEFAULT '{}', state TEXT NOT NULL, state_reason TEXT NOT NULL DEFAULT '', started_at TEXT NULL, ended_at TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT NULL, FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`,
 		`CREATE INDEX idx_session_runs_session_sequence ON session_runs(session_id, sequence)`,
-		`INSERT INTO devices (id,name,public_key,created_at,updated_at) VALUES ('device-1','local','key','2026-06-29T00:00:00Z','2026-06-29T00:00:00Z')`,
 	}
 	for _, statement := range statements {
 		if _, err := db.ExecContext(context.Background(), statement); err != nil {
 			t.Fatalf("exec schema statement error = %v\n%s", err, statement)
 		}
 	}
-	return NewDBStore(db, "sqlite", filepath.Join(t.TempDir(), ".termbridge", "devices", "device-1"), "device-1"), db
+	return NewDbStore(db, "sqlite", filepath.Join(t.TempDir(), ".termbridge", "devices", "device-1"), "device-1"), db
 }

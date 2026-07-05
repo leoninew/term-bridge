@@ -180,7 +180,7 @@ TERMBRIDGE_RESEND__FROM_EMAIL=
 
 运行角色由 CLI 子命令选择：`termbridge agent` 启动本地 agent 后端与本机控制台能力，`termbridge cloud` 启动云端门户后端。配置文件不再通过 `server.mode` 选择角色。
 
-设备身份由 `termbridge agent` 在 `<runtime.state_dir>/agent.json` 中生成并读取；业务运行中变化的配置不会写回 `configs/config.yaml`。
+设备身份由 `termbridge agent` 在 `<runtime.state_dir>/device.json` 中生成并读取；Cloud 绑定摘要只记录非 token 的 gate URL、device id、device name 和连接时间，业务运行中变化的配置不会写回 `configs/config.yaml`。
 
 ## 当前边界
 

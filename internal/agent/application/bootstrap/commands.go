@@ -20,7 +20,6 @@ import (
 	"termbridge-go/internal/agent/infrastructure/storage/history"
 	"termbridge-go/internal/agent/model/task/process"
 	"termbridge-go/internal/agent/model/task/session"
-	agentdevice "termbridge-go/internal/agent/repository/device"
 	"termbridge-go/internal/agent/repository/task/state"
 	apperrors "termbridge-go/internal/shared/common/errors"
 	basedb "termbridge-go/internal/shared/infrastructure/database"
@@ -48,7 +47,7 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 	if err != nil {
 		return CommandResult{Command: append([]string(nil), cfg.Command...)}, err
 	}
-	db, err := basedb.Open(ctx, cfg.Database.Driver, cfg.Database.SQLite.Path, cfg.Database.MySQL.DSN)
+	db, err := basedb.Open(ctx, cfg.Database.Driver, cfg.Database.SQLite.Path, cfg.Database.MySQL.Dsn)
 	if err != nil {
 		return CommandResult{Command: append([]string(nil), cfg.Command...)}, err
 	}
@@ -56,11 +55,7 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 	if err := agentdb.Migrate(ctx, db.DB, db.Driver); err != nil {
 		return CommandResult{Command: append([]string(nil), cfg.Command...)}, err
 	}
-	deviceRepository := agentdevice.NewRepository(db.DB, db.Driver)
-	if _, err := deviceRepository.UpsertLocalDevice(ctx, agentdevice.Device{ID: device.Id, Name: device.Name, PublicKey: device.PublicKey}); err != nil {
-		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("upsert local device", err)
-	}
-	store := state.NewDBStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id)
+	store := state.NewDbStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id)
 	resolver := workspaceapp.Resolver{Store: store}
 	ws, err := resolver.Resolve(cfg.Cwd)
 	if err != nil {
@@ -101,14 +96,13 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 	var hookErr error
 	hooks := runner.Hooks{
 		OnStarted: func(record process.Record) {
-			if err := store.SaveProcess(sess.WorkspaceId, sess.Id, record); err != nil {
-				hookErr = err
-				logger.Error("save process record", "error", err)
-				return
+			updatedAt := record.StartedAt
+			if updatedAt.IsZero() {
+				updatedAt = time.Now().UTC()
 			}
-			if err := store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: time.Now().UTC()}); err != nil {
+			if err := store.SaveProcessState(sess.WorkspaceId, sess.Id, record, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: updatedAt}); err != nil {
 				hookErr = err
-				logger.Error("save running state", "error", err)
+				logger.Error("save process state", "error", err)
 			}
 		},
 	}
@@ -134,12 +128,11 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 	if err := historyWriter.Close(); err != nil {
 		logger.Warn("close history writer", "error", err)
 	}
-	if historyWriter.Truncated() {
-		sess.History.Truncated = true
-		sess.UpdatedAt = endedAt
-		if err := store.SaveSession(sess); err != nil {
-			logger.Warn("save truncated history metadata", "error", err)
-		}
+	sessionUpdate := sess
+	truncatedHistory := historyWriter.Truncated()
+	if truncatedHistory {
+		sessionUpdate.History.Truncated = true
+		sessionUpdate.UpdatedAt = endedAt
 	}
 	startedAt := runtimeResult.Process.StartedAt
 	if startedAt.IsZero() {
@@ -149,16 +142,20 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 	if runtimeResult.Exit.WaitErr != nil {
 		waitErr = runtimeResult.Exit.WaitErr.Error()
 	}
-	if err := store.SaveExit(sess.WorkspaceId, sess.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: runtimeResult.ExitCode, Reason: "user_process_exited", Forced: runtimeResult.Exit.Forced, Closed: runtimeResult.Exit.Closed, StartedAt: startedAt, EndedAt: endedAt, WaitError: waitErr}); err != nil {
-		_ = store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_exit_failed", UpdatedAt: endedAt})
-		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("save exit record", err)
-	}
 	finalState := session.StateStopped
 	if runtimeResult.Exit.WaitErr != nil && !runtimeResult.Exit.Stopped && !runtimeResult.Exit.Closed && runtimeResult.Exit.Code == 0 {
 		finalState = session.StateFailed
 	}
-	if err := store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: finalState, Reason: "user_process_exited", UpdatedAt: endedAt}); err != nil {
-		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("save final state", err)
+	exitRecord := process.ExitRecord{SchemaVersion: 1, ExitCode: runtimeResult.ExitCode, Reason: "user_process_exited", Forced: runtimeResult.Exit.Forced, Closed: runtimeResult.Exit.Closed, StartedAt: startedAt, EndedAt: endedAt, WaitError: waitErr}
+	stateRecord := session.StateRecord{SchemaVersion: session.SchemaVersion, State: finalState, Reason: "user_process_exited", UpdatedAt: endedAt}
+	if truncatedHistory {
+		if err := store.SaveSessionExitState(sessionUpdate, exitRecord, stateRecord); err != nil {
+			_ = store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_exit_failed", UpdatedAt: endedAt})
+			return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("save session exit state", err)
+		}
+	} else if err := store.SaveExitState(sess.WorkspaceId, sess.Id, exitRecord, stateRecord); err != nil {
+		_ = store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_exit_failed", UpdatedAt: endedAt})
+		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("save exit state", err)
 	}
 
 	return CommandResult{Command: append([]string(nil), cfg.Command...), ExitCode: runtimeResult.ExitCode}, nil
@@ -189,7 +186,7 @@ func RunWorkspaceList(ctx context.Context, cfg Config, stdout io.Writer) error {
 	}
 	sort.Slice(workspaces, func(i, j int) bool { return workspaces[i].UpdatedAt.After(workspaces[j].UpdatedAt) })
 	w := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(w, "WORKSPACE ID\tNAME\tPATH\tSESSIONS\tUPDATED"); err != nil {
+	if _, err := fmt.Fprintln(w, "WORKSPACE Id\tNAME\tPATH\tSESSIONS\tUPDATED"); err != nil {
 		return err
 	}
 	for _, ws := range workspaces {
@@ -229,7 +226,7 @@ func RunSessionList(ctx context.Context, cfg Config, stdout io.Writer) error {
 	}
 	sort.Slice(views, func(i, j int) bool { return views[i].Session.UpdatedAt.After(views[j].Session.UpdatedAt) })
 	w := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(w, "SESSION ID\tWORKSPACE ID\tSTATE\tEXIT\tCOMMAND\tCWD\tUPDATED"); err != nil {
+	if _, err := fmt.Fprintln(w, "SESSION Id\tWORKSPACE Id\tSTATE\tEXIT\tCOMMAND\tCWD\tUPDATED"); err != nil {
 		return err
 	}
 	for _, view := range views {
@@ -244,26 +241,21 @@ func RunSessionList(ctx context.Context, cfg Config, stdout io.Writer) error {
 	return w.Flush()
 }
 
-func runtimeStateStore(ctx context.Context, cfg Config) (state.DBStore, func(), error) {
+func runtimeStateStore(ctx context.Context, cfg Config) (state.DbStore, func(), error) {
 	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: cfg.Runtime.StateDir})
 	if err != nil {
-		return state.DBStore{}, func() {}, err
+		return state.DbStore{}, func() {}, err
 	}
-	db, err := basedb.Open(ctx, cfg.Database.Driver, cfg.Database.SQLite.Path, cfg.Database.MySQL.DSN)
+	db, err := basedb.Open(ctx, cfg.Database.Driver, cfg.Database.SQLite.Path, cfg.Database.MySQL.Dsn)
 	if err != nil {
-		return state.DBStore{}, func() {}, err
+		return state.DbStore{}, func() {}, err
 	}
 	cleanup := func() { _ = db.Close() }
 	if err := agentdb.Migrate(ctx, db.DB, db.Driver); err != nil {
 		cleanup()
-		return state.DBStore{}, func() {}, err
+		return state.DbStore{}, func() {}, err
 	}
-	deviceRepository := agentdevice.NewRepository(db.DB, db.Driver)
-	if _, err := deviceRepository.UpsertLocalDevice(ctx, agentdevice.Device{ID: device.Id, Name: device.Name, PublicKey: device.PublicKey}); err != nil {
-		cleanup()
-		return state.DBStore{}, func() {}, apperrors.Runtime("upsert local device", err)
-	}
-	return state.NewDBStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id), cleanup, nil
+	return state.NewDbStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id), cleanup, nil
 }
 
 func processEnv() []string {

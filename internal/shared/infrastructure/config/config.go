@@ -43,7 +43,7 @@ type Config struct {
 	Agent             AgentConfig
 	Cloud             CloudConfig
 	Auth              AuthConfig
-	JWT               JWTConfig
+	Jwt               JwtConfig
 	Resend            ResendConfig
 	DefaultConfigFile string
 	EnvConfigFile     string
@@ -51,7 +51,7 @@ type Config struct {
 	Base              *Config
 }
 
-type JWTConfig struct {
+type JwtConfig struct {
 	SecretKey string `json:"secret_key"`
 }
 
@@ -66,14 +66,14 @@ type SQLiteConfig struct {
 }
 
 type MySQLConfig struct {
-	DSN string
+	Dsn string
 }
 
 type AuthConfig struct {
 	Username       string
 	Password       string
 	LocalAdmin     LocalAdminConfig
-	JWTTTL         time.Duration
+	JwtTTL         time.Duration
 	PasswordPolicy PasswordPolicy
 	Code           CodePolicy
 	Google         GoogleConfig
@@ -91,7 +91,7 @@ type PasswordPolicy struct {
 
 type CodePolicy struct {
 	Length         int
-	TTL            time.Duration
+	Ttl            time.Duration
 	ResendCooldown time.Duration
 	MaxAttempts    int
 }
@@ -99,11 +99,11 @@ type CodePolicy struct {
 type GoogleConfig struct {
 	ClientID     string
 	ClientSecret string
-	RedirectURL  string
+	RedirectUrl  string
 }
 
 type ResendConfig struct {
-	APIKey    string
+	ApiKey    string
 	FromEmail string
 }
 
@@ -126,8 +126,8 @@ type AgentConfig struct {
 	ListenUrl          string
 	StaticDir          string
 	PublicUrl          string
-	APIBaseURL         string
-	CORSAllowedOrigins []string
+	ApiBaseUrl         string
+	CorsAllowedOrigins []string
 	ExposeErrors       bool
 	Database           DatabaseConfig
 }
@@ -136,8 +136,8 @@ type CloudConfig struct {
 	ListenUrl          string
 	StaticDir          string
 	PublicUrl          string
-	APIBaseURL         string
-	CORSAllowedOrigins []string
+	ApiBaseUrl         string
+	CorsAllowedOrigins []string
 	ExposeErrors       bool
 	GateUrl            string
 	OAuth              CloudOAuthConfig
@@ -147,7 +147,7 @@ type CloudConfig struct {
 type CloudOAuthConfig struct {
 	ClientID     string
 	ClientSecret string
-	RedirectURL  string
+	RedirectUrl  string
 	Scopes       []string
 }
 
@@ -246,8 +246,8 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			ListenUrl:          strings.TrimSpace(v.GetString("agent.listen_url")),
 			StaticDir:          agentStaticDir,
 			PublicUrl:          strings.TrimSpace(v.GetString("agent.public_url")),
-			APIBaseURL:         strings.TrimSpace(v.GetString("agent.api_base_url")),
-			CORSAllowedOrigins: getStringSlice(v, "agent.cors_allowed_origins"),
+			ApiBaseUrl:         strings.TrimSpace(v.GetString("agent.api_base_url")),
+			CorsAllowedOrigins: getStringSlice(v, "agent.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("agent.expose_errors"),
 			Database:           agentDatabase,
 		},
@@ -255,14 +255,14 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			ListenUrl:          strings.TrimSpace(v.GetString("cloud.listen_url")),
 			StaticDir:          cloudStaticDir,
 			PublicUrl:          strings.TrimSpace(v.GetString("cloud.public_url")),
-			APIBaseURL:         strings.TrimSpace(v.GetString("cloud.api_base_url")),
-			CORSAllowedOrigins: getStringSlice(v, "cloud.cors_allowed_origins"),
+			ApiBaseUrl:         strings.TrimSpace(v.GetString("cloud.api_base_url")),
+			CorsAllowedOrigins: getStringSlice(v, "cloud.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("cloud.expose_errors"),
 			GateUrl:            strings.TrimSpace(v.GetString("cloud.gate_url")),
 			OAuth: CloudOAuthConfig{
 				ClientID:     strings.TrimSpace(v.GetString("cloud.oauth.client_id")),
 				ClientSecret: strings.TrimSpace(v.GetString("cloud.oauth.client_secret")),
-				RedirectURL:  strings.TrimSpace(v.GetString("cloud.oauth.redirect_url")),
+				RedirectUrl:  strings.TrimSpace(v.GetString("cloud.oauth.redirect_url")),
 				Scopes:       getStringSlice(v, "cloud.oauth.scopes"),
 			},
 			Database: cloudDatabase,
@@ -274,28 +274,28 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 				Username: strings.TrimSpace(v.GetString("auth.local_admin.username")),
 				Password: strings.TrimSpace(v.GetString("auth.local_admin.password")),
 			},
-			JWTTTL: v.GetDuration("auth.jwt_ttl"),
+			JwtTTL: v.GetDuration("auth.jwt_ttl"),
 			PasswordPolicy: PasswordPolicy{
 				MinLength: v.GetInt("auth.password.min_length"),
 				MaxLength: v.GetInt("auth.password.max_length"),
 			},
 			Code: CodePolicy{
 				Length:         v.GetInt("auth.code.length"),
-				TTL:            v.GetDuration("auth.code.ttl"),
+				Ttl:            v.GetDuration("auth.code.ttl"),
 				ResendCooldown: v.GetDuration("auth.code.resend_cooldown"),
 				MaxAttempts:    v.GetInt("auth.code.max_attempts"),
 			},
 			Google: GoogleConfig{
 				ClientID:     strings.TrimSpace(v.GetString("auth.google.client_id")),
 				ClientSecret: strings.TrimSpace(v.GetString("auth.google.client_secret")),
-				RedirectURL:  strings.TrimSpace(v.GetString("auth.google.redirect_url")),
+				RedirectUrl:  strings.TrimSpace(v.GetString("auth.google.redirect_url")),
 			},
 		},
-		JWT: JWTConfig{
+		Jwt: JwtConfig{
 			SecretKey: v.GetString("jwt.secret_key"),
 		},
 		Resend: ResendConfig{
-			APIKey:    strings.TrimSpace(v.GetString("resend.api_key")),
+			ApiKey:    strings.TrimSpace(v.GetString("resend.api_key")),
 			FromEmail: strings.TrimSpace(v.GetString("resend.from_email")),
 		},
 		DefaultConfigFile: defaultConfigFile,
@@ -332,7 +332,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	if err := validateCloud(cfg); err != nil {
 		return Config{}, err
 	}
-	if err := validateJWT(cfg.JWT); err != nil {
+	if err := validateJwt(cfg.Jwt); err != nil {
 		return Config{}, err
 	}
 	if err := validateAuth(cfg.Auth); err != nil {
@@ -353,7 +353,7 @@ func IsGoogleAuthEnabled(cfg GoogleConfig) bool {
 }
 
 func IsResendEnabled(cfg ResendConfig) bool {
-	return strings.TrimSpace(cfg.APIKey) != ""
+	return strings.TrimSpace(cfg.ApiKey) != ""
 }
 
 func GenerateFernetKey() (string, error) {
@@ -372,7 +372,7 @@ func loadDatabaseConfig(cwd string, v *viper.Viper, prefix string) (DatabaseConf
 	cfg := DatabaseConfig{
 		Driver: driver,
 		SQLite: SQLiteConfig{Path: strings.TrimSpace(v.GetString(pathKey))},
-		MySQL:  MySQLConfig{DSN: strings.TrimSpace(v.GetString(dsnKey))},
+		MySQL:  MySQLConfig{Dsn: strings.TrimSpace(v.GetString(dsnKey))},
 	}
 	if cfg.Driver == "" {
 		return DatabaseConfig{}, apperrors.Config("invalid "+driverKey, fmt.Errorf("empty driver"))
@@ -386,8 +386,8 @@ func loadDatabaseConfig(cwd string, v *viper.Viper, prefix string) (DatabaseConf
 			cfg.SQLite.Path = filepath.Join(cwd, cfg.SQLite.Path)
 		}
 	case "mysql":
-		if cfg.MySQL.DSN == "" {
-			return DatabaseConfig{}, apperrors.Config("invalid "+dsnKey, fmt.Errorf("empty DSN"))
+		if cfg.MySQL.Dsn == "" {
+			return DatabaseConfig{}, apperrors.Config("invalid "+dsnKey, fmt.Errorf("empty Dsn"))
 		}
 	default:
 		return DatabaseConfig{}, apperrors.Config("invalid "+driverKey, fmt.Errorf("must be sqlite or mysql"))
@@ -396,14 +396,14 @@ func loadDatabaseConfig(cwd string, v *viper.Viper, prefix string) (DatabaseConf
 }
 
 func ensureJWTSecretKey(cfg Config) (Config, error) {
-	if strings.TrimSpace(cfg.JWT.SecretKey) != "" {
+	if strings.TrimSpace(cfg.Jwt.SecretKey) != "" {
 		return cfg, nil
 	}
 	secretKey, err := GenerateFernetKey()
 	if err != nil {
 		return Config{}, apperrors.Config("generate jwt.secret_key", err)
 	}
-	cfg.JWT.SecretKey = secretKey
+	cfg.Jwt.SecretKey = secretKey
 	cfg, err = upsertGeneratedConfigValues(cfg, map[string]string{"jwt.secret_key": secretKey})
 	if err != nil {
 		return Config{}, apperrors.Config("save jwt.secret_key", err)
@@ -411,7 +411,7 @@ func ensureJWTSecretKey(cfg Config) (Config, error) {
 	return cfg, nil
 }
 
-func validateJWT(cfg JWTConfig) error {
+func validateJwt(cfg JwtConfig) error {
 	if _, err := security.ParseBase64Key(cfg.SecretKey, 32); err != nil {
 		return apperrors.Config("invalid jwt.secret_key", err)
 	}
@@ -419,7 +419,7 @@ func validateJWT(cfg JWTConfig) error {
 }
 
 func validateAuth(cfg AuthConfig) error {
-	if cfg.JWTTTL <= 0 {
+	if cfg.JwtTTL <= 0 {
 		return apperrors.Config("invalid auth.jwt_ttl", fmt.Errorf("must be positive"))
 	}
 	if cfg.PasswordPolicy.MinLength < 1 || cfg.PasswordPolicy.MaxLength < cfg.PasswordPolicy.MinLength {
@@ -428,14 +428,14 @@ func validateAuth(cfg AuthConfig) error {
 	if cfg.Code.Length != 6 {
 		return apperrors.Config("invalid auth.code.length", fmt.Errorf("must be 6"))
 	}
-	if cfg.Code.TTL <= 0 || cfg.Code.ResendCooldown <= 0 || cfg.Code.MaxAttempts < 1 {
+	if cfg.Code.Ttl <= 0 || cfg.Code.ResendCooldown <= 0 || cfg.Code.MaxAttempts < 1 {
 		return apperrors.Config("invalid auth.code", fmt.Errorf("ttl, resend cooldown and max attempts must be positive"))
 	}
 	return nil
 }
 
 func validateIntegrationConfig(cfg Config) error {
-	if cfg.Auth.Google.ClientID != "" || cfg.Auth.Google.ClientSecret != "" || cfg.Auth.Google.RedirectURL != "" {
+	if cfg.Auth.Google.ClientID != "" || cfg.Auth.Google.ClientSecret != "" || cfg.Auth.Google.RedirectUrl != "" {
 		missing := []string{}
 		if cfg.Auth.Google.ClientID == "" {
 			missing = append(missing, envNameForKey("auth.google.client_id"))
@@ -443,16 +443,16 @@ func validateIntegrationConfig(cfg Config) error {
 		if cfg.Auth.Google.ClientSecret == "" {
 			missing = append(missing, envNameForKey("auth.google.client_secret"))
 		}
-		if cfg.Auth.Google.RedirectURL == "" {
+		if cfg.Auth.Google.RedirectUrl == "" {
 			missing = append(missing, envNameForKey("auth.google.redirect_url"))
 		}
 		if len(missing) > 0 {
 			return apperrors.Config("incomplete google auth configuration", errors.New(strings.Join(missing, ", ")))
 		}
 	}
-	if cfg.Resend.APIKey != "" || cfg.Resend.FromEmail != "" {
+	if cfg.Resend.ApiKey != "" || cfg.Resend.FromEmail != "" {
 		missing := []string{}
-		if cfg.Resend.APIKey == "" {
+		if cfg.Resend.ApiKey == "" {
 			missing = append(missing, envNameForKey("resend.api_key"))
 		}
 		if cfg.Resend.FromEmail == "" {
@@ -884,11 +884,11 @@ func validateHistory(cfg HistoryConfig) error {
 func normalizeAgentConfig(cfg *Config) {
 	cfg.Agent.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.ListenUrl), "/")
 	cfg.Agent.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.PublicUrl), "/")
-	cfg.Agent.APIBaseURL = strings.TrimRight(strings.TrimSpace(cfg.Agent.APIBaseURL), "/")
-	cfg.Agent.CORSAllowedOrigins = normalizeHTTPOrigins(cfg.Agent.CORSAllowedOrigins)
+	cfg.Agent.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.ApiBaseUrl), "/")
+	cfg.Agent.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Agent.CorsAllowedOrigins)
 }
 
-func normalizeHTTPOrigins(values []string) []string {
+func normalizeHttpOrigins(values []string) []string {
 	out := make([]string, 0, len(values))
 	seen := map[string]struct{}{}
 	for _, value := range values {
@@ -908,23 +908,23 @@ func normalizeHTTPOrigins(values []string) []string {
 func normalizeCloudConfig(cfg *Config) {
 	cfg.Cloud.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.ListenUrl), "/")
 	cfg.Cloud.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.PublicUrl), "/")
-	cfg.Cloud.APIBaseURL = strings.TrimRight(strings.TrimSpace(cfg.Cloud.APIBaseURL), "/")
-	cfg.Cloud.CORSAllowedOrigins = normalizeHTTPOrigins(cfg.Cloud.CORSAllowedOrigins)
+	cfg.Cloud.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.ApiBaseUrl), "/")
+	cfg.Cloud.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Cloud.CorsAllowedOrigins)
 	cfg.Cloud.GateUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.GateUrl), "/")
 	cfg.Cloud.OAuth.ClientID = strings.TrimSpace(cfg.Cloud.OAuth.ClientID)
 	cfg.Cloud.OAuth.ClientSecret = strings.TrimSpace(cfg.Cloud.OAuth.ClientSecret)
-	cfg.Cloud.OAuth.RedirectURL = strings.TrimRight(strings.TrimSpace(cfg.Cloud.OAuth.RedirectURL), "/")
+	cfg.Cloud.OAuth.RedirectUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.OAuth.RedirectUrl), "/")
 	if len(cfg.Cloud.OAuth.Scopes) == 0 {
 		cfg.Cloud.OAuth.Scopes = []string{"openid", "email", "profile"}
 	}
 }
 
 func validateAgent(cfg AgentConfig) error {
-	return validateHTTPServerConfig("agent", cfg.ListenUrl, cfg.PublicUrl, cfg.APIBaseURL, cfg.CORSAllowedOrigins)
+	return validateHTTPServerConfig("agent", cfg.ListenUrl, cfg.PublicUrl, cfg.ApiBaseUrl, cfg.CorsAllowedOrigins)
 }
 
 func validateCloud(cfg Config) error {
-	if err := validateHTTPServerConfig("cloud", cfg.Cloud.ListenUrl, cfg.Cloud.PublicUrl, cfg.Cloud.APIBaseURL, cfg.Cloud.CORSAllowedOrigins); err != nil {
+	if err := validateHTTPServerConfig("cloud", cfg.Cloud.ListenUrl, cfg.Cloud.PublicUrl, cfg.Cloud.ApiBaseUrl, cfg.Cloud.CorsAllowedOrigins); err != nil {
 		return err
 	}
 	if cfg.Cloud.GateUrl != "" {
@@ -932,8 +932,8 @@ func validateCloud(cfg Config) error {
 			return err
 		}
 	}
-	if cfg.Cloud.OAuth.RedirectURL != "" {
-		if err := validateHTTPURL("cloud.oauth.redirect_url", cfg.Cloud.OAuth.RedirectURL, false); err != nil {
+	if cfg.Cloud.OAuth.RedirectUrl != "" {
+		if err := validateHTTPURL("cloud.oauth.redirect_url", cfg.Cloud.OAuth.RedirectUrl, false); err != nil {
 			return err
 		}
 	}

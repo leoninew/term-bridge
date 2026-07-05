@@ -66,7 +66,7 @@ func TestBackendHandlerInjectsRuntimeConfigIntoIndexHTML(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte(index), 0o644); err != nil {
 		t.Fatalf("WriteFile(index) error = %v", err)
 	}
-	handler := backendHandler(Config{Server: ServerConfig{StaticDir: staticDir, APIBaseURL: "https://agent.example.com/"}}, slog.Default(), http.NotFoundHandler())
+	handler := backendHandler(Config{Server: ServerConfig{StaticDir: staticDir, ApiBaseUrl: "https://agent.example.com/"}}, slog.Default(), http.NotFoundHandler())
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -119,8 +119,8 @@ func TestBackendHandlerLogsUnifiedRequests(t *testing.T) {
 	}
 }
 
-func TestBackendHandlerAppliesCORSOnlyToAPIRoutes(t *testing.T) {
-	handler := backendHandler(Config{Server: ServerConfig{CORSAllowedOrigins: []string{"https://app.example.com"}}}, slog.Default(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestBackendHandlerAppliesCorsOnlyToAPIRoutes(t *testing.T) {
+	handler := backendHandler(Config{Server: ServerConfig{CorsAllowedOrigins: []string{"https://app.example.com"}}}, slog.Default(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

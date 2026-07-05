@@ -12,7 +12,7 @@ import (
 	"termbridge-go/internal/agent/model/task/process"
 	"termbridge-go/internal/agent/model/task/session"
 	"termbridge-go/internal/shared/common/utils/idgen"
-	"termbridge-go/internal/shared/dto/protocol/terminal"
+	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
 )
 
 type SessionRuntime struct {
@@ -145,7 +145,7 @@ func (r *SessionRuntime) resize(cols int, rows int) error {
 		return nil
 	}
 	r.mu.Unlock()
-	r.registry.logger.Info("terminal pty resize", "session_id", r.session.Id, "previous_cols", previous.Cols, "previous_rows", previous.Rows, "cols", size.Cols, "rows", size.Rows)
+	r.registry.logger.Debug("terminal pty resize", "session_id", r.session.Id, "previous_cols", previous.Cols, "previous_rows", previous.Rows, "cols", size.Cols, "rows", size.Rows)
 	if err := r.pty.Resize(size); err != nil {
 		r.registry.logger.Warn("terminal pty resize failed", "session_id", r.session.Id, "previous_cols", previous.Cols, "previous_rows", previous.Rows, "cols", size.Cols, "rows", size.Rows, "error", err)
 		return err
@@ -226,11 +226,12 @@ func (r *SessionRuntime) waitLoop() {
 	r.mu.Unlock()
 	exit := process.InterpretExit(result.Err, result.ExitCode, mode)
 	_ = r.history.Close()
+	var sessionUpdate *session.Session
 	if r.history.Truncated() {
 		sess := r.session
 		sess.History.Truncated = true
 		sess.UpdatedAt = endedAt
-		_ = r.registry.store.SaveSession(sess)
+		sessionUpdate = &sess
 	}
 	startedAt := r.session.CreatedAt
 	if reporter, ok := r.pty.(termpty.ProcessReporter); ok {
@@ -242,15 +243,20 @@ func (r *SessionRuntime) waitLoop() {
 	if exit.WaitErr != nil {
 		waitErr = exit.WaitErr.Error()
 	}
-	if err := r.registry.store.SaveExit(r.session.WorkspaceId, r.session.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: exit.Code, Reason: "user_process_exited", Forced: exit.Forced, Closed: exit.Closed, StartedAt: startedAt, EndedAt: endedAt, WaitError: waitErr}); err != nil {
-		r.registry.logger.Warn("save web terminal exit", "session_id", r.session.Id, "error", err)
-	}
+	exitRecord := process.ExitRecord{SchemaVersion: 1, ExitCode: exit.Code, Reason: "user_process_exited", Forced: exit.Forced, Closed: exit.Closed, StartedAt: startedAt, EndedAt: endedAt, WaitError: waitErr}
 	finalState := session.StateStopped
 	if result.Err != nil && !exit.Stopped && !exit.Closed && exit.Code == 0 {
 		finalState = session.StateFailed
 	}
-	if err := r.registry.store.SaveState(r.session.WorkspaceId, r.session.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: finalState, Reason: "user_process_exited", UpdatedAt: endedAt}); err != nil {
-		r.registry.logger.Warn("save web terminal final state", "session_id", r.session.Id, "state", finalState, "error", err)
+	stateRecord := session.StateRecord{SchemaVersion: session.SchemaVersion, State: finalState, Reason: "user_process_exited", UpdatedAt: endedAt}
+	var saveErr error
+	if sessionUpdate != nil {
+		saveErr = r.registry.store.SaveSessionExitState(*sessionUpdate, exitRecord, stateRecord)
+	} else {
+		saveErr = r.registry.store.SaveExitState(r.session.WorkspaceId, r.session.Id, exitRecord, stateRecord)
+	}
+	if saveErr != nil {
+		r.registry.logger.Warn("save web terminal exit state", "session_id", r.session.Id, "state", finalState, "error", saveErr)
 	}
 	r.broadcastText(terminalproto.ServerMessage{Type: terminalproto.TypeExited, ExitCode: &exit.Code, State: string(finalState), LifecycleState: string(finalState), AttachmentState: string(AttachmentDetached)})
 	r.closeClients()

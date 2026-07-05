@@ -22,10 +22,6 @@ func (s localAuthService) Login(ctx context.Context, email, password string) (Au
 	return s.sign(s.localUser())
 }
 
-func (s localAuthService) Capabilities() Capabilities {
-	return Capabilities{Providers: []string{}, AccountAuthEnabled: false, CloudOAuthEnabled: false}
-}
-
 func (s localAuthService) UserFromClaims(ctx context.Context, claims sharedauth.Claims) (UserView, error) {
 	_ = ctx
 	if claims.Provider == ProviderLocalAdmin && claims.Sub == "local-agent" {
@@ -39,7 +35,7 @@ func (s localAuthService) VerifyToken(token string) (sharedauth.Claims, error) {
 }
 
 func (s localAuthService) sign(user UserView) (AuthResult, error) {
-	token, err := s.tokens.Sign(sharedauth.Claims{Sub: user.ID, Email: user.Email, Provider: user.Provider})
+	token, err := s.tokens.Sign(sharedauth.Claims{Sub: user.Id, Email: user.Email, Provider: user.Provider})
 	if err != nil {
 		return AuthResult{}, err
 	}
@@ -51,7 +47,7 @@ func (s localAuthService) localUser() UserView {
 	if displayName == "" {
 		displayName = "TermBridge Agent"
 	}
-	return UserView{ID: "local-agent", DisplayName: displayName, Provider: ProviderLocalAdmin, EmailVerified: true}
+	return UserView{Id: "local-agent", DisplayName: displayName, Provider: ProviderLocalAdmin, EmailVerified: true}
 }
 
 func currentOSUsername() string {

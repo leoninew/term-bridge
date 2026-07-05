@@ -13,7 +13,6 @@ import type {
 import { agentApiClient } from '../api/client'
 import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
 import type {
-  AuthCapabilities,
   AuthMeResp,
   CloudOAuthCallbackResp,
   CloudOAuthStartResp,
@@ -48,7 +47,7 @@ export async function authLogout(): Promise<void> {
   await agentApiClient.post('/auth/logout')
 }
 
-export function cloudOAuthStartURL(): string {
+export function cloudOAuthStartUrl(): string {
   return '/cloud/oauth/start'
 }
 
@@ -199,4 +198,4 @@ function isUnauthorizedApiError(err: unknown): boolean {
   )
 }
 
-export type { AuthCapabilities, AuthMeResp, CloudSessionSummary, TokenResp, UserInfo }
+export type { AuthMeResp, CloudSessionSummary, TokenResp, UserInfo }

@@ -4,8 +4,6 @@ import cloudauth "termbridge-go/internal/cloud/model/user/auth"
 
 type UserView = cloudauth.UserView
 
-type Capabilities = cloudauth.Capabilities
-
 type AuthResult = cloudauth.Result
 
 const ProviderLocalAdmin = "local_admin"

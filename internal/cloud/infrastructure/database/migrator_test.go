@@ -16,7 +16,7 @@ func TestMigrateCreatesCloudIdentitySchemaOnly(t *testing.T) {
 	if err := Migrate(context.Background(), db, "sqlite"); err != nil {
 		t.Fatalf("Migrate() error = %v", err)
 	}
-	for _, table := range []string{"users", "user_identities", "auth_codes", "email_delivery_logs", "oauth_states", "devices", "user_devices", "device_binding_codes", "goose_cloud_db_version"} {
+	for _, table := range []string{"users", "user_identities", "auth_codes", "email_delivery_logs", "oauth_states", "devices", "user_devices", "goose_cloud_db_version"} {
 		if !testTableExists(t, db, table) {
 			t.Fatalf("table %s does not exist", table)
 		}
@@ -70,9 +70,6 @@ func TestMigrateRejectsDeviceWithoutPublicKey(t *testing.T) {
 	}
 	if _, err := db.Exec(`CREATE TABLE user_devices (user_id TEXT NOT NULL, device_id TEXT NOT NULL, PRIMARY KEY (user_id, device_id))`); err != nil {
 		t.Fatalf("create user_devices table: %v", err)
-	}
-	if _, err := db.Exec(`CREATE TABLE device_binding_codes (code_hash TEXT PRIMARY KEY)`); err != nil {
-		t.Fatalf("create device_binding_codes table: %v", err)
 	}
 
 	err := Migrate(context.Background(), db, "sqlite")

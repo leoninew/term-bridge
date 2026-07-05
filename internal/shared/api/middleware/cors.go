@@ -11,11 +11,11 @@ const (
 	corsMaxAge       = "600"
 )
 
-func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
-	return CORSForPaths(allowedOrigins, nil)
+func Cors(allowedOrigins []string) func(http.Handler) http.Handler {
+	return CorsForPaths(allowedOrigins, nil)
 }
 
-func CORSForPaths(allowedOrigins []string, appliesTo func(string) bool) func(http.Handler) http.Handler {
+func CorsForPaths(allowedOrigins []string, appliesTo func(string) bool) func(http.Handler) http.Handler {
 	allowed := originSet(allowedOrigins)
 	return func(next http.Handler) http.Handler {
 		if len(allowed) == 0 {
@@ -39,7 +39,7 @@ func CORSForPaths(allowedOrigins []string, appliesTo func(string) bool) func(htt
 				next.ServeHTTP(w, r)
 				return
 			}
-			setCORSHeaders(w.Header(), origin)
+			setCorsHeaders(w.Header(), origin)
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
 				return
@@ -64,7 +64,7 @@ func normalizeOrigin(value string) string {
 	return strings.TrimRight(strings.TrimSpace(value), "/")
 }
 
-func setCORSHeaders(headers http.Header, origin string) {
+func setCorsHeaders(headers http.Header, origin string) {
 	headers.Set("Access-Control-Allow-Origin", origin)
 	headers.Set("Access-Control-Allow-Headers", corsAllowHeaders)
 	headers.Set("Access-Control-Allow-Methods", corsAllowMethods)

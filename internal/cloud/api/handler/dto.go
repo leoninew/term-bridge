@@ -22,14 +22,14 @@ type CloudSessionSummary struct {
 	ConnectedAt time.Time `json:"connected_at"`
 }
 
-type APIErrorResp[T any] struct {
+type ApiErrorResp[T any] struct {
 	Code      string `json:"code"`
 	Error     string `json:"error"`
 	RequestId string `json:"request_id"`
 	Details   T      `json:"details,omitempty"`
 }
 
-type errorResponse = APIErrorResp[any]
+type errorResponse = ApiErrorResp[any]
 
 type HealthResp struct {
 	Status string `json:"status"`
@@ -101,11 +101,10 @@ type AuthGoogleCallbackReq struct {
 }
 
 type AuthMeResp struct {
-	Authenticated bool                    `json:"authenticated"`
-	Username      string                  `json:"username,omitempty"`
-	User          *cloudauth.UserView     `json:"user,omitempty"`
-	Capabilities  *cloudauth.Capabilities `json:"capabilities,omitempty"`
-	CloudSession  *CloudSessionSummary    `json:"cloud_session"`
+	Authenticated bool                 `json:"authenticated"`
+	Username      string               `json:"username,omitempty"`
+	User          *cloudauth.UserView  `json:"user,omitempty"`
+	CloudSession  *CloudSessionSummary `json:"cloud_session"`
 }
 
 type CloudOAuthStartResp struct {
@@ -113,11 +112,12 @@ type CloudOAuthStartResp struct {
 }
 
 type CloudOAuthAuthorizeResp struct {
-	RedirectURL string `json:"redirect_url"`
+	RedirectUrl string `json:"redirect_url"`
 }
 
-type CloudOAuthExchangeReq struct {
-	Code string `json:"code"`
+type OAuthTokenResp struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
 }
 
 type CloudOAuthCallbackReq struct {
@@ -131,7 +131,7 @@ type CloudOAuthCallbackResp struct {
 }
 
 type CurrentDeviceReq struct {
-	ID        string `json:"id"`
+	Id        string `json:"id"`
 	Name      string `json:"name"`
 	PublicKey string `json:"public_key"`
 }
@@ -141,16 +141,8 @@ type CurrentDeviceResp struct {
 	Device   DeviceSummary `json:"device"`
 }
 
-type CloudOAuthExchangeTokenReq struct {
-	Code string `json:"code"`
-}
-
 type CloudOAuthDeviceReportReq struct {
-	ID        string `json:"id"`
+	Id        string `json:"id"`
 	Name      string `json:"name"`
 	PublicKey string `json:"public_key"`
-}
-
-type CloudOAuthExchangeTokenResp struct {
-	AccessToken string `json:"access_token"`
 }

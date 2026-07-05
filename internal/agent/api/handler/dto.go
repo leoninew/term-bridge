@@ -98,7 +98,6 @@ type AuthMeResp struct {
 	Authenticated bool                 `json:"authenticated"`
 	Username      string               `json:"username,omitempty"`
 	User          *UserView            `json:"user,omitempty"`
-	Capabilities  *Capabilities        `json:"capabilities,omitempty"`
 	CloudSession  *CloudSessionSummary `json:"cloud_session"`
 }
 
@@ -107,11 +106,7 @@ type CloudOAuthStartResp struct {
 }
 
 type CloudOAuthAuthorizeResp struct {
-	RedirectURL string `json:"redirect_url"`
-}
-
-type CloudOAuthExchangeReq struct {
-	Code string `json:"code"`
+	RedirectUrl string `json:"redirect_url"`
 }
 
 type CloudOAuthCallbackReq struct {
@@ -125,7 +120,7 @@ type CloudOAuthCallbackResp struct {
 }
 
 type CurrentDeviceReq struct {
-	ID        string `json:"id"`
+	Id        string `json:"id"`
 	Name      string `json:"name"`
 	PublicKey string `json:"public_key"`
 }
@@ -135,16 +130,8 @@ type CurrentDeviceResp struct {
 	Device   DeviceSummary `json:"device"`
 }
 
-type CloudOAuthExchangeTokenReq struct {
-	Code string `json:"code"`
-}
-
 type CloudOAuthDeviceReportReq struct {
-	ID        string `json:"id"`
+	Id        string `json:"id"`
 	Name      string `json:"name"`
 	PublicKey string `json:"public_key"`
-}
-
-type CloudOAuthExchangeTokenResp struct {
-	AccessToken string `json:"access_token"`
 }

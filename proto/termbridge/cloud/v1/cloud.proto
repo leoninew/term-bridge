@@ -70,10 +70,6 @@ message CloudOAuthAuthorizeResp {
   string redirect_url = 1;
 }
 
-message CloudOAuthExchangeReq {
-  string code = 1;
-}
-
 message CloudOAuthCallbackReq {
   string code = 1;
   string state = 2;

@@ -23,7 +23,7 @@ import (
 	"termbridge-go/internal/agent/repository/task/state"
 
 	apperrors "termbridge-go/internal/shared/common/errors"
-	"termbridge-go/internal/shared/dto/protocol/terminal"
+	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
 )
 
 const (
@@ -51,8 +51,11 @@ type RuntimeStore interface {
 	SaveState(workspaceId string, sessionId string, value session.StateRecord) error
 	LoadState(workspaceId string, sessionId string) (session.StateRecord, error)
 	SaveProcess(workspaceId string, sessionId string, value process.Record) error
+	SaveProcessState(workspaceId string, sessionId string, value process.Record, state session.StateRecord) error
 	LoadProcess(workspaceId string, sessionId string) (process.Record, error)
 	SaveExit(workspaceId string, sessionId string, value process.ExitRecord) error
+	SaveExitState(workspaceId string, sessionId string, value process.ExitRecord, state session.StateRecord) error
+	SaveSessionExitState(value session.Session, exit process.ExitRecord, state session.StateRecord) error
 	LoadExit(workspaceId string, sessionId string) (process.ExitRecord, error)
 	HistoryPath(workspaceId string, sessionId string) string
 	ListWorkspaces() ([]workspace.Workspace, []state.Warning, error)
@@ -292,7 +295,7 @@ func (r *Registry) startClaimedSessionRuntime(ctx context.Context, sess session.
 	}
 	spec = spec.WithResolvedCommand(resolved)
 
-	r.logger.Info("terminal pty start", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cols", spec.InitialSize.Cols, "rows", spec.InitialSize.Rows, "command", spec.EffectiveCommand())
+	r.logger.Debug("terminal pty start", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cols", spec.InitialSize.Cols, "rows", spec.InitialSize.Rows, "command", spec.EffectiveCommand())
 	ptySession, err := r.manager.Start(ctx, spec)
 	if err != nil {
 		_ = historyWriter.Close()
@@ -312,19 +315,19 @@ func (r *Registry) startClaimedSessionRuntime(ctx context.Context, sess session.
 		if record.StartedAt.IsZero() {
 			record.StartedAt = time.Now().UTC()
 		}
-		if err := r.store.SaveProcess(sess.WorkspaceId, sess.Id, record); err != nil {
+		stateRecord := session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: record.StartedAt}
+		if err := r.store.SaveProcessState(sess.WorkspaceId, sess.Id, record, stateRecord); err != nil {
 			_ = ptySession.Close()
 			_ = historyWriter.Close()
-			return apperrors.Runtime("save process", err)
+			return apperrors.Runtime("save process state", err)
 		}
-	}
-	if err := r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: time.Now().UTC()}); err != nil {
+	} else if err := r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: time.Now().UTC()}); err != nil {
 		_ = ptySession.Close()
 		_ = historyWriter.Close()
 		return apperrors.Runtime("save running state", err)
 	}
 
-	r.logger.Info("terminal pty started", "session_id", sess.Id, "workspace_id", sess.WorkspaceId)
+	r.logger.Debug("terminal pty started", "session_id", sess.Id, "workspace_id", sess.WorkspaceId)
 	runtime := newSessionRuntime(r, sess, ptySession, historyWriter, size)
 	r.mu.Lock()
 	r.runtimes[sess.Id] = runtime

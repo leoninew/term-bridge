@@ -1,12 +1,4 @@
 -- +goose Up
-CREATE TABLE IF NOT EXISTS devices (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  public_key TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS workspaces (
   id TEXT PRIMARY KEY,
   device_id TEXT NOT NULL,
@@ -16,8 +8,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   metadata_json TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  deleted_at TEXT NULL,
-  FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+  deleted_at TEXT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_workspaces_device_deleted ON workspaces(device_id, deleted_at);
@@ -40,9 +31,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   deleted_at TEXT NULL,
-  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-);
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
 
 CREATE INDEX IF NOT EXISTS idx_sessions_workspace_deleted ON sessions(workspace_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_workspace_order ON sessions(workspace_id, sort_order);
@@ -67,9 +56,7 @@ CREATE TABLE IF NOT EXISTS session_runs (
   updated_at TEXT NOT NULL,
   deleted_at TEXT NULL,
   FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
-  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-);
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
 
 CREATE INDEX IF NOT EXISTS idx_session_runs_session_sequence ON session_runs(session_id, sequence);
 CREATE INDEX IF NOT EXISTS idx_session_runs_session_deleted ON session_runs(session_id, deleted_at);
@@ -94,4 +81,3 @@ DROP INDEX IF EXISTS idx_workspaces_device_order;
 DROP INDEX IF EXISTS idx_workspaces_device_path;
 DROP INDEX IF EXISTS idx_workspaces_device_deleted;
 DROP TABLE IF EXISTS workspaces;
-DROP TABLE IF EXISTS devices;

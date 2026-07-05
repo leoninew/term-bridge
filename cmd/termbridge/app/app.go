@@ -146,7 +146,7 @@ func logLoadedConfigFiles(logger *slog.Logger, paths []string) {
 
 func runMigrate(ctx context.Context, cfg config.Config, role string) (Result, error) {
 	database := selectRoleDatabase(cfg, role)
-	db, err := basedb.Open(ctx, database.Driver, database.SQLite.Path, database.MySQL.DSN)
+	db, err := basedb.Open(ctx, database.Driver, database.SQLite.Path, database.MySQL.Dsn)
 	if err != nil {
 		return Result{Cwd: cfg.Cwd}, err
 	}
@@ -223,30 +223,30 @@ func agentConfig(cfg config.Config) agentserver.Config {
 		Server: agentserver.ServerConfig{
 			ListenURL:          cfg.Agent.ListenUrl,
 			StaticDir:          cfg.Agent.StaticDir,
-			APIBaseURL:         cfg.Agent.APIBaseURL,
-			CORSAllowedOrigins: roleCORSAllowedOrigins(cfg.Agent.PublicUrl, cfg.Agent.CORSAllowedOrigins),
+			ApiBaseUrl:         cfg.Agent.ApiBaseUrl,
+			CorsAllowedOrigins: roleCorsAllowedOrigins(cfg.Agent.PublicUrl, cfg.Agent.CorsAllowedOrigins),
 		},
-		Gate: agentserver.GateConfig{API: agentserver.GateAPIConfig{ExposeErrors: cfg.Agent.ExposeErrors}},
+		Gate: agentserver.GateConfig{API: agentserver.GateApiConfig{ExposeErrors: cfg.Agent.ExposeErrors}},
 		Database: agentserver.DatabaseConfig{
 			Driver: cfg.Agent.Database.Driver,
 			SQLite: agentserver.SQLiteConfig{Path: cfg.Agent.Database.SQLite.Path},
-			MySQL:  agentserver.MySQLConfig{DSN: cfg.Agent.Database.MySQL.DSN},
+			MySQL:  agentserver.MySQLConfig{Dsn: cfg.Agent.Database.MySQL.Dsn},
 		},
-		Auth: agentserver.AuthConfig{JWTTTL: cfg.Auth.JWTTTL},
-		JWT:  agentserver.JWTConfig{SecretKey: cfg.JWT.SecretKey},
+		Auth: agentserver.AuthConfig{JwtTTL: cfg.Auth.JwtTTL},
+		Jwt:  agentserver.JwtConfig{SecretKey: cfg.Jwt.SecretKey},
 		Cloud: agentserver.CloudConnectorConfig{
 			GateURL: cfg.Cloud.GateUrl,
 			OAuth: agentserver.CloudOAuthConfig{
 				ClientID:     cfg.Cloud.OAuth.ClientID,
 				ClientSecret: cfg.Cloud.OAuth.ClientSecret,
-				RedirectURL:  cfg.Cloud.OAuth.RedirectURL,
+				RedirectUrl:  cfg.Cloud.OAuth.RedirectUrl,
 				Scopes:       append([]string(nil), cfg.Cloud.OAuth.Scopes...),
 			},
 		},
 	}
 }
 
-func roleCORSAllowedOrigins(publicURL string, configuredOrigins []string) []string {
+func roleCorsAllowedOrigins(publicURL string, configuredOrigins []string) []string {
 	origins := make([]string, 0, len(configuredOrigins)+1)
 	if origin := strings.TrimRight(strings.TrimSpace(publicURL), "/"); origin != "" {
 		origins = append(origins, origin)
@@ -264,36 +264,36 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 		Server: cloudserver.ServerConfig{
 			ListenURL:          cfg.Cloud.ListenUrl,
 			StaticDir:          cfg.Cloud.StaticDir,
-			APIBaseURL:         cfg.Cloud.APIBaseURL,
-			CORSAllowedOrigins: roleCORSAllowedOrigins(cfg.Cloud.PublicUrl, cfg.Cloud.CORSAllowedOrigins),
+			ApiBaseUrl:         cfg.Cloud.ApiBaseUrl,
+			CorsAllowedOrigins: roleCorsAllowedOrigins(cfg.Cloud.PublicUrl, cfg.Cloud.CorsAllowedOrigins),
 		},
-		Gate: cloudserver.GateConfig{API: cloudserver.GateAPIConfig{ExposeErrors: cfg.Cloud.ExposeErrors}},
+		Gate: cloudserver.GateConfig{API: cloudserver.GateApiConfig{ExposeErrors: cfg.Cloud.ExposeErrors}},
 		Database: cloudserver.DatabaseConfig{
 			Driver: cfg.Cloud.Database.Driver,
 			SQLite: cloudserver.SQLiteConfig{Path: cfg.Cloud.Database.SQLite.Path},
-			MySQL:  cloudserver.MySQLConfig{DSN: cfg.Cloud.Database.MySQL.DSN},
+			MySQL:  cloudserver.MySQLConfig{Dsn: cfg.Cloud.Database.MySQL.Dsn},
 		},
 		Auth: cloudserver.AuthConfig{
-			JWTTTL: cfg.Auth.JWTTTL,
+			JwtTTL: cfg.Auth.JwtTTL,
 			PasswordPolicy: cloudserver.PasswordPolicy{
 				MinLength: cfg.Auth.PasswordPolicy.MinLength,
 				MaxLength: cfg.Auth.PasswordPolicy.MaxLength,
 			},
 			Code: cloudserver.CodePolicy{
 				Length:         cfg.Auth.Code.Length,
-				TTL:            cfg.Auth.Code.TTL,
+				Ttl:            cfg.Auth.Code.Ttl,
 				ResendCooldown: cfg.Auth.Code.ResendCooldown,
 				MaxAttempts:    cfg.Auth.Code.MaxAttempts,
 			},
 			Google: cloudserver.GoogleConfig{
 				ClientID:     cfg.Auth.Google.ClientID,
 				ClientSecret: cfg.Auth.Google.ClientSecret,
-				RedirectURL:  cfg.Auth.Google.RedirectURL,
+				RedirectUrl:  cfg.Auth.Google.RedirectUrl,
 			},
 		},
-		JWT: cloudserver.JWTConfig{SecretKey: cfg.JWT.SecretKey},
+		Jwt: cloudserver.JwtConfig{SecretKey: cfg.Jwt.SecretKey},
 		Resend: cloudserver.ResendConfig{
-			APIKey:    cfg.Resend.APIKey,
+			ApiKey:    cfg.Resend.ApiKey,
 			FromEmail: cfg.Resend.FromEmail,
 		},
 		Cloud: cloudserver.CloudConfig{
@@ -301,7 +301,7 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 			OAuth: cloudserver.CloudOAuthConfig{
 				ClientID:     cfg.Cloud.OAuth.ClientID,
 				ClientSecret: cfg.Cloud.OAuth.ClientSecret,
-				RedirectURL:  cfg.Cloud.OAuth.RedirectURL,
+				RedirectUrl:  cfg.Cloud.OAuth.RedirectUrl,
 				Scopes:       append([]string(nil), cfg.Cloud.OAuth.Scopes...),
 			},
 		},

@@ -167,9 +167,7 @@
   const removingWorkspaceId = ref<string | null>(null)
 
   const isAgentMode = computed(() => props.runtimeTarget.mode === 'agent')
-  const userActionDisabled = computed(
-    () => isAgentMode.value && !gateway.capabilities?.cloud_oauth_enabled,
-  )
+  const userActionDisabled = computed(() => false)
   const userActionLabel = computed(() =>
     isAgentMode.value ? t('dashboard.signInWithOAuth') : t('dashboard.signIn'),
   )
@@ -220,7 +218,7 @@
       return
     }
     if (isAgentMode.value) {
-      if (props.startCloudOAuthUrl && gateway.capabilities?.cloud_oauth_enabled) {
+      if (props.startCloudOAuthUrl) {
         window.location.href = props.startCloudOAuthUrl()
       }
       return

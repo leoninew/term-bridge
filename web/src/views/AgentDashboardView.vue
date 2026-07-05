@@ -27,8 +27,7 @@
 
           <button
             type="button"
-            :disabled="!gateway.capabilities?.cloud_oauth_enabled"
-            class="group flex items-center gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-left shadow-xl transition hover:border-blue-500/60 hover:bg-[var(--color-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            class="group flex items-center gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-left shadow-xl transition hover:border-blue-500/60 hover:bg-[var(--color-control-hover)]"
             @click="startCloudMode"
           >
             <span
@@ -61,16 +60,13 @@
   import { useI18n } from 'vue-i18n'
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../components/session/ToastHost.vue'
-  import { cloudOAuthStartURL } from '../features/agent/api'
+  import { cloudOAuthStartUrl } from '../features/agent/api'
   import { useGatewayStore } from '../store/gateway'
 
   const { t } = useI18n()
   const gateway = useGatewayStore()
 
   function startCloudMode() {
-    if (!gateway.capabilities?.cloud_oauth_enabled) {
-      return
-    }
-    window.location.href = cloudOAuthStartURL()
+    window.location.href = cloudOAuthStartUrl()
   }
 </script>

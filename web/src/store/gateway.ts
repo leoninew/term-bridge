@@ -4,13 +4,7 @@ import { readStorageValue, removeStorageValue, writeStorageValue } from './stora
 import { authLoginViaAgent, authMe } from '../features/agent/api'
 import { authLogin, authMeViaCloud, listDevices } from '../features/cloud/api'
 import { useAppModeStore } from './appMode'
-import type {
-  AuthCapabilities,
-  CloudSessionSummary,
-  DeviceSummary,
-  TokenResp,
-  UserInfo,
-} from '../features/types'
+import type { CloudSessionSummary, DeviceSummary, TokenResp, UserInfo } from '../features/types'
 import type { RuntimeTarget } from '../features/runtimeTarget'
 import type { ApiTarget } from '../config'
 
@@ -30,7 +24,6 @@ export const useGatewayStore = defineStore('gateway', () => {
   const usernameInput = ref('')
   const passwordInput = ref('')
   const user = ref<UserInfo | null>(null)
-  const capabilities = ref<AuthCapabilities | null>(null)
   const cloudSession = ref<CloudSessionSummary | null>(null)
   const devices = ref<DeviceSummary[]>([])
   const selectedDeviceId = ref('')
@@ -120,7 +113,6 @@ export const useGatewayStore = defineStore('gateway', () => {
       const me = mode === 'cloud' ? await authMeViaCloud() : await authMe()
       authenticated.value = me.authenticated
       user.value = me.user ?? null
-      capabilities.value = me.capabilities ?? null
       cloudSession.value = me.cloud_session ?? null
       usernameInput.value = me.user?.email || usernameInput.value
       initializedToken = currentToken
@@ -128,7 +120,6 @@ export const useGatewayStore = defineStore('gateway', () => {
     } catch (err) {
       authenticated.value = false
       user.value = null
-      capabilities.value = null
       cloudSession.value = null
       initializedToken = undefined
       initializedMode = undefined
@@ -178,7 +169,6 @@ export const useGatewayStore = defineStore('gateway', () => {
     authInitialized.value = false
     authenticated.value = false
     user.value = null
-    capabilities.value = null
     cloudSession.value = null
     initializedToken = undefined
     initializedMode = undefined
@@ -199,7 +189,6 @@ export const useGatewayStore = defineStore('gateway', () => {
     usernameInput,
     passwordInput,
     user,
-    capabilities,
     cloudSession,
     devices,
     selectedDeviceId,

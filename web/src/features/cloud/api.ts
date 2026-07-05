@@ -17,7 +17,7 @@ import type {
   AuthMeResp,
   CloudOAuthAuthorizeResp,
   DeviceSummary,
-  GoogleAuthURLResp,
+  GoogleAuthUrlResp,
   ListDevicesResp,
   TokenResp,
 } from '../types'
@@ -86,8 +86,8 @@ export async function authChangePassword(
   })
 }
 
-export async function authGoogleURL(): Promise<string> {
-  const response = await cloudApiClient.get<GoogleAuthURLResp>('/auth/google')
+export async function authGoogleUrl(): Promise<string> {
+  const response = await cloudApiClient.get<GoogleAuthUrlResp>('/auth/google')
   return response.data.auth_url
 }
 

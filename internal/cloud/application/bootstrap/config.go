@@ -8,7 +8,7 @@ type Config struct {
 	Gate     GateConfig
 	Database DatabaseConfig
 	Auth     AuthConfig
-	JWT      JWTConfig
+	Jwt      JwtConfig
 	Resend   ResendConfig
 	Cloud    CloudConfig
 }
@@ -21,15 +21,15 @@ type LogHTTPConfig struct {
 type ServerConfig struct {
 	ListenURL          string
 	StaticDir          string
-	APIBaseURL         string
-	CORSAllowedOrigins []string
+	ApiBaseUrl         string
+	CorsAllowedOrigins []string
 }
 
 type GateConfig struct {
-	API GateAPIConfig
+	API GateApiConfig
 }
 
-type GateAPIConfig struct {
+type GateApiConfig struct {
 	ExposeErrors bool
 }
 
@@ -44,11 +44,11 @@ type SQLiteConfig struct {
 }
 
 type MySQLConfig struct {
-	DSN string
+	Dsn string
 }
 
 type AuthConfig struct {
-	JWTTTL         time.Duration
+	JwtTTL         time.Duration
 	PasswordPolicy PasswordPolicy
 	Code           CodePolicy
 	Google         GoogleConfig
@@ -61,7 +61,7 @@ type PasswordPolicy struct {
 
 type CodePolicy struct {
 	Length         int
-	TTL            time.Duration
+	Ttl            time.Duration
 	ResendCooldown time.Duration
 	MaxAttempts    int
 }
@@ -69,15 +69,15 @@ type CodePolicy struct {
 type GoogleConfig struct {
 	ClientID     string
 	ClientSecret string
-	RedirectURL  string
+	RedirectUrl  string
 }
 
-type JWTConfig struct {
+type JwtConfig struct {
 	SecretKey string
 }
 
 type ResendConfig struct {
-	APIKey    string
+	ApiKey    string
 	FromEmail string
 }
 
@@ -89,6 +89,6 @@ type CloudConfig struct {
 type CloudOAuthConfig struct {
 	ClientID     string
 	ClientSecret string
-	RedirectURL  string
+	RedirectUrl  string
 	Scopes       []string
 }

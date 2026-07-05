@@ -88,7 +88,7 @@ func TestCORSIgnoresRequestsWithoutOrigin(t *testing.T) {
 
 func serveCORSRequest(t *testing.T, allowedOrigins []string, method string, path string, origin string) *httptest.ResponseRecorder {
 	t.Helper()
-	handler := CORSForPaths(allowedOrigins, testAPIPath)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := CorsForPaths(allowedOrigins, testAPIPath)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	request := httptest.NewRequest(method, path, nil)

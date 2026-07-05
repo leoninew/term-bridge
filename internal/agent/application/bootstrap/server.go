@@ -16,7 +16,6 @@ import (
 	agentapp "termbridge-go/internal/agent/application/user"
 	agentdb "termbridge-go/internal/agent/infrastructure/database"
 	"termbridge-go/internal/agent/infrastructure/pty/gopty"
-	agentdevice "termbridge-go/internal/agent/repository/device"
 	"termbridge-go/internal/agent/repository/task/state"
 	httpserver "termbridge-go/internal/shared/api/server"
 	sharedauth "termbridge-go/internal/shared/common/auth"
@@ -38,7 +37,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 	if stdout == nil {
 		stdout = io.Discard
 	}
-	db, err := basedb.Open(ctx, cfg.Database.Driver, cfg.Database.SQLite.Path, cfg.Database.MySQL.DSN)
+	db, err := basedb.Open(ctx, cfg.Database.Driver, cfg.Database.SQLite.Path, cfg.Database.MySQL.Dsn)
 	if err != nil {
 		return err
 	}
@@ -47,8 +46,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		return err
 	}
 
-	deviceRepository := agentdevice.NewRepository(db.DB, db.Driver)
-	tokens, err := sharedauth.NewTokenServiceFromBase64Key(cfg.JWT.SecretKey, cfg.Auth.JWTTTL)
+	tokens, err := sharedauth.NewTokenServiceFromBase64Key(cfg.Jwt.SecretKey, cfg.Auth.JwtTTL)
 	if err != nil {
 		return apperrors.Config("invalid jwt.secret_key", err)
 	}
@@ -58,10 +56,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 	if err != nil {
 		return err
 	}
-	if _, err := deviceRepository.UpsertLocalDevice(ctx, agentdevice.Device{ID: device.Id, Name: device.Name, PublicKey: device.PublicKey}); err != nil {
-		return apperrors.Runtime("upsert local device", err)
-	}
-	runtimeAccess := agentapp.WebTerminalAccess{Registry: newWebTerminalRegistry(cfg, logger, state.NewDBStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id))}
+	runtimeAccess := agentapp.WebTerminalAccess{Registry: newWebTerminalRegistry(cfg, logger, state.NewDbStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id))}
 
 	serveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -102,7 +97,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		}()
 	}
 
-	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudGateURL: cfg.Cloud.GateURL, CloudOAuth: agentapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectURL: cfg.Cloud.OAuth.RedirectURL, Scopes: cfg.Cloud.OAuth.Scopes}, CloudOAuthAttemptStore: agentapi.NewCloudOAuthAttemptStore(cfg.Runtime.StateDir), LocalDevice: device, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CORSAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(agentapi.CloudSessionSummary) {
+	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudGateURL: cfg.Cloud.GateURL, CloudOAuth: agentapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectUrl: cfg.Cloud.OAuth.RedirectUrl, Scopes: cfg.Cloud.OAuth.Scopes}, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(agentapi.CloudSessionSummary) {
 		if cloudConnector != nil {
 			startConnector(cloudConnector)
 		}

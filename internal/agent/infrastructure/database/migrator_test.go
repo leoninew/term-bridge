@@ -16,18 +16,15 @@ func TestMigrateCreatesAgentRuntimeSchemaOnly(t *testing.T) {
 	if err := Migrate(context.Background(), db, "sqlite"); err != nil {
 		t.Fatalf("Migrate() error = %v", err)
 	}
-	for _, table := range []string{"devices", "workspaces", "sessions", "session_runs", "goose_agent_db_version"} {
+	for _, table := range []string{"workspaces", "sessions", "session_runs", "goose_agent_db_version"} {
 		if !testTableExists(t, db, table) {
 			t.Fatalf("table %s does not exist", table)
 		}
 	}
-	for _, table := range []string{"users", "user_identities", "auth_codes", "user_devices", "device_binding_codes", "goose_cloud_db_version"} {
+	for _, table := range []string{"users", "user_identities", "auth_codes", "user_devices", "goose_cloud_db_version"} {
 		if testTableExists(t, db, table) {
 			t.Fatalf("cloud table %s exists in agent schema", table)
 		}
-	}
-	if !testColumnExists(t, db, "devices", "public_key") {
-		t.Fatal("devices.public_key does not exist")
 	}
 }
 
@@ -44,22 +41,6 @@ func TestMigrateRejectsPartialAgentSchemaState(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "partially present") {
 		t.Fatalf("Migrate() error = %v, want partial schema state error", err)
-	}
-}
-
-func TestMigrateRejectsDeviceWithoutPublicKey(t *testing.T) {
-	db := openTestDB(t)
-	defer func() { _ = db.Close() }()
-	if _, err := db.Exec(`CREATE TABLE devices (id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`); err != nil {
-		t.Fatalf("create device table without public key: %v", err)
-	}
-
-	err := Migrate(context.Background(), db, "sqlite")
-	if err == nil {
-		t.Fatal("Migrate() error = nil, want public_key schema state error")
-	}
-	if !strings.Contains(err.Error(), "public_key") {
-		t.Fatalf("Migrate() error = %v, want public_key error", err)
 	}
 }
 

@@ -71,19 +71,6 @@ func validateRuntimeSchemaState(ctx context.Context, db *sql.DB, driver string) 
 	if (workspaces || sessions || sessionRuns) && (!workspaces || !sessions || !sessionRuns) {
 		return apperrors.Config("invalid agent schema state", fmt.Errorf("runtime tables are partially present"))
 	}
-	devices, err := tableExists(ctx, db, driver, "devices")
-	if err != nil {
-		return apperrors.Config("inspect agent schema state", err)
-	}
-	if devices {
-		publicKey, err := columnExists(ctx, db, driver, "devices", "public_key")
-		if err != nil {
-			return apperrors.Config("inspect agent schema state", err)
-		}
-		if !publicKey {
-			return apperrors.Config("invalid agent schema state", fmt.Errorf("devices table exists without public_key column"))
-		}
-	}
 	return nil
 }
 

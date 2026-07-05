@@ -24,18 +24,8 @@ export type UserInfo = ProtoUser & {
   provider: string
 }
 
-export type AuthCapabilities = {
-  // proto 未覆盖 capabilities；待补充 AuthMeResp proto 字段后迁移。
-  providers: string[]
-  password_reset_enabled: boolean
-  email_verification_enabled: boolean
-  account_auth_enabled: boolean
-  cloud_oauth_enabled: boolean
-}
-
 export type AuthMeResp = Omit<ProtoAuthMeResp, 'user' | 'cloud_session'> & {
   user?: UserInfo
-  capabilities?: AuthCapabilities
   cloud_session?: CloudSessionSummary | null
 }
 
@@ -47,7 +37,7 @@ export type ListDevicesResp = Omit<ProtoListDevicesResp, 'items'> & {
   items: DeviceSummary[]
 }
 
-export type GoogleAuthURLResp = {
+export type GoogleAuthUrlResp = {
   // proto 未覆盖 Google auth URL HTTP 响应；待补充 proto 消息后迁移。
   auth_url: string
 }

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,7 +115,6 @@ func TestRunMigrateRunsAgentDatabaseMigrations(t *testing.T) {
 	}
 	db := openRuntimeDB(t, cwd)
 	defer func() { _ = db.Close() }()
-	assertTableCount(t, db, "devices", 0)
 	assertTableCount(t, db, "workspaces", 0)
 	assertTableCount(t, db, "sessions", 0)
 	assertTableCount(t, db, "session_runs", 0)
@@ -123,8 +123,8 @@ func TestRunMigrateRunsAgentDatabaseMigrations(t *testing.T) {
 	}
 }
 
-func TestRoleCORSAllowedOriginsIncludesPublicURL(t *testing.T) {
-	origins := roleCORSAllowedOrigins("http://localhost:9030/", []string{"https://app.example.com"})
+func TestRoleCorsAllowedOriginsIncludesPublicUrl(t *testing.T) {
+	origins := roleCorsAllowedOrigins("http://localhost:9030/", []string{"https://app.example.com"})
 	if len(origins) != 2 || origins[0] != "http://localhost:9030" || origins[1] != "https://app.example.com" {
 		t.Fatalf("origins = %#v", origins)
 	}
@@ -139,13 +139,6 @@ func TestRunAgentStartsBackendAndConnectorFromConfig(t *testing.T) {
 	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: http://termbridge.lvh.me\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
-	if err := os.MkdirAll(filepath.Join(cwd, "data"), 0o755); err != nil {
-		t.Fatalf("MkdirAll(state dir) error = %v", err)
-	}
-	identityContent := "{\n  \"auth\": {\n    \"username\": \"admin\",\n    \"password\": \"admin\"\n  }\n}\n"
-	if err := os.WriteFile(filepath.Join(cwd, "data", "device.json"), []byte(identityContent), 0o600); err != nil {
-		t.Fatalf("WriteFile(identity) error = %v", err)
-	}
 	oldRunBackendServer := runBackendServer
 	defer func() {
 		runBackendServer = oldRunBackendServer
@@ -206,22 +199,33 @@ func TestRunAgentStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	var reportSeen bool
+	var tokenRequest url.Values
+	var reportedDevice struct {
+		Id        string `json:"id"`
+		Name      string `json:"name"`
+		PublicKey string `json:"public_key"`
+	}
 	cloudGate := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/cloud-api/cloud-oauth/exchange":
+		case "/cloud-api/oauth2/token":
 			if r.Method != http.MethodPost {
 				http.NotFound(w, r)
 				return
 			}
+			if err := r.ParseForm(); err != nil {
+				t.Fatalf("parse token request form: %v", err)
+			}
+			tokenRequest = r.PostForm
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"access_token":"cloud-token"}`))
+			_, _ = w.Write([]byte(`{"access_token":"cloud-token","token_type":"bearer"}`))
 		case "/cloud-api/devices/current":
 			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer cloud-token" {
 				http.NotFound(w, r)
 				return
 			}
-			reportSeen = true
+			if err := json.NewDecoder(r.Body).Decode(&reportedDevice); err != nil {
+				t.Fatalf("decode device report: %v", err)
+			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"accepted":true}`))
 		default:
@@ -232,13 +236,6 @@ func TestRunAgentStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: " + cloudGate.URL + "\n  oauth:\n    client_id: termbridge-local\n    redirect_url: http://localhost:9030/cloud/oauth/callback\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
-	if err := os.MkdirAll(filepath.Join(cwd, "data"), 0o755); err != nil {
-		t.Fatalf("MkdirAll(state dir) error = %v", err)
-	}
-	identityContent := "{\n  \"auth\": {\n    \"username\": \"admin\",\n    \"password\": \"admin\"\n  }\n}\n"
-	if err := os.WriteFile(filepath.Join(cwd, "data", "device.json"), []byte(identityContent), 0o600); err != nil {
-		t.Fatalf("WriteFile(identity) error = %v", err)
-	}
 	oldRunBackendServer := runBackendServer
 	oldRunAgentClient := runAgentClient
 	defer func() {
@@ -295,8 +292,11 @@ func TestRunAgentStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 	if callbackResponse.Code != http.StatusOK {
 		t.Fatalf("cloud oauth callback status = %d; body=%s", callbackResponse.Code, callbackResponse.Body.String())
 	}
-	if !reportSeen {
-		t.Fatal("cloud device report was not sent")
+	if tokenRequest.Get("grant_type") != "authorization_code" || tokenRequest.Get("code") != "code-1" || tokenRequest.Get("client_id") != "termbridge-local" || tokenRequest.Get("redirect_uri") != "http://localhost:9030/cloud/oauth/callback" {
+		t.Fatalf("token request = %#v", tokenRequest)
+	}
+	if reportedDevice.Id == "" || reportedDevice.Name == "" || reportedDevice.PublicKey == "" {
+		t.Fatalf("cloud device report = %#v", reportedDevice)
 	}
 	waitFor(t, time.Second, func() bool {
 		clientMu.Lock()
@@ -382,7 +382,7 @@ func TestRunWorkspaceAndSessionList(t *testing.T) {
 	if _, err := Run(context.Background(), Options{Cwd: cwd, Command: Command{Kind: CommandWorkspace}, Stdout: &workspaceOut}); err != nil {
 		t.Fatalf("Run(workspace) error = %v", err)
 	}
-	if !strings.Contains(workspaceOut.String(), "WORKSPACE ID") || !strings.Contains(workspaceOut.String(), filepath.Base(cwd)) {
+	if !strings.Contains(workspaceOut.String(), "WORKSPACE Id") || !strings.Contains(workspaceOut.String(), filepath.Base(cwd)) {
 		t.Fatalf("workspace output = %s", workspaceOut.String())
 	}
 	var sessionOut bytes.Buffer
@@ -390,7 +390,7 @@ func TestRunWorkspaceAndSessionList(t *testing.T) {
 		t.Fatalf("Run(session) error = %v", err)
 	}
 	sessionOutput := sessionOut.String()
-	for _, want := range []string{"SESSION ID", "COMMAND", "CWD", "stopped", "pwsh", cwd} {
+	for _, want := range []string{"SESSION Id", "COMMAND", "CWD", "stopped", "pwsh", cwd} {
 		if !strings.Contains(sessionOutput, want) {
 			t.Fatalf("session output missing %q: %s", want, sessionOutput)
 		}

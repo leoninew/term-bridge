@@ -14,12 +14,12 @@ import (
 	apperrors "termbridge-go/internal/shared/common/errors"
 )
 
-type DB struct {
+type Db struct {
 	*sql.DB
 	Driver string
 }
 
-func Open(ctx context.Context, driver string, sqlitePath string, mysqlDSN string) (*DB, error) {
+func Open(ctx context.Context, driver string, sqlitePath string, mysqlDSN string) (*Db, error) {
 	switch driver {
 	case "sqlite":
 		return openSQLite(ctx, sqlitePath)
@@ -30,7 +30,7 @@ func Open(ctx context.Context, driver string, sqlitePath string, mysqlDSN string
 	}
 }
 
-func openSQLite(ctx context.Context, path string) (*DB, error) {
+func openSQLite(ctx context.Context, path string) (*Db, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, apperrors.Config("create sqlite parent directory", err)
 	}
@@ -55,10 +55,10 @@ func openSQLite(ctx context.Context, path string) (*DB, error) {
 		_ = db.Close()
 		return nil, apperrors.Config("ping sqlite database", err)
 	}
-	return &DB{DB: db, Driver: "sqlite"}, nil
+	return &Db{DB: db, Driver: "sqlite"}, nil
 }
 
-func openMySQL(ctx context.Context, dsn string) (*DB, error) {
+func openMySQL(ctx context.Context, dsn string) (*Db, error) {
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, apperrors.Config("open mysql database", err)
@@ -70,5 +70,5 @@ func openMySQL(ctx context.Context, dsn string) (*DB, error) {
 		_ = db.Close()
 		return nil, apperrors.Config("ping mysql database", err)
 	}
-	return &DB{DB: db, Driver: "mysql"}, nil
+	return &Db{DB: db, Driver: "mysql"}, nil
 }

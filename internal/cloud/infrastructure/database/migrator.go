@@ -58,7 +58,7 @@ func Version(ctx context.Context, db *sql.DB, driver string) (int64, error) {
 func validateCloudSchemaState(ctx context.Context, db *sql.DB, driver string) error {
 	groups := [][]string{
 		{"users", "user_identities", "auth_codes", "email_delivery_logs", "oauth_states"},
-		{"devices", "user_devices", "device_binding_codes"},
+		{"devices", "user_devices"},
 	}
 	for _, group := range groups {
 		present := 0

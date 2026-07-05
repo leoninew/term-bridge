@@ -20,15 +20,15 @@ type ResendSender struct {
 }
 
 type Config struct {
-	APIKey    string
+	ApiKey    string
 	FromEmail string
 }
 
 func NewResendSender(cfg Config) *ResendSender {
-	if cfg.APIKey == "" {
+	if cfg.ApiKey == "" {
 		return nil
 	}
-	return &ResendSender{apiKey: cfg.APIKey, from: cfg.FromEmail, client: &http.Client{Timeout: 10 * time.Second}, endpoint: "https://api.resend.com/emails"}
+	return &ResendSender{apiKey: cfg.ApiKey, from: cfg.FromEmail, client: &http.Client{Timeout: 10 * time.Second}, endpoint: "https://api.resend.com/emails"}
 }
 
 func (s *ResendSender) Send(ctx context.Context, to, subject, html string) (cloudauth.EmailResult, error) {
@@ -50,10 +50,10 @@ func (s *ResendSender) Send(ctx context.Context, to, subject, html string) (clou
 	defer func() { _ = resp.Body.Close() }()
 	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	var body struct {
-		ID string `json:"id"`
+		Id string `json:"id"`
 	}
 	_ = json.Unmarshal(bodyBytes, &body)
-	result := cloudauth.EmailResult{MessageID: body.ID, Success: resp.StatusCode >= 200 && resp.StatusCode < 300, ResponseBody: string(bodyBytes)}
+	result := cloudauth.EmailResult{MessageId: body.Id, Success: resp.StatusCode >= 200 && resp.StatusCode < 300, ResponseBody: string(bodyBytes)}
 	if !result.Success {
 		return result, fmt.Errorf("resend status %d", resp.StatusCode)
 	}

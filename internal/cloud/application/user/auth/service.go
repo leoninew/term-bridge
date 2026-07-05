@@ -39,7 +39,7 @@ type EmailSender interface {
 }
 
 type EmailResult struct {
-	MessageID    string
+	MessageId    string
 	Success      bool
 	ResponseBody string
 }
@@ -68,7 +68,7 @@ type PasswordPolicy struct {
 
 type CodePolicy struct {
 	Length         int
-	TTL            time.Duration
+	Ttl            time.Duration
 	ResendCooldown time.Duration
 	MaxAttempts    int
 }
@@ -83,15 +83,6 @@ type Service struct {
 
 func New(repo *repository.Repository, tokens sharedauth.TokenService, cfg Config, sender EmailSender, google GoogleClient) *Service {
 	return &Service{repo: repo, tokens: tokens, cfg: cfg, sender: sender, google: google}
-}
-
-func (s *Service) Capabilities() authmodel.Capabilities {
-	providers := []string{"email"}
-	if s.google != nil {
-		providers = append(providers, "google")
-	}
-	mail := s.sender != nil
-	return authmodel.Capabilities{Providers: providers, PasswordResetEnabled: mail, EmailVerificationEnabled: mail, AccountAuthEnabled: true, CloudOAuthEnabled: false}
 }
 
 func (s *Service) Register(ctx context.Context, email, password string) error {
@@ -118,7 +109,7 @@ func (s *Service) Register(ctx context.Context, email, password string) error {
 	if err != nil {
 		return err
 	}
-	return s.sendCode(ctx, &user.ID, email, PurposeEmailVerification)
+	return s.sendCode(ctx, &user.Id, email, PurposeEmailVerification)
 }
 
 func (s *Service) ResendVerification(ctx context.Context, email string) error {
@@ -132,24 +123,26 @@ func (s *Service) ResendVerification(ctx context.Context, email string) error {
 	if user.Status == repository.StatusEnabled {
 		return nil
 	}
-	return s.sendCode(ctx, &user.ID, user.EmailNormalized, PurposeEmailVerification)
+	return s.sendCode(ctx, &user.Id, user.EmailNormalized, PurposeEmailVerification)
 }
 
 func (s *Service) VerifyEmail(ctx context.Context, email, code string) error {
 	if err := s.requireRepository(); err != nil {
 		return err
 	}
-	codeRow, err := s.verifyCode(ctx, email, PurposeEmailVerification, code)
-	if err != nil {
-		return err
-	}
-	if !codeRow.UserId.Valid {
-		return authmodel.ErrCodeInvalid
-	}
-	if err := s.repo.MarkEmailVerified(ctx, codeRow.UserId.String); err != nil {
-		return err
-	}
-	return s.repo.MarkCodeUsed(ctx, codeRow.ID)
+	return s.repo.WithinTx(ctx, func(repo *repository.TxRepository) error {
+		codeRow, err := s.verifyCodeWithRepo(ctx, repo, email, PurposeEmailVerification, code)
+		if err != nil {
+			return err
+		}
+		if !codeRow.UserId.Valid {
+			return authmodel.ErrCodeInvalid
+		}
+		if err := repo.MarkEmailVerified(ctx, codeRow.UserId.String); err != nil {
+			return err
+		}
+		return repo.MarkCodeUsed(ctx, codeRow.Id)
+	})
 }
 
 func (s *Service) Login(ctx context.Context, email, password string) (authmodel.Result, error) {
@@ -160,7 +153,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (authmodel.
 	if err != nil {
 		return authmodel.Result{}, authmodel.ErrInvalidCredentials
 	}
-	identity, err := s.repo.FindIdentityForUser(ctx, user.ID, repository.ProviderEmail)
+	identity, err := s.repo.FindIdentityForUser(ctx, user.Id, repository.ProviderEmail)
 	if err != nil || !identity.PasswordHash.Valid {
 		return authmodel.Result{}, authmodel.ErrInvalidCredentials
 	}
@@ -170,7 +163,9 @@ func (s *Service) Login(ctx context.Context, email, password string) (authmodel.
 	if user.Status != repository.StatusEnabled || !user.EmailVerifiedAt.Valid {
 		return authmodel.Result{}, authmodel.ErrEmailNotVerified
 	}
-	_ = s.repo.UpdateLastLogin(ctx, user.ID)
+	if err := s.repo.UpdateLastLogin(ctx, user.Id); err != nil {
+		return authmodel.Result{}, err
+	}
 	return s.sign(userView(user, repository.ProviderEmail))
 }
 
@@ -211,10 +206,10 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email string) error 
 	if user.Status != repository.StatusEnabled || !user.EmailVerifiedAt.Valid {
 		return nil
 	}
-	if _, err := s.repo.FindIdentityForUser(ctx, user.ID, repository.ProviderEmail); err != nil {
+	if _, err := s.repo.FindIdentityForUser(ctx, user.Id, repository.ProviderEmail); err != nil {
 		return nil
 	}
-	return s.sendCode(ctx, &user.ID, user.EmailNormalized, PurposePasswordReset)
+	return s.sendCode(ctx, &user.Id, user.EmailNormalized, PurposePasswordReset)
 }
 
 func (s *Service) ConfirmPasswordReset(ctx context.Context, email, code, newPassword string) error {
@@ -224,21 +219,23 @@ func (s *Service) ConfirmPasswordReset(ctx context.Context, email, code, newPass
 	if err := s.validatePassword(newPassword); err != nil {
 		return err
 	}
-	codeRow, err := s.verifyCode(ctx, email, PurposePasswordReset, code)
-	if err != nil {
-		return err
-	}
-	if !codeRow.UserId.Valid {
-		return authmodel.ErrCodeInvalid
-	}
 	hash, err := hashPassword(newPassword)
 	if err != nil {
 		return err
 	}
-	if err := s.repo.UpdatePassword(ctx, codeRow.UserId.String, hash); err != nil {
-		return err
-	}
-	return s.repo.MarkCodeUsed(ctx, codeRow.ID)
+	return s.repo.WithinTx(ctx, func(repo *repository.TxRepository) error {
+		codeRow, err := s.verifyCodeWithRepo(ctx, repo, email, PurposePasswordReset, code)
+		if err != nil {
+			return err
+		}
+		if !codeRow.UserId.Valid {
+			return authmodel.ErrCodeInvalid
+		}
+		if err := repo.UpdatePassword(ctx, codeRow.UserId.String, hash); err != nil {
+			return err
+		}
+		return repo.MarkCodeUsed(ctx, codeRow.Id)
+	})
 }
 
 func (s *Service) GoogleAuthURL(ctx context.Context) (string, error) {
@@ -287,7 +284,7 @@ func (s *Service) GoogleCallback(ctx context.Context, code, state string) (authm
 		if err != nil {
 			return authmodel.Result{}, err
 		}
-		_ = s.repo.UpdateLastLogin(ctx, user.ID)
+		_ = s.repo.UpdateLastLogin(ctx, user.Id)
 		return s.sign(userView(user, repository.ProviderGoogle))
 	} else if !repository.IsNotFound(err) {
 		return authmodel.Result{}, err
@@ -338,7 +335,7 @@ func (s *Service) requireRepository() error {
 }
 
 func (s *Service) sign(user authmodel.UserView) (authmodel.Result, error) {
-	token, err := s.tokens.Sign(sharedauth.Claims{Sub: user.ID, Email: user.Email, Provider: user.Provider})
+	token, err := s.tokens.Sign(sharedauth.Claims{Sub: user.Id, Email: user.Email, Provider: user.Provider})
 	if err != nil {
 		return authmodel.Result{}, err
 	}
@@ -368,11 +365,7 @@ func (s *Service) sendCode(ctx context.Context, userId *string, email, purpose s
 		return err
 	}
 	hash := hashCode(email, purpose, code)
-	expires := time.Now().UTC().Add(s.cfg.Code.TTL)
-	codeID, err := s.repo.CreateCode(ctx, userId, email, purpose, hash, expires)
-	if err != nil {
-		return err
-	}
+	expires := time.Now().UTC().Add(s.cfg.Code.Ttl)
 	subject := "TermBridge verification code"
 	if purpose == PurposePasswordReset {
 		subject = "TermBridge password reset code"
@@ -381,9 +374,21 @@ func (s *Service) sendCode(ctx context.Context, userId *string, email, purpose s
 	status := "success"
 	if sendErr != nil || !result.Success {
 		status = "failed"
-		_ = s.repo.InvalidateCode(ctx, codeID)
 	}
-	_ = s.repo.SaveEmailLog(ctx, repository.EmailLog{EmailNormalized: email, Purpose: purpose, ProviderMessageID: result.MessageID, Status: status, ResponseBody: result.ResponseBody})
+	if err := s.repo.WithinTx(ctx, func(repo *repository.TxRepository) error {
+		codeId, err := repo.CreateCode(ctx, userId, email, purpose, hash, expires)
+		if err != nil {
+			return err
+		}
+		if status == "failed" {
+			if err := repo.InvalidateCode(ctx, codeId); err != nil {
+				return err
+			}
+		}
+		return repo.SaveEmailLog(ctx, repository.EmailLog{EmailNormalized: email, Purpose: purpose, ProviderMessageId: result.MessageId, Status: status, ResponseBody: result.ResponseBody})
+	}); err != nil {
+		return err
+	}
 	if sendErr != nil {
 		return sendErr
 	}
@@ -393,11 +398,20 @@ func (s *Service) sendCode(ctx context.Context, userId *string, email, purpose s
 	return nil
 }
 
+type codeRepository interface {
+	LatestCode(ctx context.Context, email, purpose string) (repository.AuthCode, error)
+	IncrementCodeAttempts(ctx context.Context, id string) error
+}
+
 func (s *Service) verifyCode(ctx context.Context, email, purpose, input string) (repository.AuthCode, error) {
 	if err := s.requireRepository(); err != nil {
 		return repository.AuthCode{}, authmodel.ErrCodeInvalid
 	}
-	row, err := s.repo.LatestCode(ctx, email, purpose)
+	return s.verifyCodeWithRepo(ctx, s.repo, email, purpose, input)
+}
+
+func (s *Service) verifyCodeWithRepo(ctx context.Context, repo codeRepository, email, purpose, input string) (repository.AuthCode, error) {
+	row, err := repo.LatestCode(ctx, email, purpose)
 	if err != nil {
 		return repository.AuthCode{}, authmodel.ErrCodeInvalid
 	}
@@ -406,14 +420,14 @@ func (s *Service) verifyCode(ctx context.Context, email, purpose, input string) 
 		return repository.AuthCode{}, authmodel.ErrCodeInvalid
 	}
 	if hashCode(email, purpose, strings.ToUpper(strings.TrimSpace(input))) != row.CodeHash {
-		_ = s.repo.IncrementCodeAttempts(ctx, row.ID)
+		_ = repo.IncrementCodeAttempts(ctx, row.Id)
 		return repository.AuthCode{}, authmodel.ErrCodeInvalid
 	}
 	return row, nil
 }
 
 func userView(user repository.User, provider string) authmodel.UserView {
-	return authmodel.UserView{ID: user.ID, Email: user.EmailNormalized, DisplayName: user.DisplayName, Provider: provider, EmailVerified: user.EmailVerifiedAt.Valid}
+	return authmodel.UserView{Id: user.Id, Email: user.EmailNormalized, DisplayName: user.DisplayName, Provider: provider, EmailVerified: user.EmailVerifiedAt.Valid}
 }
 
 func hashPassword(password string) (string, error) {
@@ -456,14 +470,14 @@ type OAuthGoogleClient struct{ cfg *oauth2.Config }
 type GoogleConfig struct {
 	ClientID     string
 	ClientSecret string
-	RedirectURL  string
+	RedirectUrl  string
 }
 
 func NewOAuthGoogleClient(cfg GoogleConfig) GoogleClient {
 	if strings.TrimSpace(cfg.ClientID) == "" {
 		return nil
 	}
-	return &OAuthGoogleClient{cfg: &oauth2.Config{ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret, RedirectURL: cfg.RedirectURL, Scopes: []string{"openid", "email", "profile"}, Endpoint: google.Endpoint}}
+	return &OAuthGoogleClient{cfg: &oauth2.Config{ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret, RedirectURL: cfg.RedirectUrl, Scopes: []string{"openid", "email", "profile"}, Endpoint: google.Endpoint}}
 }
 
 func (g *OAuthGoogleClient) AuthCodeURL(state string) string {

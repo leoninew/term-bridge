@@ -38,11 +38,11 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Base.Base != nil {
 		t.Fatalf("Base.Base = %#v, want nil", cfg.Base.Base)
 	}
-	if cfg.Base.JWT.SecretKey != "" {
-		t.Fatalf("Base.JWT.SecretKey = %q, want default YAML value", cfg.Base.JWT.SecretKey)
+	if cfg.Base.Jwt.SecretKey != "" {
+		t.Fatalf("Base.Jwt.SecretKey = %q, want default YAML value", cfg.Base.Jwt.SecretKey)
 	}
-	if cfg.JWT.SecretKey != "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" {
-		t.Fatalf("JWT.SecretKey = %q, want env value", cfg.JWT.SecretKey)
+	if cfg.Jwt.SecretKey != "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" {
+		t.Fatalf("Jwt.SecretKey = %q, want env value", cfg.Jwt.SecretKey)
 	}
 	if cfg.LogLevel != "info" {
 		t.Fatalf("LogLevel = %q, want info", cfg.LogLevel)
@@ -73,11 +73,11 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Agent.PublicUrl != "http://localhost:9030" {
 		t.Fatalf("Agent.PublicUrl = %q, want local frontend URL", cfg.Agent.PublicUrl)
 	}
-	if cfg.Agent.APIBaseURL != "" {
-		t.Fatalf("Agent.APIBaseURL = %q, want empty", cfg.Agent.APIBaseURL)
+	if cfg.Agent.ApiBaseUrl != "" {
+		t.Fatalf("Agent.ApiBaseUrl = %q, want empty", cfg.Agent.ApiBaseUrl)
 	}
-	if len(cfg.Agent.CORSAllowedOrigins) != 0 {
-		t.Fatalf("Agent.CORSAllowedOrigins = %#v, want empty", cfg.Agent.CORSAllowedOrigins)
+	if len(cfg.Agent.CorsAllowedOrigins) != 0 {
+		t.Fatalf("Agent.CorsAllowedOrigins = %#v, want empty", cfg.Agent.CorsAllowedOrigins)
 	}
 	if cfg.Cloud.ExposeErrors {
 		t.Fatal("Cloud.ExposeErrors = true, want false")
@@ -88,7 +88,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Cloud.GateUrl != "" {
 		t.Fatalf("Cloud.GateUrl = %q, want empty by default", cfg.Cloud.GateUrl)
 	}
-	if cfg.Cloud.OAuth.ClientID != "termbridge-local" || cfg.Cloud.OAuth.ClientSecret != "" || cfg.Cloud.OAuth.RedirectURL != "http://localhost:9030/cloud/oauth/callback" {
+	if cfg.Cloud.OAuth.ClientID != "termbridge-local" || cfg.Cloud.OAuth.ClientSecret != "" || cfg.Cloud.OAuth.RedirectUrl != "http://localhost:9030/cloud/oauth/callback" {
 		t.Fatalf("Cloud.OAuth = %#v", cfg.Cloud.OAuth)
 	}
 	if !reflect.DeepEqual(cfg.Cloud.OAuth.Scopes, []string{"openid", "email", "profile"}) {
@@ -141,12 +141,12 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	if cfg.Agent.PublicUrl != "https://configured.example.com/app" {
 		t.Fatalf("Agent.PublicUrl = %q", cfg.Agent.PublicUrl)
 	}
-	if cfg.Agent.APIBaseURL != "https://api.configured.example.com" {
-		t.Fatalf("Agent.APIBaseURL = %q", cfg.Agent.APIBaseURL)
+	if cfg.Agent.ApiBaseUrl != "https://api.configured.example.com" {
+		t.Fatalf("Agent.ApiBaseUrl = %q", cfg.Agent.ApiBaseUrl)
 	}
 	wantOrigins := []string{"https://configured.example.com", "https://preview.configured.example.com"}
-	if !reflect.DeepEqual(cfg.Agent.CORSAllowedOrigins, wantOrigins) {
-		t.Fatalf("Agent.CORSAllowedOrigins = %#v, want %#v", cfg.Agent.CORSAllowedOrigins, wantOrigins)
+	if !reflect.DeepEqual(cfg.Agent.CorsAllowedOrigins, wantOrigins) {
+		t.Fatalf("Agent.CorsAllowedOrigins = %#v, want %#v", cfg.Agent.CorsAllowedOrigins, wantOrigins)
 	}
 	if cfg.History.MaxLines != 42 || cfg.History.MaxBytes != 2048 || cfg.History.MaxLineBytes != 128 {
 		t.Fatalf("History = %#v", cfg.History)
@@ -193,12 +193,12 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	if cfg.Agent.PublicUrl != "https://dotenv.example.com" || cfg.Agent.ListenUrl != "http://127.0.0.1:9091" {
 		t.Fatalf("Agent = %#v", cfg.Agent)
 	}
-	if cfg.Agent.APIBaseURL != "https://api.dotenv.example.com" {
-		t.Fatalf("Agent.APIBaseURL = %q", cfg.Agent.APIBaseURL)
+	if cfg.Agent.ApiBaseUrl != "https://api.dotenv.example.com" {
+		t.Fatalf("Agent.ApiBaseUrl = %q", cfg.Agent.ApiBaseUrl)
 	}
 	wantOrigins := []string{"https://dotenv.example.com", "https://preview.dotenv.example.com"}
-	if !reflect.DeepEqual(cfg.Agent.CORSAllowedOrigins, wantOrigins) {
-		t.Fatalf("Agent.CORSAllowedOrigins = %#v, want %#v", cfg.Agent.CORSAllowedOrigins, wantOrigins)
+	if !reflect.DeepEqual(cfg.Agent.CorsAllowedOrigins, wantOrigins) {
+		t.Fatalf("Agent.CorsAllowedOrigins = %#v, want %#v", cfg.Agent.CorsAllowedOrigins, wantOrigins)
 	}
 	if !cfg.Agent.ExposeErrors {
 		t.Fatal("Agent.ExposeErrors = false, want true")
@@ -467,10 +467,10 @@ func TestLoadAllowsPathAPIBaseURLForDevProxy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9031" || cfg.Agent.APIBaseURL != "/agent-api" {
+	if cfg.Agent.ListenUrl != "http://127.0.0.1:9031" || cfg.Agent.ApiBaseUrl != "/agent-api" {
 		t.Fatalf("Agent dev proxy config = %#v", cfg.Agent)
 	}
-	if cfg.Cloud.ListenUrl != "http://127.0.0.1:9032" || cfg.Cloud.APIBaseURL != "/cloud-api" {
+	if cfg.Cloud.ListenUrl != "http://127.0.0.1:9032" || cfg.Cloud.ApiBaseUrl != "/cloud-api" {
 		t.Fatalf("Cloud dev proxy config = %#v", cfg.Cloud)
 	}
 }
@@ -519,14 +519,14 @@ func TestLoadGeneratesMissingJWTSecretKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if _, err := security.ParseBase64Key(cfg.JWT.SecretKey, 32); err != nil {
-		t.Fatalf("JWT.SecretKey = %q, want generated fernet key: %v", cfg.JWT.SecretKey, err)
+	if _, err := security.ParseBase64Key(cfg.Jwt.SecretKey, 32); err != nil {
+		t.Fatalf("Jwt.SecretKey = %q, want generated fernet key: %v", cfg.Jwt.SecretKey, err)
 	}
 	data, err := os.ReadFile(filepath.Join(cwd, EnvFileName))
 	if err != nil {
 		t.Fatalf("ReadFile(.env) error = %v", err)
 	}
-	if !strings.Contains(string(data), "TERMBRIDGE_JWT__SECRET_KEY="+quoteEnvValue(cfg.JWT.SecretKey)) {
+	if !strings.Contains(string(data), "TERMBRIDGE_JWT__SECRET_KEY="+quoteEnvValue(cfg.Jwt.SecretKey)) {
 		t.Fatalf("env file missing generated jwt secret key: %s", string(data))
 	}
 }
@@ -544,8 +544,8 @@ func TestLoadGeneratesMissingJWTSecretKeyIntoEnvironmentConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if _, err := security.ParseBase64Key(cfg.JWT.SecretKey, 32); err != nil {
-		t.Fatalf("JWT.SecretKey = %q, want generated fernet key: %v", cfg.JWT.SecretKey, err)
+	if _, err := security.ParseBase64Key(cfg.Jwt.SecretKey, 32); err != nil {
+		t.Fatalf("Jwt.SecretKey = %q, want generated fernet key: %v", cfg.Jwt.SecretKey, err)
 	}
 	if _, err := os.Stat(filepath.Join(cwd, EnvFileName+".develop")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("environment .env file exists err = %v, want not exist", err)
@@ -555,7 +555,7 @@ func TestLoadGeneratesMissingJWTSecretKeyIntoEnvironmentConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile(config.develop.yaml) error = %v", err)
 	}
-	if !strings.Contains(string(data), "secret_key: "+cfg.JWT.SecretKey) {
+	if !strings.Contains(string(data), "secret_key: "+cfg.Jwt.SecretKey) {
 		t.Fatalf("env config file missing generated jwt secret key: %s", string(data))
 	}
 }
@@ -586,7 +586,7 @@ func TestLoadUpsertsGeneratedValuesIntoExistingEnvironmentConfig(t *testing.T) {
 	for _, want := range []string{
 		"level: debug",
 		"listen_url: http://127.0.0.1:9040",
-		"secret_key: " + cfg.JWT.SecretKey,
+		"secret_key: " + cfg.Jwt.SecretKey,
 	} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("env config file missing %q: %s", want, content)

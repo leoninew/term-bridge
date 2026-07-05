@@ -17,7 +17,7 @@ type Config struct {
 	Gate     GateConfig
 	Database DatabaseConfig
 	Auth     AuthConfig
-	JWT      JWTConfig
+	Jwt      JwtConfig
 	Cloud    CloudConnectorConfig
 }
 
@@ -33,15 +33,15 @@ type RuntimeConfig struct {
 type ServerConfig struct {
 	ListenURL          string
 	StaticDir          string
-	APIBaseURL         string
-	CORSAllowedOrigins []string
+	ApiBaseUrl         string
+	CorsAllowedOrigins []string
 }
 
 type GateConfig struct {
-	API GateAPIConfig
+	API GateApiConfig
 }
 
-type GateAPIConfig struct {
+type GateApiConfig struct {
 	ExposeErrors bool
 }
 
@@ -56,14 +56,14 @@ type SQLiteConfig struct {
 }
 
 type MySQLConfig struct {
-	DSN string
+	Dsn string
 }
 
 type AuthConfig struct {
-	JWTTTL time.Duration
+	JwtTTL time.Duration
 }
 
-type JWTConfig struct {
+type JwtConfig struct {
 	SecretKey string
 }
 
@@ -75,6 +75,6 @@ type CloudConnectorConfig struct {
 type CloudOAuthConfig struct {
 	ClientID     string
 	ClientSecret string
-	RedirectURL  string
+	RedirectUrl  string
 	Scopes       []string
 }

@@ -666,50 +666,6 @@ func (x *CloudOAuthAuthorizeResp) GetRedirectUrl() string {
 	return ""
 }
 
-type CloudOAuthExchangeReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CloudOAuthExchangeReq) Reset() {
-	*x = CloudOAuthExchangeReq{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CloudOAuthExchangeReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CloudOAuthExchangeReq) ProtoMessage() {}
-
-func (x *CloudOAuthExchangeReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CloudOAuthExchangeReq.ProtoReflect.Descriptor instead.
-func (*CloudOAuthExchangeReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *CloudOAuthExchangeReq) GetCode() string {
-	if x != nil {
-		return x.Code
-	}
-	return ""
-}
-
 type CloudOAuthCallbackReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
@@ -720,7 +676,7 @@ type CloudOAuthCallbackReq struct {
 
 func (x *CloudOAuthCallbackReq) Reset() {
 	*x = CloudOAuthCallbackReq{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[12]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -732,7 +688,7 @@ func (x *CloudOAuthCallbackReq) String() string {
 func (*CloudOAuthCallbackReq) ProtoMessage() {}
 
 func (x *CloudOAuthCallbackReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[12]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -745,7 +701,7 @@ func (x *CloudOAuthCallbackReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudOAuthCallbackReq.ProtoReflect.Descriptor instead.
 func (*CloudOAuthCallbackReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{12}
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CloudOAuthCallbackReq) GetCode() string {
@@ -772,7 +728,7 @@ type CloudOAuthCallbackResp struct {
 
 func (x *CloudOAuthCallbackResp) Reset() {
 	*x = CloudOAuthCallbackResp{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[13]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -784,7 +740,7 @@ func (x *CloudOAuthCallbackResp) String() string {
 func (*CloudOAuthCallbackResp) ProtoMessage() {}
 
 func (x *CloudOAuthCallbackResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[13]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -797,7 +753,7 @@ func (x *CloudOAuthCallbackResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudOAuthCallbackResp.ProtoReflect.Descriptor instead.
 func (*CloudOAuthCallbackResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{13}
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CloudOAuthCallbackResp) GetCloudSession() *CloudSessionSummary {
@@ -864,9 +820,7 @@ const file_termbridge_cloud_v1_cloud_proto_rawDesc = "" +
 	"\x13CloudOAuthStartResp\x12#\n" +
 	"\rauthorize_url\x18\x01 \x01(\tR\fauthorizeUrl\"<\n" +
 	"\x17CloudOAuthAuthorizeResp\x12!\n" +
-	"\fredirect_url\x18\x01 \x01(\tR\vredirectUrl\"+\n" +
-	"\x15CloudOAuthExchangeReq\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\tR\x04code\"A\n" +
+	"\fredirect_url\x18\x01 \x01(\tR\vredirectUrl\"A\n" +
 	"\x15CloudOAuthCallbackReq\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05state\x18\x02 \x01(\tR\x05state\"\x83\x01\n" +
@@ -886,7 +840,7 @@ func file_termbridge_cloud_v1_cloud_proto_rawDescGZIP() []byte {
 	return file_termbridge_cloud_v1_cloud_proto_rawDescData
 }
 
-var file_termbridge_cloud_v1_cloud_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_termbridge_cloud_v1_cloud_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_termbridge_cloud_v1_cloud_proto_goTypes = []any{
 	(*User)(nil),                    // 0: termbridge.cloud.v1.User
 	(*DeviceSummary)(nil),           // 1: termbridge.cloud.v1.DeviceSummary
@@ -899,15 +853,14 @@ var file_termbridge_cloud_v1_cloud_proto_goTypes = []any{
 	(*CurrentDeviceResp)(nil),       // 8: termbridge.cloud.v1.CurrentDeviceResp
 	(*CloudOAuthStartResp)(nil),     // 9: termbridge.cloud.v1.CloudOAuthStartResp
 	(*CloudOAuthAuthorizeResp)(nil), // 10: termbridge.cloud.v1.CloudOAuthAuthorizeResp
-	(*CloudOAuthExchangeReq)(nil),   // 11: termbridge.cloud.v1.CloudOAuthExchangeReq
-	(*CloudOAuthCallbackReq)(nil),   // 12: termbridge.cloud.v1.CloudOAuthCallbackReq
-	(*CloudOAuthCallbackResp)(nil),  // 13: termbridge.cloud.v1.CloudOAuthCallbackResp
-	(*timestamppb.Timestamp)(nil),   // 14: google.protobuf.Timestamp
+	(*CloudOAuthCallbackReq)(nil),   // 11: termbridge.cloud.v1.CloudOAuthCallbackReq
+	(*CloudOAuthCallbackResp)(nil),  // 12: termbridge.cloud.v1.CloudOAuthCallbackResp
+	(*timestamppb.Timestamp)(nil),   // 13: google.protobuf.Timestamp
 }
 var file_termbridge_cloud_v1_cloud_proto_depIdxs = []int32{
-	14, // 0: termbridge.cloud.v1.DeviceSummary.connected_at:type_name -> google.protobuf.Timestamp
-	14, // 1: termbridge.cloud.v1.DeviceSummary.last_seen:type_name -> google.protobuf.Timestamp
-	14, // 2: termbridge.cloud.v1.CloudSessionSummary.connected_at:type_name -> google.protobuf.Timestamp
+	13, // 0: termbridge.cloud.v1.DeviceSummary.connected_at:type_name -> google.protobuf.Timestamp
+	13, // 1: termbridge.cloud.v1.DeviceSummary.last_seen:type_name -> google.protobuf.Timestamp
+	13, // 2: termbridge.cloud.v1.CloudSessionSummary.connected_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: termbridge.cloud.v1.AuthMeResp.user:type_name -> termbridge.cloud.v1.User
 	2,  // 4: termbridge.cloud.v1.AuthMeResp.cloud_session:type_name -> termbridge.cloud.v1.CloudSessionSummary
 	1,  // 5: termbridge.cloud.v1.ListDevicesResp.items:type_name -> termbridge.cloud.v1.DeviceSummary
@@ -931,7 +884,7 @@ func file_termbridge_cloud_v1_cloud_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_termbridge_cloud_v1_cloud_proto_rawDesc), len(file_termbridge_cloud_v1_cloud_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

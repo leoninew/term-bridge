@@ -16,18 +16,26 @@ import (
 
 const (
 	DeviceSchemaVersion    = 1
-	DeviceIdentityFileName = "agent.json"
+	DeviceIdentityFileName = "device.json"
 	PrivateKeyFileName     = "private_key.pem"
 	PublicKeyFileName      = "public_key.pem"
 )
 
 type Device struct {
-	SchemaVersion int       `json:"schema_version"`
-	Id            string    `json:"id"`
-	Name          string    `json:"name"`
-	PublicKey     string    `json:"public_key"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	SchemaVersion int                  `json:"schema_version"`
+	Id            string               `json:"id"`
+	Name          string               `json:"name"`
+	PublicKey     string               `json:"public_key"`
+	CloudBinding  *CloudBindingSummary `json:"cloud_binding,omitempty"`
+	CreatedAt     time.Time            `json:"created_at"`
+	UpdatedAt     time.Time            `json:"updated_at"`
+}
+
+type CloudBindingSummary struct {
+	GateUrl     string    `json:"gate_url"`
+	DeviceId    string    `json:"device_id"`
+	DeviceName  string    `json:"device_name"`
+	ConnectedAt time.Time `json:"connected_at"`
 }
 
 type DeviceOptions struct {
@@ -36,11 +44,12 @@ type DeviceOptions struct {
 }
 
 type deviceIdentity struct {
-	SchemaVersion int       `json:"schema_version"`
-	Id            string    `json:"id"`
-	Name          string    `json:"name"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	SchemaVersion int                  `json:"schema_version"`
+	Id            string               `json:"id"`
+	Name          string               `json:"name"`
+	CloudBinding  *CloudBindingSummary `json:"cloud_binding,omitempty"`
+	CreatedAt     time.Time            `json:"created_at"`
+	UpdatedAt     time.Time            `json:"updated_at"`
 }
 
 func LoadOrCreateDevice(options DeviceOptions) (Device, error) {
@@ -58,26 +67,13 @@ func LoadOrCreateDevice(options DeviceOptions) (Device, error) {
 	if err != nil {
 		return Device{}, err
 	}
-	return Device{SchemaVersion: DeviceSchemaVersion, Id: identity.Id, Name: identity.Name, PublicKey: keys.PublicKeyBase64, CreatedAt: identity.CreatedAt, UpdatedAt: identity.UpdatedAt}, nil
+	return Device{SchemaVersion: DeviceSchemaVersion, Id: identity.Id, Name: identity.Name, PublicKey: keys.PublicKeyBase64, CloudBinding: cloneCloudBindingSummary(identity.CloudBinding), CreatedAt: identity.CreatedAt, UpdatedAt: identity.UpdatedAt}, nil
 }
 
 func loadOrCreateDeviceIdentity(stateDir string, now time.Time) (deviceIdentity, error) {
 	path := filepath.Join(stateDir, DeviceIdentityFileName)
-	data, err := os.ReadFile(path)
+	identity, err := readDeviceIdentity(path)
 	if err == nil {
-		var identity deviceIdentity
-		if err := json.Unmarshal(data, &identity); err != nil {
-			return deviceIdentity{}, fmt.Errorf("read device identity: %w", err)
-		}
-		if identity.SchemaVersion != DeviceSchemaVersion {
-			return deviceIdentity{}, fmt.Errorf("read device identity: unsupported schema version %d", identity.SchemaVersion)
-		}
-		if strings.TrimSpace(identity.Id) == "" {
-			return deviceIdentity{}, fmt.Errorf("read device identity: id is required")
-		}
-		if strings.TrimSpace(identity.Name) == "" {
-			return deviceIdentity{}, fmt.Errorf("read device identity: name is required")
-		}
 		return identity, nil
 	}
 	if !os.IsNotExist(err) {
@@ -87,20 +83,102 @@ func loadOrCreateDeviceIdentity(stateDir string, now time.Time) (deviceIdentity,
 	if err != nil {
 		return deviceIdentity{}, err
 	}
-	identity := deviceIdentity{SchemaVersion: DeviceSchemaVersion, Id: id, Name: defaultDeviceName(), CreatedAt: now, UpdatedAt: now}
+	identity = deviceIdentity{SchemaVersion: DeviceSchemaVersion, Id: id, Name: defaultDeviceName(), CreatedAt: now, UpdatedAt: now}
 	if err := writeDeviceIdentity(path, identity); err != nil {
 		return deviceIdentity{}, err
 	}
 	return identity, nil
 }
 
+func readDeviceIdentity(path string) (deviceIdentity, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return deviceIdentity{}, err
+	}
+	var identity deviceIdentity
+	if err := json.Unmarshal(data, &identity); err != nil {
+		return deviceIdentity{}, fmt.Errorf("read device identity: %w", err)
+	}
+	if identity.SchemaVersion != DeviceSchemaVersion {
+		return deviceIdentity{}, fmt.Errorf("read device identity: unsupported schema version %d", identity.SchemaVersion)
+	}
+	if strings.TrimSpace(identity.Id) == "" {
+		return deviceIdentity{}, fmt.Errorf("read device identity: id is required")
+	}
+	if strings.TrimSpace(identity.Name) == "" {
+		return deviceIdentity{}, fmt.Errorf("read device identity: name is required")
+	}
+	identity.CloudBinding = cloneCloudBindingSummary(identity.CloudBinding)
+	return identity, nil
+}
+
 func writeDeviceIdentity(path string, identity deviceIdentity) error {
+	identity.CloudBinding = cloneCloudBindingSummary(identity.CloudBinding)
 	data, err := json.MarshalIndent(identity, "", "  ")
 	if err != nil {
 		return err
 	}
 	data = append(data, '\n')
 	return writeFileAtomic(path, data, 0o600)
+}
+
+func LoadCloudBindingSummary(stateDir string) (*CloudBindingSummary, error) {
+	if strings.TrimSpace(stateDir) == "" {
+		return nil, fmt.Errorf("state dir is required")
+	}
+	identity, err := readDeviceIdentity(filepath.Join(stateDir, DeviceIdentityFileName))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return cloneCloudBindingSummary(identity.CloudBinding), nil
+}
+
+func SaveCloudBindingSummary(stateDir string, summary CloudBindingSummary, now time.Time) error {
+	if strings.TrimSpace(stateDir) == "" {
+		return fmt.Errorf("state dir is required")
+	}
+	if strings.TrimSpace(summary.GateUrl) == "" {
+		return fmt.Errorf("cloud binding gate URL is required")
+	}
+	if strings.TrimSpace(summary.DeviceId) == "" {
+		return fmt.Errorf("cloud binding device id is required")
+	}
+	if strings.TrimSpace(summary.DeviceName) == "" {
+		return fmt.Errorf("cloud binding device name is required")
+	}
+	if summary.ConnectedAt.IsZero() {
+		return fmt.Errorf("cloud binding connected time is required")
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	path := filepath.Join(stateDir, DeviceIdentityFileName)
+	identity, err := readDeviceIdentity(path)
+	if err != nil {
+		return err
+	}
+	summary.GateUrl = strings.TrimRight(strings.TrimSpace(summary.GateUrl), "/")
+	summary.DeviceId = strings.TrimSpace(summary.DeviceId)
+	summary.DeviceName = strings.TrimSpace(summary.DeviceName)
+	summary.ConnectedAt = summary.ConnectedAt.UTC()
+	identity.CloudBinding = &summary
+	identity.UpdatedAt = now.UTC()
+	return writeDeviceIdentity(path, identity)
+}
+
+func cloneCloudBindingSummary(summary *CloudBindingSummary) *CloudBindingSummary {
+	if summary == nil {
+		return nil
+	}
+	clone := *summary
+	clone.GateUrl = strings.TrimRight(strings.TrimSpace(clone.GateUrl), "/")
+	clone.DeviceId = strings.TrimSpace(clone.DeviceId)
+	clone.DeviceName = strings.TrimSpace(clone.DeviceName)
+	clone.ConnectedAt = clone.ConnectedAt.UTC()
+	return &clone
 }
 
 type deviceKeys struct {

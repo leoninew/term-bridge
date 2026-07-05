@@ -30,7 +30,7 @@
   import { ToastProvider } from 'reka-ui'
   import LoginPanel from '../components/session/LoginPanel.vue'
   import ToastHost from '../components/session/ToastHost.vue'
-  import { authGoogleURL } from '../features/cloud/api'
+  import { authGoogleUrl } from '../features/cloud/api'
   import { useAppModeStore } from '../store/appMode'
   import { writeStorageValue } from '../store/storage'
   import { useGatewayStore } from '../store/gateway'
@@ -86,7 +86,7 @@
       if (redirect) {
         writeStorageValue(OAUTH_REDIRECT_KEY, redirect)
       }
-      window.location.href = await authGoogleURL()
+      window.location.href = await authGoogleUrl()
     } catch (err) {
       googleLoggingIn.value = false
       notifications.notifyError(t('gateway.googleLoginFailed'), err)
