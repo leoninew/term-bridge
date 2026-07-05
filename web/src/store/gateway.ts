@@ -4,7 +4,12 @@ import { readStorageValue, removeStorageValue, writeStorageValue } from './stora
 import { authLoginViaAgent, authMe } from '../features/agent/api'
 import { authLogin, authMeViaCloud, listDevices } from '../features/cloud/api'
 import { useAppModeStore } from './appMode'
-import type { CloudSessionSummary, DeviceSummary, TokenResp, UserInfo } from '../features/types'
+import type {
+  CloudSessionSummary,
+  DeviceSummary,
+  TokenResp,
+  User as UserInfo,
+} from '../gen/proto/termbridge/cloud/v1/cloud'
 import type { RuntimeTarget } from '../features/runtimeTarget'
 import type { ApiTarget } from '../config'
 

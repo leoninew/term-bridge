@@ -3,8 +3,6 @@ package api
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -15,7 +13,6 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"golang.org/x/oauth2"
 
 	terminalapp "termbridge-go/internal/agent/application/task/terminal"
 	agentapp "termbridge-go/internal/agent/application/user"
@@ -29,19 +26,11 @@ type Config struct {
 	Logger              *slog.Logger
 	AuthService         AuthService
 	CloudGateURL        string
-	CloudOAuth          CloudOAuthConfig
 	LocalDevice         agentapp.Device
 	LocalDeviceStateDir string
 	LocalRuntime        agentapp.RuntimeAccess
 	CORSAllowedOrigins  []string
 	OnLocalCloudSession func(CloudSessionSummary)
-}
-
-type CloudOAuthConfig struct {
-	ClientID     string
-	ClientSecret string
-	RedirectUrl  string
-	Scopes       []string
 }
 
 type AuthService interface {
@@ -50,34 +39,23 @@ type AuthService interface {
 	VerifyToken(token string) (auth.Claims, error)
 }
 
-const cloudOAuthStateTtl = 10 * time.Minute
-
-type CloudOAuthState struct {
-	Value            string
-	PostAuthRedirect string
-	ExpiresAt        time.Time
-}
-
 type Handler struct {
-	config              Config
-	auth                *auth.Auther
-	authService         AuthService
-	writers             map[string]string
-	writerMu            sync.Mutex
-	cacheMu             sync.Mutex
-	workspaceTreeCache  map[string]json.RawMessage
-	historyCache        map[string]map[string]string
-	cloudSessionMu      sync.Mutex
-	cloudSession        *CloudSessionSummary
-	cloudOAuthMu        sync.Mutex
-	cloudOAuthStates    map[string]CloudOAuthState
-	cloudOAuthConfigErr error
-	localRuntime        runtimeEndpoint
+	config             Config
+	auth               *auth.Auther
+	authService        AuthService
+	writers            map[string]string
+	writerMu           sync.Mutex
+	cacheMu            sync.Mutex
+	workspaceTreeCache map[string]json.RawMessage
+	historyCache       map[string]map[string]string
+	cloudSessionMu     sync.Mutex
+	cloudSession       *CloudSessionSummary
+	localRuntime       runtimeEndpoint
 }
 
 func New(config Config) *Handler {
 	config = normalizeConfig(config)
-	handler := &Handler{config: config, auth: auth.NewAuther(auth.Credentials{}, auth.NewTokenService(config.JWTSecret)), authService: config.AuthService, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}, cloudOAuthStates: map[string]CloudOAuthState{}, cloudOAuthConfigErr: validateCloudOAuthConfig(config)}
+	handler := &Handler{config: config, auth: auth.NewAuther(auth.Credentials{}, auth.NewTokenService(config.JWTSecret)), authService: config.AuthService, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
 	if config.LocalDevice.CloudBinding != nil {
 		handler.setLocalCloudSession(cloudSessionSummaryFromBinding(*config.LocalDevice.CloudBinding))
 	} else if config.LocalDeviceStateDir != "" {
@@ -110,8 +88,7 @@ func (h *Handler) registerCommonRoutes(mux *http.ServeMux) {
 }
 
 func (h *Handler) registerAgentRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/agent-api/cloud-oauth/start", h.handleCloudOAuthStart)
-	mux.HandleFunc("/agent-api/cloud-oauth/callback", h.handleCloudOAuthCallback)
+	mux.HandleFunc("/agent-api/cloud/connect", h.authMiddleware(http.HandlerFunc(h.handleCloudConnect)).ServeHTTP)
 	mux.HandleFunc("/agent-api/workspaces", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
 	mux.HandleFunc("/agent-api/workspaces/", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
 	mux.HandleFunc("/agent-api/sessions", h.authMiddleware(http.HandlerFunc(h.handleLocalSessions)).ServeHTTP)
@@ -197,51 +174,6 @@ func (s *Handler) authMiddleware(next http.Handler) http.Handler {
 		s.auth.Middleware(next, s.writeUnauthorized).ServeHTTP(w, r)
 	})
 }
-func (s *Handler) storeCloudOAuthState(state CloudOAuthState, now time.Time) {
-	s.cloudOAuthMu.Lock()
-	defer s.cloudOAuthMu.Unlock()
-	for value, existing := range s.cloudOAuthStates {
-		if !existing.ExpiresAt.IsZero() && !existing.ExpiresAt.After(now) {
-			delete(s.cloudOAuthStates, value)
-		}
-	}
-	s.cloudOAuthStates[state.Value] = state
-}
-
-func (s *Handler) consumeCloudOAuthState(value string, now time.Time) (CloudOAuthState, bool) {
-	s.cloudOAuthMu.Lock()
-	defer s.cloudOAuthMu.Unlock()
-	state, ok := s.cloudOAuthStates[value]
-	if ok {
-		delete(s.cloudOAuthStates, value)
-	}
-	if !ok || state.ExpiresAt.IsZero() || !state.ExpiresAt.After(now) {
-		return CloudOAuthState{}, false
-	}
-	return state, true
-}
-
-func randomCloudOAuthState() (string, error) {
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
-}
-
-func validateCloudOAuthConfig(config Config) error {
-	if config.CloudGateURL == "" {
-		return fmt.Errorf("cloud gate URL is required")
-	}
-	if config.CloudOAuth.ClientID == "" {
-		return fmt.Errorf("cloud OAuth client id is required")
-	}
-	if config.CloudOAuth.RedirectUrl == "" {
-		return fmt.Errorf("cloud OAuth redirect URL is required")
-	}
-	return nil
-}
-
 func (s *Handler) localCloudSessionSummary() *CloudSessionSummary {
 	s.cloudSessionMu.Lock()
 	defer s.cloudSessionMu.Unlock()
@@ -274,82 +206,49 @@ func (s *Handler) claimsFromRequest(r *http.Request) (auth.Claims, bool) {
 	claims, err := s.authService.VerifyToken(token)
 	return claims, err == nil
 }
-func (s *Handler) handleCloudOAuthStart(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		s.methodNotAllowed(w, r, http.MethodGet)
-		return
-	}
-	if err := s.cloudOAuthConfigErr; err != nil {
-		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud OAuth is not configured.", err)
-		return
-	}
-	state, err := randomCloudOAuthState()
-	if err != nil {
-		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
-		return
-	}
-	now := time.Now().UTC()
-	s.storeCloudOAuthState(CloudOAuthState{Value: state, PostAuthRedirect: r.URL.Query().Get("redirect"), ExpiresAt: now.Add(cloudOAuthStateTtl)}, now)
-	oauthConfig := s.cloudOAuthConfig()
-	writeJSON(w, http.StatusOK, CloudOAuthStartResp{AuthorizeURL: oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOnline)})
-}
-
-func (s *Handler) cloudOAuthConfig() *oauth2.Config {
-	return &oauth2.Config{
-		ClientID:     s.config.CloudOAuth.ClientID,
-		ClientSecret: s.config.CloudOAuth.ClientSecret,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:   s.config.CloudGateURL + "/oauth2/authorize",
-			TokenURL:  s.config.CloudGateURL + "/cloud-api/oauth2/token",
-			AuthStyle: oauth2.AuthStyleInParams,
-		},
-		RedirectURL: s.config.CloudOAuth.RedirectUrl,
-		Scopes:      append([]string(nil), s.config.CloudOAuth.Scopes...),
-	}
-}
-
-func (s *Handler) handleCloudOAuthCallback(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleCloudConnect(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if err := s.cloudOAuthConfigErr; err != nil {
-		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud OAuth is not configured.", err)
+	if strings.TrimSpace(s.config.CloudGateURL) == "" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud Gate is not configured.", nil)
 		return
 	}
-	var req CloudOAuthCallbackReq
+	var req CloudConnectReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
-	stateValue := strings.TrimSpace(req.State)
-	code := strings.TrimSpace(req.Code)
-	if stateValue == "" || code == "" {
-		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth callback is invalid.", nil)
+	cloudToken := strings.TrimSpace(req.CloudToken)
+	if cloudToken == "" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud token is required.", nil)
 		return
 	}
-	state, ok := s.consumeCloudOAuthState(stateValue, time.Now().UTC())
-	if !ok {
-		s.writeAPIError(w, r, http.StatusUnauthorized, errorCodeUnauthorized, "OAuth state is invalid or expired.", nil)
-		return
-	}
-	summary, err := s.completeCloudOAuthLogin(r.Context(), code)
+	summary, err := s.connectCloudWithToken(r.Context(), cloudToken)
 	if err != nil {
-		s.config.Logger.Warn("cloud oauth callback failed", "error", err)
+		s.config.Logger.Warn("cloud connect failed", "error", err)
 		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
 		return
 	}
+	if !s.persistLocalCloudSession(w, r, summary) {
+		return
+	}
+	writeJSON(w, http.StatusOK, CloudConnectResp{CloudSession: summary})
+}
+
+func (s *Handler) persistLocalCloudSession(w http.ResponseWriter, r *http.Request, summary CloudSessionSummary) bool {
 	if s.config.LocalDeviceStateDir != "" {
 		if err := agentapp.SaveCloudBindingSummary(s.config.LocalDeviceStateDir, cloudBindingSummaryFromSession(summary), time.Now().UTC()); err != nil {
 			s.config.Logger.Warn("persist local cloud session", "error", err)
 			s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
-			return
+			return false
 		}
 	}
 	s.setLocalCloudSession(summary)
 	if s.config.OnLocalCloudSession != nil {
 		s.config.OnLocalCloudSession(summary)
 	}
-	writeJSON(w, http.StatusOK, CloudOAuthCallbackResp{CloudSession: summary, Redirect: state.PostAuthRedirect})
+	return true
 }
 
 func (s *Handler) handleLocalWorkspaces(w http.ResponseWriter, r *http.Request) {
@@ -587,7 +486,7 @@ func terminalAttachSizeFromQuery(r *http.Request) (int, int, bool, error) {
 	}
 	return cols, rows, true, nil
 }
-func writeTerminalControl(conn *websocket.Conn, message terminalproto.ServerMessage) error {
+func writeTerminalControl(conn *websocket.Conn, message *terminalproto.ServerMessage) error {
 	data, err := terminalproto.EncodeServer(message)
 	if err != nil {
 		return err
@@ -595,7 +494,7 @@ func writeTerminalControl(conn *websocket.Conn, message terminalproto.ServerMess
 	return conn.Write(context.Background(), websocket.MessageText, data)
 }
 
-func (s *Handler) completeCloudOAuthLogin(ctx context.Context, code string) (CloudSessionSummary, error) {
+func (s *Handler) connectCloudWithToken(ctx context.Context, cloudToken string) (CloudSessionSummary, error) {
 	device := s.config.LocalDevice
 	if device.Id == "" || device.Name == "" {
 		return CloudSessionSummary{}, fmt.Errorf("local device identity is incomplete")
@@ -603,14 +502,7 @@ func (s *Handler) completeCloudOAuthLogin(ctx context.Context, code string) (Clo
 	if strings.TrimSpace(device.PublicKey) == "" {
 		return CloudSessionSummary{}, fmt.Errorf("local device public key is incomplete")
 	}
-	token, err := s.cloudOAuthConfig().Exchange(ctx, code)
-	if err != nil {
-		return CloudSessionSummary{}, err
-	}
-	if strings.TrimSpace(token.AccessToken) == "" {
-		return CloudSessionSummary{}, fmt.Errorf("cloud OAuth token response missing access token")
-	}
-	reportBody, err := json.Marshal(CloudOAuthDeviceReportReq{Id: device.Id, Name: device.Name, PublicKey: device.PublicKey})
+	reportBody, err := json.Marshal(CloudDeviceReportReq{Id: device.Id, Name: device.Name, PublicKey: device.PublicKey})
 	if err != nil {
 		return CloudSessionSummary{}, err
 	}
@@ -619,7 +511,7 @@ func (s *Handler) completeCloudOAuthLogin(ctx context.Context, code string) (Clo
 		return CloudSessionSummary{}, err
 	}
 	reportReq.Header.Set("Content-Type", "application/json")
-	reportReq.Header.Set("Authorization", "Bearer "+token.AccessToken)
+	reportReq.Header.Set("Authorization", "Bearer "+cloudToken)
 	reportResp, err := http.DefaultClient.Do(reportReq)
 	if err != nil {
 		return CloudSessionSummary{}, err
@@ -708,16 +600,5 @@ func normalizeConfig(config Config) Config {
 	}
 	config.CloudGateURL = strings.TrimRight(strings.TrimSpace(config.CloudGateURL), "/")
 	config.CORSAllowedOrigins = cleanOrigins(config.CORSAllowedOrigins)
-	config.CloudOAuth.ClientID = strings.TrimSpace(config.CloudOAuth.ClientID)
-	config.CloudOAuth.ClientSecret = strings.TrimSpace(config.CloudOAuth.ClientSecret)
-	config.CloudOAuth.RedirectUrl = strings.TrimRight(strings.TrimSpace(config.CloudOAuth.RedirectUrl), "/")
-	cleanScopes := make([]string, 0, len(config.CloudOAuth.Scopes))
-	for _, scope := range config.CloudOAuth.Scopes {
-		scope = strings.TrimSpace(scope)
-		if scope != "" {
-			cleanScopes = append(cleanScopes, scope)
-		}
-	}
-	config.CloudOAuth.Scopes = cleanScopes
 	return config
 }

@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAppModeStore, type RouteMode } from '../store/appMode'
 import { useGatewayStore } from '../store/gateway'
 
-const agentAuthWhitelistRoutes = ['home', 'cloud-oauth-start', 'cloud-oauth-callback']
+const agentAuthWhitelistRoutes = ['home']
 
 const cloudAuthWhitelistRoutes = [
   'home',
@@ -12,7 +12,6 @@ const cloudAuthWhitelistRoutes = [
   'forgot-password',
   'google-callback',
   'reset-password',
-  'cloud-oauth-authorize',
 ]
 
 export const router = createRouter({
@@ -65,27 +64,6 @@ export const router = createRouter({
       name: 'connect',
       component: () => import('../views/ConnectView.vue'),
       meta: { mode: 'agent' },
-    },
-    {
-      path: '/cloud/oauth/start',
-      alias: '/cloud/connect/start',
-      name: 'cloud-oauth-start',
-      component: () => import('../views/CloudConnectStartView.vue'),
-      meta: { mode: 'agent' },
-    },
-    {
-      path: '/cloud/oauth/callback',
-      alias: '/cloud/connect/callback',
-      name: 'cloud-oauth-callback',
-      component: () => import('../views/CloudConnectCallbackView.vue'),
-      meta: { mode: 'agent' },
-    },
-    {
-      path: '/oauth2/authorize',
-      alias: '/cloud/connect/authorize',
-      name: 'cloud-oauth-authorize',
-      component: () => import('../views/CloudConnectAuthorizeView.vue'),
-      meta: { mode: 'cloud' },
     },
     {
       path: '/agent/dashboard',

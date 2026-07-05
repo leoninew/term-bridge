@@ -47,7 +47,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		return apperrors.Config("invalid jwt.secret_key", err)
 	}
 	authService := cloudauth.New(repo, tokens, cloudauth.Config{PasswordPolicy: cloudauth.PasswordPolicy{MinLength: cfg.Auth.PasswordPolicy.MinLength, MaxLength: cfg.Auth.PasswordPolicy.MaxLength}, Code: cloudauth.CodePolicy{Length: cfg.Auth.Code.Length, Ttl: cfg.Auth.Code.Ttl, ResendCooldown: cfg.Auth.Code.ResendCooldown, MaxAttempts: cfg.Auth.Code.MaxAttempts}}, cloudemail.NewResendSender(cloudemail.Config{ApiKey: cfg.Resend.ApiKey, FromEmail: cfg.Resend.FromEmail}), cloudauth.NewOAuthGoogleClient(cloudauth.GoogleConfig{ClientID: cfg.Auth.Google.ClientID, ClientSecret: cfg.Auth.Google.ClientSecret, RedirectUrl: cfg.Auth.Google.RedirectUrl}))
-	cloudHandler := cloudapi.New(cloudapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, AgentTunnelAudience: tunnelAudience(cfg), DeviceRepository: cloudapi.NewDeviceRepository(deviceRepository), CloudGateURL: cfg.Cloud.GateURL, CloudOAuth: cloudapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectUrl: cfg.Cloud.OAuth.RedirectUrl, Scopes: cfg.Cloud.OAuth.Scopes}, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey()})
+	cloudHandler := cloudapi.New(cloudapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, AgentTunnelAudience: tunnelAudience(cfg), DeviceRepository: cloudapi.NewDeviceRepository(deviceRepository), CloudGateURL: cfg.Cloud.GateURL, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey()})
 	return serveHTTP(ctx, cfg, logger, options, cloudHandler, stdout)
 }
 

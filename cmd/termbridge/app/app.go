@@ -236,12 +236,6 @@ func agentConfig(cfg config.Config) agentserver.Config {
 		Jwt:  agentserver.JwtConfig{SecretKey: cfg.Jwt.SecretKey},
 		Cloud: agentserver.CloudConnectorConfig{
 			GateURL: cfg.Cloud.GateUrl,
-			OAuth: agentserver.CloudOAuthConfig{
-				ClientID:     cfg.Cloud.OAuth.ClientID,
-				ClientSecret: cfg.Cloud.OAuth.ClientSecret,
-				RedirectUrl:  cfg.Cloud.OAuth.RedirectUrl,
-				Scopes:       append([]string(nil), cfg.Cloud.OAuth.Scopes...),
-			},
 		},
 	}
 }
@@ -298,12 +292,6 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 		},
 		Cloud: cloudserver.CloudConfig{
 			GateURL: cfg.Cloud.GateUrl,
-			OAuth: cloudserver.CloudOAuthConfig{
-				ClientID:     cfg.Cloud.OAuth.ClientID,
-				ClientSecret: cfg.Cloud.OAuth.ClientSecret,
-				RedirectUrl:  cfg.Cloud.OAuth.RedirectUrl,
-				Scopes:       append([]string(nil), cfg.Cloud.OAuth.Scopes...),
-			},
 		},
 	}
 }

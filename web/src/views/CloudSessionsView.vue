@@ -30,7 +30,11 @@
   } from '../features/cloud/api'
   import type { SessionRuntimeApi } from '../features/sessions/runtime'
   import type { RuntimeTarget } from '../features/runtimeTarget'
-  import type { CreateSessionReq, RerunSessionReq, UpdateSessionReq } from '../protocol/terminal'
+  import type {
+    CreateSessionReq,
+    RerunSessionReq,
+    UpdateSessionReq,
+  } from '../gen/proto/termbridge/runtime/v1/runtime'
 
   const route = useRoute()
   const gateway = useGatewayStore()

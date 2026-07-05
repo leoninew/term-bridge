@@ -92,7 +92,7 @@
   import { useI18n } from 'vue-i18n'
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../components/session/ToastHost.vue'
-  import type { DeviceSummary } from '../features/types'
+  import type { DeviceSummary } from '../gen/proto/termbridge/cloud/v1/cloud'
   import { useGatewayStore } from '../store/gateway'
   import { useNotificationsStore } from '../store/notifications'
 

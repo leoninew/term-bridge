@@ -1,31 +1,36 @@
 import type { AxiosResponse } from 'axios'
 import type {
-  CreateSessionReq,
-  CreateSessionResp,
-  ListResp,
-  RerunSessionReq,
-  SessionSummary,
-  UpdateSessionReq,
-  WorkspaceSummary,
-  WorkspaceTreeSession,
-  WorkspaceTreeSummary,
-} from '../../protocol/terminal'
-import { cloudApiClient } from '../api/client'
-import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
-import type { RuntimeTarget } from '../runtimeTarget'
-import type {
+  AuthChangePasswordReq,
+  AuthGoogleCallbackReq,
+  AuthLoginReq,
   AuthMeResp,
-  CloudOAuthAuthorizeResp,
+  AuthPasswordResetConfirmReq,
+  AuthPasswordResetRequestReq,
+  AuthRegisterReq,
+  AuthResendVerificationReq,
+  AuthVerifyEmailReq,
   DeviceSummary,
   GoogleAuthUrlResp,
   ListDevicesResp,
   TokenResp,
-} from '../types'
-
-export type ListWorkspacesResp = ListResp<WorkspaceSummary>
-export type WorkspaceTreeResp = ListResp<WorkspaceTreeSummary>
-export type UpdateWorkspaceOrderResp = ListResp<WorkspaceSummary>
-export type UpdateSessionOrderResp = ListResp<WorkspaceTreeSession>
+} from '../../gen/proto/termbridge/cloud/v1/cloud'
+import type {
+  CreateSessionReq,
+  CreateSessionResp,
+  ListWorkspacesResp,
+  RerunSessionReq,
+  SessionSummary,
+  UpdateSessionReq,
+  UpdateSessionOrderResp,
+  UpdateWorkspaceOrderReq,
+  UpdateWorkspaceOrderResp,
+  Workspace,
+  WorkspaceTreeNode,
+  WorkspaceTreeResp,
+} from '../../gen/proto/termbridge/runtime/v1/runtime'
+import { cloudApiClient } from '../api/client'
+import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
+import type { RuntimeTarget } from '../runtimeTarget'
 
 export async function authMeViaCloud(): Promise<AuthMeResp> {
   try {
@@ -33,14 +38,15 @@ export async function authMeViaCloud(): Promise<AuthMeResp> {
     return response.data
   } catch (err) {
     if (isUnauthorizedApiError(err)) {
-      return { authenticated: false, username: '' }
+      return { authenticated: false, username: '', user: undefined, cloud_session: undefined }
     }
     throw err
   }
 }
 
 export async function authLogin(email: string, password: string): Promise<TokenResp> {
-  const response = await cloudApiClient.post<TokenResp>('/auth/login', { email, password })
+  const request: AuthLoginReq = { email, username: '', password }
+  const response = await cloudApiClient.post<TokenResp>('/auth/login', request)
   return response.data
 }
 
@@ -49,19 +55,23 @@ export async function authLogout(): Promise<void> {
 }
 
 export async function authRegister(email: string, password: string): Promise<void> {
-  await cloudApiClient.post('/auth/register', { email, password })
+  const request: AuthRegisterReq = { email, password }
+  await cloudApiClient.post('/auth/register', request)
 }
 
 export async function authVerifyEmail(email: string, code: string): Promise<void> {
-  await cloudApiClient.post('/auth/email/verify', { email, code })
+  const request: AuthVerifyEmailReq = { email, code }
+  await cloudApiClient.post('/auth/email/verify', request)
 }
 
 export async function authResendVerification(email: string): Promise<void> {
-  await cloudApiClient.post('/auth/email/verification/resend', { email })
+  const request: AuthResendVerificationReq = { email }
+  await cloudApiClient.post('/auth/email/verification/resend', request)
 }
 
 export async function authPasswordResetRequest(email: string): Promise<void> {
-  await cloudApiClient.post('/auth/password-reset/request', { email })
+  const request: AuthPasswordResetRequestReq = { email }
+  await cloudApiClient.post('/auth/password-reset/request', request)
 }
 
 export async function authPasswordResetConfirm(
@@ -69,21 +79,19 @@ export async function authPasswordResetConfirm(
   code: string,
   newPassword: string,
 ): Promise<void> {
-  await cloudApiClient.post('/auth/password-reset/confirm', {
-    email,
-    code,
-    new_password: newPassword,
-  })
+  const request: AuthPasswordResetConfirmReq = { email, code, new_password: newPassword }
+  await cloudApiClient.post('/auth/password-reset/confirm', request)
 }
 
 export async function authChangePassword(
   currentPassword: string,
   newPassword: string,
 ): Promise<void> {
-  await cloudApiClient.post('/auth/password/change', {
+  const request: AuthChangePasswordReq = {
     current_password: currentPassword,
     new_password: newPassword,
-  })
+  }
+  await cloudApiClient.post('/auth/password/change', request)
 }
 
 export async function authGoogleUrl(): Promise<string> {
@@ -92,22 +100,9 @@ export async function authGoogleUrl(): Promise<string> {
 }
 
 export async function authGoogleCallback(code: string, state: string): Promise<TokenResp> {
-  const response = await cloudApiClient.post<TokenResp>('/auth/google/callback', {
-    code,
-    state,
-  })
+  const request: AuthGoogleCallbackReq = { code, state }
+  const response = await cloudApiClient.post<TokenResp>('/auth/google/callback', request)
   return response.data
-}
-
-export async function cloudOAuthAuthorize(
-  clientId: string,
-  redirectUri: string,
-  state: string,
-): Promise<string> {
-  const response = await cloudApiClient.get<CloudOAuthAuthorizeResp>('/cloud-oauth/authorize', {
-    params: { client_id: clientId, redirect_uri: redirectUri, state },
-  })
-  return response.data.redirect_url
 }
 
 export async function deleteDevice(deviceId: string): Promise<void> {
@@ -205,7 +200,7 @@ export async function updateSessionOrder(
   target: RuntimeTarget,
   workspaceId: string,
   sessionIds: string[],
-): Promise<WorkspaceTreeSession[]> {
+): Promise<SessionSummary[]> {
   const response = await cloudApiClient.patch<UpdateSessionOrderResp>(
     cloudRuntimePath(target, `${workspaceSessionPath(workspaceId)}/order`),
     { session_ids: sessionIds },
@@ -213,9 +208,7 @@ export async function updateSessionOrder(
   return response.data.items
 }
 
-export async function listWorkspaces(
-  target: RuntimeTarget,
-): Promise<ApiResult<WorkspaceSummary[]>> {
+export async function listWorkspaces(target: RuntimeTarget): Promise<ApiResult<Workspace[]>> {
   const response = await cloudApiClient.get<ListWorkspacesResp>(
     cloudRuntimePath(target, '/workspaces'),
   )
@@ -227,7 +220,7 @@ export async function listWorkspaces(
 
 export async function listWorkspaceTree(
   target: RuntimeTarget,
-): Promise<ApiResult<WorkspaceTreeSummary[]>> {
+): Promise<ApiResult<WorkspaceTreeNode[]>> {
   const response = await cloudApiClient.get<WorkspaceTreeResp>(
     cloudRuntimePath(target, '/workspaces/tree'),
   )
@@ -237,14 +230,10 @@ export async function listWorkspaceTree(
   }
 }
 
-export type UpdateWorkspaceOrderReq = {
-  workspace_ids: string[]
-}
-
 export async function updateWorkspaceOrder(
   target: RuntimeTarget,
   workspaceIds: string[],
-): Promise<WorkspaceSummary[]> {
+): Promise<Workspace[]> {
   const request: UpdateWorkspaceOrderReq = { workspace_ids: workspaceIds }
   const response = await cloudApiClient.patch<UpdateWorkspaceOrderResp>(
     cloudRuntimePath(target, '/workspaces/order'),

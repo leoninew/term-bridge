@@ -97,7 +97,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		}()
 	}
 
-	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudGateURL: cfg.Cloud.GateURL, CloudOAuth: agentapi.CloudOAuthConfig{ClientID: cfg.Cloud.OAuth.ClientID, ClientSecret: cfg.Cloud.OAuth.ClientSecret, RedirectUrl: cfg.Cloud.OAuth.RedirectUrl, Scopes: cfg.Cloud.OAuth.Scopes}, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(agentapi.CloudSessionSummary) {
+	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudGateURL: cfg.Cloud.GateURL, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(agentapi.CloudSessionSummary) {
 		if cloudConnector != nil {
 			startConnector(cloudConnector)
 		}

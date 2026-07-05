@@ -198,7 +198,7 @@ func HandleRuntimeRequest(ctx context.Context, runtime RuntimeAccess, frame *tun
 		}
 		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_CreateSessionResp{CreateSessionResp: createSessionToProto(result)}), nil
 	case *tunnelv1.TunnelFrame_RerunSessionReq:
-		result, err := runtime.RerunSession(ctx, payload.RerunSessionReq.GetWorkspaceId(), payload.RerunSessionReq.GetSessionId(), terminalapp.RerunSessionReq{Cols: int(payload.RerunSessionReq.GetCols()), Rows: int(payload.RerunSessionReq.GetRows())})
+		result, err := runtime.RerunSession(ctx, payload.RerunSessionReq.GetWorkspaceId(), payload.RerunSessionReq.GetSessionId(), terminalapp.RerunSessionReq{Cols: int(payload.RerunSessionReq.GetRequest().GetCols()), Rows: int(payload.RerunSessionReq.GetRequest().GetRows())})
 		if err != nil {
 			return nil, err
 		}
@@ -211,8 +211,8 @@ func HandleRuntimeRequest(ctx context.Context, runtime RuntimeAccess, frame *tun
 		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_GetSessionResp{GetSessionResp: &runtimev1.GetSessionResp{Session: sessionToProto(session)}}), nil
 	case *tunnelv1.TunnelFrame_UpdateSessionReq:
 		request := terminalapp.UpdateSessionReq{}
-		if payload.UpdateSessionReq.Name != nil {
-			request.Name = payload.UpdateSessionReq.GetName()
+		if payload.UpdateSessionReq.GetRequest().Name != nil {
+			request.Name = payload.UpdateSessionReq.GetRequest().GetName()
 		}
 		session, err := runtime.UpdateSession(ctx, payload.UpdateSessionReq.GetWorkspaceId(), payload.UpdateSessionReq.GetSessionId(), request)
 		if err != nil {

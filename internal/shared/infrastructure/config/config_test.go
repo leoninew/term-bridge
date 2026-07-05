@@ -88,12 +88,6 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Cloud.GateUrl != "" {
 		t.Fatalf("Cloud.GateUrl = %q, want empty by default", cfg.Cloud.GateUrl)
 	}
-	if cfg.Cloud.OAuth.ClientID != "termbridge-local" || cfg.Cloud.OAuth.ClientSecret != "" || cfg.Cloud.OAuth.RedirectUrl != "http://localhost:9030/cloud/oauth/callback" {
-		t.Fatalf("Cloud.OAuth = %#v", cfg.Cloud.OAuth)
-	}
-	if !reflect.DeepEqual(cfg.Cloud.OAuth.Scopes, []string{"openid", "email", "profile"}) {
-		t.Fatalf("Cloud.OAuth.Scopes = %#v", cfg.Cloud.OAuth.Scopes)
-	}
 	if cfg.Auth.LocalAdmin.Username != DefaultAuthUsername || cfg.Auth.LocalAdmin.Password != DefaultAuthPassword {
 		t.Fatalf("Auth.LocalAdmin = %#v, want default PoC auth", cfg.Auth.LocalAdmin)
 	}

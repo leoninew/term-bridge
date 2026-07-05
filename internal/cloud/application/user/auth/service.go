@@ -403,13 +403,6 @@ type codeRepository interface {
 	IncrementCodeAttempts(ctx context.Context, id string) error
 }
 
-func (s *Service) verifyCode(ctx context.Context, email, purpose, input string) (repository.AuthCode, error) {
-	if err := s.requireRepository(); err != nil {
-		return repository.AuthCode{}, authmodel.ErrCodeInvalid
-	}
-	return s.verifyCodeWithRepo(ctx, s.repo, email, purpose, input)
-}
-
 func (s *Service) verifyCodeWithRepo(ctx context.Context, repo codeRepository, email, purpose, input string) (repository.AuthCode, error) {
 	row, err := repo.LatestCode(ctx, email, purpose)
 	if err != nil {

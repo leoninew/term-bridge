@@ -140,15 +140,7 @@ type CloudConfig struct {
 	CorsAllowedOrigins []string
 	ExposeErrors       bool
 	GateUrl            string
-	OAuth              CloudOAuthConfig
 	Database           DatabaseConfig
-}
-
-type CloudOAuthConfig struct {
-	ClientID     string
-	ClientSecret string
-	RedirectUrl  string
-	Scopes       []string
 }
 
 type Options struct {
@@ -259,13 +251,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			CorsAllowedOrigins: getStringSlice(v, "cloud.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("cloud.expose_errors"),
 			GateUrl:            strings.TrimSpace(v.GetString("cloud.gate_url")),
-			OAuth: CloudOAuthConfig{
-				ClientID:     strings.TrimSpace(v.GetString("cloud.oauth.client_id")),
-				ClientSecret: strings.TrimSpace(v.GetString("cloud.oauth.client_secret")),
-				RedirectUrl:  strings.TrimSpace(v.GetString("cloud.oauth.redirect_url")),
-				Scopes:       getStringSlice(v, "cloud.oauth.scopes"),
-			},
-			Database: cloudDatabase,
+			Database:           cloudDatabase,
 		},
 		Auth: AuthConfig{
 			Username: strings.TrimSpace(v.GetString("auth.local_admin.username")),
@@ -763,10 +749,6 @@ func configKeys() []string {
 		"cloud.cors_allowed_origins",
 		"cloud.expose_errors",
 		"cloud.gate_url",
-		"cloud.oauth.client_id",
-		"cloud.oauth.client_secret",
-		"cloud.oauth.redirect_url",
-		"cloud.oauth.scopes",
 		"cloud.database.driver",
 		"cloud.database.sqlite.path",
 		"cloud.database.mysql.dsn",
@@ -911,12 +893,6 @@ func normalizeCloudConfig(cfg *Config) {
 	cfg.Cloud.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.ApiBaseUrl), "/")
 	cfg.Cloud.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Cloud.CorsAllowedOrigins)
 	cfg.Cloud.GateUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.GateUrl), "/")
-	cfg.Cloud.OAuth.ClientID = strings.TrimSpace(cfg.Cloud.OAuth.ClientID)
-	cfg.Cloud.OAuth.ClientSecret = strings.TrimSpace(cfg.Cloud.OAuth.ClientSecret)
-	cfg.Cloud.OAuth.RedirectUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.OAuth.RedirectUrl), "/")
-	if len(cfg.Cloud.OAuth.Scopes) == 0 {
-		cfg.Cloud.OAuth.Scopes = []string{"openid", "email", "profile"}
-	}
 }
 
 func validateAgent(cfg AgentConfig) error {
@@ -929,11 +905,6 @@ func validateCloud(cfg Config) error {
 	}
 	if cfg.Cloud.GateUrl != "" {
 		if err := validateHTTPURL("cloud.gate_url", cfg.Cloud.GateUrl, false); err != nil {
-			return err
-		}
-	}
-	if cfg.Cloud.OAuth.RedirectUrl != "" {
-		if err := validateHTTPURL("cloud.oauth.redirect_url", cfg.Cloud.OAuth.RedirectUrl, false); err != nil {
 			return err
 		}
 	}

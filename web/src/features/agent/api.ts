@@ -2,29 +2,25 @@ import type { AxiosResponse } from 'axios'
 import type {
   CreateSessionReq,
   CreateSessionResp,
-  ListResp,
+  ListWorkspacesResp,
   RerunSessionReq,
   SessionSummary,
   UpdateSessionReq,
-  WorkspaceSummary,
-  WorkspaceTreeSession,
-  WorkspaceTreeSummary,
-} from '../../protocol/terminal'
-import { agentApiClient } from '../api/client'
-import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
+  UpdateSessionOrderResp,
+  UpdateWorkspaceOrderReq,
+  UpdateWorkspaceOrderResp,
+  Workspace,
+  WorkspaceTreeNode,
+  WorkspaceTreeResp,
+} from '../../gen/proto/termbridge/runtime/v1/runtime'
 import type {
   AuthMeResp,
-  CloudOAuthCallbackResp,
-  CloudOAuthStartResp,
-  CloudSessionSummary,
+  CloudConnectReq,
+  CloudConnectResp,
   TokenResp,
-  UserInfo,
-} from '../types'
-
-export type ListWorkspacesResp = ListResp<WorkspaceSummary>
-export type WorkspaceTreeResp = ListResp<WorkspaceTreeSummary>
-export type UpdateWorkspaceOrderResp = ListResp<WorkspaceSummary>
-export type UpdateSessionOrderResp = ListResp<WorkspaceTreeSession>
+} from '../../gen/proto/termbridge/cloud/v1/cloud'
+import { agentApiClient } from '../api/client'
+import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
 
 export async function authMe(): Promise<AuthMeResp> {
   try {
@@ -32,7 +28,7 @@ export async function authMe(): Promise<AuthMeResp> {
     return response.data
   } catch (err) {
     if (isUnauthorizedApiError(err)) {
-      return { authenticated: false, username: '' }
+      return { authenticated: false, username: '', user: undefined, cloud_session: undefined }
     }
     throw err
   }
@@ -47,25 +43,11 @@ export async function authLogout(): Promise<void> {
   await agentApiClient.post('/auth/logout')
 }
 
-export function cloudOAuthStartUrl(): string {
-  return '/cloud/oauth/start'
-}
-
-export async function cloudOAuthStart(redirect?: string): Promise<string> {
-  const response = await agentApiClient.get<CloudOAuthStartResp>('/cloud-oauth/start', {
-    params: redirect ? { redirect } : undefined,
-  })
-  return response.data.authorize_url
-}
-
-export async function cloudOAuthCallback(
-  code: string,
-  state: string,
-): Promise<CloudOAuthCallbackResp> {
-  const response = await agentApiClient.post<CloudOAuthCallbackResp>('/cloud-oauth/callback', {
-    code,
-    state,
-  })
+export async function connectCloudWithCurrentAccount(
+  cloudToken: string,
+): Promise<CloudConnectResp> {
+  const request: CloudConnectReq = { cloud_token: cloudToken }
+  const response = await agentApiClient.post<CloudConnectResp>('/cloud/connect', request)
   return response.data
 }
 
@@ -139,7 +121,7 @@ export async function rerunSession(
 export async function updateSessionOrder(
   workspaceId: string,
   sessionIds: string[],
-): Promise<WorkspaceTreeSession[]> {
+): Promise<SessionSummary[]> {
   const response = await agentApiClient.patch<UpdateSessionOrderResp>(
     agentRuntimePath(`${workspaceSessionPath(workspaceId)}/order`),
     { session_ids: sessionIds },
@@ -147,7 +129,7 @@ export async function updateSessionOrder(
   return response.data.items
 }
 
-export async function listWorkspaces(): Promise<ApiResult<WorkspaceSummary[]>> {
+export async function listWorkspaces(): Promise<ApiResult<Workspace[]>> {
   const response = await agentApiClient.get<ListWorkspacesResp>(agentRuntimePath('/workspaces'))
   return {
     data: response.data.items,
@@ -155,7 +137,7 @@ export async function listWorkspaces(): Promise<ApiResult<WorkspaceSummary[]>> {
   }
 }
 
-export async function listWorkspaceTree(): Promise<ApiResult<WorkspaceTreeSummary[]>> {
+export async function listWorkspaceTree(): Promise<ApiResult<WorkspaceTreeNode[]>> {
   const response = await agentApiClient.get<WorkspaceTreeResp>(agentRuntimePath('/workspaces/tree'))
   return {
     data: response.data.items,
@@ -163,11 +145,7 @@ export async function listWorkspaceTree(): Promise<ApiResult<WorkspaceTreeSummar
   }
 }
 
-export type UpdateWorkspaceOrderReq = {
-  workspace_ids: string[]
-}
-
-export async function updateWorkspaceOrder(workspaceIds: string[]): Promise<WorkspaceSummary[]> {
+export async function updateWorkspaceOrder(workspaceIds: string[]): Promise<Workspace[]> {
   const request: UpdateWorkspaceOrderReq = { workspace_ids: workspaceIds }
   const response = await agentApiClient.patch<UpdateWorkspaceOrderResp>(
     agentRuntimePath('/workspaces/order'),
@@ -197,5 +175,3 @@ function isUnauthorizedApiError(err: unknown): boolean {
     err.code === 'unauthorized'
   )
 }
-
-export type { AuthMeResp, CloudSessionSummary, TokenResp, UserInfo }

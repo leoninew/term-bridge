@@ -4,7 +4,6 @@
     :runtime-api="runtimeApi"
     dashboard-route-name="agent-dashboard"
     login-redirect="/agent/sessions"
-    :start-cloud-o-auth-url="cloudOAuthStartUrl"
     :logout="authLogout"
   />
 </template>
@@ -14,7 +13,6 @@
   import {
     authLogout,
     closeSession,
-    cloudOAuthStartUrl,
     createSession,
     deleteSession,
     deleteWorkspace,

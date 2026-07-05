@@ -106,6 +106,8 @@ export const messages = {
       agentKicker: 'TermBridge Agent',
       agentTitle: 'Agent Dashboard',
       agentDescription: '直接管理这台机器上的 workspace 和 session；连接云端账号是可选能力。',
+      agentFlowDescription:
+        '这里分成三件事：先进入本机 session；需要云端可见时先登录 Cloud 账号；登录后再把当前 Agent 设备连接到该账号。',
       addDevice: '添加设备',
       refreshDevices: '刷新设备',
       refreshing: '刷新中…',
@@ -120,6 +122,20 @@ export const messages = {
         'Agent mode 不要求浏览器登录。你可以直接进入 Agent workbench，或连接 Cloud Gate 后让云端账号看到这台设备。',
       agentModeAction: 'Agent 模式',
       agentModeDescription: '直接进入 Agent workspace 和 session，不需要浏览器账号登录。',
+      agentSessionsAction: '进入本机 session',
+      agentSessionsDescription: '直接管理这台机器上的 workspace 和 session，不需要 Cloud 账号。',
+      cloudLoginAction: '登录 Cloud 账号',
+      cloudLoginDescription:
+        '使用 Cloud 登录拿到账号 token；这一步只表示账号已登录，还不会绑定设备。',
+      cloudLoginActive: 'Cloud 账号已登录',
+      cloudLoginActiveDescription: '账号 token 已可用；现在可以把当前 Agent 设备连接到该账号。',
+      connectCloudDeviceAction: '连接当前 Agent 到云端',
+      connectCloudDeviceDescription:
+        '使用已登录的 Cloud 账号上报当前设备，不再重新发起 OAuth2 流程。',
+      connectCloudDeviceRequiresLogin: '请先登录 Cloud 账号，登录完成后才能连接当前设备。',
+      connectCloudDeviceConnectedDescription:
+        '当前 Agent 设备已经连接到 Cloud 账号，可在 Cloud 设备列表中看到。',
+      cloudDeviceConnected: '当前设备已连接云端',
       cloudModeAction: '云端模式',
       cloudModeDescription: '连接 Cloud Gate，让云端账号看到并管理这台本机设备。',
       cloudModeDisabledDescription: '请先配置 Cloud Gate OAuth client 后再连接云端账号。',
@@ -309,6 +325,8 @@ export const messages = {
       agentTitle: 'Agent dashboard',
       agentDescription:
         'Manage workspaces and sessions on this machine directly. Connecting a cloud account is optional.',
+      agentFlowDescription:
+        'There are three separate actions here: open local sessions, sign in to Cloud when you need cloud visibility, then connect this Agent device to that signed-in account.',
       addDevice: 'Add device',
       refreshDevices: 'Refresh devices',
       refreshing: 'Refreshing…',
@@ -326,6 +344,23 @@ export const messages = {
       agentModeAction: 'Agent mode',
       agentModeDescription:
         'Open Agent workspaces and sessions directly without browser account sign-in.',
+      agentSessionsAction: 'Open local sessions',
+      agentSessionsDescription:
+        'Manage workspaces and sessions on this machine directly without a Cloud account.',
+      cloudLoginAction: 'Sign in to Cloud account',
+      cloudLoginDescription:
+        'Use Cloud sign-in to obtain the account token. This only signs in the account; it does not bind the device yet.',
+      cloudLoginActive: 'Cloud account signed in',
+      cloudLoginActiveDescription:
+        'The account token is available. You can now connect this Agent device to that account.',
+      connectCloudDeviceAction: 'Connect this Agent to Cloud',
+      connectCloudDeviceDescription:
+        'Report this device using the signed-in Cloud account without starting another OAuth2 flow.',
+      connectCloudDeviceRequiresLogin:
+        'Sign in to a Cloud account first; the device connection becomes available after that.',
+      connectCloudDeviceConnectedDescription:
+        'This Agent device is connected to the Cloud account and should appear in the Cloud device list.',
+      cloudDeviceConnected: 'Device connected to Cloud',
       cloudModeAction: 'Cloud mode',
       cloudModeDescription:
         'Connect Cloud Gate so your cloud account can see and manage this local device.',

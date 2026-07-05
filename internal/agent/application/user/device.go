@@ -311,13 +311,3 @@ func sanitizeName(value string) string {
 	}, value)
 	return strings.Trim(value, "-_.")
 }
-
-func safeDeviceSegment(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" || value == "." || value == ".." {
-		return "unknown"
-	}
-	value = strings.ReplaceAll(value, string(os.PathSeparator), "_")
-	value = strings.ReplaceAll(value, "/", "_")
-	return value
-}

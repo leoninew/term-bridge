@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -193,47 +192,34 @@ func TestRunAgentStartsBackendAndConnectorFromConfig(t *testing.T) {
 	}
 }
 
-func TestRunAgentStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
+func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	var tokenRequest url.Values
 	var reportedDevice struct {
 		Id        string `json:"id"`
 		Name      string `json:"name"`
 		PublicKey string `json:"public_key"`
 	}
 	cloudGate := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/cloud-api/oauth2/token":
-			if r.Method != http.MethodPost {
-				http.NotFound(w, r)
-				return
-			}
-			if err := r.ParseForm(); err != nil {
-				t.Fatalf("parse token request form: %v", err)
-			}
-			tokenRequest = r.PostForm
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"access_token":"cloud-token","token_type":"bearer"}`))
-		case "/cloud-api/devices/current":
-			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer cloud-token" {
-				http.NotFound(w, r)
-				return
-			}
-			if err := json.NewDecoder(r.Body).Decode(&reportedDevice); err != nil {
-				t.Fatalf("decode device report: %v", err)
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"accepted":true}`))
-		default:
+		if r.URL.Path != "/cloud-api/devices/current" {
 			http.NotFound(w, r)
+			return
 		}
+		if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer cloud-token" {
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&reportedDevice); err != nil {
+			t.Fatalf("decode device report: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"accepted":true}`))
 	}))
 	defer cloudGate.Close()
-	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: " + cloudGate.URL + "\n  oauth:\n    client_id: termbridge-local\n    redirect_url: http://localhost:9030/cloud/oauth/callback\n"
+	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: " + cloudGate.URL + "\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
 	oldRunBackendServer := runBackendServer
@@ -270,30 +256,27 @@ func TestRunAgentStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 		return gotServer != nil
 	})
 
-	startResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(startResponse, httptest.NewRequest(http.MethodGet, "/agent-api/cloud-oauth/start", nil))
-	if startResponse.Code != http.StatusOK {
-		t.Fatalf("cloud oauth start status = %d; body=%s", startResponse.Code, startResponse.Body.String())
+	loginResponse := httptest.NewRecorder()
+	gotServer.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/agent-api/auth/login", nil))
+	if loginResponse.Code != http.StatusOK {
+		t.Fatalf("agent login status = %d; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
-	var startBody struct {
-		AuthorizeURL string `json:"authorize_url"`
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
 	}
-	if err := json.Unmarshal(startResponse.Body.Bytes(), &startBody); err != nil {
-		t.Fatalf("decode cloud oauth start response: %v", err)
+	if err := json.Unmarshal(loginResponse.Body.Bytes(), &tokenResp); err != nil {
+		t.Fatalf("decode agent login response: %v", err)
 	}
-	callbackRequest := httptest.NewRequest(http.MethodGet, startBody.AuthorizeURL, nil)
-	state := callbackRequest.URL.Query().Get("state")
-	if state == "" {
-		t.Fatalf("authorize_url missing state: %q", startBody.AuthorizeURL)
+	if tokenResp.AccessToken == "" {
+		t.Fatalf("agent login token is empty: %s", loginResponse.Body.String())
 	}
 
-	callbackResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(callbackResponse, httptest.NewRequest(http.MethodPost, "/agent-api/cloud-oauth/callback", strings.NewReader(`{"code":"code-1","state":"`+state+`"}`)))
-	if callbackResponse.Code != http.StatusOK {
-		t.Fatalf("cloud oauth callback status = %d; body=%s", callbackResponse.Code, callbackResponse.Body.String())
-	}
-	if tokenRequest.Get("grant_type") != "authorization_code" || tokenRequest.Get("code") != "code-1" || tokenRequest.Get("client_id") != "termbridge-local" || tokenRequest.Get("redirect_uri") != "http://localhost:9030/cloud/oauth/callback" {
-		t.Fatalf("token request = %#v", tokenRequest)
+	connectRequest := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
+	connectRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
+	connectResponse := httptest.NewRecorder()
+	gotServer.ServeHTTP(connectResponse, connectRequest)
+	if connectResponse.Code != http.StatusOK {
+		t.Fatalf("cloud connect status = %d; body=%s", connectResponse.Code, connectResponse.Body.String())
 	}
 	if reportedDevice.Id == "" || reportedDevice.Name == "" || reportedDevice.PublicKey == "" {
 		t.Fatalf("cloud device report = %#v", reportedDevice)
@@ -311,11 +294,11 @@ func TestRunAgentStartsCloudConnectorAfterOAuthCompletion(t *testing.T) {
 		gotTargets[client.Config().ConnectUrl] = true
 	}
 	if len(gotTargets) != 1 || !gotTargets[cloudGate.URL] {
-		t.Fatalf("agent connector targets after OAuth completion = %#v", gotTargets)
+		t.Fatalf("agent connector targets after device report = %#v", gotTargets)
 	}
 	out := stdout.String()
 	if !strings.Contains(out, "TermBridge agent connector targeting "+cloudGate.URL) {
-		t.Fatalf("stdout missing cloud connector target after OAuth completion: %s", out)
+		t.Fatalf("stdout missing cloud connector target after device report: %s", out)
 	}
 	cancelServe()
 	if err := <-resultCh; err != nil {

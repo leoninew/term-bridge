@@ -28,6 +28,7 @@ type User struct {
 	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
 	DisplayName   string                 `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	EmailVerified bool                   `protobuf:"varint,4,opt,name=email_verified,json=emailVerified,proto3" json:"email_verified,omitempty"`
+	Provider      string                 `protobuf:"bytes,5,opt,name=provider,proto3" json:"provider,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -88,6 +89,13 @@ func (x *User) GetEmailVerified() bool {
 		return x.EmailVerified
 	}
 	return false
+}
+
+func (x *User) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
 }
 
 type DeviceSummary struct {
@@ -302,6 +310,362 @@ func (x *AuthLoginReq) GetPassword() string {
 	return ""
 }
 
+type AuthRegisterReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthRegisterReq) Reset() {
+	*x = AuthRegisterReq{}
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthRegisterReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthRegisterReq) ProtoMessage() {}
+
+func (x *AuthRegisterReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthRegisterReq.ProtoReflect.Descriptor instead.
+func (*AuthRegisterReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AuthRegisterReq) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *AuthRegisterReq) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+type AuthVerifyEmailReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthVerifyEmailReq) Reset() {
+	*x = AuthVerifyEmailReq{}
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthVerifyEmailReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthVerifyEmailReq) ProtoMessage() {}
+
+func (x *AuthVerifyEmailReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthVerifyEmailReq.ProtoReflect.Descriptor instead.
+func (*AuthVerifyEmailReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *AuthVerifyEmailReq) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *AuthVerifyEmailReq) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+type AuthResendVerificationReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthResendVerificationReq) Reset() {
+	*x = AuthResendVerificationReq{}
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthResendVerificationReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthResendVerificationReq) ProtoMessage() {}
+
+func (x *AuthResendVerificationReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthResendVerificationReq.ProtoReflect.Descriptor instead.
+func (*AuthResendVerificationReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AuthResendVerificationReq) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+type AuthChangePasswordReq struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	CurrentPassword string                 `protobuf:"bytes,1,opt,name=current_password,json=currentPassword,proto3" json:"current_password,omitempty"`
+	NewPassword     string                 `protobuf:"bytes,2,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AuthChangePasswordReq) Reset() {
+	*x = AuthChangePasswordReq{}
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthChangePasswordReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthChangePasswordReq) ProtoMessage() {}
+
+func (x *AuthChangePasswordReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthChangePasswordReq.ProtoReflect.Descriptor instead.
+func (*AuthChangePasswordReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *AuthChangePasswordReq) GetCurrentPassword() string {
+	if x != nil {
+		return x.CurrentPassword
+	}
+	return ""
+}
+
+func (x *AuthChangePasswordReq) GetNewPassword() string {
+	if x != nil {
+		return x.NewPassword
+	}
+	return ""
+}
+
+type AuthPasswordResetRequestReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthPasswordResetRequestReq) Reset() {
+	*x = AuthPasswordResetRequestReq{}
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthPasswordResetRequestReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthPasswordResetRequestReq) ProtoMessage() {}
+
+func (x *AuthPasswordResetRequestReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthPasswordResetRequestReq.ProtoReflect.Descriptor instead.
+func (*AuthPasswordResetRequestReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AuthPasswordResetRequestReq) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+type AuthPasswordResetConfirmReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	NewPassword   string                 `protobuf:"bytes,3,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthPasswordResetConfirmReq) Reset() {
+	*x = AuthPasswordResetConfirmReq{}
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthPasswordResetConfirmReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthPasswordResetConfirmReq) ProtoMessage() {}
+
+func (x *AuthPasswordResetConfirmReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthPasswordResetConfirmReq.ProtoReflect.Descriptor instead.
+func (*AuthPasswordResetConfirmReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AuthPasswordResetConfirmReq) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *AuthPasswordResetConfirmReq) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *AuthPasswordResetConfirmReq) GetNewPassword() string {
+	if x != nil {
+		return x.NewPassword
+	}
+	return ""
+}
+
+type AuthGoogleCallbackReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	State         string                 `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthGoogleCallbackReq) Reset() {
+	*x = AuthGoogleCallbackReq{}
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthGoogleCallbackReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthGoogleCallbackReq) ProtoMessage() {}
+
+func (x *AuthGoogleCallbackReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthGoogleCallbackReq.ProtoReflect.Descriptor instead.
+func (*AuthGoogleCallbackReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *AuthGoogleCallbackReq) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *AuthGoogleCallbackReq) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
 type TokenResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
@@ -312,7 +676,7 @@ type TokenResp struct {
 
 func (x *TokenResp) Reset() {
 	*x = TokenResp{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[4]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -324,7 +688,7 @@ func (x *TokenResp) String() string {
 func (*TokenResp) ProtoMessage() {}
 
 func (x *TokenResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[4]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -337,7 +701,7 @@ func (x *TokenResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenResp.ProtoReflect.Descriptor instead.
 func (*TokenResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{4}
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *TokenResp) GetAccessToken() string {
@@ -354,6 +718,50 @@ func (x *TokenResp) GetTokenType() string {
 	return ""
 }
 
+type GoogleAuthUrlResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AuthUrl       string                 `protobuf:"bytes,1,opt,name=auth_url,json=authUrl,proto3" json:"auth_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GoogleAuthUrlResp) Reset() {
+	*x = GoogleAuthUrlResp{}
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GoogleAuthUrlResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GoogleAuthUrlResp) ProtoMessage() {}
+
+func (x *GoogleAuthUrlResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GoogleAuthUrlResp.ProtoReflect.Descriptor instead.
+func (*GoogleAuthUrlResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GoogleAuthUrlResp) GetAuthUrl() string {
+	if x != nil {
+		return x.AuthUrl
+	}
+	return ""
+}
+
 type AuthMeResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Authenticated bool                   `protobuf:"varint,1,opt,name=authenticated,proto3" json:"authenticated,omitempty"`
@@ -366,7 +774,7 @@ type AuthMeResp struct {
 
 func (x *AuthMeResp) Reset() {
 	*x = AuthMeResp{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[5]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -378,7 +786,7 @@ func (x *AuthMeResp) String() string {
 func (*AuthMeResp) ProtoMessage() {}
 
 func (x *AuthMeResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[5]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -391,7 +799,7 @@ func (x *AuthMeResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthMeResp.ProtoReflect.Descriptor instead.
 func (*AuthMeResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{5}
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AuthMeResp) GetAuthenticated() bool {
@@ -422,6 +830,94 @@ func (x *AuthMeResp) GetCloudSession() *CloudSessionSummary {
 	return nil
 }
 
+type CloudConnectReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CloudToken    string                 `protobuf:"bytes,1,opt,name=cloud_token,json=cloudToken,proto3" json:"cloud_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloudConnectReq) Reset() {
+	*x = CloudConnectReq{}
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudConnectReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudConnectReq) ProtoMessage() {}
+
+func (x *CloudConnectReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudConnectReq.ProtoReflect.Descriptor instead.
+func (*CloudConnectReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *CloudConnectReq) GetCloudToken() string {
+	if x != nil {
+		return x.CloudToken
+	}
+	return ""
+}
+
+type CloudConnectResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CloudSession  *CloudSessionSummary   `protobuf:"bytes,1,opt,name=cloud_session,json=cloudSession,proto3" json:"cloud_session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloudConnectResp) Reset() {
+	*x = CloudConnectResp{}
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudConnectResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudConnectResp) ProtoMessage() {}
+
+func (x *CloudConnectResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudConnectResp.ProtoReflect.Descriptor instead.
+func (*CloudConnectResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *CloudConnectResp) GetCloudSession() *CloudSessionSummary {
+	if x != nil {
+		return x.CloudSession
+	}
+	return nil
+}
+
 type ListDevicesResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Items         []*DeviceSummary       `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
@@ -431,7 +927,7 @@ type ListDevicesResp struct {
 
 func (x *ListDevicesResp) Reset() {
 	*x = ListDevicesResp{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[6]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -443,7 +939,7 @@ func (x *ListDevicesResp) String() string {
 func (*ListDevicesResp) ProtoMessage() {}
 
 func (x *ListDevicesResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[6]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -456,7 +952,7 @@ func (x *ListDevicesResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevicesResp.ProtoReflect.Descriptor instead.
 func (*ListDevicesResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{6}
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListDevicesResp) GetItems() []*DeviceSummary {
@@ -477,7 +973,7 @@ type CurrentDeviceReq struct {
 
 func (x *CurrentDeviceReq) Reset() {
 	*x = CurrentDeviceReq{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[7]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -489,7 +985,7 @@ func (x *CurrentDeviceReq) String() string {
 func (*CurrentDeviceReq) ProtoMessage() {}
 
 func (x *CurrentDeviceReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[7]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -502,7 +998,7 @@ func (x *CurrentDeviceReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CurrentDeviceReq.ProtoReflect.Descriptor instead.
 func (*CurrentDeviceReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{7}
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CurrentDeviceReq) GetId() string {
@@ -536,7 +1032,7 @@ type CurrentDeviceResp struct {
 
 func (x *CurrentDeviceResp) Reset() {
 	*x = CurrentDeviceResp{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[8]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -548,7 +1044,7 @@ func (x *CurrentDeviceResp) String() string {
 func (*CurrentDeviceResp) ProtoMessage() {}
 
 func (x *CurrentDeviceResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[8]
+	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -561,7 +1057,7 @@ func (x *CurrentDeviceResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CurrentDeviceResp.ProtoReflect.Descriptor instead.
 func (*CurrentDeviceResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{8}
+	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CurrentDeviceResp) GetAccepted() bool {
@@ -578,208 +1074,17 @@ func (x *CurrentDeviceResp) GetDevice() *DeviceSummary {
 	return nil
 }
 
-type CloudOAuthStartResp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AuthorizeUrl  string                 `protobuf:"bytes,1,opt,name=authorize_url,json=authorizeUrl,proto3" json:"authorize_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CloudOAuthStartResp) Reset() {
-	*x = CloudOAuthStartResp{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CloudOAuthStartResp) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CloudOAuthStartResp) ProtoMessage() {}
-
-func (x *CloudOAuthStartResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CloudOAuthStartResp.ProtoReflect.Descriptor instead.
-func (*CloudOAuthStartResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *CloudOAuthStartResp) GetAuthorizeUrl() string {
-	if x != nil {
-		return x.AuthorizeUrl
-	}
-	return ""
-}
-
-type CloudOAuthAuthorizeResp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RedirectUrl   string                 `protobuf:"bytes,1,opt,name=redirect_url,json=redirectUrl,proto3" json:"redirect_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CloudOAuthAuthorizeResp) Reset() {
-	*x = CloudOAuthAuthorizeResp{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CloudOAuthAuthorizeResp) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CloudOAuthAuthorizeResp) ProtoMessage() {}
-
-func (x *CloudOAuthAuthorizeResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CloudOAuthAuthorizeResp.ProtoReflect.Descriptor instead.
-func (*CloudOAuthAuthorizeResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *CloudOAuthAuthorizeResp) GetRedirectUrl() string {
-	if x != nil {
-		return x.RedirectUrl
-	}
-	return ""
-}
-
-type CloudOAuthCallbackReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	State         string                 `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CloudOAuthCallbackReq) Reset() {
-	*x = CloudOAuthCallbackReq{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CloudOAuthCallbackReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CloudOAuthCallbackReq) ProtoMessage() {}
-
-func (x *CloudOAuthCallbackReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CloudOAuthCallbackReq.ProtoReflect.Descriptor instead.
-func (*CloudOAuthCallbackReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *CloudOAuthCallbackReq) GetCode() string {
-	if x != nil {
-		return x.Code
-	}
-	return ""
-}
-
-func (x *CloudOAuthCallbackReq) GetState() string {
-	if x != nil {
-		return x.State
-	}
-	return ""
-}
-
-type CloudOAuthCallbackResp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CloudSession  *CloudSessionSummary   `protobuf:"bytes,1,opt,name=cloud_session,json=cloudSession,proto3" json:"cloud_session,omitempty"`
-	Redirect      string                 `protobuf:"bytes,2,opt,name=redirect,proto3" json:"redirect,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CloudOAuthCallbackResp) Reset() {
-	*x = CloudOAuthCallbackResp{}
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CloudOAuthCallbackResp) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CloudOAuthCallbackResp) ProtoMessage() {}
-
-func (x *CloudOAuthCallbackResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_cloud_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CloudOAuthCallbackResp.ProtoReflect.Descriptor instead.
-func (*CloudOAuthCallbackResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_cloud_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *CloudOAuthCallbackResp) GetCloudSession() *CloudSessionSummary {
-	if x != nil {
-		return x.CloudSession
-	}
-	return nil
-}
-
-func (x *CloudOAuthCallbackResp) GetRedirect() string {
-	if x != nil {
-		return x.Redirect
-	}
-	return ""
-}
-
 var File_termbridge_cloud_v1_cloud_proto protoreflect.FileDescriptor
 
 const file_termbridge_cloud_v1_cloud_proto_rawDesc = "" +
 	"\n" +
-	"\x1ftermbridge/cloud/v1/cloud.proto\x12\x13termbridge.cloud.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"v\n" +
+	"\x1ftermbridge/cloud/v1/cloud.proto\x12\x13termbridge.cloud.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x92\x01\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12!\n" +
 	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\x12%\n" +
-	"\x0eemail_verified\x18\x04 \x01(\bR\remailVerified\"\xdb\x01\n" +
+	"\x0eemail_verified\x18\x04 \x01(\bR\remailVerified\x12\x1a\n" +
+	"\bprovider\x18\x05 \x01(\tR\bprovider\"\xdb\x01\n" +
 	"\rDeviceSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
@@ -796,17 +1101,44 @@ const file_termbridge_cloud_v1_cloud_proto_rawDesc = "" +
 	"\fAuthLoginReq\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x1a\n" +
-	"\bpassword\x18\x03 \x01(\tR\bpassword\"M\n" +
+	"\bpassword\x18\x03 \x01(\tR\bpassword\"C\n" +
+	"\x0fAuthRegisterReq\x12\x14\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\">\n" +
+	"\x12AuthVerifyEmailReq\x12\x14\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\"1\n" +
+	"\x19AuthResendVerificationReq\x12\x14\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\"e\n" +
+	"\x15AuthChangePasswordReq\x12)\n" +
+	"\x10current_password\x18\x01 \x01(\tR\x0fcurrentPassword\x12!\n" +
+	"\fnew_password\x18\x02 \x01(\tR\vnewPassword\"3\n" +
+	"\x1bAuthPasswordResetRequestReq\x12\x14\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\"j\n" +
+	"\x1bAuthPasswordResetConfirmReq\x12\x14\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12!\n" +
+	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\"A\n" +
+	"\x15AuthGoogleCallbackReq\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
+	"\x05state\x18\x02 \x01(\tR\x05state\"M\n" +
 	"\tTokenResp\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
 	"\n" +
-	"token_type\x18\x02 \x01(\tR\ttokenType\"\xcc\x01\n" +
+	"token_type\x18\x02 \x01(\tR\ttokenType\".\n" +
+	"\x11GoogleAuthUrlResp\x12\x19\n" +
+	"\bauth_url\x18\x01 \x01(\tR\aauthUrl\"\xcc\x01\n" +
 	"\n" +
 	"AuthMeResp\x12$\n" +
 	"\rauthenticated\x18\x01 \x01(\bR\rauthenticated\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12-\n" +
 	"\x04user\x18\x03 \x01(\v2\x19.termbridge.cloud.v1.UserR\x04user\x12M\n" +
-	"\rcloud_session\x18\x04 \x01(\v2(.termbridge.cloud.v1.CloudSessionSummaryR\fcloudSession\"K\n" +
+	"\rcloud_session\x18\x04 \x01(\v2(.termbridge.cloud.v1.CloudSessionSummaryR\fcloudSession\"2\n" +
+	"\x0fCloudConnectReq\x12\x1f\n" +
+	"\vcloud_token\x18\x01 \x01(\tR\n" +
+	"cloudToken\"a\n" +
+	"\x10CloudConnectResp\x12M\n" +
+	"\rcloud_session\x18\x01 \x01(\v2(.termbridge.cloud.v1.CloudSessionSummaryR\fcloudSession\"K\n" +
 	"\x0fListDevicesResp\x128\n" +
 	"\x05items\x18\x01 \x03(\v2\".termbridge.cloud.v1.DeviceSummaryR\x05items\"U\n" +
 	"\x10CurrentDeviceReq\x12\x0e\n" +
@@ -816,17 +1148,7 @@ const file_termbridge_cloud_v1_cloud_proto_rawDesc = "" +
 	"public_key\x18\x03 \x01(\tR\tpublicKey\"k\n" +
 	"\x11CurrentDeviceResp\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\bR\baccepted\x12:\n" +
-	"\x06device\x18\x02 \x01(\v2\".termbridge.cloud.v1.DeviceSummaryR\x06device\":\n" +
-	"\x13CloudOAuthStartResp\x12#\n" +
-	"\rauthorize_url\x18\x01 \x01(\tR\fauthorizeUrl\"<\n" +
-	"\x17CloudOAuthAuthorizeResp\x12!\n" +
-	"\fredirect_url\x18\x01 \x01(\tR\vredirectUrl\"A\n" +
-	"\x15CloudOAuthCallbackReq\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
-	"\x05state\x18\x02 \x01(\tR\x05state\"\x83\x01\n" +
-	"\x16CloudOAuthCallbackResp\x12M\n" +
-	"\rcloud_session\x18\x01 \x01(\v2(.termbridge.cloud.v1.CloudSessionSummaryR\fcloudSession\x12\x1a\n" +
-	"\bredirect\x18\x02 \x01(\tR\bredirectBEZCtermbridge-go/internal/shared/dto/proto/termbridge/cloud/v1;cloudv1b\x06proto3"
+	"\x06device\x18\x02 \x01(\v2\".termbridge.cloud.v1.DeviceSummaryR\x06deviceBEZCtermbridge-go/internal/shared/dto/proto/termbridge/cloud/v1;cloudv1b\x06proto3"
 
 var (
 	file_termbridge_cloud_v1_cloud_proto_rawDescOnce sync.Once
@@ -840,32 +1162,38 @@ func file_termbridge_cloud_v1_cloud_proto_rawDescGZIP() []byte {
 	return file_termbridge_cloud_v1_cloud_proto_rawDescData
 }
 
-var file_termbridge_cloud_v1_cloud_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_termbridge_cloud_v1_cloud_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_termbridge_cloud_v1_cloud_proto_goTypes = []any{
-	(*User)(nil),                    // 0: termbridge.cloud.v1.User
-	(*DeviceSummary)(nil),           // 1: termbridge.cloud.v1.DeviceSummary
-	(*CloudSessionSummary)(nil),     // 2: termbridge.cloud.v1.CloudSessionSummary
-	(*AuthLoginReq)(nil),            // 3: termbridge.cloud.v1.AuthLoginReq
-	(*TokenResp)(nil),               // 4: termbridge.cloud.v1.TokenResp
-	(*AuthMeResp)(nil),              // 5: termbridge.cloud.v1.AuthMeResp
-	(*ListDevicesResp)(nil),         // 6: termbridge.cloud.v1.ListDevicesResp
-	(*CurrentDeviceReq)(nil),        // 7: termbridge.cloud.v1.CurrentDeviceReq
-	(*CurrentDeviceResp)(nil),       // 8: termbridge.cloud.v1.CurrentDeviceResp
-	(*CloudOAuthStartResp)(nil),     // 9: termbridge.cloud.v1.CloudOAuthStartResp
-	(*CloudOAuthAuthorizeResp)(nil), // 10: termbridge.cloud.v1.CloudOAuthAuthorizeResp
-	(*CloudOAuthCallbackReq)(nil),   // 11: termbridge.cloud.v1.CloudOAuthCallbackReq
-	(*CloudOAuthCallbackResp)(nil),  // 12: termbridge.cloud.v1.CloudOAuthCallbackResp
-	(*timestamppb.Timestamp)(nil),   // 13: google.protobuf.Timestamp
+	(*User)(nil),                        // 0: termbridge.cloud.v1.User
+	(*DeviceSummary)(nil),               // 1: termbridge.cloud.v1.DeviceSummary
+	(*CloudSessionSummary)(nil),         // 2: termbridge.cloud.v1.CloudSessionSummary
+	(*AuthLoginReq)(nil),                // 3: termbridge.cloud.v1.AuthLoginReq
+	(*AuthRegisterReq)(nil),             // 4: termbridge.cloud.v1.AuthRegisterReq
+	(*AuthVerifyEmailReq)(nil),          // 5: termbridge.cloud.v1.AuthVerifyEmailReq
+	(*AuthResendVerificationReq)(nil),   // 6: termbridge.cloud.v1.AuthResendVerificationReq
+	(*AuthChangePasswordReq)(nil),       // 7: termbridge.cloud.v1.AuthChangePasswordReq
+	(*AuthPasswordResetRequestReq)(nil), // 8: termbridge.cloud.v1.AuthPasswordResetRequestReq
+	(*AuthPasswordResetConfirmReq)(nil), // 9: termbridge.cloud.v1.AuthPasswordResetConfirmReq
+	(*AuthGoogleCallbackReq)(nil),       // 10: termbridge.cloud.v1.AuthGoogleCallbackReq
+	(*TokenResp)(nil),                   // 11: termbridge.cloud.v1.TokenResp
+	(*GoogleAuthUrlResp)(nil),           // 12: termbridge.cloud.v1.GoogleAuthUrlResp
+	(*AuthMeResp)(nil),                  // 13: termbridge.cloud.v1.AuthMeResp
+	(*CloudConnectReq)(nil),             // 14: termbridge.cloud.v1.CloudConnectReq
+	(*CloudConnectResp)(nil),            // 15: termbridge.cloud.v1.CloudConnectResp
+	(*ListDevicesResp)(nil),             // 16: termbridge.cloud.v1.ListDevicesResp
+	(*CurrentDeviceReq)(nil),            // 17: termbridge.cloud.v1.CurrentDeviceReq
+	(*CurrentDeviceResp)(nil),           // 18: termbridge.cloud.v1.CurrentDeviceResp
+	(*timestamppb.Timestamp)(nil),       // 19: google.protobuf.Timestamp
 }
 var file_termbridge_cloud_v1_cloud_proto_depIdxs = []int32{
-	13, // 0: termbridge.cloud.v1.DeviceSummary.connected_at:type_name -> google.protobuf.Timestamp
-	13, // 1: termbridge.cloud.v1.DeviceSummary.last_seen:type_name -> google.protobuf.Timestamp
-	13, // 2: termbridge.cloud.v1.CloudSessionSummary.connected_at:type_name -> google.protobuf.Timestamp
+	19, // 0: termbridge.cloud.v1.DeviceSummary.connected_at:type_name -> google.protobuf.Timestamp
+	19, // 1: termbridge.cloud.v1.DeviceSummary.last_seen:type_name -> google.protobuf.Timestamp
+	19, // 2: termbridge.cloud.v1.CloudSessionSummary.connected_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: termbridge.cloud.v1.AuthMeResp.user:type_name -> termbridge.cloud.v1.User
 	2,  // 4: termbridge.cloud.v1.AuthMeResp.cloud_session:type_name -> termbridge.cloud.v1.CloudSessionSummary
-	1,  // 5: termbridge.cloud.v1.ListDevicesResp.items:type_name -> termbridge.cloud.v1.DeviceSummary
-	1,  // 6: termbridge.cloud.v1.CurrentDeviceResp.device:type_name -> termbridge.cloud.v1.DeviceSummary
-	2,  // 7: termbridge.cloud.v1.CloudOAuthCallbackResp.cloud_session:type_name -> termbridge.cloud.v1.CloudSessionSummary
+	2,  // 5: termbridge.cloud.v1.CloudConnectResp.cloud_session:type_name -> termbridge.cloud.v1.CloudSessionSummary
+	1,  // 6: termbridge.cloud.v1.ListDevicesResp.items:type_name -> termbridge.cloud.v1.DeviceSummary
+	1,  // 7: termbridge.cloud.v1.CurrentDeviceResp.device:type_name -> termbridge.cloud.v1.DeviceSummary
 	8,  // [8:8] is the sub-list for method output_type
 	8,  // [8:8] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
@@ -884,7 +1212,7 @@ func file_termbridge_cloud_v1_cloud_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_termbridge_cloud_v1_cloud_proto_rawDesc), len(file_termbridge_cloud_v1_cloud_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

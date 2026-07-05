@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -21,86 +20,17 @@ import (
 	"termbridge-go/internal/shared/dto/protocol/tunnel"
 )
 
-const registeredCloudOAuthRedirectURL = "http://localhost:9031/cloud/oauth/callback"
-
-func TestCloudOAuthAuthorizeRejectsInvalidRegisteredClientRequest(t *testing.T) {
-	tests := []struct {
-		name  string
-		query string
-	}{
-		{name: "missing client id", query: "redirect_uri=http://localhost:9031/cloud/oauth/callback&state=state-1"},
-		{name: "wrong client id", query: "client_id=other-client&redirect_uri=http://localhost:9031/cloud/oauth/callback&state=state-1"},
-		{name: "wrong redirect uri", query: "client_id=termbridge-local&redirect_uri=http://127.0.0.1:9031/cloud/oauth/callback&state=state-1"},
-		{name: "missing state", query: "client_id=termbridge-local&redirect_uri=http://localhost:9031/cloud/oauth/callback"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			handler := newCloudHandlerForTest(t)
-			token := cloudUserToken(t, handler.authService, "user-1", "user-1@example.test")
-			request := httptest.NewRequest(http.MethodGet, "/cloud-api/cloud-oauth/authorize?"+tt.query, nil)
-			request.Header.Set("Authorization", "Bearer "+token)
-			response := httptest.NewRecorder()
-			handler.ServeHTTP(response, request)
-			assertAPIError(t, response, http.StatusBadRequest, errorCodeBadRequest)
-		})
-	}
-}
-
-func TestCloudOAuthAuthorizeRejectsUnauthenticatedRequest(t *testing.T) {
-	handler := newCloudHandlerForTest(t)
-	request := httptest.NewRequest(http.MethodGet, "/cloud-api/cloud-oauth/authorize?client_id=termbridge-local&redirect_uri=http://localhost:9031/cloud/oauth/callback&state=state-1", nil)
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, request)
-	assertAPIError(t, response, http.StatusUnauthorized, errorCodeUnauthorized)
-}
-
-func TestCloudOAuthAuthorizeExchangeAndCurrentDeviceReport(t *testing.T) {
+func TestCurrentDeviceReportBindsDeviceToCloudUserAndTunnelUsesPublicKey(t *testing.T) {
 	handler := newCloudHandlerForTest(t)
 	token := cloudUserToken(t, handler.authService, "user-1", "user-1@example.test")
-
-	authorizeRequest := httptest.NewRequest(http.MethodGet, "/cloud-api/cloud-oauth/authorize?client_id=termbridge-local&redirect_uri=http://localhost:9031/cloud/oauth/callback&state=state-1", nil)
-	authorizeRequest.Header.Set("Authorization", "Bearer "+token)
-	authorizeResponse := httptest.NewRecorder()
-	handler.ServeHTTP(authorizeResponse, authorizeRequest)
-	if authorizeResponse.Code != http.StatusOK {
-		t.Fatalf("authorize status = %d; body=%s", authorizeResponse.Code, authorizeResponse.Body.String())
-	}
-	var authorizeBody struct {
-		RedirectUrl string `json:"redirect_url"`
-	}
-	if err := json.Unmarshal(authorizeResponse.Body.Bytes(), &authorizeBody); err != nil {
-		t.Fatalf("decode authorize response: %v", err)
-	}
-	if !strings.HasPrefix(authorizeBody.RedirectUrl, registeredCloudOAuthRedirectURL+"?") || !strings.Contains(authorizeBody.RedirectUrl, "state=state-1") || !strings.Contains(authorizeBody.RedirectUrl, "code=") {
-		t.Fatalf("authorize redirect_url = %q", authorizeBody.RedirectUrl)
-	}
-	callbackRequest := httptest.NewRequest(http.MethodGet, authorizeBody.RedirectUrl, nil)
-	code := callbackRequest.URL.Query().Get("code")
-
-	exchangeResponse := httptest.NewRecorder()
-	exchangeReq := httptest.NewRequest(http.MethodPost, "/cloud-api/oauth2/token", strings.NewReader("grant_type=authorization_code&code="+url.QueryEscape(code)+"&client_id=termbridge-local&redirect_uri="+url.QueryEscape("http://localhost:9031/cloud/oauth/callback")))
-	exchangeReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	handler.ServeHTTP(exchangeResponse, exchangeReq)
-	if exchangeResponse.Code != http.StatusOK {
-		t.Fatalf("exchange status = %d; body=%s", exchangeResponse.Code, exchangeResponse.Body.String())
-	}
-	var tokenBody struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.Unmarshal(exchangeResponse.Body.Bytes(), &tokenBody); err != nil {
-		t.Fatalf("decode exchange response: %v", err)
-	}
-	if tokenBody.AccessToken == "" {
-		t.Fatal("exchange response access_token is empty")
-	}
-
 	publicKey, privateKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
 	localDevice := Device{Id: "dev-1", Name: "local-device", PublicKey: base64.StdEncoding.EncodeToString(publicKey)}
+
 	reportRequest := httptest.NewRequest(http.MethodPost, "/cloud-api/devices/current", strings.NewReader(`{"id":"`+localDevice.Id+`","name":"`+localDevice.Name+`","public_key":"`+localDevice.PublicKey+`"}`))
-	reportRequest.Header.Set("Authorization", "Bearer "+tokenBody.AccessToken)
+	reportRequest.Header.Set("Authorization", "Bearer "+token)
 	reportResponse := httptest.NewRecorder()
 	handler.ServeHTTP(reportResponse, reportRequest)
 	if reportResponse.Code != http.StatusOK {
@@ -139,12 +69,14 @@ func TestCloudOAuthAuthorizeExchangeAndCurrentDeviceReport(t *testing.T) {
 	if !ok || verifiedDeviceId != localDevice.Id {
 		t.Fatalf("verifyAgentTunnelRequest() = %q, %v; want %q, true", verifiedDeviceId, ok, localDevice.Id)
 	}
+}
 
-	reuseResponse := httptest.NewRecorder()
-	reuseReq := httptest.NewRequest(http.MethodPost, "/cloud-api/oauth2/token", strings.NewReader("grant_type=authorization_code&code="+url.QueryEscape(code)+"&client_id=termbridge-local&redirect_uri="+url.QueryEscape("http://localhost:9031/cloud/oauth/callback")))
-	reuseReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	handler.ServeHTTP(reuseResponse, reuseReq)
-	assertAPIError(t, reuseResponse, http.StatusUnauthorized, errorCodeUnauthorized)
+func TestCurrentDeviceReportRejectsUnauthenticatedRequest(t *testing.T) {
+	handler := newCloudHandlerForTest(t)
+	request := httptest.NewRequest(http.MethodPost, "/cloud-api/devices/current", strings.NewReader(`{"id":"dev-1","name":"local-device","public_key":"public-key"}`))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	assertAPIError(t, response, http.StatusUnauthorized, errorCodeUnauthorized)
 }
 
 func TestDevicesFiltersByCloudUserAndDeleteDisconnectsRoute(t *testing.T) {
@@ -202,7 +134,7 @@ func newCloudHandlerForTest(t *testing.T) *Handler {
 	insertCloudUser(t, db, "user-1", "user-1@example.test")
 	insertCloudUser(t, db, "user-2", "user-2@example.test")
 	authService := newTestAuthService(sharedauth.NewTokenService(testJWTKey))
-	return New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, DeviceRepository: deviceRepo, CloudOAuth: CloudOAuthConfig{ClientID: "termbridge-local", RedirectUrl: registeredCloudOAuthRedirectURL}})
+	return New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, DeviceRepository: deviceRepo})
 }
 
 func newCloudDeviceRepository(db *sql.DB) DeviceRepository {

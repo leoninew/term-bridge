@@ -70,30 +70,3 @@ func testTableExists(t *testing.T, db *sql.DB, table string) bool {
 	t.Fatalf("query table %s: %v", table, err)
 	return false
 }
-
-func testColumnExists(t *testing.T, db *sql.DB, table string, column string) bool {
-	t.Helper()
-	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
-	if err != nil {
-		t.Fatalf("table_info(%s): %v", table, err)
-	}
-	defer func() { _ = rows.Close() }()
-	for rows.Next() {
-		var cid int
-		var name string
-		var typ string
-		var notNull int
-		var defaultValue sql.NullString
-		var pk int
-		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
-			t.Fatalf("scan column: %v", err)
-		}
-		if name == column {
-			return true
-		}
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatalf("iterate columns: %v", err)
-	}
-	return false
-}
