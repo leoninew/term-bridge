@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	terminalv1 "termbridge-go/internal/gen/proto/termbridge/terminal/v1"
+	terminalv1 "termbridge/internal/gen/proto/termbridge/terminal/v1"
 )
 
 const (

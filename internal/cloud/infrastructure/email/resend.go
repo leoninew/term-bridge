@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	cloudauth "termbridge-go/internal/cloud/application/user/auth"
+	cloudauth "termbridge/internal/cloud/application/user/auth"
 )
 
 type ResendSender struct {

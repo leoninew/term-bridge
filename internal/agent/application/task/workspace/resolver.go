@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	workspacemodel "termbridge-go/internal/agent/model/task/workspace"
-	"termbridge-go/internal/shared/common/utils/idgen"
+	workspacemodel "termbridge/internal/agent/model/task/workspace"
+	"termbridge/internal/shared/common/utils/idgen"
 )
 
 type Store interface {

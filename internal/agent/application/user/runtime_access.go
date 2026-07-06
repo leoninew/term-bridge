@@ -3,7 +3,7 @@ package application
 import (
 	"context"
 
-	terminalapp "termbridge-go/internal/agent/application/task/terminal"
+	terminalapp "termbridge/internal/agent/application/task/terminal"
 )
 
 type RuntimeAccess interface {

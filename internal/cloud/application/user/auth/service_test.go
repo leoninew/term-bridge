@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	clouddb "termbridge-go/internal/cloud/infrastructure/database"
-	repository "termbridge-go/internal/cloud/repository/user/auth"
-	sharedauth "termbridge-go/internal/shared/common/auth"
+	clouddb "termbridge/internal/cloud/infrastructure/database"
+	repository "termbridge/internal/cloud/repository/user/auth"
+	sharedauth "termbridge/internal/shared/common/auth"
 
 	_ "modernc.org/sqlite"
 )

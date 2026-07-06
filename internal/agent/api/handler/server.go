@@ -14,10 +14,10 @@ import (
 
 	"github.com/coder/websocket"
 
-	terminalapp "termbridge-go/internal/agent/application/task/terminal"
-	agentapp "termbridge-go/internal/agent/application/user"
-	"termbridge-go/internal/shared/common/auth"
-	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
+	terminalapp "termbridge/internal/agent/application/task/terminal"
+	agentapp "termbridge/internal/agent/application/user"
+	"termbridge/internal/shared/common/auth"
+	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
 )
 
 type Config struct {

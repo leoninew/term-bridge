@@ -7,9 +7,9 @@ import (
 	"io"
 	"strings"
 
-	"termbridge-go/cmd/termbridge/app"
-	apperrors "termbridge-go/internal/shared/common/errors"
-	"termbridge-go/internal/shared/common/utils/version"
+	"termbridge/cmd/termbridge/app"
+	apperrors "termbridge/internal/shared/common/errors"
+	"termbridge/internal/shared/common/utils/version"
 )
 
 type CommandKind string

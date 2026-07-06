@@ -13,15 +13,15 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	repository "termbridge/internal/cloud/repository/user/auth"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
-	authmodel "termbridge-go/internal/cloud/model/user/auth"
-	"termbridge-go/internal/cloud/repository/user/auth"
-	sharedauth "termbridge-go/internal/shared/common/auth"
+	authmodel "termbridge/internal/cloud/model/user/auth"
+	sharedauth "termbridge/internal/shared/common/auth"
 )
 
 const (

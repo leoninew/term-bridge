@@ -13,17 +13,17 @@ import (
 	"time"
 
 	"log/slog"
-	sessionapp "termbridge-go/internal/agent/application/task/session"
-	workspaceapp "termbridge-go/internal/agent/application/task/workspace"
-	termpty "termbridge-go/internal/agent/infrastructure/pty"
-	"termbridge-go/internal/agent/infrastructure/storage/history"
-	"termbridge-go/internal/agent/model/task/process"
-	"termbridge-go/internal/agent/model/task/session"
-	"termbridge-go/internal/agent/model/task/workspace"
-	"termbridge-go/internal/agent/repository/task/state"
+	sessionapp "termbridge/internal/agent/application/task/session"
+	workspaceapp "termbridge/internal/agent/application/task/workspace"
+	termpty "termbridge/internal/agent/infrastructure/pty"
+	"termbridge/internal/agent/infrastructure/storage/history"
+	"termbridge/internal/agent/model/task/process"
+	"termbridge/internal/agent/model/task/session"
+	"termbridge/internal/agent/model/task/workspace"
+	"termbridge/internal/agent/repository/task/state"
 
-	apperrors "termbridge-go/internal/shared/common/errors"
-	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
+	apperrors "termbridge/internal/shared/common/errors"
+	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
 )
 
 const (

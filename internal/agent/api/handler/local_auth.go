@@ -6,7 +6,7 @@ import (
 	osuser "os/user"
 	"strings"
 
-	sharedauth "termbridge-go/internal/shared/common/auth"
+	sharedauth "termbridge/internal/shared/common/auth"
 )
 
 type localAuthService struct {

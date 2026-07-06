@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"termbridge-go/internal/shared/dto/protocol/tunnel"
+	"termbridge/internal/shared/dto/protocol/tunnel"
 )
 
 func verifyRepositorySignedTunnelRequest(ctx context.Context, r *http.Request, repo DeviceRepository, audience string) (string, bool) {

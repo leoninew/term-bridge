@@ -9,16 +9,16 @@ import (
 	"net/http"
 	"strings"
 
-	cloudapi "termbridge-go/internal/cloud/api/handler"
-	cloudauth "termbridge-go/internal/cloud/application/user/auth"
-	clouddb "termbridge-go/internal/cloud/infrastructure/database"
-	cloudemail "termbridge-go/internal/cloud/infrastructure/email"
-	cloudauthrepo "termbridge-go/internal/cloud/repository/user/auth"
-	clouddevice "termbridge-go/internal/cloud/repository/user/device"
-	httpserver "termbridge-go/internal/shared/api/server"
-	sharedauth "termbridge-go/internal/shared/common/auth"
-	apperrors "termbridge-go/internal/shared/common/errors"
-	basedb "termbridge-go/internal/shared/infrastructure/database"
+	cloudapi "termbridge/internal/cloud/api/handler"
+	cloudauth "termbridge/internal/cloud/application/user/auth"
+	clouddb "termbridge/internal/cloud/infrastructure/database"
+	cloudemail "termbridge/internal/cloud/infrastructure/email"
+	cloudauthrepo "termbridge/internal/cloud/repository/user/auth"
+	clouddevice "termbridge/internal/cloud/repository/user/device"
+	httpserver "termbridge/internal/shared/api/server"
+	sharedauth "termbridge/internal/shared/common/auth"
+	apperrors "termbridge/internal/shared/common/errors"
+	basedb "termbridge/internal/shared/infrastructure/database"
 )
 
 type Options struct {

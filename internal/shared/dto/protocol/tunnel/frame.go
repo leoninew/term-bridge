@@ -7,9 +7,9 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	commonv1 "termbridge-go/internal/gen/proto/termbridge/common/v1"
-	tunnelv1 "termbridge-go/internal/gen/proto/termbridge/tunnel/v1"
-	"termbridge-go/internal/shared/common/utils/codec"
+	commonv1 "termbridge/internal/gen/proto/termbridge/common/v1"
+	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
+	"termbridge/internal/shared/common/utils/codec"
 )
 
 const ProtocolVersion = 2

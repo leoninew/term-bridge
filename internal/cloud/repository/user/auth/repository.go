@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"termbridge-go/internal/shared/common/utils/idgen"
+	"termbridge/internal/shared/common/utils/idgen"
 )
 
 const (

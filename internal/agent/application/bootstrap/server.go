@@ -11,16 +11,16 @@ import (
 	"sync"
 	"time"
 
-	agentapi "termbridge-go/internal/agent/api/handler"
-	terminalapp "termbridge-go/internal/agent/application/task/terminal"
-	agentapp "termbridge-go/internal/agent/application/user"
-	agentdb "termbridge-go/internal/agent/infrastructure/database"
-	"termbridge-go/internal/agent/infrastructure/pty/gopty"
-	"termbridge-go/internal/agent/repository/task/state"
-	httpserver "termbridge-go/internal/shared/api/server"
-	sharedauth "termbridge-go/internal/shared/common/auth"
-	apperrors "termbridge-go/internal/shared/common/errors"
-	basedb "termbridge-go/internal/shared/infrastructure/database"
+	agentapi "termbridge/internal/agent/api/handler"
+	terminalapp "termbridge/internal/agent/application/task/terminal"
+	agentapp "termbridge/internal/agent/application/user"
+	agentdb "termbridge/internal/agent/infrastructure/database"
+	"termbridge/internal/agent/infrastructure/pty/gopty"
+	"termbridge/internal/agent/repository/task/state"
+	httpserver "termbridge/internal/shared/api/server"
+	sharedauth "termbridge/internal/shared/common/auth"
+	apperrors "termbridge/internal/shared/common/errors"
+	basedb "termbridge/internal/shared/infrastructure/database"
 )
 
 type Options struct {

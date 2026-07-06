@@ -10,9 +10,9 @@ import (
 
 	"github.com/coder/websocket"
 
-	tunnelv1 "termbridge-go/internal/gen/proto/termbridge/tunnel/v1"
-	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
-	"termbridge-go/internal/shared/dto/protocol/tunnel"
+	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
+	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
+	"termbridge/internal/shared/dto/protocol/tunnel"
 )
 
 const requestTimeout = 5 * time.Second

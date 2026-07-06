@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	agentapp "termbridge-go/internal/agent/application/user"
-	sharedauth "termbridge-go/internal/shared/common/auth"
+	agentapp "termbridge/internal/agent/application/user"
+	sharedauth "termbridge/internal/shared/common/auth"
 )
 
 func testLocalDevice() agentapp.Device {

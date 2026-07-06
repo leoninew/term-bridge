@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	commonv1 "termbridge-go/internal/gen/proto/termbridge/common/v1"
-	"termbridge-go/internal/shared/common/utils/codec"
-	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
+	commonv1 "termbridge/internal/gen/proto/termbridge/common/v1"
+	"termbridge/internal/shared/common/utils/codec"
+	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
 )
 
 const requestIdHeader = "X-Request-ID"

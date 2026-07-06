@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	termpty "termbridge-go/internal/agent/infrastructure/pty"
-	"termbridge-go/internal/agent/model/task/process"
+	termpty "termbridge/internal/agent/infrastructure/pty"
+	"termbridge/internal/agent/model/task/process"
 )
 
 func TestManagerRunsUnicodeAndAnsiOutput(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	apperrors "termbridge-go/internal/shared/common/errors"
+	apperrors "termbridge/internal/shared/common/errors"
 )
 
 func TestParseExecCommandWithDefaultCwd(t *testing.T) {

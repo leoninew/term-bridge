@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	termpty "termbridge-go/internal/agent/infrastructure/pty"
-	"termbridge-go/internal/agent/infrastructure/storage/history"
-	"termbridge-go/internal/agent/model/task/process"
-	"termbridge-go/internal/agent/model/task/session"
-	"termbridge-go/internal/shared/common/utils/idgen"
-	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
+	termpty "termbridge/internal/agent/infrastructure/pty"
+	"termbridge/internal/agent/infrastructure/storage/history"
+	"termbridge/internal/agent/model/task/process"
+	"termbridge/internal/agent/model/task/session"
+	"termbridge/internal/shared/common/utils/idgen"
+	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
 )
 
 type SessionRuntime struct {

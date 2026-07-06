@@ -3,7 +3,7 @@ package api
 import (
 	"time"
 
-	cloudauth "termbridge-go/internal/cloud/model/user/auth"
+	cloudauth "termbridge/internal/cloud/model/user/auth"
 )
 
 type DeviceSummary struct {

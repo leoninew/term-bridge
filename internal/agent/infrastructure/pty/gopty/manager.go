@@ -13,8 +13,8 @@ import (
 
 	gopty "github.com/aymanbagabas/go-pty"
 
-	termpty "termbridge-go/internal/agent/infrastructure/pty"
-	"termbridge-go/internal/agent/model/task/process"
+	termpty "termbridge/internal/agent/infrastructure/pty"
+	"termbridge/internal/agent/model/task/process"
 )
 
 type Manager struct {

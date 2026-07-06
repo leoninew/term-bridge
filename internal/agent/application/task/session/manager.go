@@ -3,9 +3,9 @@ package session
 import (
 	"time"
 
-	sessionmodel "termbridge-go/internal/agent/model/task/session"
-	"termbridge-go/internal/agent/model/task/workspace"
-	"termbridge-go/internal/shared/common/utils/idgen"
+	sessionmodel "termbridge/internal/agent/model/task/session"
+	"termbridge/internal/agent/model/task/workspace"
+	"termbridge/internal/shared/common/utils/idgen"
 )
 
 type Store interface {

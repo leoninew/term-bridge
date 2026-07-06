@@ -3,7 +3,7 @@ package app
 import (
 	"time"
 
-	"termbridge-go/internal/agent/infrastructure/storage/history"
+	"termbridge/internal/agent/infrastructure/storage/history"
 )
 
 type Config struct {

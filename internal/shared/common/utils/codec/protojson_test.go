@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	commonv1 "termbridge-go/internal/gen/proto/termbridge/common/v1"
+	commonv1 "termbridge/internal/gen/proto/termbridge/common/v1"
 )
 
 func TestMarshalProtoJSONUsesProtoNames(t *testing.T) {

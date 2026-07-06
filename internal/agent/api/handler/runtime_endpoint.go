@@ -10,12 +10,12 @@ import (
 
 	"github.com/coder/websocket"
 
-	terminalapp "termbridge-go/internal/agent/application/task/terminal"
-	agentapp "termbridge-go/internal/agent/application/user"
-	runtimev1 "termbridge-go/internal/gen/proto/termbridge/runtime/v1"
-	tunnelv1 "termbridge-go/internal/gen/proto/termbridge/tunnel/v1"
-	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
-	"termbridge-go/internal/shared/dto/protocol/tunnel"
+	terminalapp "termbridge/internal/agent/application/task/terminal"
+	agentapp "termbridge/internal/agent/application/user"
+	runtimev1 "termbridge/internal/gen/proto/termbridge/runtime/v1"
+	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
+	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
+	"termbridge/internal/shared/dto/protocol/tunnel"
 )
 
 type runtimeEndpoint interface {

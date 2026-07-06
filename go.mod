@@ -1,4 +1,4 @@
-module termbridge-go
+module termbridge
 
 go 1.25.7
 

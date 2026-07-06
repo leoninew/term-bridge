@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	sharedauth "termbridge-go/internal/shared/common/auth"
+	sharedauth "termbridge/internal/shared/common/auth"
 )
 
 type testAuthService struct {

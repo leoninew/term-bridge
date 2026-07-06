@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"termbridge-go/internal/agent/model/task/process"
-	"termbridge-go/internal/agent/model/task/session"
-	"termbridge-go/internal/agent/model/task/workspace"
+	"termbridge/internal/agent/model/task/process"
+	"termbridge/internal/agent/model/task/session"
+	"termbridge/internal/agent/model/task/workspace"
 
 	_ "modernc.org/sqlite"
 )

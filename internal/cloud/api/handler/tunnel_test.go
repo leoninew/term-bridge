@@ -12,8 +12,8 @@ import (
 
 	"github.com/coder/websocket"
 
-	tunnelv1 "termbridge-go/internal/gen/proto/termbridge/tunnel/v1"
-	"termbridge-go/internal/shared/dto/protocol/tunnel"
+	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
+	"termbridge/internal/shared/dto/protocol/tunnel"
 )
 
 func TestAgentTunnelRegistersDevice(t *testing.T) {

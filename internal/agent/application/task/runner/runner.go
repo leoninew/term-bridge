@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"time"
 
-	termpty "termbridge-go/internal/agent/infrastructure/pty"
-	"termbridge-go/internal/agent/model/task/process"
-	apperrors "termbridge-go/internal/shared/common/errors"
+	termpty "termbridge/internal/agent/infrastructure/pty"
+	"termbridge/internal/agent/model/task/process"
+	apperrors "termbridge/internal/shared/common/errors"
 )
 
 const defaultInterruptGrace = 1500 * time.Millisecond

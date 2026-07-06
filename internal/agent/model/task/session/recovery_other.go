@@ -6,7 +6,7 @@ import (
 	"os"
 	"syscall"
 
-	"termbridge-go/internal/agent/model/task/process"
+	"termbridge/internal/agent/model/task/process"
 )
 
 type OSAliveChecker struct{}

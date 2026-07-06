@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	transportmiddleware "termbridge-go/internal/shared/api/middleware"
-	"termbridge-go/internal/shared/api/middleware/requestlog"
+	transportmiddleware "termbridge/internal/shared/api/middleware"
+	"termbridge/internal/shared/api/middleware/requestlog"
 )
 
 func backendHandler(cfg Config, logger *slog.Logger, apiHandler http.Handler) http.Handler {

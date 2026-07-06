@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	apperrors "termbridge-go/internal/shared/common/errors"
+	apperrors "termbridge/internal/shared/common/errors"
 )
 
 type Config struct {

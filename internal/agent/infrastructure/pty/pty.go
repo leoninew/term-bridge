@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"termbridge-go/internal/agent/model/task/process"
+	"termbridge/internal/agent/model/task/process"
 )
 
 type Manager interface {

@@ -1,6 +1,6 @@
 package api
 
-import cloudauth "termbridge-go/internal/cloud/model/user/auth"
+import cloudauth "termbridge/internal/cloud/model/user/auth"
 
 type UserView = cloudauth.UserView
 

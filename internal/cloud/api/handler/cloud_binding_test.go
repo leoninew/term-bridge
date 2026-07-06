@@ -15,9 +15,9 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	clouddevice "termbridge-go/internal/cloud/repository/user/device"
-	sharedauth "termbridge-go/internal/shared/common/auth"
-	"termbridge-go/internal/shared/dto/protocol/tunnel"
+	clouddevice "termbridge/internal/cloud/repository/user/device"
+	sharedauth "termbridge/internal/shared/common/auth"
+	"termbridge/internal/shared/dto/protocol/tunnel"
 )
 
 func TestCurrentDeviceReportBindsDeviceToCloudUserAndTunnelUsesPublicKey(t *testing.T) {

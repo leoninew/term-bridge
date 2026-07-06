@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"net/http"
 
-	runtimev1 "termbridge-go/internal/gen/proto/termbridge/runtime/v1"
-	tunnelv1 "termbridge-go/internal/gen/proto/termbridge/tunnel/v1"
-	"termbridge-go/internal/shared/dto/protocol/tunnel"
+	runtimev1 "termbridge/internal/gen/proto/termbridge/runtime/v1"
+	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
+	"termbridge/internal/shared/dto/protocol/tunnel"
 )
 
 type runtimeEndpoint interface {

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io/fs"
 	"strings"
+	migrations "termbridge/migrations/agent"
 
 	"github.com/pressly/goose/v3"
 
-	apperrors "termbridge-go/internal/shared/common/errors"
-	"termbridge-go/migrations/cloud"
+	apperrors "termbridge/internal/shared/common/errors"
 )
 
 func Migrate(ctx context.Context, db *sql.DB, driver string) error {

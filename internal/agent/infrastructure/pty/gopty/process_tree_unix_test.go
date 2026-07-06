@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"termbridge-go/internal/agent/model/task/process"
+	"termbridge/internal/agent/model/task/process"
 )
 
 func TestKillTreeStopsUnixChildProcess(t *testing.T) {

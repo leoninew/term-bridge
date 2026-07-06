@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	termpty "termbridge-go/internal/agent/infrastructure/pty"
+	termpty "termbridge/internal/agent/infrastructure/pty"
 )
 
 func relayInput(ctx context.Context, stdin io.Reader, session termpty.Session, ctrlC chan<- struct{}) {

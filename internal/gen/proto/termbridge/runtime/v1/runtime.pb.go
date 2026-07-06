@@ -1644,7 +1644,7 @@ const file_termbridge_runtime_v1_runtime_proto_rawDesc = "" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\"%\n" +
 	"\x0fReadHistoryResp\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04textBBZ@termbridge-go/internal/gen/proto/termbridge/runtime/v1;runtimev1b\x06proto3"
+	"\x04text\x18\x01 \x01(\tR\x04textB?Z=termbridge/internal/gen/proto/termbridge/runtime/v1;runtimev1b\x06proto3"
 
 var (
 	file_termbridge_runtime_v1_runtime_proto_rawDescOnce sync.Once

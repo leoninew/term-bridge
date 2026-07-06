@@ -12,11 +12,12 @@ import (
 	"sync"
 	"time"
 
+	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
+	"termbridge/internal/shared/common/auth"
+	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
+	"termbridge/internal/shared/dto/protocol/tunnel"
+
 	"github.com/coder/websocket"
-	tunnelv1 "termbridge-go/internal/gen/proto/termbridge/tunnel/v1"
-	"termbridge-go/internal/shared/common/auth"
-	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
-	"termbridge-go/internal/shared/dto/protocol/tunnel"
 )
 
 type Config struct {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"termbridge-go/internal/agent/model/task/session"
+	"termbridge/internal/agent/model/task/session"
 )
 
 type CreateSessionReq struct {
