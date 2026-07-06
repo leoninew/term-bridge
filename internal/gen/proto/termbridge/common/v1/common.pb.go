@@ -147,7 +147,7 @@ const file_termbridge_common_v1_common_proto_rawDesc = "" +
 	"\adetails\x18\x04 \x01(\v2\x17.google.protobuf.StructR\adetails\"$\n" +
 	"\n" +
 	"HealthResp\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06statusBGZEtermbridge-go/internal/shared/dto/proto/termbridge/common/v1;commonv1b\x06proto3"
+	"\x06status\x18\x01 \x01(\tR\x06statusB@Z>termbridge-go/internal/gen/proto/termbridge/common/v1;commonv1b\x06proto3"
 
 var (
 	file_termbridge_common_v1_common_proto_rawDescOnce sync.Once

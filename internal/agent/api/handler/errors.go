@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	commonv1 "termbridge-go/internal/gen/proto/termbridge/common/v1"
 	"termbridge-go/internal/shared/common/utils/codec"
-	commonv1 "termbridge-go/internal/shared/dto/proto/termbridge/common/v1"
 	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
 )
 

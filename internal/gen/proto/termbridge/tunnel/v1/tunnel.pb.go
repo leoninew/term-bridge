@@ -11,8 +11,8 @@ import (
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
-	v11 "termbridge-go/internal/shared/dto/proto/termbridge/common/v1"
-	v1 "termbridge-go/internal/shared/dto/proto/termbridge/runtime/v1"
+	v11 "termbridge-go/internal/gen/proto/termbridge/common/v1"
+	v1 "termbridge-go/internal/gen/proto/termbridge/runtime/v1"
 	unsafe "unsafe"
 )
 
@@ -1244,7 +1244,7 @@ const file_termbridge_tunnel_v1_tunnel_proto_rawDesc = "" +
 	"\x0eTerminalClosed\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\"\x1f\n" +
 	"\x05Close\x12\x16\n" +
-	"\x06reason\x18\x01 \x01(\tR\x06reasonBGZEtermbridge-go/internal/shared/dto/proto/termbridge/tunnel/v1;tunnelv1b\x06proto3"
+	"\x06reason\x18\x01 \x01(\tR\x06reasonB@Z>termbridge-go/internal/gen/proto/termbridge/tunnel/v1;tunnelv1b\x06proto3"
 
 var (
 	file_termbridge_tunnel_v1_tunnel_proto_rawDescOnce sync.Once

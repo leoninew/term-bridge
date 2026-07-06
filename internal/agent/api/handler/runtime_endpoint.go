@@ -12,8 +12,8 @@ import (
 
 	terminalapp "termbridge-go/internal/agent/application/task/terminal"
 	agentapp "termbridge-go/internal/agent/application/user"
-	runtimev1 "termbridge-go/internal/shared/dto/proto/termbridge/runtime/v1"
-	tunnelv1 "termbridge-go/internal/shared/dto/proto/termbridge/tunnel/v1"
+	runtimev1 "termbridge-go/internal/gen/proto/termbridge/runtime/v1"
+	tunnelv1 "termbridge-go/internal/gen/proto/termbridge/tunnel/v1"
 	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
 	"termbridge-go/internal/shared/dto/protocol/tunnel"
 )

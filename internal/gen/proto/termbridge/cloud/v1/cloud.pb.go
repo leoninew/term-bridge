@@ -1148,7 +1148,7 @@ const file_termbridge_cloud_v1_cloud_proto_rawDesc = "" +
 	"public_key\x18\x03 \x01(\tR\tpublicKey\"k\n" +
 	"\x11CurrentDeviceResp\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\bR\baccepted\x12:\n" +
-	"\x06device\x18\x02 \x01(\v2\".termbridge.cloud.v1.DeviceSummaryR\x06deviceBEZCtermbridge-go/internal/shared/dto/proto/termbridge/cloud/v1;cloudv1b\x06proto3"
+	"\x06device\x18\x02 \x01(\v2\".termbridge.cloud.v1.DeviceSummaryR\x06deviceB>Z<termbridge-go/internal/gen/proto/termbridge/cloud/v1;cloudv1b\x06proto3"
 
 var (
 	file_termbridge_cloud_v1_cloud_proto_rawDescOnce sync.Once

@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	tunnelv1 "termbridge-go/internal/gen/proto/termbridge/tunnel/v1"
 	"termbridge-go/internal/shared/common/auth"
-	tunnelv1 "termbridge-go/internal/shared/dto/proto/termbridge/tunnel/v1"
 	terminalproto "termbridge-go/internal/shared/dto/protocol/terminal"
 	"termbridge-go/internal/shared/dto/protocol/tunnel"
 )

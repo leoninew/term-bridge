@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package termbridge.terminal.v1;
 
-option go_package = "termbridge-go/internal/shared/dto/proto/termbridge/terminal/v1;terminalv1";
+option go_package = "termbridge-go/internal/gen/proto/termbridge/terminal/v1;terminalv1";
 
 message ClientControlMessage {
   string type = 1;

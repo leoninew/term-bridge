@@ -258,7 +258,7 @@ const file_termbridge_terminal_v1_terminal_proto_rawDesc = "" +
 	"\n" +
 	"_exit_codeB\f\n" +
 	"\n" +
-	"_truncatedBKZItermbridge-go/internal/shared/dto/proto/termbridge/terminal/v1;terminalv1b\x06proto3"
+	"_truncatedBDZBtermbridge-go/internal/gen/proto/termbridge/terminal/v1;terminalv1b\x06proto3"
 
 var (
 	file_termbridge_terminal_v1_terminal_proto_rawDescOnce sync.Once

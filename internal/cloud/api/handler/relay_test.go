@@ -12,8 +12,8 @@ import (
 
 	"github.com/coder/websocket"
 
-	runtimev1 "termbridge-go/internal/shared/dto/proto/termbridge/runtime/v1"
-	tunnelv1 "termbridge-go/internal/shared/dto/proto/termbridge/tunnel/v1"
+	runtimev1 "termbridge-go/internal/gen/proto/termbridge/runtime/v1"
+	tunnelv1 "termbridge-go/internal/gen/proto/termbridge/tunnel/v1"
 	"termbridge-go/internal/shared/dto/protocol/tunnel"
 )
 
