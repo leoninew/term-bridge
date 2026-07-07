@@ -1,24 +1,22 @@
 import type { AxiosResponse } from 'axios'
 import type {
-  CreateSessionReq,
-  CreateSessionResp,
   ListWorkspacesResp,
-  RerunSessionReq,
   SessionSummary,
-  UpdateSessionReq,
-  UpdateSessionOrderResp,
   UpdateWorkspaceOrderReq,
   UpdateWorkspaceOrderResp,
   Workspace,
   WorkspaceTreeNode,
   WorkspaceTreeResp,
-} from '../../gen/proto/termbridge/runtime/v1/runtime'
+} from '../../gen/proto/termbridge/agent/v1/workspace'
 import type {
-  AuthMeResp,
-  CloudConnectReq,
-  CloudConnectResp,
-  TokenResp,
-} from '../../gen/proto/termbridge/cloud/v1/cloud'
+  CreateSessionReq,
+  CreateSessionResp,
+  RerunSessionReq,
+  UpdateSessionReq,
+  UpdateSessionOrderResp,
+} from '../../gen/proto/termbridge/agent/v1/session'
+import type { AuthMeResp, TokenResp } from '../../gen/proto/termbridge/cloud/v1/auth'
+import type { CloudConnectReq, CloudConnectResp } from '../../gen/proto/termbridge/cloud/v1/session'
 import { agentApiClient } from '../api/client'
 import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
 

@@ -12,13 +12,19 @@ import (
 	"sync"
 	"time"
 
-	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
-	"termbridge/internal/shared/common/auth"
-	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
-	"termbridge/internal/shared/dto/protocol/tunnel"
+	cloudauth "gitee.com/leoninew/TermBridge-go/internal/cloud/model/user/auth"
+	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
+	cloudproto "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/prototime"
+	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 
 	"github.com/coder/websocket"
 )
+
+const ProviderLocalAdmin = "local_admin"
 
 type Config struct {
 	Username            string
@@ -34,8 +40,8 @@ type Config struct {
 }
 
 type AuthService interface {
-	Login(ctx context.Context, email, password string) (AuthResult, error)
-	UserFromClaims(ctx context.Context, claims auth.Claims) (UserView, error)
+	Login(ctx context.Context, email, password string) (*cloudproto.TokenResp, error)
+	UserFromClaims(ctx context.Context, claims auth.Claims) (*cloudproto.User, error)
 	Register(ctx context.Context, email, password string) error
 	VerifyEmail(ctx context.Context, email, code string) error
 	ResendVerification(ctx context.Context, email string) error
@@ -43,8 +49,8 @@ type AuthService interface {
 	RequestPasswordReset(ctx context.Context, email string) error
 	ConfirmPasswordReset(ctx context.Context, email, code, newPassword string) error
 	GoogleAuthURL(ctx context.Context) (string, error)
-	GoogleCallback(ctx context.Context, code, state string) (AuthResult, error)
-	IssueUserToken(ctx context.Context, userId string) (AuthResult, error)
+	GoogleCallback(ctx context.Context, code, state string) (*cloudproto.TokenResp, error)
+	IssueUserToken(ctx context.Context, userId string) (*cloudproto.TokenResp, error)
 	VerifyToken(token string) (auth.Claims, error)
 	VerifyBasic(ctx context.Context, username, password string) bool
 }
@@ -65,52 +71,53 @@ type Handler struct {
 
 type DeviceRegistry struct {
 	mu      sync.Mutex
-	devices map[string]DeviceSummary
+	devices map[string]*cloudproto.DeviceSummary
 }
 
-func NewDeviceRegistry() *DeviceRegistry { return &DeviceRegistry{devices: map[string]DeviceSummary{}} }
-func (r *DeviceRegistry) Register(id string, name string, now time.Time) DeviceSummary {
+func NewDeviceRegistry() *DeviceRegistry {
+	return &DeviceRegistry{devices: map[string]*cloudproto.DeviceSummary{}}
+}
+func (r *DeviceRegistry) Register(id string, name string, now time.Time) *cloudproto.DeviceSummary {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	d := r.devices[id]
-	if d.ConnectedAt.IsZero() {
-		d.ConnectedAt = now
+	d := cloneDeviceSummary(r.devices[id])
+	if d.GetConnectedAt() == nil {
+		d.ConnectedAt = prototime.FromTime(now)
 	}
 	d.Id = id
 	d.Name = name
 	d.Online = true
 	d.Status = "online"
-	d.LastSeen = now
+	d.LastSeen = prototime.FromTime(now)
 	r.devices[id] = d
-	return d
+	return cloneDeviceSummary(d)
 }
 func (r *DeviceRegistry) MarkOffline(id string, now time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	d, ok := r.devices[id]
-	if !ok {
+	d := r.devices[id]
+	if d == nil {
 		return
 	}
 	d.Online = false
 	d.Status = "offline"
-	d.LastSeen = now
-	r.devices[id] = d
+	d.LastSeen = prototime.FromTime(now)
 }
-func (r *DeviceRegistry) List() []DeviceSummary {
+func (r *DeviceRegistry) List() []*cloudproto.DeviceSummary {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	out := make([]DeviceSummary, 0, len(r.devices))
+	out := make([]*cloudproto.DeviceSummary, 0, len(r.devices))
 	for _, d := range r.devices {
-		out = append(out, normalizeDeviceStatus(d))
+		out = append(out, normalizeDeviceStatus(cloneDeviceSummary(d)))
 	}
 	return out
 }
 
-func (r *DeviceRegistry) Get(id string) (DeviceSummary, bool) {
+func (r *DeviceRegistry) Get(id string) (*cloudproto.DeviceSummary, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	d, ok := r.devices[id]
-	return normalizeDeviceStatus(d), ok
+	d := r.devices[id]
+	return normalizeDeviceStatus(cloneDeviceSummary(d)), d != nil
 }
 
 func (r *DeviceRegistry) Delete(id string) {
@@ -119,7 +126,10 @@ func (r *DeviceRegistry) Delete(id string) {
 	delete(r.devices, id)
 }
 
-func normalizeDeviceStatus(d DeviceSummary) DeviceSummary {
+func normalizeDeviceStatus(d *cloudproto.DeviceSummary) *cloudproto.DeviceSummary {
+	if d == nil {
+		return nil
+	}
 	if d.Status == "" {
 		if d.Online {
 			d.Status = "online"
@@ -128,6 +138,13 @@ func normalizeDeviceStatus(d DeviceSummary) DeviceSummary {
 		}
 	}
 	return d
+}
+
+func cloneDeviceSummary(d *cloudproto.DeviceSummary) *cloudproto.DeviceSummary {
+	if d == nil {
+		return &cloudproto.DeviceSummary{}
+	}
+	return &cloudproto.DeviceSummary{Id: d.GetId(), Name: d.GetName(), Online: d.GetOnline(), Status: d.GetStatus(), ConnectedAt: d.GetConnectedAt(), LastSeen: d.GetLastSeen()}
 }
 
 func New(config Config) *Handler {
@@ -178,7 +195,7 @@ func (s *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	writeJSON(w, http.StatusOK, HealthResp{Status: "ok"})
+	writeJSON(w, http.StatusOK, &shared.HealthResp{Status: "ok"})
 }
 
 func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
@@ -189,7 +206,7 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	if !s.requireCloudEndpoint(w, r) {
 		return
 	}
-	var req AuthLoginReq
+	var req cloudproto.AuthLoginReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -203,7 +220,7 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 			s.writeAuthError(w, r, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, TokenResp{AccessToken: result.Token, TokenType: "bearer"})
+		writeJSON(w, http.StatusOK, result)
 		return
 	}
 	if !s.auth.ValidCredentials(login, req.Password) {
@@ -215,7 +232,7 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, "Failed to sign token", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, TokenResp{AccessToken: token, TokenType: "bearer"})
+	writeJSON(w, http.StatusOK, &cloudproto.TokenResp{AccessToken: token, TokenType: "bearer"})
 }
 
 func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +251,7 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 	if s.authService != nil {
 		claims, ok := s.claimsFromRequest(r)
 		if !ok {
-			writeJSON(w, http.StatusOK, AuthMeResp{Authenticated: false})
+			writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: false})
 			return
 		}
 		user, err := s.authService.UserFromClaims(r.Context(), claims)
@@ -242,10 +259,10 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 			s.writeUnauthorized(w, r)
 			return
 		}
-		writeJSON(w, http.StatusOK, AuthMeResp{Authenticated: true, User: &user})
+		writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, User: user})
 		return
 	}
-	writeJSON(w, http.StatusOK, AuthMeResp{Authenticated: true, Username: s.auth.UsernameFromRequest(r)})
+	writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, Username: s.auth.UsernameFromRequest(r)})
 }
 
 func (s *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
@@ -256,7 +273,7 @@ func (s *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if !s.requireCloudEndpoint(w, r) {
 		return
 	}
-	var req AuthRegisterReq
+	var req cloudproto.AuthRegisterReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -278,7 +295,7 @@ func (s *Handler) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	if !s.requireCloudEndpoint(w, r) {
 		return
 	}
-	var req AuthVerifyEmailReq
+	var req cloudproto.AuthVerifyEmailReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -300,7 +317,7 @@ func (s *Handler) handleResendVerification(w http.ResponseWriter, r *http.Reques
 	if !s.requireCloudEndpoint(w, r) {
 		return
 	}
-	var req AuthResendVerificationReq
+	var req cloudproto.AuthResendVerificationReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -322,7 +339,7 @@ func (s *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	if !s.requireCloudEndpoint(w, r) {
 		return
 	}
-	var req AuthChangePasswordReq
+	var req cloudproto.AuthChangePasswordReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -341,7 +358,7 @@ func (s *Handler) handlePasswordResetRequest(w http.ResponseWriter, r *http.Requ
 	if !s.requireCloudEndpoint(w, r) {
 		return
 	}
-	var req AuthPasswordResetRequestReq
+	var req cloudproto.AuthPasswordResetRequestReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -358,7 +375,7 @@ func (s *Handler) handlePasswordResetConfirm(w http.ResponseWriter, r *http.Requ
 	if !s.requireCloudEndpoint(w, r) {
 		return
 	}
-	var req AuthPasswordResetConfirmReq
+	var req cloudproto.AuthPasswordResetConfirmReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -389,7 +406,7 @@ func (s *Handler) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, GoogleAuthURLResp{AuthURL: url})
+	writeJSON(w, http.StatusOK, &cloudproto.GoogleAuthUrlResp{AuthUrl: url})
 }
 func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -399,7 +416,7 @@ func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if !s.requireCloudEndpoint(w, r) {
 		return
 	}
-	var req AuthGoogleCallbackReq
+	var req cloudproto.AuthGoogleCallbackReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -412,7 +429,7 @@ func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, TokenResp{AccessToken: result.Token, TokenType: "bearer"})
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Handler) authMiddleware(next http.Handler) http.Handler {
@@ -443,17 +460,17 @@ func (s *Handler) claimsFromRequest(r *http.Request) (auth.Claims, bool) {
 }
 func (s *Handler) writeAuthError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
-	case errors.Is(err, ErrInvalidCredentials):
+	case errors.Is(err, cloudauth.ErrInvalidCredentials):
 		s.writeUnauthorized(w, r)
-	case errors.Is(err, ErrEmailNotVerified):
+	case errors.Is(err, cloudauth.ErrEmailNotVerified):
 		s.writeAPIError(w, r, http.StatusForbidden, "email_not_verified", "Email is not verified.", nil)
-	case errors.Is(err, ErrEmailAlreadyUsed):
+	case errors.Is(err, cloudauth.ErrEmailAlreadyUsed):
 		s.writeAPIError(w, r, http.StatusConflict, "email_already_used", "Email is already used.", nil)
-	case errors.Is(err, ErrCodeInvalid):
+	case errors.Is(err, cloudauth.ErrCodeInvalid):
 		s.writeAPIError(w, r, http.StatusBadRequest, "code_invalid", "Code is invalid or expired.", nil)
-	case errors.Is(err, ErrCodeCooldown):
+	case errors.Is(err, cloudauth.ErrCodeCooldown):
 		s.writeAPIError(w, r, http.StatusTooManyRequests, "code_cooldown", "Please wait before requesting another code.", nil)
-	case errors.Is(err, ErrProviderUnsupported):
+	case errors.Is(err, cloudauth.ErrProviderUnsupported):
 		s.writeAPIError(w, r, http.StatusBadRequest, "provider_unsupported", "Provider is unsupported for this operation.", nil)
 	default:
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
@@ -474,16 +491,16 @@ func (s *Handler) handleCurrentDevice(w http.ResponseWriter, r *http.Request) {
 		s.writeUnauthorized(w, r)
 		return
 	}
-	var req CurrentDeviceReq
+	var req cloudproto.CurrentDeviceReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
-	device := Device{Id: req.Id, Name: req.Name, PublicKey: req.PublicKey}
+	device := Device{Id: req.GetId(), Name: req.GetName(), PublicKey: req.GetPublicKey()}
 	if err := s.config.DeviceRepository.UpsertUserDevice(r.Context(), claims.Sub, device); err != nil {
 		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Device report is invalid.", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, CurrentDeviceResp{Accepted: true, Device: s.deviceSummary(device)})
+	writeJSON(w, http.StatusOK, &cloudproto.CurrentDeviceResp{Accepted: true, Device: s.deviceSummary(device)})
 }
 
 func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
@@ -500,7 +517,7 @@ func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, ListDevicesResp{Items: devices})
+	writeJSON(w, http.StatusOK, &cloudproto.ListDevicesResp{Items: devices})
 }
 func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/cloud-api/devices/"), "/")
@@ -521,8 +538,8 @@ func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkspaceRoute(w, r, endpoint, deviceId, parts)
 	case "sessions":
 		if len(parts) == 2 && r.Method == http.MethodPost {
-			var request CreateSessionReq
-			if !s.decodeJSONRequest(w, r, &request) {
+			request := &agent.CreateSessionReq{}
+			if !s.decodeJSONRequest(w, r, request) {
 				return
 			}
 			s.handleJSONRuntimeWithStatus(w, r, endpoint, deviceId, "create_session", request, "", http.StatusCreated)
@@ -543,15 +560,15 @@ func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, e
 		return
 	}
 	if len(parts) == 3 && parts[2] == "order" && r.Method == http.MethodPatch {
-		var request UpdateWorkspaceOrderReq
-		if !s.decodeJSONRequest(w, r, &request) {
+		request := &agent.UpdateWorkspaceOrderReq{}
+		if !s.decodeJSONRequest(w, r, request) {
 			return
 		}
 		s.handleJSONRuntime(w, r, endpoint, deviceId, "workspace_order", request, "")
 		return
 	}
 	if len(parts) == 3 && r.Method == http.MethodDelete {
-		s.handleNoContentRuntime(w, r, endpoint, "delete_workspace", DeleteWorkspaceReq{WorkspaceId: parts[2]})
+		s.handleNoContentRuntime(w, r, endpoint, "delete_workspace", &agent.DeleteWorkspaceReq{WorkspaceId: parts[2]})
 		return
 	}
 	if len(parts) >= 4 && parts[3] == "sessions" {
@@ -564,10 +581,10 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 	if len(parts) == 0 {
 		switch r.Method {
 		case http.MethodGet:
-			s.handleJSONRuntime(w, r, endpoint, deviceId, "workspace_sessions", WorkspaceSessionsReq{WorkspaceId: workspaceId}, "")
+			s.handleJSONRuntime(w, r, endpoint, deviceId, "workspace_sessions", &agent.WorkspaceSessionsReq{WorkspaceId: workspaceId}, "")
 		case http.MethodPost:
-			var request CreateSessionReq
-			if !s.decodeJSONRequest(w, r, &request) {
+			request := &agent.CreateSessionReq{}
+			if !s.decodeJSONRequest(w, r, request) {
 				return
 			}
 			request.WorkspaceId = workspaceId
@@ -578,11 +595,11 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if len(parts) == 1 && parts[0] == "order" && r.Method == http.MethodPatch {
-		var request UpdateSessionOrderReq
-		if !s.decodeJSONRequest(w, r, &request) {
+		request := &agent.UpdateSessionOrderReq{}
+		if !s.decodeJSONRequest(w, r, request) {
 			return
 		}
-		s.handleJSONRuntime(w, r, endpoint, deviceId, "session_order", WorkspaceSessionOrderReq{WorkspaceId: workspaceId, SessionIds: request.SessionIds}, "")
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "session_order", &agent.WorkspaceSessionOrderReq{WorkspaceId: workspaceId, SessionIds: request.GetSessionIds()}, "")
 		return
 	}
 	sessionId := parts[0]
@@ -590,17 +607,17 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 		s.writeNotFound(w, r)
 		return
 	}
-	params := WorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId}
+	params := &agent.WorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId}
 	if len(parts) == 1 {
 		switch r.Method {
 		case http.MethodGet:
 			s.handleJSONRuntime(w, r, endpoint, deviceId, "get_session", params, "")
 		case http.MethodPatch:
-			var request UpdateSessionReq
-			if !s.decodeJSONRequest(w, r, &request) {
+			request := &agent.UpdateSessionReq{}
+			if !s.decodeJSONRequest(w, r, request) {
 				return
 			}
-			s.handleJSONRuntime(w, r, endpoint, deviceId, "update_session", UpdateWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
+			s.handleJSONRuntime(w, r, endpoint, deviceId, "update_session", &agent.UpdateWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
 		case http.MethodDelete:
 			s.handleNoContentRuntime(w, r, endpoint, "delete_session", params)
 		default:
@@ -624,11 +641,11 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 			s.methodNotAllowed(w, r, http.MethodPost)
 			return
 		}
-		var request RerunSessionReq
-		if !s.decodeJSONRequest(w, r, &request) {
+		request := &agent.RerunSessionReq{}
+		if !s.decodeJSONRequest(w, r, request) {
 			return
 		}
-		s.handleJSONRuntime(w, r, endpoint, deviceId, "rerun_session", RerunWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "rerun_session", &agent.RerunWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
 	case "history":
 		if r.Method != http.MethodGet {
 			s.methodNotAllowed(w, r, http.MethodGet)
@@ -773,17 +790,17 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 	cols, rows, hasAttachSize, sizeErr := terminalAttachSizeFromQuery(r)
 	if sizeErr != nil {
 		s.config.Logger.Warn("terminal attach size invalid", "workspace_id", workspaceId, "session_id", sessionId, "error", sizeErr)
-		_ = writeTerminalControl(conn, &terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: sizeErr.Error()})
+		_ = writeTerminalControl(conn, &agent.ServerControlMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: sizeErr.Error()})
 		return
 	}
 	term := &terminalRelay{sessionId: sessionId, browser: conn, done: make(chan struct{}), logger: s.config.Logger}
 	route.addTerminal(streamId, term)
-	attachReq := &tunnelv1.TerminalAttachReq{WorkspaceId: workspaceId, SessionId: sessionId}
+	attachReq := &shared.TerminalAttachReq{WorkspaceId: workspaceId, SessionId: sessionId}
 	if hasAttachSize {
 		attachReq.Cols = int32(cols)
 		attachReq.Rows = int32(rows)
 	}
-	attach := &tunnelv1.TunnelFrame{StreamId: streamId, RequestId: s.requestIdFor(w, r), Payload: &tunnelv1.TunnelFrame_TerminalAttach{TerminalAttach: attachReq}}
+	attach := &shared.TunnelFrame{StreamId: streamId, RequestId: s.requestIdFor(w, r), Payload: &shared.TunnelFrame_TerminalAttach{TerminalAttach: attachReq}}
 	if err := route.writeFrame(r.Context(), attach); err != nil {
 		return
 	}
@@ -791,7 +808,7 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 		for {
 			messageType, data, err := conn.Read(r.Context())
 			if err != nil {
-				closeFrame := &tunnelv1.TunnelFrame{StreamId: streamId, Payload: &tunnelv1.TunnelFrame_Close{Close: &tunnelv1.Close{Reason: "browser_disconnected"}}}
+				closeFrame := &shared.TunnelFrame{StreamId: streamId, Payload: &shared.TunnelFrame_Close{Close: &shared.Close{Reason: "browser_disconnected"}}}
 				_ = route.writeFrame(context.Background(), closeFrame)
 				closeOnce(term.done)
 				return
@@ -800,25 +817,25 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 			case websocket.MessageText:
 				message, err := terminalproto.DecodeClient(data)
 				if err != nil {
-					_ = writeTerminalControl(conn, &terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: err.Error()})
+					_ = writeTerminalControl(conn, &agent.ServerControlMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: err.Error()})
 					continue
 				}
 				switch message.Type {
 				case terminalproto.TypeHello:
 					continue
 				case terminalproto.TypeResize:
-					resize := &tunnelv1.TunnelFrame{StreamId: streamId, Payload: &tunnelv1.TunnelFrame_TerminalResize{TerminalResize: &tunnelv1.TerminalResize{Cols: message.Cols, Rows: message.Rows}}}
+					resize := &shared.TunnelFrame{StreamId: streamId, Payload: &shared.TunnelFrame_TerminalResize{TerminalResize: &shared.TerminalResize{Cols: message.Cols, Rows: message.Rows}}}
 					_ = route.writeFrame(r.Context(), resize)
 				case terminalproto.TypeDetach:
-					closeFrame := &tunnelv1.TunnelFrame{StreamId: streamId, Payload: &tunnelv1.TunnelFrame_Close{Close: &tunnelv1.Close{Reason: "browser_detached"}}}
+					closeFrame := &shared.TunnelFrame{StreamId: streamId, Payload: &shared.TunnelFrame_Close{Close: &shared.Close{Reason: "browser_detached"}}}
 					_ = route.writeFrame(context.Background(), closeFrame)
 					closeOnce(term.done)
 					return
 				case terminalproto.TypePing:
-					_ = writeTerminalControl(conn, &terminalproto.ServerMessage{Type: terminalproto.TypePong, Nonce: message.Nonce})
+					_ = writeTerminalControl(conn, &agent.ServerControlMessage{Type: terminalproto.TypePong, Nonce: message.Nonce})
 				}
 			case websocket.MessageBinary:
-				input := &tunnelv1.TunnelFrame{StreamId: streamId, Payload: &tunnelv1.TunnelFrame_TerminalInput{TerminalInput: &tunnelv1.TerminalInput{Data: data}}}
+				input := &shared.TunnelFrame{StreamId: streamId, Payload: &shared.TunnelFrame_TerminalInput{TerminalInput: &shared.TerminalInput{Data: data}}}
 				_ = route.writeFrame(r.Context(), input)
 			}
 		}
@@ -847,7 +864,7 @@ func terminalAttachSizeFromQuery(r *http.Request) (int, int, bool, error) {
 	}
 	return cols, rows, true, nil
 }
-func writeTerminalControl(conn *websocket.Conn, message *terminalproto.ServerMessage) error {
+func writeTerminalControl(conn *websocket.Conn, message *agent.ServerControlMessage) error {
 	data, err := terminalproto.EncodeServer(message)
 	if err != nil {
 		return err
@@ -897,7 +914,7 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 		route.closeTerminals("device disconnected")
 		s.registry.MarkOffline(hello.GetDeviceId(), time.Now().UTC())
 	}()
-	ack := &tunnelv1.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &tunnelv1.TunnelFrame_HelloAck{HelloAck: &tunnelv1.HelloAck{ProtocolVersion: tunnel.ProtocolVersion}}}
+	ack := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_HelloAck{HelloAck: &shared.HelloAck{ProtocolVersion: tunnel.ProtocolVersion}}}
 	if err := route.writeFrame(r.Context(), ack); err != nil {
 		return
 	}
@@ -914,7 +931,7 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if ping := frame.GetPing(); ping != nil {
-			pong := &tunnelv1.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &tunnelv1.TunnelFrame_Pong{Pong: &tunnelv1.Pong{Nonce: ping.GetNonce()}}}
+			pong := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Pong{Pong: &shared.Pong{Nonce: ping.GetNonce()}}}
 			_ = route.writeFrame(r.Context(), pong)
 		}
 	}
@@ -940,7 +957,7 @@ func (s *Handler) configAudience() string {
 	return "termbridge-cloud"
 }
 
-func (s *Handler) devicesForRequest(r *http.Request) ([]DeviceSummary, error) {
+func (s *Handler) devicesForRequest(r *http.Request) ([]*cloudproto.DeviceSummary, error) {
 	if s.authService == nil {
 		return s.registry.List(), nil
 	}
@@ -955,21 +972,21 @@ func (s *Handler) devicesForRequest(r *http.Request) ([]DeviceSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	summaries := make([]DeviceSummary, 0, len(devices))
+	summaries := make([]*cloudproto.DeviceSummary, 0, len(devices))
 	for _, device := range devices {
 		summaries = append(summaries, s.deviceSummary(device))
 	}
 	return summaries, nil
 }
 
-func (s *Handler) deviceSummary(device Device) DeviceSummary {
+func (s *Handler) deviceSummary(device Device) *cloudproto.DeviceSummary {
 	if runtimeDevice, ok := s.registry.Get(device.Id); ok {
 		if runtimeDevice.Name == "" {
 			runtimeDevice.Name = device.Name
 		}
 		return normalizeDeviceStatus(runtimeDevice)
 	}
-	return DeviceSummary{Id: device.Id, Name: device.Name, Online: false, Status: "offline", LastSeen: device.UpdatedAt}
+	return &cloudproto.DeviceSummary{Id: device.Id, Name: device.Name, Online: false, Status: "offline", LastSeen: prototime.FromTime(device.UpdatedAt)}
 }
 
 func (s *Handler) disconnectDevice(deviceId string, reason string) {
@@ -1056,11 +1073,6 @@ func (s *Handler) originPatterns(r *http.Request) []string {
 	patterns := []string{"http://" + r.Host, "https://" + r.Host}
 	patterns = append(patterns, s.config.CORSAllowedOrigins...)
 	return patterns
-}
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
 }
 func cleanOrigins(values []string) []string {
 	out := make([]string, 0, len(values))

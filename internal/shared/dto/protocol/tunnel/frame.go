@@ -7,9 +7,8 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	commonv1 "termbridge/internal/gen/proto/termbridge/common/v1"
-	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
-	"termbridge/internal/shared/common/utils/codec"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 )
 
 const ProtocolVersion = 2
@@ -18,15 +17,15 @@ const MaxFrameBytes = 32 * 1024 * 1024
 
 const ControlStreamID = "control"
 
-func MarshalFrame(frame *tunnelv1.TunnelFrame) ([]byte, error) {
+func MarshalFrame(frame *shared.TunnelFrame) ([]byte, error) {
 	if err := ValidateFrame(frame); err != nil {
 		return nil, err
 	}
 	return codec.MarshalProtoJSON(frame)
 }
 
-func UnmarshalFrame(data []byte) (*tunnelv1.TunnelFrame, error) {
-	var frame tunnelv1.TunnelFrame
+func UnmarshalFrame(data []byte) (*shared.TunnelFrame, error) {
+	var frame shared.TunnelFrame
 	if err := codec.UnmarshalProtoJSON(data, &frame); err != nil {
 		return nil, err
 	}
@@ -36,7 +35,7 @@ func UnmarshalFrame(data []byte) (*tunnelv1.TunnelFrame, error) {
 	return &frame, nil
 }
 
-func ValidateFrame(frame *tunnelv1.TunnelFrame) error {
+func ValidateFrame(frame *shared.TunnelFrame) error {
 	if frame == nil {
 		return fmt.Errorf("tunnel frame is nil")
 	}
@@ -52,11 +51,11 @@ func ValidateFrame(frame *tunnelv1.TunnelFrame) error {
 	return nil
 }
 
-func ErrorFrame(streamId string, requestId string, code string, message string) *tunnelv1.TunnelFrame {
-	return &tunnelv1.TunnelFrame{
+func ErrorFrame(streamId string, requestId string, code string, message string) *shared.TunnelFrame {
+	return &shared.TunnelFrame{
 		StreamId:  streamId,
 		RequestId: requestId,
-		Payload: &tunnelv1.TunnelFrame_Error{Error: &commonv1.ErrorResp{
+		Payload: &shared.TunnelFrame_Error{Error: &shared.ErrorResp{
 			Code:      code,
 			Error:     message,
 			RequestId: requestId,
@@ -64,14 +63,14 @@ func ErrorFrame(streamId string, requestId string, code string, message string) 
 	}
 }
 
-func ErrorMessage(frame *tunnelv1.TunnelFrame) string {
+func ErrorMessage(frame *shared.TunnelFrame) string {
 	if frame == nil || frame.GetError() == nil || frame.GetError().GetError() == "" {
 		return "tunnel frame error"
 	}
 	return frame.GetError().GetError()
 }
 
-func ResponseJSON(frame *tunnelv1.TunnelFrame) (json.RawMessage, error) {
+func ResponseJSON(frame *shared.TunnelFrame) (json.RawMessage, error) {
 	if frame == nil {
 		return nil, fmt.Errorf("tunnel response is nil")
 	}
@@ -89,33 +88,33 @@ func ResponseJSON(frame *tunnelv1.TunnelFrame) (json.RawMessage, error) {
 	return json.RawMessage(data), nil
 }
 
-func responseMessage(frame *tunnelv1.TunnelFrame) proto.Message {
+func responseMessage(frame *shared.TunnelFrame) proto.Message {
 	switch payload := frame.GetPayload().(type) {
-	case *tunnelv1.TunnelFrame_ListWorkspacesResp:
+	case *shared.TunnelFrame_ListWorkspacesResp:
 		return payload.ListWorkspacesResp
-	case *tunnelv1.TunnelFrame_WorkspaceTreeResp:
+	case *shared.TunnelFrame_WorkspaceTreeResp:
 		return payload.WorkspaceTreeResp
-	case *tunnelv1.TunnelFrame_WorkspaceSessionsResp:
+	case *shared.TunnelFrame_WorkspaceSessionsResp:
 		return payload.WorkspaceSessionsResp
-	case *tunnelv1.TunnelFrame_CreateSessionResp:
+	case *shared.TunnelFrame_CreateSessionResp:
 		return payload.CreateSessionResp
-	case *tunnelv1.TunnelFrame_GetSessionResp:
+	case *shared.TunnelFrame_GetSessionResp:
 		return payload.GetSessionResp.GetSession()
-	case *tunnelv1.TunnelFrame_RerunSessionResp:
+	case *shared.TunnelFrame_RerunSessionResp:
 		return payload.RerunSessionResp
-	case *tunnelv1.TunnelFrame_UpdateSessionResp:
+	case *shared.TunnelFrame_UpdateSessionResp:
 		return payload.UpdateSessionResp.GetSession()
-	case *tunnelv1.TunnelFrame_CloseSessionResp:
+	case *shared.TunnelFrame_CloseSessionResp:
 		return payload.CloseSessionResp.GetSession()
-	case *tunnelv1.TunnelFrame_DeleteSessionResp:
+	case *shared.TunnelFrame_DeleteSessionResp:
 		return payload.DeleteSessionResp
-	case *tunnelv1.TunnelFrame_ReadHistoryResp:
+	case *shared.TunnelFrame_ReadHistoryResp:
 		return payload.ReadHistoryResp
-	case *tunnelv1.TunnelFrame_UpdateWorkspaceOrderResp:
+	case *shared.TunnelFrame_UpdateWorkspaceOrderResp:
 		return payload.UpdateWorkspaceOrderResp
-	case *tunnelv1.TunnelFrame_UpdateSessionOrderResp:
+	case *shared.TunnelFrame_UpdateSessionOrderResp:
 		return payload.UpdateSessionOrderResp
-	case *tunnelv1.TunnelFrame_DeleteWorkspaceResp:
+	case *shared.TunnelFrame_DeleteWorkspaceResp:
 		return payload.DeleteWorkspaceResp
 	default:
 		return nil

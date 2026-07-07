@@ -1,4 +1,4 @@
-module termbridge
+module gitee.com/leoninew/TermBridge-go
 
 go 1.25.7
 

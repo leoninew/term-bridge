@@ -10,9 +10,10 @@ import (
 
 	"github.com/coder/websocket"
 
-	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
-	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
-	"termbridge/internal/shared/dto/protocol/tunnel"
+	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
+	tunnel "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
 const requestTimeout = 5 * time.Second
@@ -21,7 +22,7 @@ type agentRoute struct {
 	deviceId string
 	conn     *websocket.Conn
 	writeMu  sync.Mutex
-	pending  map[string]chan *tunnelv1.TunnelFrame
+	pending  map[string]chan *shared.TunnelFrame
 	terms    map[string]*terminalRelay
 	mu       sync.Mutex
 }
@@ -34,14 +35,14 @@ type terminalRelay struct {
 }
 
 func newAgentRoute(deviceId string, conn *websocket.Conn) *agentRoute {
-	return &agentRoute{deviceId: deviceId, conn: conn, pending: map[string]chan *tunnelv1.TunnelFrame{}, terms: map[string]*terminalRelay{}}
+	return &agentRoute{deviceId: deviceId, conn: conn, pending: map[string]chan *shared.TunnelFrame{}, terms: map[string]*terminalRelay{}}
 }
 
-func (r *agentRoute) request(ctx context.Context, frame *tunnelv1.TunnelFrame) (*tunnelv1.TunnelFrame, error) {
+func (r *agentRoute) request(ctx context.Context, frame *shared.TunnelFrame) (*shared.TunnelFrame, error) {
 	if frame.GetStreamId() == "" {
 		frame.StreamId = fmt.Sprintf("req-%d", time.Now().UnixNano())
 	}
-	ch := make(chan *tunnelv1.TunnelFrame, 1)
+	ch := make(chan *shared.TunnelFrame, 1)
 	r.mu.Lock()
 	r.pending[frame.GetStreamId()] = ch
 	r.mu.Unlock()
@@ -66,7 +67,7 @@ func (r *agentRoute) request(ctx context.Context, frame *tunnelv1.TunnelFrame) (
 	}
 }
 
-func (r *agentRoute) writeFrame(ctx context.Context, frame *tunnelv1.TunnelFrame) error {
+func (r *agentRoute) writeFrame(ctx context.Context, frame *shared.TunnelFrame) error {
 	data, err := tunnel.MarshalFrame(frame)
 	if err != nil {
 		return err
@@ -76,7 +77,7 @@ func (r *agentRoute) writeFrame(ctx context.Context, frame *tunnelv1.TunnelFrame
 	return r.conn.Write(ctx, websocket.MessageText, data)
 }
 
-func (r *agentRoute) dispatch(frame *tunnelv1.TunnelFrame) bool {
+func (r *agentRoute) dispatch(frame *shared.TunnelFrame) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if ch := r.pending[frame.GetStreamId()]; ch != nil && isRuntimeResponse(frame) {
@@ -110,30 +111,30 @@ func (r *agentRoute) closeTerminals(reason string) {
 	r.terms = map[string]*terminalRelay{}
 	r.mu.Unlock()
 	for _, term := range terms {
-		_ = writeTerminalControl(term.browser, &terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "device_disconnected", Message: reason})
+		_ = writeTerminalControl(term.browser, &agent.ServerControlMessage{Type: terminalproto.TypeError, Code: "device_disconnected", Message: reason})
 		_ = term.browser.Close(websocket.StatusGoingAway, reason)
 		closeOnce(term.done)
 	}
 }
 
-func (t *terminalRelay) dispatch(frame *tunnelv1.TunnelFrame) bool {
+func (t *terminalRelay) dispatch(frame *shared.TunnelFrame) bool {
 	switch payload := frame.GetPayload().(type) {
-	case *tunnelv1.TunnelFrame_TerminalOutput:
+	case *shared.TunnelFrame_TerminalOutput:
 		data := payload.TerminalOutput.GetData()
 		if err := t.browser.Write(context.Background(), websocket.MessageBinary, data); err != nil && t.logger != nil {
 			t.logger.Warn("terminal websocket output write failed", "session_id", t.sessionId, "stream_id", frame.GetStreamId(), "error", err)
 		}
 		return true
-	case *tunnelv1.TunnelFrame_Error:
+	case *shared.TunnelFrame_Error:
 		message := tunnel.ErrorMessage(frame)
 		if t.logger != nil {
 			t.logger.Warn("terminal stream error", "session_id", t.sessionId, "stream_id", frame.GetStreamId(), "message", message)
 		}
-		_ = writeTerminalControl(t.browser, &terminalproto.ServerMessage{Type: terminalproto.TypeError, Code: "terminal_stream_error", Message: message})
+		_ = writeTerminalControl(t.browser, &agent.ServerControlMessage{Type: terminalproto.TypeError, Code: "terminal_stream_error", Message: message})
 		_ = t.browser.Close(websocket.StatusNormalClosure, "terminal closed")
 		closeOnce(t.done)
 		return true
-	case *tunnelv1.TunnelFrame_TerminalClosed, *tunnelv1.TunnelFrame_Close:
+	case *shared.TunnelFrame_TerminalClosed, *shared.TunnelFrame_Close:
 		_ = t.browser.Close(websocket.StatusNormalClosure, "terminal closed")
 		closeOnce(t.done)
 		return true
@@ -142,24 +143,24 @@ func (t *terminalRelay) dispatch(frame *tunnelv1.TunnelFrame) bool {
 	}
 }
 
-func isRuntimeResponse(frame *tunnelv1.TunnelFrame) bool {
+func isRuntimeResponse(frame *shared.TunnelFrame) bool {
 	if frame.GetError() != nil {
 		return true
 	}
 	switch frame.GetPayload().(type) {
-	case *tunnelv1.TunnelFrame_ListWorkspacesResp,
-		*tunnelv1.TunnelFrame_WorkspaceTreeResp,
-		*tunnelv1.TunnelFrame_WorkspaceSessionsResp,
-		*tunnelv1.TunnelFrame_CreateSessionResp,
-		*tunnelv1.TunnelFrame_GetSessionResp,
-		*tunnelv1.TunnelFrame_RerunSessionResp,
-		*tunnelv1.TunnelFrame_UpdateSessionResp,
-		*tunnelv1.TunnelFrame_CloseSessionResp,
-		*tunnelv1.TunnelFrame_DeleteSessionResp,
-		*tunnelv1.TunnelFrame_ReadHistoryResp,
-		*tunnelv1.TunnelFrame_UpdateWorkspaceOrderResp,
-		*tunnelv1.TunnelFrame_UpdateSessionOrderResp,
-		*tunnelv1.TunnelFrame_DeleteWorkspaceResp:
+	case *shared.TunnelFrame_ListWorkspacesResp,
+		*shared.TunnelFrame_WorkspaceTreeResp,
+		*shared.TunnelFrame_WorkspaceSessionsResp,
+		*shared.TunnelFrame_CreateSessionResp,
+		*shared.TunnelFrame_GetSessionResp,
+		*shared.TunnelFrame_RerunSessionResp,
+		*shared.TunnelFrame_UpdateSessionResp,
+		*shared.TunnelFrame_CloseSessionResp,
+		*shared.TunnelFrame_DeleteSessionResp,
+		*shared.TunnelFrame_ReadHistoryResp,
+		*shared.TunnelFrame_UpdateWorkspaceOrderResp,
+		*shared.TunnelFrame_UpdateSessionOrderResp,
+		*shared.TunnelFrame_DeleteWorkspaceResp:
 		return true
 	default:
 		return false

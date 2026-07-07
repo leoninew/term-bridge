@@ -1,4 +1,18 @@
 version: v2
+clean: true
+
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: gitee.com/leoninew/TermBridge-go/internal/gen/proto
+  disable:
+    - module: buf.build/googleapis/googleapis
+    - module: buf.build/grpc/grpc
+
+inputs:
+  - directory: proto
+
 plugins:
   - local: bin/protoc-gen-go
     out: internal/gen/proto

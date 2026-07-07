@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package termbridge.shared;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1/common";
+
+message ErrorResp {
+  string code = 1;
+  string error = 2;
+  string request_id = 3;
+  google.protobuf.Struct details = 4;
+}
+
+message HealthResp {
+  string status = 1;
+}

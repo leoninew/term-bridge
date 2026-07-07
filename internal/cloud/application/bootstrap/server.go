@@ -9,16 +9,16 @@ import (
 	"net/http"
 	"strings"
 
-	cloudapi "termbridge/internal/cloud/api/handler"
-	cloudauth "termbridge/internal/cloud/application/user/auth"
-	clouddb "termbridge/internal/cloud/infrastructure/database"
-	cloudemail "termbridge/internal/cloud/infrastructure/email"
-	cloudauthrepo "termbridge/internal/cloud/repository/user/auth"
-	clouddevice "termbridge/internal/cloud/repository/user/device"
-	httpserver "termbridge/internal/shared/api/server"
-	sharedauth "termbridge/internal/shared/common/auth"
-	apperrors "termbridge/internal/shared/common/errors"
-	basedb "termbridge/internal/shared/infrastructure/database"
+	cloudapi "gitee.com/leoninew/TermBridge-go/internal/cloud/api/handler"
+	cloudauth "gitee.com/leoninew/TermBridge-go/internal/cloud/application/user/auth"
+	clouddb "gitee.com/leoninew/TermBridge-go/internal/cloud/infrastructure/database"
+	cloudemail "gitee.com/leoninew/TermBridge-go/internal/cloud/infrastructure/email"
+	cloudauthrepo "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/auth"
+	clouddevice "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/device"
+	httpserver "gitee.com/leoninew/TermBridge-go/internal/shared/api/server"
+	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
+	basedb "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/database"
 )
 
 type Options struct {

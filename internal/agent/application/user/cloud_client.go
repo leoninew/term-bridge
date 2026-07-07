@@ -11,13 +11,12 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
-	terminalapp "termbridge/internal/agent/application/task/terminal"
-	runtimev1 "termbridge/internal/gen/proto/termbridge/runtime/v1"
-	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
-	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
-	"termbridge/internal/shared/dto/protocol/tunnel"
+	terminalapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/terminal"
+	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
+	tunnel "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
 type Config struct {
@@ -31,7 +30,7 @@ type Client struct {
 	config Config
 	device Device
 	mu     sync.Mutex
-	terms  map[string]chan *tunnelv1.TunnelFrame
+	terms  map[string]chan *shared.TunnelFrame
 }
 
 func (c *Client) SetDevice(device Device) {
@@ -39,7 +38,7 @@ func (c *Client) SetDevice(device Device) {
 }
 
 func New(config Config) *Client {
-	return &Client{config: config, terms: map[string]chan *tunnelv1.TunnelFrame{}}
+	return &Client{config: config, terms: map[string]chan *shared.TunnelFrame{}}
 }
 
 func (c *Client) logInfo(message string, attrs ...any) {
@@ -78,7 +77,7 @@ func (c *Client) Run(ctx context.Context) error {
 		<-ctx.Done()
 		_ = conn.CloseNow()
 	}()
-	hello := &tunnelv1.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &tunnelv1.TunnelFrame_Hello{Hello: &tunnelv1.Hello{DeviceId: device.Id, DeviceName: device.Name, ProtocolVersion: tunnel.ProtocolVersion}}}
+	hello := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Hello{Hello: &shared.Hello{DeviceId: device.Id, DeviceName: device.Name, ProtocolVersion: tunnel.ProtocolVersion}}}
 	helloData, err := tunnel.MarshalFrame(hello)
 	if err != nil {
 		return err
@@ -115,10 +114,10 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 			continue
 		}
 		switch frame.GetPayload().(type) {
-		case *tunnelv1.TunnelFrame_TerminalAttach:
+		case *shared.TunnelFrame_TerminalAttach:
 			go c.handleTerminal(ctx, conn, &writeMu, frame)
-		case *tunnelv1.TunnelFrame_Ping:
-			pong := &tunnelv1.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &tunnelv1.TunnelFrame_Pong{Pong: &tunnelv1.Pong{Nonce: frame.GetPing().GetNonce()}}}
+		case *shared.TunnelFrame_Ping:
+			pong := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Pong{Pong: &shared.Pong{Nonce: frame.GetPing().GetNonce()}}}
 			_ = writeTunnelFrame(ctx, conn, &writeMu, pong)
 		default:
 			if isRuntimeRequest(frame) {
@@ -128,7 +127,7 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 	}
 }
 
-func (c *Client) handleRequest(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, frame *tunnelv1.TunnelFrame) {
+func (c *Client) handleRequest(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, frame *shared.TunnelFrame) {
 	attrs := []any{"stream_id", frame.GetStreamId(), "request_id", frame.GetRequestId()}
 	if c.config.Runtime == nil {
 		err := fmt.Errorf("runtime access unavailable")
@@ -146,156 +145,152 @@ func (c *Client) handleRequest(ctx context.Context, conn *websocket.Conn, writeM
 	_ = writeTunnelFrame(ctx, conn, writeMu, response)
 }
 
-func (c *Client) handleRuntimeRequest(ctx context.Context, frame *tunnelv1.TunnelFrame) (*tunnelv1.TunnelFrame, error) {
+func (c *Client) handleRuntimeRequest(ctx context.Context, frame *shared.TunnelFrame) (*shared.TunnelFrame, error) {
 	return HandleRuntimeRequest(ctx, c.config.Runtime, frame)
 }
 
-func HandleRuntimeRequest(ctx context.Context, runtime RuntimeAccess, frame *tunnelv1.TunnelFrame) (*tunnelv1.TunnelFrame, error) {
+func HandleRuntimeRequest(ctx context.Context, runtimeAccess RuntimeAccess, frame *shared.TunnelFrame) (*shared.TunnelFrame, error) {
 	streamId := frame.GetStreamId()
 	requestId := frame.GetRequestId()
 	switch payload := frame.GetPayload().(type) {
-	case *tunnelv1.TunnelFrame_ListWorkspacesReq:
-		items, err := runtime.ListWorkspaces(ctx)
+	case *shared.TunnelFrame_ListWorkspacesReq:
+		items, err := runtimeAccess.ListWorkspaces(ctx)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_ListWorkspacesResp{ListWorkspacesResp: &runtimev1.ListWorkspacesResp{Items: workspacesToProto(items)}}), nil
-	case *tunnelv1.TunnelFrame_WorkspaceTreeReq:
-		items, err := runtime.WorkspaceTree(ctx)
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ListWorkspacesResp{ListWorkspacesResp: &agent.ListWorkspacesResp{Items: items}}), nil
+	case *shared.TunnelFrame_WorkspaceTreeReq:
+		items, err := runtimeAccess.WorkspaceTree(ctx)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_WorkspaceTreeResp{WorkspaceTreeResp: &runtimev1.WorkspaceTreeResp{Items: workspaceTreeToProto(items)}}), nil
-	case *tunnelv1.TunnelFrame_UpdateWorkspaceOrderReq:
-		items, err := runtime.UpdateWorkspaceOrder(ctx, payload.UpdateWorkspaceOrderReq.GetWorkspaceIds())
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_WorkspaceTreeResp{WorkspaceTreeResp: &agent.WorkspaceTreeResp{Items: items}}), nil
+	case *shared.TunnelFrame_UpdateWorkspaceOrderReq:
+		items, err := runtimeAccess.UpdateWorkspaceOrder(ctx, payload.UpdateWorkspaceOrderReq.GetWorkspaceIds())
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_UpdateWorkspaceOrderResp{UpdateWorkspaceOrderResp: &runtimev1.UpdateWorkspaceOrderResp{Items: workspacesToProto(items)}}), nil
-	case *tunnelv1.TunnelFrame_DeleteWorkspaceReq:
-		if err := runtime.DeleteWorkspace(ctx, payload.DeleteWorkspaceReq.GetWorkspaceId()); err != nil {
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_UpdateWorkspaceOrderResp{UpdateWorkspaceOrderResp: &agent.UpdateWorkspaceOrderResp{Items: items}}), nil
+	case *shared.TunnelFrame_DeleteWorkspaceReq:
+		if err := runtimeAccess.DeleteWorkspace(ctx, payload.DeleteWorkspaceReq.GetWorkspaceId()); err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_DeleteWorkspaceResp{DeleteWorkspaceResp: &runtimev1.DeleteWorkspaceResp{}}), nil
-	case *tunnelv1.TunnelFrame_WorkspaceSessionsReq:
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_DeleteWorkspaceResp{DeleteWorkspaceResp: &agent.DeleteWorkspaceResp{}}), nil
+	case *shared.TunnelFrame_WorkspaceSessionsReq:
 		workspaceId := payload.WorkspaceSessionsReq.GetWorkspaceId()
-		items, err := runtime.ListSessionsByWorkspaceId(ctx, workspaceId)
+		items, err := runtimeAccess.ListSessionsByWorkspaceId(ctx, workspaceId)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_WorkspaceSessionsResp{WorkspaceSessionsResp: &runtimev1.WorkspaceSessionsResp{Items: workspaceSessionsToProto(workspaceId, items)}}), nil
-	case *tunnelv1.TunnelFrame_UpdateSessionOrderReq:
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_WorkspaceSessionsResp{WorkspaceSessionsResp: &agent.WorkspaceSessionsResp{Items: items}}), nil
+	case *shared.TunnelFrame_UpdateSessionOrderReq:
 		workspaceId := payload.UpdateSessionOrderReq.GetWorkspaceId()
-		items, err := runtime.UpdateSessionOrder(ctx, workspaceId, payload.UpdateSessionOrderReq.GetSessionIds())
+		items, err := runtimeAccess.UpdateSessionOrder(ctx, workspaceId, payload.UpdateSessionOrderReq.GetSessionIds())
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_UpdateSessionOrderResp{UpdateSessionOrderResp: &runtimev1.UpdateSessionOrderResp{Items: workspaceSessionsToProto(workspaceId, items)}}), nil
-	case *tunnelv1.TunnelFrame_CreateSessionReq:
-		result, err := runtime.CreateSession(ctx, terminalapp.CreateSessionReq{WorkspaceId: payload.CreateSessionReq.GetWorkspaceId(), Name: payload.CreateSessionReq.GetName(), Cwd: payload.CreateSessionReq.GetCwd(), Command: payload.CreateSessionReq.GetCommand(), Cols: int(payload.CreateSessionReq.GetCols()), Rows: int(payload.CreateSessionReq.GetRows())})
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_UpdateSessionOrderResp{UpdateSessionOrderResp: &agent.UpdateSessionOrderResp{Items: items}}), nil
+	case *shared.TunnelFrame_CreateSessionReq:
+		result, err := runtimeAccess.CreateSession(ctx, payload.CreateSessionReq)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_CreateSessionResp{CreateSessionResp: createSessionToProto(result)}), nil
-	case *tunnelv1.TunnelFrame_RerunSessionReq:
-		result, err := runtime.RerunSession(ctx, payload.RerunSessionReq.GetWorkspaceId(), payload.RerunSessionReq.GetSessionId(), terminalapp.RerunSessionReq{Cols: int(payload.RerunSessionReq.GetRequest().GetCols()), Rows: int(payload.RerunSessionReq.GetRequest().GetRows())})
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_CreateSessionResp{CreateSessionResp: result}), nil
+	case *shared.TunnelFrame_RerunSessionReq:
+		result, err := runtimeAccess.RerunSession(ctx, payload.RerunSessionReq.GetWorkspaceId(), payload.RerunSessionReq.GetSessionId(), payload.RerunSessionReq.GetRequest())
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_RerunSessionResp{RerunSessionResp: createSessionToProto(result)}), nil
-	case *tunnelv1.TunnelFrame_GetSessionReq:
-		session, err := runtime.GetSession(ctx, payload.GetSessionReq.GetWorkspaceId(), payload.GetSessionReq.GetSessionId())
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_RerunSessionResp{RerunSessionResp: result}), nil
+	case *shared.TunnelFrame_GetSessionReq:
+		session, err := runtimeAccess.GetSession(ctx, payload.GetSessionReq.GetWorkspaceId(), payload.GetSessionReq.GetSessionId())
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_GetSessionResp{GetSessionResp: &runtimev1.GetSessionResp{Session: sessionToProto(session)}}), nil
-	case *tunnelv1.TunnelFrame_UpdateSessionReq:
-		request := terminalapp.UpdateSessionReq{}
-		if payload.UpdateSessionReq.GetRequest().Name != nil {
-			request.Name = payload.UpdateSessionReq.GetRequest().GetName()
-		}
-		session, err := runtime.UpdateSession(ctx, payload.UpdateSessionReq.GetWorkspaceId(), payload.UpdateSessionReq.GetSessionId(), request)
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_GetSessionResp{GetSessionResp: &agent.GetSessionResp{Session: session}}), nil
+	case *shared.TunnelFrame_UpdateSessionReq:
+		session, err := runtimeAccess.UpdateSession(ctx, payload.UpdateSessionReq.GetWorkspaceId(), payload.UpdateSessionReq.GetSessionId(), payload.UpdateSessionReq.GetRequest())
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_UpdateSessionResp{UpdateSessionResp: &runtimev1.UpdateSessionResp{Session: sessionToProto(session)}}), nil
-	case *tunnelv1.TunnelFrame_DeleteSessionReq:
-		if err := runtime.DeleteSession(ctx, payload.DeleteSessionReq.GetWorkspaceId(), payload.DeleteSessionReq.GetSessionId()); err != nil {
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_UpdateSessionResp{UpdateSessionResp: &agent.UpdateSessionResp{Session: session}}), nil
+	case *shared.TunnelFrame_DeleteSessionReq:
+		if err := runtimeAccess.DeleteSession(ctx, payload.DeleteSessionReq.GetWorkspaceId(), payload.DeleteSessionReq.GetSessionId()); err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_DeleteSessionResp{DeleteSessionResp: &runtimev1.DeleteSessionResp{}}), nil
-	case *tunnelv1.TunnelFrame_CloseSessionReq:
-		session, err := runtime.CloseSession(ctx, payload.CloseSessionReq.GetWorkspaceId(), payload.CloseSessionReq.GetSessionId())
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_DeleteSessionResp{DeleteSessionResp: &agent.DeleteSessionResp{}}), nil
+	case *shared.TunnelFrame_CloseSessionReq:
+		session, err := runtimeAccess.CloseSession(ctx, payload.CloseSessionReq.GetWorkspaceId(), payload.CloseSessionReq.GetSessionId())
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_CloseSessionResp{CloseSessionResp: &runtimev1.CloseSessionResp{Session: sessionToProto(session)}}), nil
-	case *tunnelv1.TunnelFrame_ReadHistoryReq:
-		data, err := runtime.ReadHistory(ctx, payload.ReadHistoryReq.GetWorkspaceId(), payload.ReadHistoryReq.GetSessionId())
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_CloseSessionResp{CloseSessionResp: &agent.CloseSessionResp{Session: session}}), nil
+	case *shared.TunnelFrame_ReadHistoryReq:
+		data, err := runtimeAccess.ReadHistory(ctx, payload.ReadHistoryReq.GetWorkspaceId(), payload.ReadHistoryReq.GetSessionId())
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &tunnelv1.TunnelFrame_ReadHistoryResp{ReadHistoryResp: &runtimev1.ReadHistoryResp{Text: string(data)}}), nil
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ReadHistoryResp{ReadHistoryResp: &agent.ReadHistoryResp{Text: string(data)}}), nil
 	default:
 		return nil, fmt.Errorf("unsupported runtime payload %T", frame.GetPayload())
 	}
 }
 
-func runtimeResponse(streamId string, requestId string, payload any) *tunnelv1.TunnelFrame {
-	frame := &tunnelv1.TunnelFrame{StreamId: streamId, RequestId: requestId}
+func runtimeResponse(streamId string, requestId string, payload any) *shared.TunnelFrame {
+	frame := &shared.TunnelFrame{StreamId: streamId, RequestId: requestId}
 	switch value := payload.(type) {
-	case *tunnelv1.TunnelFrame_ListWorkspacesResp:
+	case *shared.TunnelFrame_ListWorkspacesResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_WorkspaceTreeResp:
+	case *shared.TunnelFrame_WorkspaceTreeResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_WorkspaceSessionsResp:
+	case *shared.TunnelFrame_WorkspaceSessionsResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_CreateSessionResp:
+	case *shared.TunnelFrame_CreateSessionResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_GetSessionResp:
+	case *shared.TunnelFrame_GetSessionResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_RerunSessionResp:
+	case *shared.TunnelFrame_RerunSessionResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_UpdateSessionResp:
+	case *shared.TunnelFrame_UpdateSessionResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_CloseSessionResp:
+	case *shared.TunnelFrame_CloseSessionResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_DeleteSessionResp:
+	case *shared.TunnelFrame_DeleteSessionResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_ReadHistoryResp:
+	case *shared.TunnelFrame_ReadHistoryResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_UpdateWorkspaceOrderResp:
+	case *shared.TunnelFrame_UpdateWorkspaceOrderResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_UpdateSessionOrderResp:
+	case *shared.TunnelFrame_UpdateSessionOrderResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_DeleteWorkspaceResp:
+	case *shared.TunnelFrame_DeleteWorkspaceResp:
 		frame.Payload = value
 	}
 	return frame
 }
 
-func isRuntimeRequest(frame *tunnelv1.TunnelFrame) bool {
+func isRuntimeRequest(frame *shared.TunnelFrame) bool {
 	switch frame.GetPayload().(type) {
-	case *tunnelv1.TunnelFrame_ListWorkspacesReq,
-		*tunnelv1.TunnelFrame_WorkspaceTreeReq,
-		*tunnelv1.TunnelFrame_WorkspaceSessionsReq,
-		*tunnelv1.TunnelFrame_CreateSessionReq,
-		*tunnelv1.TunnelFrame_GetSessionReq,
-		*tunnelv1.TunnelFrame_RerunSessionReq,
-		*tunnelv1.TunnelFrame_UpdateSessionReq,
-		*tunnelv1.TunnelFrame_CloseSessionReq,
-		*tunnelv1.TunnelFrame_DeleteSessionReq,
-		*tunnelv1.TunnelFrame_ReadHistoryReq,
-		*tunnelv1.TunnelFrame_UpdateWorkspaceOrderReq,
-		*tunnelv1.TunnelFrame_UpdateSessionOrderReq,
-		*tunnelv1.TunnelFrame_DeleteWorkspaceReq:
+	case *shared.TunnelFrame_ListWorkspacesReq,
+		*shared.TunnelFrame_WorkspaceTreeReq,
+		*shared.TunnelFrame_WorkspaceSessionsReq,
+		*shared.TunnelFrame_CreateSessionReq,
+		*shared.TunnelFrame_GetSessionReq,
+		*shared.TunnelFrame_RerunSessionReq,
+		*shared.TunnelFrame_UpdateSessionReq,
+		*shared.TunnelFrame_CloseSessionReq,
+		*shared.TunnelFrame_DeleteSessionReq,
+		*shared.TunnelFrame_ReadHistoryReq,
+		*shared.TunnelFrame_UpdateWorkspaceOrderReq,
+		*shared.TunnelFrame_UpdateSessionOrderReq,
+		*shared.TunnelFrame_DeleteWorkspaceReq:
 		return true
 	default:
 		return false
 	}
 }
 
-func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, frame *tunnelv1.TunnelFrame) {
+func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, frame *shared.TunnelFrame) {
 	payload := frame.GetTerminalAttach()
 	if payload == nil {
 		_ = writeTerminalError(ctx, conn, writeMu, frame.GetStreamId(), frame.GetRequestId(), "invalid terminal attach")
@@ -331,7 +326,7 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 			return
 		}
 	}
-	inbound := make(chan *tunnelv1.TunnelFrame, 16)
+	inbound := make(chan *shared.TunnelFrame, 16)
 	c.addTerminal(frame.GetStreamId(), inbound)
 	defer c.removeTerminal(frame.GetStreamId())
 	for {
@@ -340,11 +335,11 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 			return
 		case inboundFrame := <-inbound:
 			switch payload := inboundFrame.GetPayload().(type) {
-			case *tunnelv1.TunnelFrame_TerminalInput:
+			case *shared.TunnelFrame_TerminalInput:
 				if err := stream.WriteInput(payload.TerminalInput.GetData()); err != nil {
 					c.logWarn("agent terminal input write failed", append(attrs, "bytes", len(payload.TerminalInput.GetData()), "error", err)...)
 				}
-			case *tunnelv1.TunnelFrame_TerminalResize:
+			case *shared.TunnelFrame_TerminalResize:
 				cols := int(payload.TerminalResize.GetCols())
 				rows := int(payload.TerminalResize.GetRows())
 				if err := terminalproto.ValidateSize(cols, rows); err != nil {
@@ -354,23 +349,23 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 				if err := stream.Resize(cols, rows); err != nil {
 					c.logWarn("agent terminal resize failed", append(attrs, "cols", cols, "rows", rows, "error", err)...)
 				}
-			case *tunnelv1.TunnelFrame_Close:
+			case *shared.TunnelFrame_Close:
 				return
 			}
 		case outbound, ok := <-stream.Outbound():
 			if !ok {
-				closed := &tunnelv1.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &tunnelv1.TunnelFrame_TerminalClosed{TerminalClosed: &tunnelv1.TerminalClosed{}}}
+				closed := &shared.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &shared.TunnelFrame_TerminalClosed{TerminalClosed: &shared.TerminalClosed{}}}
 				_ = writeTunnelFrame(ctx, conn, writeMu, closed)
 				return
 			}
 			data := outboundData(outbound)
-			output := &tunnelv1.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &tunnelv1.TunnelFrame_TerminalOutput{TerminalOutput: &tunnelv1.TerminalOutput{Data: data}}}
+			output := &shared.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &shared.TunnelFrame_TerminalOutput{TerminalOutput: &shared.TerminalOutput{Data: data}}}
 			_ = writeTunnelFrame(ctx, conn, writeMu, output)
 		}
 	}
 }
 
-func (c *Client) dispatchTerminal(frame *tunnelv1.TunnelFrame) bool {
+func (c *Client) dispatchTerminal(frame *shared.TunnelFrame) bool {
 	c.mu.Lock()
 	ch := c.terms[frame.GetStreamId()]
 	c.mu.Unlock()
@@ -385,7 +380,7 @@ func (c *Client) dispatchTerminal(frame *tunnelv1.TunnelFrame) bool {
 	return true
 }
 
-func (c *Client) addTerminal(streamId string, ch chan *tunnelv1.TunnelFrame) {
+func (c *Client) addTerminal(streamId string, ch chan *shared.TunnelFrame) {
 	c.mu.Lock()
 	c.terms[streamId] = ch
 	c.mu.Unlock()
@@ -401,7 +396,7 @@ func writeTerminalError(ctx context.Context, conn *websocket.Conn, writeMu *sync
 	return writeTunnelFrame(ctx, conn, writeMu, tunnel.ErrorFrame(streamId, requestId, "terminal_stream_error", message))
 }
 
-func writeTunnelFrame(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, frame *tunnelv1.TunnelFrame) error {
+func writeTunnelFrame(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, frame *shared.TunnelFrame) error {
 	data, err := tunnel.MarshalFrame(frame)
 	if err != nil {
 		return err
@@ -416,63 +411,6 @@ func outboundData(outbound terminalapp.Outbound) []byte {
 		return outbound.Binary
 	}
 	return []byte(outbound.Text.Message)
-}
-
-func workspacesToProto(items []terminalapp.WorkspaceSummary) []*runtimev1.Workspace {
-	out := make([]*runtimev1.Workspace, 0, len(items))
-	for _, item := range items {
-		out = append(out, workspaceToProto(item))
-	}
-	return out
-}
-
-func workspaceToProto(item terminalapp.WorkspaceSummary) *runtimev1.Workspace {
-	return &runtimev1.Workspace{Id: item.Id, Name: item.Name, Path: item.Path, UpdatedAt: timestamp(item.UpdatedAt)}
-}
-
-func workspaceTreeToProto(items []terminalapp.WorkspaceTreeNode) []*runtimev1.WorkspaceTreeNode {
-	out := make([]*runtimev1.WorkspaceTreeNode, 0, len(items))
-	for _, item := range items {
-		out = append(out, &runtimev1.WorkspaceTreeNode{Id: item.Id, Name: item.Name, Path: item.Path, UpdatedAt: timestamp(item.UpdatedAt), Children: workspaceSessionsToProto(item.Id, item.Children)})
-	}
-	return out
-}
-
-func workspaceSessionsToProto(workspaceId string, items []terminalapp.WorkspaceSessionSummary) []*runtimev1.SessionSummary {
-	out := make([]*runtimev1.SessionSummary, 0, len(items))
-	for _, item := range items {
-		out = append(out, workspaceSessionToProto(workspaceId, item))
-	}
-	return out
-}
-
-func workspaceSessionToProto(workspaceId string, item terminalapp.WorkspaceSessionSummary) *runtimev1.SessionSummary {
-	var exitCode *int32
-	if item.ExitCode != nil {
-		value := int32(*item.ExitCode)
-		exitCode = &value
-	}
-	return &runtimev1.SessionSummary{Id: item.Id, WorkspaceId: workspaceId, Name: item.Name, Command: item.Command, Cwd: item.Cwd, LifecycleState: string(item.LifecycleState), AttachmentState: string(item.AttachmentState), ExitCode: exitCode, UpdatedAt: timestamp(item.UpdatedAt)}
-}
-
-func sessionToProto(item terminalapp.SessionSummary) *runtimev1.SessionSummary {
-	var exitCode *int32
-	if item.ExitCode != nil {
-		value := int32(*item.ExitCode)
-		exitCode = &value
-	}
-	return &runtimev1.SessionSummary{Id: item.Id, WorkspaceId: item.WorkspaceId, Name: item.Name, Command: item.Command, Cwd: item.Cwd, LifecycleState: string(item.LifecycleState), AttachmentState: string(item.AttachmentState), ExitCode: exitCode, UpdatedAt: timestamp(item.UpdatedAt)}
-}
-
-func createSessionToProto(item terminalapp.CreateSessionResp) *runtimev1.CreateSessionResp {
-	return &runtimev1.CreateSessionResp{SessionId: item.SessionId, WorkspaceId: item.WorkspaceId, State: item.State}
-}
-
-func timestamp(value time.Time) *timestamppb.Timestamp {
-	if value.IsZero() {
-		return nil
-	}
-	return timestamppb.New(value)
 }
 
 func (c *Client) tunnelHeader(device Device) (http.Header, error) {

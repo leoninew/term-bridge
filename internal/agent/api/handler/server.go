@@ -13,11 +13,16 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"google.golang.org/protobuf/proto"
 
-	terminalapp "termbridge/internal/agent/application/task/terminal"
-	agentapp "termbridge/internal/agent/application/user"
-	"termbridge/internal/shared/common/auth"
-	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
+	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
+	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
+	cloudproto "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	sharedAuth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/prototime"
+	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 )
 
 type Config struct {
@@ -30,18 +35,18 @@ type Config struct {
 	LocalDeviceStateDir string
 	LocalRuntime        agentapp.RuntimeAccess
 	CORSAllowedOrigins  []string
-	OnLocalCloudSession func(CloudSessionSummary)
+	OnLocalCloudSession func(*cloudproto.CloudSessionSummary) // shared auth via sharedAuth
 }
 
 type AuthService interface {
-	Login(ctx context.Context, email, password string) (AuthResult, error)
-	UserFromClaims(ctx context.Context, claims auth.Claims) (UserView, error)
-	VerifyToken(token string) (auth.Claims, error)
+	Login(ctx context.Context, email, password string) (*cloudproto.TokenResp, error)
+	UserFromClaims(ctx context.Context, claims sharedAuth.Claims) (*cloudproto.User, error)
+	VerifyToken(token string) (sharedAuth.Claims, error)
 }
 
 type Handler struct {
 	config             Config
-	auth               *auth.Auther
+	auth               *sharedAuth.Auther
 	authService        AuthService
 	writers            map[string]string
 	writerMu           sync.Mutex
@@ -49,13 +54,13 @@ type Handler struct {
 	workspaceTreeCache map[string]json.RawMessage
 	historyCache       map[string]map[string]string
 	cloudSessionMu     sync.Mutex
-	cloudSession       *CloudSessionSummary
+	cloudSession       *cloudproto.CloudSessionSummary
 	localRuntime       runtimeEndpoint
 }
 
 func New(config Config) *Handler {
 	config = normalizeConfig(config)
-	handler := &Handler{config: config, auth: auth.NewAuther(auth.Credentials{}, auth.NewTokenService(config.JWTSecret)), authService: config.AuthService, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
+	handler := &Handler{config: config, auth: sharedAuth.NewAuther(sharedAuth.Credentials{}, sharedAuth.NewTokenService(config.JWTSecret)), authService: config.AuthService, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
 	if config.LocalDevice.CloudBinding != nil {
 		handler.setLocalCloudSession(cloudSessionSummaryFromBinding(*config.LocalDevice.CloudBinding))
 	} else if config.LocalDeviceStateDir != "" {
@@ -101,7 +106,7 @@ func (s *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	writeJSON(w, http.StatusOK, HealthResp{Status: "ok"})
+	writeJSON(w, http.StatusOK, &shared.HealthResp{Status: "ok"})
 }
 
 func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +120,7 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 			s.writeUnauthorized(w, r)
 			return
 		}
-		writeJSON(w, http.StatusOK, TokenResp{AccessToken: result.Token, TokenType: "bearer"})
+		writeJSON(w, http.StatusOK, result)
 		return
 	}
 	if s.auth == nil {
@@ -127,7 +132,7 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, "Failed to sign token", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, TokenResp{AccessToken: token, TokenType: "bearer"})
+	writeJSON(w, http.StatusOK, &cloudproto.TokenResp{AccessToken: token, TokenType: "bearer"})
 }
 
 func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +152,7 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		cloudSession := s.localCloudSessionSummary()
 		claims, ok := s.claimsFromRequest(r)
 		if !ok {
-			writeJSON(w, http.StatusOK, AuthMeResp{Authenticated: false, CloudSession: cloudSession})
+			writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: false, CloudSession: cloudSession})
 			return
 		}
 		user, err := s.authService.UserFromClaims(r.Context(), claims)
@@ -155,10 +160,10 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 			s.writeUnauthorized(w, r)
 			return
 		}
-		writeJSON(w, http.StatusOK, AuthMeResp{Authenticated: true, User: &user, CloudSession: cloudSession})
+		writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, User: user, CloudSession: cloudSession})
 		return
 	}
-	writeJSON(w, http.StatusOK, AuthMeResp{Authenticated: true, Username: s.auth.UsernameFromRequest(r)})
+	writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, Username: s.auth.UsernameFromRequest(r)})
 }
 
 func (s *Handler) authMiddleware(next http.Handler) http.Handler {
@@ -174,34 +179,37 @@ func (s *Handler) authMiddleware(next http.Handler) http.Handler {
 		s.auth.Middleware(next, s.writeUnauthorized).ServeHTTP(w, r)
 	})
 }
-func (s *Handler) localCloudSessionSummary() *CloudSessionSummary {
+func (s *Handler) localCloudSessionSummary() *cloudproto.CloudSessionSummary {
 	s.cloudSessionMu.Lock()
 	defer s.cloudSessionMu.Unlock()
 	if s.cloudSession == nil {
 		return nil
 	}
-	summary := *s.cloudSession
-	return &summary
+	return proto.Clone(s.cloudSession).(*cloudproto.CloudSessionSummary)
 }
 
-func (s *Handler) setLocalCloudSession(summary CloudSessionSummary) {
+func (s *Handler) setLocalCloudSession(summary *cloudproto.CloudSessionSummary) {
 	s.cloudSessionMu.Lock()
 	defer s.cloudSessionMu.Unlock()
-	s.cloudSession = &summary
+	if summary == nil {
+		s.cloudSession = nil
+		return
+	}
+	s.cloudSession = proto.Clone(summary).(*cloudproto.CloudSessionSummary)
 }
 
-func cloudSessionSummaryFromBinding(summary agentapp.CloudBindingSummary) CloudSessionSummary {
-	return CloudSessionSummary{GateURL: summary.GateUrl, DeviceId: summary.DeviceId, DeviceName: summary.DeviceName, ConnectedAt: summary.ConnectedAt}
+func cloudSessionSummaryFromBinding(summary agentapp.CloudBindingSummary) *cloudproto.CloudSessionSummary {
+	return &cloudproto.CloudSessionSummary{GateUrl: summary.GateUrl, DeviceId: summary.DeviceId, DeviceName: summary.DeviceName, ConnectedAt: prototime.FromTime(summary.ConnectedAt)}
 }
 
-func cloudBindingSummaryFromSession(summary CloudSessionSummary) agentapp.CloudBindingSummary {
-	return agentapp.CloudBindingSummary{GateUrl: summary.GateURL, DeviceId: summary.DeviceId, DeviceName: summary.DeviceName, ConnectedAt: summary.ConnectedAt}
+func cloudBindingSummaryFromSession(summary *cloudproto.CloudSessionSummary) agentapp.CloudBindingSummary {
+	return agentapp.CloudBindingSummary{GateUrl: summary.GetGateUrl(), DeviceId: summary.GetDeviceId(), DeviceName: summary.GetDeviceName(), ConnectedAt: prototime.ToTime(summary.GetConnectedAt())}
 }
 
-func (s *Handler) claimsFromRequest(r *http.Request) (auth.Claims, bool) {
-	token := auth.ExtractBearerToken(r)
+func (s *Handler) claimsFromRequest(r *http.Request) (sharedAuth.Claims, bool) {
+	token := sharedAuth.ExtractBearerToken(r)
 	if token == "" || s.authService == nil {
-		return auth.Claims{}, false
+		return sharedAuth.Claims{}, false
 	}
 	claims, err := s.authService.VerifyToken(token)
 	return claims, err == nil
@@ -215,7 +223,7 @@ func (s *Handler) handleCloudConnect(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud Gate is not configured.", nil)
 		return
 	}
-	var req CloudConnectReq
+	var req cloudproto.CloudConnectReq
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
@@ -233,10 +241,10 @@ func (s *Handler) handleCloudConnect(w http.ResponseWriter, r *http.Request) {
 	if !s.persistLocalCloudSession(w, r, summary) {
 		return
 	}
-	writeJSON(w, http.StatusOK, CloudConnectResp{CloudSession: summary})
+	writeJSON(w, http.StatusOK, &cloudproto.CloudConnectResp{CloudSession: summary})
 }
 
-func (s *Handler) persistLocalCloudSession(w http.ResponseWriter, r *http.Request, summary CloudSessionSummary) bool {
+func (s *Handler) persistLocalCloudSession(w http.ResponseWriter, r *http.Request, summary *cloudproto.CloudSessionSummary) bool {
 	if s.config.LocalDeviceStateDir != "" {
 		if err := agentapp.SaveCloudBindingSummary(s.config.LocalDeviceStateDir, cloudBindingSummaryFromSession(summary), time.Now().UTC()); err != nil {
 			s.config.Logger.Warn("persist local cloud session", "error", err)
@@ -269,8 +277,8 @@ func (s *Handler) handleLocalSessions(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	var request terminalapp.CreateSessionReq
-	if !s.decodeJSONRequest(w, r, &request) {
+	request := &agent.CreateSessionReq{}
+	if !s.decodeJSONRequest(w, r, request) {
 		return
 	}
 	s.handleJSONRuntimeWithStatus(w, r, s.localRuntime, "", "create_session", request, "", http.StatusCreated)
@@ -286,15 +294,15 @@ func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, e
 		return
 	}
 	if len(parts) == 3 && parts[2] == "order" && r.Method == http.MethodPatch {
-		var request terminalapp.UpdateWorkspaceOrderReq
-		if !s.decodeJSONRequest(w, r, &request) {
+		request := &agent.UpdateWorkspaceOrderReq{}
+		if !s.decodeJSONRequest(w, r, request) {
 			return
 		}
 		s.handleJSONRuntime(w, r, endpoint, deviceId, "workspace_order", request, "")
 		return
 	}
 	if len(parts) == 3 && r.Method == http.MethodDelete {
-		s.handleNoContentRuntime(w, r, endpoint, "delete_workspace", terminalapp.DeleteWorkspaceReq{WorkspaceId: parts[2]})
+		s.handleNoContentRuntime(w, r, endpoint, "delete_workspace", &agent.DeleteWorkspaceReq{WorkspaceId: parts[2]})
 		return
 	}
 	if len(parts) >= 4 && parts[3] == "sessions" {
@@ -307,10 +315,10 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 	if len(parts) == 0 {
 		switch r.Method {
 		case http.MethodGet:
-			s.handleJSONRuntime(w, r, endpoint, deviceId, "workspace_sessions", terminalapp.WorkspaceSessionsReq{WorkspaceId: workspaceId}, "")
+			s.handleJSONRuntime(w, r, endpoint, deviceId, "workspace_sessions", &agent.WorkspaceSessionsReq{WorkspaceId: workspaceId}, "")
 		case http.MethodPost:
-			var request terminalapp.CreateSessionReq
-			if !s.decodeJSONRequest(w, r, &request) {
+			request := &agent.CreateSessionReq{}
+			if !s.decodeJSONRequest(w, r, request) {
 				return
 			}
 			request.WorkspaceId = workspaceId
@@ -321,11 +329,11 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if len(parts) == 1 && parts[0] == "order" && r.Method == http.MethodPatch {
-		var request terminalapp.UpdateSessionOrderReq
-		if !s.decodeJSONRequest(w, r, &request) {
+		request := &agent.UpdateSessionOrderReq{}
+		if !s.decodeJSONRequest(w, r, request) {
 			return
 		}
-		s.handleJSONRuntime(w, r, endpoint, deviceId, "session_order", terminalapp.WorkspaceSessionOrderReq{WorkspaceId: workspaceId, SessionIds: request.SessionIds}, "")
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "session_order", &agent.WorkspaceSessionOrderReq{WorkspaceId: workspaceId, SessionIds: request.GetSessionIds()}, "")
 		return
 	}
 	sessionId := parts[0]
@@ -333,17 +341,17 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 		s.writeNotFound(w, r)
 		return
 	}
-	params := terminalapp.WorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId}
+	params := &agent.WorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId}
 	if len(parts) == 1 {
 		switch r.Method {
 		case http.MethodGet:
 			s.handleJSONRuntime(w, r, endpoint, deviceId, "get_session", params, "")
 		case http.MethodPatch:
-			var request terminalapp.UpdateSessionReq
-			if !s.decodeJSONRequest(w, r, &request) {
+			request := &agent.UpdateSessionReq{}
+			if !s.decodeJSONRequest(w, r, request) {
 				return
 			}
-			s.handleJSONRuntime(w, r, endpoint, deviceId, "update_session", terminalapp.UpdateWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
+			s.handleJSONRuntime(w, r, endpoint, deviceId, "update_session", &agent.UpdateWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
 		case http.MethodDelete:
 			s.handleNoContentRuntime(w, r, endpoint, "delete_session", params)
 		default:
@@ -367,11 +375,11 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 			s.methodNotAllowed(w, r, http.MethodPost)
 			return
 		}
-		var request terminalapp.RerunSessionReq
-		if !s.decodeJSONRequest(w, r, &request) {
+		request := &agent.RerunSessionReq{}
+		if !s.decodeJSONRequest(w, r, request) {
 			return
 		}
-		s.handleJSONRuntime(w, r, endpoint, deviceId, "rerun_session", terminalapp.RerunWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "rerun_session", &agent.RerunWorkspaceSessionReq{WorkspaceId: workspaceId, SessionId: sessionId, Request: request}, "")
 	case "history":
 		if r.Method != http.MethodGet {
 			s.methodNotAllowed(w, r, http.MethodGet)
@@ -486,7 +494,7 @@ func terminalAttachSizeFromQuery(r *http.Request) (int, int, bool, error) {
 	}
 	return cols, rows, true, nil
 }
-func writeTerminalControl(conn *websocket.Conn, message *terminalproto.ServerMessage) error {
+func writeTerminalControl(conn *websocket.Conn, message *agent.ServerControlMessage) error {
 	data, err := terminalproto.EncodeServer(message)
 	if err != nil {
 		return err
@@ -494,33 +502,33 @@ func writeTerminalControl(conn *websocket.Conn, message *terminalproto.ServerMes
 	return conn.Write(context.Background(), websocket.MessageText, data)
 }
 
-func (s *Handler) connectCloudWithToken(ctx context.Context, cloudToken string) (CloudSessionSummary, error) {
+func (s *Handler) connectCloudWithToken(ctx context.Context, cloudToken string) (*cloudproto.CloudSessionSummary, error) {
 	device := s.config.LocalDevice
 	if device.Id == "" || device.Name == "" {
-		return CloudSessionSummary{}, fmt.Errorf("local device identity is incomplete")
+		return nil, fmt.Errorf("local device identity is incomplete")
 	}
 	if strings.TrimSpace(device.PublicKey) == "" {
-		return CloudSessionSummary{}, fmt.Errorf("local device public key is incomplete")
+		return nil, fmt.Errorf("local device public key is incomplete")
 	}
-	reportBody, err := json.Marshal(CloudDeviceReportReq{Id: device.Id, Name: device.Name, PublicKey: device.PublicKey})
+	reportBody, err := codec.MarshalProtoJSON(&cloudproto.CurrentDeviceReq{Id: device.Id, Name: device.Name, PublicKey: device.PublicKey})
 	if err != nil {
-		return CloudSessionSummary{}, err
+		return nil, err
 	}
 	reportReq, err := http.NewRequestWithContext(ctx, http.MethodPost, s.config.CloudGateURL+"/cloud-api/devices/current", bytes.NewReader(reportBody))
 	if err != nil {
-		return CloudSessionSummary{}, err
+		return nil, err
 	}
 	reportReq.Header.Set("Content-Type", "application/json")
 	reportReq.Header.Set("Authorization", "Bearer "+cloudToken)
 	reportResp, err := http.DefaultClient.Do(reportReq)
 	if err != nil {
-		return CloudSessionSummary{}, err
+		return nil, err
 	}
 	defer func() { _ = reportResp.Body.Close() }()
 	if reportResp.StatusCode < 200 || reportResp.StatusCode >= 300 {
-		return CloudSessionSummary{}, fmt.Errorf("cloud device report status %d", reportResp.StatusCode)
+		return nil, fmt.Errorf("cloud device report status %d", reportResp.StatusCode)
 	}
-	return CloudSessionSummary{GateURL: s.config.CloudGateURL, DeviceId: device.Id, DeviceName: device.Name, ConnectedAt: time.Now().UTC()}, nil
+	return &cloudproto.CloudSessionSummary{GateUrl: s.config.CloudGateURL, DeviceId: device.Id, DeviceName: device.Name, ConnectedAt: prototime.FromTime(time.Now().UTC())}, nil
 }
 
 func (s *Handler) cachedJSON(deviceId string, kind string) (json.RawMessage, bool) {
@@ -571,11 +579,6 @@ func (s *Handler) originPatterns(r *http.Request) []string {
 	patterns := []string{"http://" + r.Host, "https://" + r.Host}
 	patterns = append(patterns, s.config.CORSAllowedOrigins...)
 	return patterns
-}
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
 }
 func cleanOrigins(values []string) []string {
 	out := make([]string, 0, len(values))

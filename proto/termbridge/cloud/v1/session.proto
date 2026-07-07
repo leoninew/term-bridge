@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package termbridge.cloud;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1/session";
+
+message CloudSessionSummary {
+  string gate_url = 1;
+  string device_id = 2;
+  string device_name = 3;
+  google.protobuf.Timestamp connected_at = 4;
+}
+
+message CloudConnectReq {
+  string cloud_token = 1;
+}
+
+message CloudConnectResp {
+  CloudSessionSummary cloud_session = 1;
+}

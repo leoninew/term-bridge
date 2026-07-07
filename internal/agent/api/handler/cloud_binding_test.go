@@ -1,7 +1,7 @@
 package api
 
 import (
-	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -11,8 +11,13 @@ import (
 	"testing"
 	"time"
 
-	agentapp "termbridge/internal/agent/application/user"
-	sharedauth "termbridge/internal/shared/common/auth"
+	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
+	cloudv1 "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
+	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/prototime"
+
+	"google.golang.org/protobuf/proto"
 )
 
 func testLocalDevice() agentapp.Device {
@@ -23,18 +28,15 @@ func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	authService := newTestAuthService(sharedauth.NewTokenService(testJWTKey))
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudGateURL: "https://cloud.example.test"})
 	connectedAt := time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
-	handler.setLocalCloudSession(CloudSessionSummary{GateURL: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: connectedAt})
+	handler.setLocalCloudSession(&cloudv1.CloudSessionSummary{GateUrl: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: prototime.FromTime(connectedAt)})
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil))
 	if response.Code != http.StatusOK {
 		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
 	}
-	var body struct {
-		Authenticated bool                 `json:"authenticated"`
-		CloudSession  *CloudSessionSummary `json:"cloud_session"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+	var body cloudv1.AuthMeResp
+	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode auth me response: %v", err)
 	}
 	if body.Authenticated {
@@ -43,7 +45,7 @@ func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	if body.CloudSession == nil {
 		t.Fatalf("cloud_session is nil; body=%s", response.Body.String())
 	}
-	if body.CloudSession.GateURL != "https://cloud.example.test" || body.CloudSession.DeviceId != "dev-1" || body.CloudSession.DeviceName != "local-device" || !body.CloudSession.ConnectedAt.Equal(connectedAt) {
+	if body.CloudSession.GetGateUrl() != "https://cloud.example.test" || body.CloudSession.GetDeviceId() != "dev-1" || body.CloudSession.GetDeviceName() != "local-device" || !prototime.ToTime(body.CloudSession.GetConnectedAt()).Equal(connectedAt) {
 		t.Fatalf("cloud_session = %#v", body.CloudSession)
 	}
 }
@@ -63,12 +65,12 @@ func TestAgentLoginIssuesLocalTokenAndProtectsBusinessRoutes(t *testing.T) {
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d, want 200; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
-	var tokenResp TokenResp
-	if err := json.Unmarshal(loginResponse.Body.Bytes(), &tokenResp); err != nil {
+	var tokenResp cloudv1.TokenResp
+	if err := codec.UnmarshalProtoJSON(loginResponse.Body.Bytes(), &tokenResp); err != nil {
 		t.Fatalf("decode login response: %v", err)
 	}
 	if tokenResp.AccessToken == "" || tokenResp.TokenType != "bearer" {
-		t.Fatalf("token response = %#v", tokenResp)
+		t.Fatalf("token response access_token=%q token_type=%q", tokenResp.GetAccessToken(), tokenResp.GetTokenType())
 	}
 
 	meRequest := httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil)
@@ -78,12 +80,12 @@ func TestAgentLoginIssuesLocalTokenAndProtectsBusinessRoutes(t *testing.T) {
 	if meResponse.Code != http.StatusOK {
 		t.Fatalf("auth me status = %d, want 200; body=%s", meResponse.Code, meResponse.Body.String())
 	}
-	var me AuthMeResp
-	if err := json.Unmarshal(meResponse.Body.Bytes(), &me); err != nil {
+	var me cloudv1.AuthMeResp
+	if err := codec.UnmarshalProtoJSON(meResponse.Body.Bytes(), &me); err != nil {
 		t.Fatalf("decode auth me response: %v", err)
 	}
-	if !me.Authenticated || me.User == nil || me.User.Id != "local-agent" || me.User.DisplayName == "" {
-		t.Fatalf("auth me = %#v", me)
+	if !me.GetAuthenticated() || me.GetUser() == nil || me.GetUser().GetId() != "local-agent" || me.GetUser().GetDisplayName() == "" {
+		t.Fatalf("auth me authenticated=%v user_id=%q display_name=%q", me.GetAuthenticated(), me.GetUser().GetId(), me.GetUser().GetDisplayName())
 	}
 }
 
@@ -94,7 +96,7 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadOrCreateDevice() error = %v", err)
 	}
-	var deviceReport CurrentDeviceReq
+	var deviceReport cloudv1.CurrentDeviceReq
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/cloud-api/devices/current" {
 			t.Fatalf("unexpected cloud request path = %s", r.URL.Path)
@@ -102,7 +104,7 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer cloud-token" {
 			t.Fatalf("device report authorization = %q", got)
 		}
-		if err := json.NewDecoder(r.Body).Decode(&deviceReport); err != nil {
+		if err := decodeProtoJSONBody(r, &deviceReport); err != nil {
 			t.Fatalf("decode device report: %v", err)
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -117,14 +119,14 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("cloud connect status = %d; body=%s", response.Code, response.Body.String())
 	}
-	if deviceReport.Id != device.Id || deviceReport.Name != device.Name || deviceReport.PublicKey != device.PublicKey {
-		t.Fatalf("device report = %#v", deviceReport)
+	if deviceReport.GetId() != device.Id || deviceReport.GetName() != device.Name || deviceReport.GetPublicKey() != device.PublicKey {
+		t.Fatalf("device report id=%q name=%q public_key=%q", deviceReport.GetId(), deviceReport.GetName(), deviceReport.GetPublicKey())
 	}
-	var body CloudConnectResp
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+	var body cloudv1.CloudConnectResp
+	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode cloud connect response: %v", err)
 	}
-	if body.CloudSession.GateURL != cloud.URL || body.CloudSession.DeviceId != device.Id || body.CloudSession.DeviceName != device.Name {
+	if body.CloudSession.GetGateUrl() != cloud.URL || body.CloudSession.GetDeviceId() != device.Id || body.CloudSession.GetDeviceName() != device.Name {
 		t.Fatalf("cloud session = %#v", body.CloudSession)
 	}
 }
@@ -136,7 +138,7 @@ func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T)
 	if err != nil {
 		t.Fatalf("LoadOrCreateDevice() error = %v", err)
 	}
-	var deviceReport CurrentDeviceReq
+	var deviceReport cloudv1.CurrentDeviceReq
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/cloud-api/devices/current" {
 			t.Fatalf("unexpected cloud request path = %s", r.URL.Path)
@@ -147,7 +149,7 @@ func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T)
 		if got := r.Header.Get("Authorization"); got != "Bearer cloud-token" {
 			t.Fatalf("device report authorization = %q", got)
 		}
-		if err := json.NewDecoder(r.Body).Decode(&deviceReport); err != nil {
+		if err := decodeProtoJSONBody(r, &deviceReport); err != nil {
 			t.Fatalf("decode device report: %v", err)
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -163,8 +165,8 @@ func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T)
 	if connectResponse.Code != http.StatusOK {
 		t.Fatalf("cloud connect status = %d; body=%s", connectResponse.Code, connectResponse.Body.String())
 	}
-	if deviceReport.Id != device.Id || deviceReport.Name != device.Name || deviceReport.PublicKey != device.PublicKey {
-		t.Fatalf("device report = %#v", deviceReport)
+	if deviceReport.GetId() != device.Id || deviceReport.GetName() != device.Name || deviceReport.GetPublicKey() != device.PublicKey {
+		t.Fatalf("device report id=%q name=%q public_key=%q", deviceReport.GetId(), deviceReport.GetName(), deviceReport.GetPublicKey())
 	}
 
 	second := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudGateURL: cloud.URL, LocalDevice: agentapp.Device{Id: device.Id, Name: device.Name, PublicKey: device.PublicKey}, LocalDeviceStateDir: stateDir})
@@ -173,13 +175,11 @@ func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T)
 	if response.Code != http.StatusOK {
 		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
 	}
-	var body struct {
-		CloudSession *CloudSessionSummary `json:"cloud_session"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+	var body cloudv1.AuthMeResp
+	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode auth me response: %v", err)
 	}
-	if body.CloudSession == nil || body.CloudSession.GateURL != cloud.URL || body.CloudSession.DeviceId != device.Id || body.CloudSession.DeviceName != device.Name || body.CloudSession.ConnectedAt.IsZero() {
+	if body.CloudSession == nil || body.CloudSession.GetGateUrl() != cloud.URL || body.CloudSession.GetDeviceId() != device.Id || body.CloudSession.GetDeviceName() != device.Name || body.CloudSession.GetConnectedAt() == nil {
 		t.Fatalf("cloud_session = %#v", body.CloudSession)
 	}
 	data, err := os.ReadFile(filepath.Join(stateDir, agentapp.DeviceIdentityFileName))
@@ -210,6 +210,14 @@ func TestCloudConnectRequiresCloudTokenBeforeDeviceReport(t *testing.T) {
 	}
 }
 
+func decodeProtoJSONBody(r *http.Request, message proto.Message) error {
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	return codec.UnmarshalProtoJSON(data, message)
+}
+
 func agentToken(t *testing.T, handler *Handler) string {
 	t.Helper()
 	loginResponse := httptest.NewRecorder()
@@ -217,12 +225,12 @@ func agentToken(t *testing.T, handler *Handler) string {
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
-	var token TokenResp
-	if err := json.Unmarshal(loginResponse.Body.Bytes(), &token); err != nil {
+	var token cloudv1.TokenResp
+	if err := codec.UnmarshalProtoJSON(loginResponse.Body.Bytes(), &token); err != nil {
 		t.Fatalf("decode login response: %v", err)
 	}
-	if token.AccessToken == "" {
-		t.Fatalf("login token is empty: %#v", token)
+	if token.GetAccessToken() == "" {
+		t.Fatalf("login token is empty: token_type=%q", token.GetTokenType())
 	}
 	return token.AccessToken
 }

@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package termbridge.agent;
+
+import "termbridge/agent/v1/workspace.proto";
+
+option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1/session";
+
+message CreateSessionReq {
+  string workspace_id = 1;
+  string name = 2;
+  string cwd = 3;
+  repeated string command = 4;
+  int32 cols = 5;
+  int32 rows = 6;
+}
+
+message CreateSessionResp {
+  string session_id = 1;
+  string workspace_id = 2;
+  string state = 3;
+}
+
+message WorkspaceSessionsReq {
+  string workspace_id = 1;
+}
+
+message WorkspaceSessionsResp {
+  repeated SessionSummary items = 1;
+}
+
+message WorkspaceSessionReq {
+  string workspace_id = 1;
+  string session_id = 2;
+}
+
+message GetSessionResp {
+  SessionSummary session = 1;
+}
+
+message RerunSessionReq {
+  int32 cols = 1;
+  int32 rows = 2;
+}
+
+message RerunWorkspaceSessionReq {
+  string workspace_id = 1;
+  string session_id = 2;
+  RerunSessionReq request = 3;
+}
+
+message UpdateSessionReq {
+  optional string name = 1;
+}
+
+message UpdateWorkspaceSessionReq {
+  string workspace_id = 1;
+  string session_id = 2;
+  UpdateSessionReq request = 3;
+}
+
+message UpdateSessionResp {
+  SessionSummary session = 1;
+}
+
+message DeleteSessionResp {}
+
+message CloseSessionResp {
+  SessionSummary session = 1;
+}
+
+message UpdateSessionOrderReq {
+  repeated string session_ids = 1;
+}
+
+message WorkspaceSessionOrderReq {
+  string workspace_id = 1;
+  repeated string session_ids = 2;
+}
+
+message UpdateSessionOrderResp {
+  repeated SessionSummary items = 1;
+}

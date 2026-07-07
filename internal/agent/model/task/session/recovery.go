@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"termbridge/internal/agent/model/task/process"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
 )
 
 type AliveStatus int

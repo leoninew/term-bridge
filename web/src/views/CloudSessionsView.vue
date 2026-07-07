@@ -34,7 +34,7 @@
     CreateSessionReq,
     RerunSessionReq,
     UpdateSessionReq,
-  } from '../gen/proto/termbridge/runtime/v1/runtime'
+  } from '../gen/proto/termbridge/agent/v1/session'
 
   const route = useRoute()
   const gateway = useGatewayStore()

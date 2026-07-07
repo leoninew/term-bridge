@@ -26,8 +26,8 @@ tasks:
     desc: Generate Go and frontend TypeScript code from proto files via buf
     cmds:
       - ./bin/buf dep update
-      - ./bin/buf generate
-      - cd web && ../bin/buf generate ../proto --template buf.gen.yaml
+      - ./bin/buf generate --template buf.gen.yaml
+      - cd web && ../bin/buf generate --template buf.gen.yaml
 
   check:
     desc: Run frontend and backend checks

@@ -11,7 +11,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	_ "modernc.org/sqlite"
 
-	apperrors "termbridge/internal/shared/common/errors"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 )
 
 type Db struct {

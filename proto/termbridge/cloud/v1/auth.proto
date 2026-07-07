@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package termbridge.cloud;
+
+import "termbridge/cloud/v1/device.proto";
+import "termbridge/cloud/v1/session.proto";
+
+option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1/auth";
+
+message User {
+  string id = 1;
+  string email = 2;
+  string display_name = 3;
+  bool email_verified = 4;
+  string provider = 5;
+}
+
+message AuthLoginReq {
+  string email = 1;
+  string username = 2;
+  string password = 3;
+}
+
+message AuthRegisterReq {
+  string email = 1;
+  string password = 2;
+}
+
+message AuthVerifyEmailReq {
+  string email = 1;
+  string code = 2;
+}
+
+message AuthResendVerificationReq {
+  string email = 1;
+}
+
+message AuthChangePasswordReq {
+  string current_password = 1;
+  string new_password = 2;
+}
+
+message AuthPasswordResetRequestReq {
+  string email = 1;
+}
+
+message AuthPasswordResetConfirmReq {
+  string email = 1;
+  string code = 2;
+  string new_password = 3;
+}
+
+message AuthGoogleCallbackReq {
+  string code = 1;
+  string state = 2;
+}
+
+message TokenResp {
+  string access_token = 1;
+  string token_type = 2;
+}
+
+message GoogleAuthUrlResp {
+  string auth_url = 1;
+}
+
+message AuthMeResp {
+  bool authenticated = 1;
+  string username = 2;
+  User user = 3;
+  CloudSessionSummary cloud_session = 4;
+}

@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	clouddevice "termbridge/internal/cloud/repository/user/device"
+	clouddevice "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/device"
 )
 
 type Device = clouddevice.Device

@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package termbridge.agent;
+
+option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1/terminal";
+
+message ClientControlMessage {
+  string type = 1;
+  int32 cols = 2;
+  int32 rows = 3;
+  string nonce = 4;
+}
+
+message ServerControlMessage {
+  string type = 1;
+  string session_id = 2;
+  string workspace_id = 3;
+  string state = 4;
+  string lifecycle_state = 5;
+  string attachment_state = 6;
+  string reason = 7;
+  optional int32 exit_code = 8;
+  string code = 9;
+  string message = 10;
+  string error = 11;
+  string nonce = 12;
+  optional bool truncated = 13;
+}

@@ -3,6 +3,8 @@ package terminalproto
 import (
 	"strings"
 	"testing"
+
+	terminal "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 )
 
 func TestDecodeClientAcceptsResize(t *testing.T) {
@@ -66,7 +68,7 @@ func TestDecodeClientRejectsLargeControlMessage(t *testing.T) {
 }
 
 func TestEncodeServerRejectsUnknownType(t *testing.T) {
-	_, err := EncodeServer(&ServerMessage{Type: "bogus"})
+	_, err := EncodeServer(&terminal.ServerControlMessage{Type: "bogus"})
 	if err == nil {
 		t.Fatal("EncodeServer() error = nil, want error")
 	}

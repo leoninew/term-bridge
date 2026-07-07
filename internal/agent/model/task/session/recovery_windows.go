@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"termbridge/internal/agent/model/task/process"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
 
 	"golang.org/x/sys/windows"
 )

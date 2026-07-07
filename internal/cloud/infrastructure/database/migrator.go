@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	migrations "gitee.com/leoninew/TermBridge-go/migrations/cloud"
 	"io/fs"
 	"strings"
-	migrations "termbridge/migrations/agent"
 
 	"github.com/pressly/goose/v3"
 
-	apperrors "termbridge/internal/shared/common/errors"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 )
 
 func Migrate(ctx context.Context, db *sql.DB, driver string) error {

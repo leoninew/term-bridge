@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -11,9 +12,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	commonv1 "termbridge/internal/gen/proto/termbridge/common/v1"
-	"termbridge/internal/shared/common/utils/codec"
-	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
+	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
+
+	"google.golang.org/protobuf/proto"
 )
 
 const requestIdHeader = "X-Request-ID"
@@ -58,11 +61,11 @@ func (h *Handler) requestIdFor(w http.ResponseWriter, r *http.Request) string {
 func (h *Handler) writeAPIError(w http.ResponseWriter, r *http.Request, status int, code string, safeError string, cause error) {
 	requestId := h.requestIdFor(w, r)
 	h.logAPIError(r, status, code, requestId, cause)
-	body := &commonv1.ErrorResp{Code: code, Error: h.responseErrorText(safeError, cause), RequestId: requestId}
+	body := &shared.ErrorResp{Code: code, Error: h.responseErrorText(safeError, cause), RequestId: requestId}
 	data, err := codec.MarshalProtoJSON(body)
 	if err != nil {
 		h.logAPIError(r, http.StatusInternalServerError, errorCodeInternal, requestId, err)
-		data, _ = json.Marshal(commonv1.ErrorResp{Code: errorCodeInternal, Error: errorMessageInternal, RequestId: requestId})
+		data, _ = json.Marshal(shared.ErrorResp{Code: errorCodeInternal, Error: errorMessageInternal, RequestId: requestId})
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -82,13 +85,28 @@ func (h *Handler) methodNotAllowed(w http.ResponseWriter, r *http.Request, allow
 	h.writeAPIError(w, r, http.StatusMethodNotAllowed, errorCodeMethodNotAllowed, errorMessageMethodNotAllowed, nil)
 }
 
-func (h *Handler) decodeJSONRequest(w http.ResponseWriter, r *http.Request, value any) bool {
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, terminalproto.MaxJSONMessageBytes))
-	if err := decoder.Decode(value); err != nil {
+func (h *Handler) decodeJSONRequest(w http.ResponseWriter, r *http.Request, message proto.Message) bool {
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, terminalproto.MaxJSONMessageBytes))
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, errorMessageBadRequest, err)
+		return false
+	}
+	if err := codec.UnmarshalProtoJSON(data, message); err != nil {
 		h.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, errorMessageBadRequest, err)
 		return false
 	}
 	return true
+}
+
+func writeJSON(w http.ResponseWriter, status int, message proto.Message) {
+	data, err := codec.MarshalProtoJSON(message)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write(data)
 }
 
 func (h *Handler) responseErrorText(safeError string, cause error) string {

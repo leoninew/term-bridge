@@ -15,8 +15,8 @@ import (
 	"github.com/subosito/gotenv"
 	"go.yaml.in/yaml/v3"
 
-	apperrors "termbridge/internal/shared/common/errors"
-	"termbridge/internal/shared/common/security"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/security"
 )
 
 const (

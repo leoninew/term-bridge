@@ -4,7 +4,7 @@ import axios, {
   type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from 'axios'
-import type { ErrorResp } from '../../gen/proto/termbridge/common/v1/common'
+import type { ErrorResp } from '../../gen/proto/termbridge/shared/v1/common'
 import { runtimeConfig, type ApiTarget } from '../../config'
 import { useAppModeStore } from '../../store/appMode'
 import { useGatewayStore } from '../../store/gateway'

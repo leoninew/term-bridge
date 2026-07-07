@@ -137,12 +137,10 @@
   import CreateSessionPanel from './CreateSessionPanel.vue'
   import SessionStatusBar from './SessionStatusBar.vue'
   import TerminalPane from './TerminalPane.vue'
-  import type {
-    CloudSessionSummary,
-    DeviceSummary,
-  } from '../../gen/proto/termbridge/cloud/v1/cloud'
-  import type { SessionSummary } from '../../gen/proto/termbridge/runtime/v1/runtime'
-  import type { ServerControlMessage } from '../../gen/proto/termbridge/terminal/v1/terminal'
+  import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
+  import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
+  import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
+  import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
   import type { OpenSessionTab } from '../../store/workbench'
 
   const props = defineProps<{

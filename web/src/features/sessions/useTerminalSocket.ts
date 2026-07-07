@@ -3,7 +3,7 @@ import { decodeControl, encodeControl, terminalSubprotocol } from '../../protoco
 import type {
   ClientControlMessage,
   ServerControlMessage,
-} from '../../gen/proto/termbridge/terminal/v1/terminal'
+} from '../../gen/proto/termbridge/agent/v1/terminal'
 import {
   diagnosticWebSocketPath,
   logTerminalDiagnostic,

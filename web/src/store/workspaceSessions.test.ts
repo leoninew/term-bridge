@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import type { WorkspaceTreeNode as WorkspaceTreeSummary } from '../gen/proto/termbridge/runtime/v1/runtime'
+import type { WorkspaceTreeNode as WorkspaceTreeSummary } from '../gen/proto/termbridge/agent/v1/workspace'
 import type { SessionRuntimeApi } from '../features/sessions/runtime'
 import { useWorkspaceSessionsStore } from './workspaceSessions'
 

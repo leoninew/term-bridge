@@ -1,9 +1,9 @@
 import type {
   ClientControlMessage,
   ServerControlMessage,
-} from '../gen/proto/termbridge/terminal/v1/terminal'
+} from '../gen/proto/termbridge/agent/v1/terminal'
 
-export const terminalSubprotocol = 'termbridge.terminal.v1'
+export const terminalSubprotocol = 'termbridge.terminal'
 export const minTerminalCols = 1
 export const maxTerminalCols = 1000
 export const minTerminalRows = 1

@@ -3,7 +3,7 @@ package app
 import (
 	"time"
 
-	"termbridge/internal/agent/infrastructure/storage/history"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/storage/history"
 )
 
 type Config struct {

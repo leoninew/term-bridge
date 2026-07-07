@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import type { SessionSummary } from '../gen/proto/termbridge/runtime/v1/runtime'
+import type { SessionSummary } from '../gen/proto/termbridge/agent/v1/workspace'
 import type { SessionRuntimeApi } from '../features/sessions/runtime'
 import { useWorkbenchStore } from './workbench'
 

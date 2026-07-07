@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	apperrors "termbridge/internal/shared/common/errors"
-	"termbridge/internal/shared/common/security"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/security"
 )
 
 func TestLoadDefaults(t *testing.T) {

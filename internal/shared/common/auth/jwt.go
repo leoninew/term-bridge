@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"termbridge/internal/shared/common/security"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/security"
 )
 
 type Claims struct {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ClientControlMessage } from '../../gen/proto/termbridge/terminal/v1/terminal'
+import type { ClientControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
 import { useTerminalSocket } from './useTerminalSocket'
 
 class FakeWebSocket {

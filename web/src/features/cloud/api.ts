@@ -9,25 +9,26 @@ import type {
   AuthRegisterReq,
   AuthResendVerificationReq,
   AuthVerifyEmailReq,
-  DeviceSummary,
   GoogleAuthUrlResp,
-  ListDevicesResp,
   TokenResp,
-} from '../../gen/proto/termbridge/cloud/v1/cloud'
+} from '../../gen/proto/termbridge/cloud/v1/auth'
+import type { DeviceSummary, ListDevicesResp } from '../../gen/proto/termbridge/cloud/v1/device'
 import type {
-  CreateSessionReq,
-  CreateSessionResp,
   ListWorkspacesResp,
-  RerunSessionReq,
   SessionSummary,
-  UpdateSessionReq,
-  UpdateSessionOrderResp,
   UpdateWorkspaceOrderReq,
   UpdateWorkspaceOrderResp,
   Workspace,
   WorkspaceTreeNode,
   WorkspaceTreeResp,
-} from '../../gen/proto/termbridge/runtime/v1/runtime'
+} from '../../gen/proto/termbridge/agent/v1/workspace'
+import type {
+  CreateSessionReq,
+  CreateSessionResp,
+  RerunSessionReq,
+  UpdateSessionReq,
+  UpdateSessionOrderResp,
+} from '../../gen/proto/termbridge/agent/v1/session'
 import { cloudApiClient } from '../api/client'
 import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
 import type { RuntimeTarget } from '../runtimeTarget'

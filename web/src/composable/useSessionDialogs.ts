@@ -2,7 +2,7 @@ import { proxyRefs, ref } from 'vue'
 import type {
   SessionSummary,
   Workspace as WorkspaceSummary,
-} from '../gen/proto/termbridge/runtime/v1/runtime'
+} from '../gen/proto/termbridge/agent/v1/workspace'
 
 export function useSessionDialogs() {
   const editDialogOpen = ref(false)

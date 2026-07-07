@@ -1,6 +1,6 @@
 import { proxyRefs, ref } from 'vue'
 import { commandFromText } from '../protocol/terminal'
-import type { Workspace as WorkspaceSummary } from '../gen/proto/termbridge/runtime/v1/runtime'
+import type { Workspace as WorkspaceSummary } from '../gen/proto/termbridge/agent/v1/workspace'
 
 export type ValidCreateSessionDraft = {
   workspaceId: string | null

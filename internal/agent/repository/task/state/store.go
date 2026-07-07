@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"termbridge/internal/agent/model/task/process"
-	"termbridge/internal/agent/model/task/session"
-	"termbridge/internal/agent/model/task/workspace"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/session"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/workspace"
 )
 
 const StateDirName = ".termbridge"

@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package termbridge.agent;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1/workspace";
+
+message Workspace {
+  string id = 1;
+  string name = 2;
+  string path = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message WorkspaceTreeNode {
+  string id = 1;
+  string name = 2;
+  string path = 3;
+  google.protobuf.Timestamp updated_at = 4;
+  repeated SessionSummary children = 5;
+}
+
+message SessionSummary {
+  string id = 1;
+  string workspace_id = 2;
+  string name = 3;
+  string command = 4;
+  string cwd = 5;
+  string lifecycle_state = 6;
+  string attachment_state = 7;
+  optional int32 exit_code = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message ListWorkspacesReq {}
+
+message ListWorkspacesResp {
+  repeated Workspace items = 1;
+}
+
+message WorkspaceTreeReq {}
+
+message WorkspaceTreeResp {
+  repeated WorkspaceTreeNode items = 1;
+}
+
+message UpdateWorkspaceOrderReq {
+  repeated string workspace_ids = 1;
+}
+
+message UpdateWorkspaceOrderResp {
+  repeated Workspace items = 1;
+}
+
+message DeleteWorkspaceReq {
+  string workspace_id = 1;
+}
+
+message DeleteWorkspaceResp {}

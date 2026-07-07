@@ -7,12 +7,13 @@ import (
 	"sync"
 	"time"
 
-	termpty "termbridge/internal/agent/infrastructure/pty"
-	"termbridge/internal/agent/infrastructure/storage/history"
-	"termbridge/internal/agent/model/task/process"
-	"termbridge/internal/agent/model/task/session"
-	"termbridge/internal/shared/common/utils/idgen"
-	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
+	termpty "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/pty"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/storage/history"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/session"
+	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/idgen"
+	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 )
 
 type SessionRuntime struct {
@@ -85,10 +86,10 @@ func (r *SessionRuntime) attach() (*Client, error) {
 
 func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentState) error {
 	r.registry.logger.Info("terminal replay enqueue start", "session_id", r.session.Id, "client_id", client.Id())
-	if !client.enqueue(Outbound{Kind: OutboundText, Text: &terminalproto.ServerMessage{Type: terminalproto.TypeStarted, SessionId: r.session.Id, WorkspaceId: r.session.WorkspaceId, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(attachment)}}) {
+	if !client.enqueue(Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeStarted, SessionId: r.session.Id, WorkspaceId: r.session.WorkspaceId, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(attachment)}}) {
 		return fmt.Errorf("client queue full")
 	}
-	if !client.enqueue(Outbound{Kind: OutboundText, Text: &terminalproto.ServerMessage{Type: terminalproto.TypeReplayStarted}}) {
+	if !client.enqueue(Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeReplayStarted}}) {
 		return fmt.Errorf("client queue full")
 	}
 	if err := r.history.Flush(); err != nil {
@@ -106,7 +107,7 @@ func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentStat
 		}
 	}
 	truncated := false
-	if !client.enqueue(Outbound{Kind: OutboundText, Text: &terminalproto.ServerMessage{Type: terminalproto.TypeReplayFinished, Truncated: &truncated}}) {
+	if !client.enqueue(Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeReplayFinished, Truncated: &truncated}}) {
 		return fmt.Errorf("client queue full")
 	}
 	r.registry.logger.Info("terminal replay enqueue finish", "session_id", r.session.Id, "client_id", client.Id(), "queued_bytes", client.QueuedBytes())
@@ -170,7 +171,7 @@ func (r *SessionRuntime) detachClient(id string, reason string) {
 	if client != nil {
 		client.closeQueue()
 	}
-	r.broadcastText(&terminalproto.ServerMessage{Type: terminalproto.TypeState, LifecycleState: string(session.StateRunning), AttachmentState: string(attachment), Reason: reason})
+	r.broadcastText(&agent.ServerControlMessage{Type: terminalproto.TypeState, LifecycleState: string(session.StateRunning), AttachmentState: string(attachment), Reason: reason})
 }
 
 func (r *SessionRuntime) closeSession(reason string) error {
@@ -187,7 +188,7 @@ func (r *SessionRuntime) closeSession(reason string) error {
 	done := r.done
 	r.mu.Unlock()
 	for _, client := range clients {
-		client.enqueue(Outbound{Kind: OutboundText, Text: &terminalproto.ServerMessage{Type: terminalproto.TypeState, LifecycleState: string(session.StateRunning), AttachmentState: string(AttachmentDetached), Reason: reason}})
+		client.enqueue(Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeState, LifecycleState: string(session.StateRunning), AttachmentState: string(AttachmentDetached), Reason: reason}})
 	}
 	if err := r.pty.Close(); err != nil {
 		return err
@@ -259,7 +260,7 @@ func (r *SessionRuntime) waitLoop() {
 		r.registry.logger.Warn("save web terminal exit state", "session_id", r.session.Id, "state", finalState, "error", saveErr)
 	}
 	exitCode := int32(exit.Code)
-	r.broadcastText(&terminalproto.ServerMessage{Type: terminalproto.TypeExited, ExitCode: &exitCode, State: string(finalState), LifecycleState: string(finalState), AttachmentState: string(AttachmentDetached)})
+	r.broadcastText(&agent.ServerControlMessage{Type: terminalproto.TypeExited, ExitCode: &exitCode, State: string(finalState), LifecycleState: string(finalState), AttachmentState: string(AttachmentDetached)})
 	r.closeClients()
 	r.registry.removeRuntime(r.session.Id)
 	close(r.done)
@@ -274,7 +275,7 @@ func (r *SessionRuntime) publishBinary(chunk []byte) {
 	}
 }
 
-func (r *SessionRuntime) broadcastText(message *terminalproto.ServerMessage) {
+func (r *SessionRuntime) broadcastText(message *agent.ServerControlMessage) {
 	clients := r.clientsSnapshot()
 	for _, client := range clients {
 		if ok := client.enqueue(Outbound{Kind: OutboundText, Text: message}); !ok {

@@ -12,8 +12,10 @@ import (
 
 	"github.com/coder/websocket"
 
-	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
-	"termbridge/internal/shared/dto/protocol/tunnel"
+	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
 func TestAgentTunnelRegistersDevice(t *testing.T) {
@@ -32,7 +34,7 @@ func TestAgentTunnelRegistersDevice(t *testing.T) {
 		t.Fatalf("Dial() error = %v", err)
 	}
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
-	hello := &tunnelv1.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &tunnelv1.TunnelFrame_Hello{Hello: &tunnelv1.Hello{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
+	hello := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Hello{Hello: &shared.Hello{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
 	helloData, err := tunnel.MarshalFrame(hello)
 	if err != nil {
 		t.Fatalf("MarshalFrame() error = %v", err)
@@ -79,12 +81,12 @@ func TestDevicesEndpointReturnsRegisteredDevices(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("devices status = %d", response.Code)
 	}
-	var devices ListDevicesResp
-	if err := json.Unmarshal(response.Body.Bytes(), &devices); err != nil {
+	var devices cloud.ListDevicesResp
+	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &devices); err != nil {
 		t.Fatalf("Unmarshal() error = %v; body=%s", err, response.Body.String())
 	}
-	if len(devices.Items) != 1 || devices.Items[0].Id != "dev-1" || !devices.Items[0].Online {
-		t.Fatalf("devices = %#v", devices)
+	if len(devices.GetItems()) != 1 || devices.GetItems()[0].GetId() != "dev-1" || !devices.GetItems()[0].GetOnline() {
+		t.Fatalf("devices count=%d first_id=%q first_online=%v", len(devices.GetItems()), devices.GetItems()[0].GetId(), devices.GetItems()[0].GetOnline())
 	}
 }
 

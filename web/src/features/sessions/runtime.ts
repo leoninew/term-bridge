@@ -1,14 +1,16 @@
 import { buildApiWebSocketUrl } from '../../config'
 import { clampTerminalSize } from '../../protocol/terminal'
 import type {
+  SessionSummary,
+  Workspace,
+  WorkspaceTreeNode,
+} from '../../gen/proto/termbridge/agent/v1/workspace'
+import type {
   CreateSessionReq,
   CreateSessionResp,
   RerunSessionReq,
-  SessionSummary,
   UpdateSessionReq,
-  Workspace,
-  WorkspaceTreeNode,
-} from '../../gen/proto/termbridge/runtime/v1/runtime'
+} from '../../gen/proto/termbridge/agent/v1/session'
 import { runtimeApiTarget, runtimePath, type RuntimeTarget } from '../runtimeTarget'
 
 export type ApiResult<T> = {

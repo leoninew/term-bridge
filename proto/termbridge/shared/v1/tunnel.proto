@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package termbridge.shared;
+
+import "termbridge/agent/v1/workspace.proto";
+import "termbridge/agent/v1/session.proto";
+import "termbridge/agent/v1/history.proto";
+import "termbridge/shared/v1/common.proto";
+
+option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1/tunnel";
+
+message TunnelFrame {
+  string stream_id = 1;
+  string request_id = 2;
+
+  oneof payload {
+    Hello hello = 10;
+    HelloAck hello_ack = 11;
+    Ping ping = 12;
+    Pong pong = 13;
+
+    termbridge.agent.ListWorkspacesReq list_workspaces_req = 100;
+    termbridge.agent.WorkspaceTreeReq workspace_tree_req = 101;
+    termbridge.agent.WorkspaceSessionsReq workspace_sessions_req = 102;
+    termbridge.agent.CreateSessionReq create_session_req = 103;
+    termbridge.agent.WorkspaceSessionReq get_session_req = 104;
+    termbridge.agent.RerunWorkspaceSessionReq rerun_session_req = 105;
+    termbridge.agent.UpdateWorkspaceSessionReq update_session_req = 106;
+    termbridge.agent.WorkspaceSessionReq close_session_req = 107;
+    termbridge.agent.WorkspaceSessionReq delete_session_req = 108;
+    termbridge.agent.ReadWorkspaceSessionHistoryReq read_history_req = 109;
+    termbridge.agent.UpdateWorkspaceOrderReq update_workspace_order_req = 110;
+    termbridge.agent.WorkspaceSessionOrderReq update_session_order_req = 111;
+    termbridge.agent.DeleteWorkspaceReq delete_workspace_req = 112;
+
+    termbridge.agent.ListWorkspacesResp list_workspaces_resp = 200;
+    termbridge.agent.WorkspaceTreeResp workspace_tree_resp = 201;
+    termbridge.agent.WorkspaceSessionsResp workspace_sessions_resp = 202;
+    termbridge.agent.CreateSessionResp create_session_resp = 203;
+    termbridge.agent.GetSessionResp get_session_resp = 204;
+    termbridge.agent.CreateSessionResp rerun_session_resp = 205;
+    termbridge.agent.UpdateSessionResp update_session_resp = 206;
+    termbridge.agent.CloseSessionResp close_session_resp = 207;
+    termbridge.agent.DeleteSessionResp delete_session_resp = 208;
+    termbridge.agent.ReadHistoryResp read_history_resp = 209;
+    termbridge.agent.UpdateWorkspaceOrderResp update_workspace_order_resp = 210;
+    termbridge.agent.UpdateSessionOrderResp update_session_order_resp = 211;
+    termbridge.agent.DeleteWorkspaceResp delete_workspace_resp = 212;
+
+    TerminalAttachReq terminal_attach = 300;
+    TerminalInput terminal_input = 301;
+    TerminalOutput terminal_output = 302;
+    TerminalResize terminal_resize = 303;
+    TerminalClosed terminal_closed = 304;
+
+    termbridge.shared.ErrorResp error = 900;
+    Close close = 901;
+  }
+}
+
+message Hello {
+  string device_id = 1;
+  string device_name = 2;
+  int32 protocol_version = 3;
+}
+
+message HelloAck {
+  int32 protocol_version = 1;
+}
+
+message Ping {
+  string nonce = 1;
+}
+
+message Pong {
+  string nonce = 1;
+}
+
+message TerminalAttachReq {
+  string workspace_id = 1;
+  string session_id = 2;
+  int32 cols = 3;
+  int32 rows = 4;
+}
+
+message TerminalInput {
+  bytes data = 1;
+}
+
+message TerminalOutput {
+  bytes data = 1;
+}
+
+message TerminalResize {
+  int32 cols = 1;
+  int32 rows = 2;
+}
+
+message TerminalClosed {
+  string reason = 1;
+}
+
+message Close {
+  string reason = 1;
+}

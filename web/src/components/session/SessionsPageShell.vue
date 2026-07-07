@@ -126,15 +126,13 @@
   import { useTerminalSize } from '../../composable/useTerminalSize'
   import { terminalWsUrl, type SessionRuntimeApi } from '../../features/sessions/runtime'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
-  import type {
-    CloudSessionSummary,
-    DeviceSummary,
-  } from '../../gen/proto/termbridge/cloud/v1/cloud'
+  import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
+  import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
   import type {
     SessionSummary,
     Workspace as WorkspaceSummary,
-  } from '../../gen/proto/termbridge/runtime/v1/runtime'
-  import type { ServerControlMessage } from '../../gen/proto/termbridge/terminal/v1/terminal'
+  } from '../../gen/proto/termbridge/agent/v1/workspace'
+  import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
   import { useGatewayStore } from '../../store/gateway'
   import { useNotificationsStore } from '../../store/notifications'
   import { useWorkbenchStore } from '../../store/workbench'

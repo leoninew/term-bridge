@@ -9,7 +9,7 @@ import (
 
 	gopty "github.com/aymanbagabas/go-pty"
 
-	"termbridge/internal/agent/model/task/process"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
 )
 
 func TestManagerStartReturnsErrorWhenInitialResizeFails(t *testing.T) {

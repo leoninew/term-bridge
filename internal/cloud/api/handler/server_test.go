@@ -7,7 +7,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 )
+
+type testErrorResponse struct {
+	Code      string `json:"code"`
+	Error     string `json:"error"`
+	RequestId string `json:"request_id"`
+}
 
 func testCloudConfig() Config {
 	return Config{Username: "admin", Password: "admin", JWTSecret: testJWTKey, Logger: slog.Default()}
@@ -73,12 +82,12 @@ func TestAuthEndpoints(t *testing.T) {
 	if devicesResponseAfterExpired.Code != http.StatusOK {
 		t.Fatalf("devices with valid token status = %d, want 200", devicesResponseAfterExpired.Code)
 	}
-	var devicesBody ListDevicesResp
-	if err := json.Unmarshal(devicesResponseAfterExpired.Body.Bytes(), &devicesBody); err != nil {
+	var devicesBody cloud.ListDevicesResp
+	if err := codec.UnmarshalProtoJSON(devicesResponseAfterExpired.Body.Bytes(), &devicesBody); err != nil {
 		t.Fatalf("decode devices response: %v; body=%s", err, devicesResponseAfterExpired.Body.String())
 	}
-	if devicesBody.Items == nil {
-		t.Fatalf("devices items is nil; body=%s", devicesResponseAfterExpired.Body.String())
+	if len(devicesBody.GetItems()) != 0 {
+		t.Fatalf("devices count = %d, want 0", len(devicesBody.GetItems()))
 	}
 }
 
@@ -110,12 +119,12 @@ func TestUnknownAPIPathReturnsStructuredNotFound(t *testing.T) {
 	assertAPIError(t, response, http.StatusNotFound, errorCodeNotFound)
 }
 
-func assertAPIError(t *testing.T, response *httptest.ResponseRecorder, status int, code string) errorResponse {
+func assertAPIError(t *testing.T, response *httptest.ResponseRecorder, status int, code string) testErrorResponse {
 	t.Helper()
 	if response.Code != status {
 		t.Fatalf("status = %d, want %d; body=%s", response.Code, status, response.Body.String())
 	}
-	var body errorResponse
+	var body testErrorResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode error response: %v; body=%s", err, response.Body.String())
 	}

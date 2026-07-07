@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	cloudauth "termbridge/internal/cloud/application/user/auth"
+	cloudauth "gitee.com/leoninew/TermBridge-go/internal/cloud/application/user/auth"
 )
 
 type ResendSender struct {

@@ -11,8 +11,8 @@ import (
 
 	"github.com/coder/websocket"
 
-	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
-	"termbridge/internal/shared/dto/protocol/tunnel"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
 func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
@@ -79,7 +79,7 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, input
 		return
 	}
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
-	hello := &tunnelv1.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &tunnelv1.TunnelFrame_Hello{Hello: &tunnelv1.Hello{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
+	hello := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Hello{Hello: &shared.Hello{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
 	helloData, _ := tunnel.MarshalFrame(hello)
 	if err := conn.Write(ctx, websocket.MessageText, helloData); err != nil {
 		t.Errorf("hello Write() error = %v", err)
@@ -99,16 +99,16 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, input
 			continue
 		}
 		switch payload := frame.GetPayload().(type) {
-		case *tunnelv1.TunnelFrame_TerminalAttach:
+		case *shared.TunnelFrame_TerminalAttach:
 			if frame.GetRequestId() == "" || payload.TerminalAttach.GetWorkspaceId() == "" {
 				return
 			}
-			output := &tunnelv1.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &tunnelv1.TunnelFrame_TerminalOutput{TerminalOutput: &tunnelv1.TerminalOutput{Data: []byte{'h', 'e', 'l', 'l', 'o', 0xff, 0xfe, 0x1b, '[', '2', 'J'}}}}
+			output := &shared.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &shared.TunnelFrame_TerminalOutput{TerminalOutput: &shared.TerminalOutput{Data: []byte{'h', 'e', 'l', 'l', 'o', 0xff, 0xfe, 0x1b, '[', '2', 'J'}}}}
 			outputData, _ := tunnel.MarshalFrame(output)
 			_ = conn.Write(ctx, websocket.MessageText, outputData)
-		case *tunnelv1.TunnelFrame_TerminalInput:
+		case *shared.TunnelFrame_TerminalInput:
 			inputCh <- payload.TerminalInput.GetData()
-		case *tunnelv1.TunnelFrame_Close:
+		case *shared.TunnelFrame_Close:
 			return
 		}
 	}

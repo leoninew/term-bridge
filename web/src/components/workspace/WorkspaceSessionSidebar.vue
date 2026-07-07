@@ -391,7 +391,7 @@
     SessionSummary,
     Workspace as WorkspaceSummary,
     WorkspaceTreeNode as WorkspaceTreeSummary,
-  } from '../../gen/proto/termbridge/runtime/v1/runtime'
+  } from '../../gen/proto/termbridge/agent/v1/workspace'
 
   type WorkspaceTreeItem = {
     kind: 'workspace'

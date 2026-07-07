@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"termbridge/internal/agent/application/task/runner"
-	agent "termbridge/internal/agent/application/user"
-	"termbridge/internal/agent/model/task/process"
-	httpserver "termbridge/internal/shared/api/server"
-	apperrors "termbridge/internal/shared/common/errors"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/application/task/runner"
+	agent "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
+	httpserver "gitee.com/leoninew/TermBridge-go/internal/shared/api/server"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 )
 
 func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {

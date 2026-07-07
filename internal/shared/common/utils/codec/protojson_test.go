@@ -4,11 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	commonv1 "termbridge/internal/gen/proto/termbridge/common/v1"
+	common "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 )
 
 func TestMarshalProtoJSONUsesProtoNames(t *testing.T) {
-	data, err := MarshalProtoJSON(&commonv1.ErrorResp{RequestId: "req-1"})
+	data, err := MarshalProtoJSON(&common.ErrorResp{RequestId: "req-1"})
 	if err != nil {
 		t.Fatalf("MarshalProtoJSON() error = %v", err)
 	}
@@ -22,7 +22,7 @@ func TestMarshalProtoJSONUsesProtoNames(t *testing.T) {
 }
 
 func TestUnmarshalProtoJSONRejectsUnknownFields(t *testing.T) {
-	var resp commonv1.ErrorResp
+	var resp common.ErrorResp
 	err := UnmarshalProtoJSON([]byte(`{"request_id":"req-1","unknown_field":"x"}`), &resp)
 	if err == nil {
 		t.Fatal("UnmarshalProtoJSON() error = nil, want unknown field error")

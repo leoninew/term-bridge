@@ -80,7 +80,7 @@
     DropdownMenuRoot,
     DropdownMenuTrigger,
   } from 'reka-ui'
-  import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/cloud'
+  import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
 
   const props = defineProps<{
     connection: CloudSessionSummary | null

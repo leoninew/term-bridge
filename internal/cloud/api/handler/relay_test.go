@@ -12,9 +12,9 @@ import (
 
 	"github.com/coder/websocket"
 
-	runtimev1 "termbridge/internal/gen/proto/termbridge/runtime/v1"
-	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
-	"termbridge/internal/shared/dto/protocol/tunnel"
+	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
 func TestBrowserAPIRelay(t *testing.T) {
@@ -26,17 +26,17 @@ func TestBrowserAPIRelay(t *testing.T) {
 	agentDone := make(chan struct{})
 	go func() {
 		defer close(agentDone)
-		runFakeAgent(t, ctx, server.URL, func(frame *tunnelv1.TunnelFrame) *tunnelv1.TunnelFrame {
+		runFakeAgent(t, ctx, server.URL, func(frame *shared.TunnelFrame) *shared.TunnelFrame {
 			if frame.GetRequestId() != "req_test_relay" {
 				return tunnel.ErrorFrame(frame.GetStreamId(), frame.GetRequestId(), "bad_request", "missing request id")
 			}
 			switch payload := frame.GetPayload().(type) {
-			case *tunnelv1.TunnelFrame_WorkspaceTreeReq:
-				return responseFrame(frame, &tunnelv1.TunnelFrame_WorkspaceTreeResp{WorkspaceTreeResp: &runtimev1.WorkspaceTreeResp{Items: []*runtimev1.WorkspaceTreeNode{{Id: "ws-1", Name: "Workspace"}}}})
-			case *tunnelv1.TunnelFrame_WorkspaceSessionsReq:
-				return responseFrame(frame, &tunnelv1.TunnelFrame_WorkspaceSessionsResp{WorkspaceSessionsResp: &runtimev1.WorkspaceSessionsResp{Items: []*runtimev1.SessionSummary{{Id: "sess-1", WorkspaceId: payload.WorkspaceSessionsReq.GetWorkspaceId(), Name: "Session"}}}})
-			case *tunnelv1.TunnelFrame_ReadHistoryReq:
-				return responseFrame(frame, &tunnelv1.TunnelFrame_ReadHistoryResp{ReadHistoryResp: &runtimev1.ReadHistoryResp{Text: strings.Repeat("h", 64*1024)}})
+			case *shared.TunnelFrame_WorkspaceTreeReq:
+				return responseFrame(frame, &shared.TunnelFrame_WorkspaceTreeResp{WorkspaceTreeResp: &agent.WorkspaceTreeResp{Items: []*agent.WorkspaceTreeNode{{Id: "ws-1", Name: "Workspace"}}}})
+			case *shared.TunnelFrame_WorkspaceSessionsReq:
+				return responseFrame(frame, &shared.TunnelFrame_WorkspaceSessionsResp{WorkspaceSessionsResp: &agent.WorkspaceSessionsResp{Items: []*agent.SessionSummary{{Id: "sess-1", WorkspaceId: payload.WorkspaceSessionsReq.GetWorkspaceId(), Name: "Session"}}}})
+			case *shared.TunnelFrame_ReadHistoryReq:
+				return responseFrame(frame, &shared.TunnelFrame_ReadHistoryResp{ReadHistoryResp: &agent.ReadHistoryResp{Text: strings.Repeat("h", 64*1024)}})
 			default:
 				return tunnel.ErrorFrame(frame.GetStreamId(), frame.GetRequestId(), "bad_request", "unknown payload")
 			}
@@ -96,7 +96,7 @@ func waitForRoute(t *testing.T, handler *Handler, deviceId string) {
 	t.Fatalf("route %s not registered", deviceId)
 }
 
-func runFakeAgent(t *testing.T, ctx context.Context, serverUrl string, respond func(*tunnelv1.TunnelFrame) *tunnelv1.TunnelFrame) {
+func runFakeAgent(t *testing.T, ctx context.Context, serverUrl string, respond func(*shared.TunnelFrame) *shared.TunnelFrame) {
 	t.Helper()
 	requestHeader := http.Header{}
 	req, _ := http.NewRequest(http.MethodGet, serverUrl, nil)
@@ -108,7 +108,7 @@ func runFakeAgent(t *testing.T, ctx context.Context, serverUrl string, respond f
 		return
 	}
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
-	hello := &tunnelv1.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &tunnelv1.TunnelFrame_Hello{Hello: &tunnelv1.Hello{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
+	hello := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Hello{Hello: &shared.Hello{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
 	helloData, _ := tunnel.MarshalFrame(hello)
 	if err := conn.Write(ctx, websocket.MessageText, helloData); err != nil {
 		t.Errorf("hello Write() error = %v", err)
@@ -132,22 +132,22 @@ func runFakeAgent(t *testing.T, ctx context.Context, serverUrl string, respond f
 	}
 }
 
-func responseFrame(request *tunnelv1.TunnelFrame, payload any) *tunnelv1.TunnelFrame {
-	frame := &tunnelv1.TunnelFrame{StreamId: request.GetStreamId(), RequestId: request.GetRequestId()}
+func responseFrame(request *shared.TunnelFrame, payload any) *shared.TunnelFrame {
+	frame := &shared.TunnelFrame{StreamId: request.GetStreamId(), RequestId: request.GetRequestId()}
 	switch value := payload.(type) {
-	case *tunnelv1.TunnelFrame_WorkspaceTreeResp:
+	case *shared.TunnelFrame_WorkspaceTreeResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_WorkspaceSessionsResp:
+	case *shared.TunnelFrame_WorkspaceSessionsResp:
 		frame.Payload = value
-	case *tunnelv1.TunnelFrame_ReadHistoryResp:
+	case *shared.TunnelFrame_ReadHistoryResp:
 		frame.Payload = value
 	}
 	return frame
 }
 
-func isRuntimeRequestFrame(frame *tunnelv1.TunnelFrame) bool {
+func isRuntimeRequestFrame(frame *shared.TunnelFrame) bool {
 	switch frame.GetPayload().(type) {
-	case *tunnelv1.TunnelFrame_WorkspaceTreeReq, *tunnelv1.TunnelFrame_WorkspaceSessionsReq, *tunnelv1.TunnelFrame_ReadHistoryReq:
+	case *shared.TunnelFrame_WorkspaceTreeReq, *shared.TunnelFrame_WorkspaceSessionsReq, *shared.TunnelFrame_ReadHistoryReq:
 		return true
 	default:
 		return false

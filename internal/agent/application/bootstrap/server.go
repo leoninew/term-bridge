@@ -11,16 +11,17 @@ import (
 	"sync"
 	"time"
 
-	agentapi "termbridge/internal/agent/api/handler"
-	terminalapp "termbridge/internal/agent/application/task/terminal"
-	agentapp "termbridge/internal/agent/application/user"
-	agentdb "termbridge/internal/agent/infrastructure/database"
-	"termbridge/internal/agent/infrastructure/pty/gopty"
-	"termbridge/internal/agent/repository/task/state"
-	httpserver "termbridge/internal/shared/api/server"
-	sharedauth "termbridge/internal/shared/common/auth"
-	apperrors "termbridge/internal/shared/common/errors"
-	basedb "termbridge/internal/shared/infrastructure/database"
+	agentapi "gitee.com/leoninew/TermBridge-go/internal/agent/api/handler"
+	terminalapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/terminal"
+	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
+	agentdb "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/database"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/pty/gopty"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/repository/task/state"
+	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
+	httpserver "gitee.com/leoninew/TermBridge-go/internal/shared/api/server"
+	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
+	basedb "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/database"
 )
 
 type Options struct {
@@ -97,7 +98,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		}()
 	}
 
-	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudGateURL: cfg.Cloud.GateURL, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(agentapi.CloudSessionSummary) {
+	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudGateURL: cfg.Cloud.GateURL, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(*cloud.CloudSessionSummary) {
 		if cloudConnector != nil {
 			startConnector(cloudConnector)
 		}

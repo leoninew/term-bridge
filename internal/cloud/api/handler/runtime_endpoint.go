@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"net/http"
 
-	runtimev1 "termbridge/internal/gen/proto/termbridge/runtime/v1"
-	tunnelv1 "termbridge/internal/gen/proto/termbridge/tunnel/v1"
-	"termbridge/internal/shared/dto/protocol/tunnel"
+	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
 type runtimeEndpoint interface {
@@ -42,7 +42,7 @@ func (e tunnelRuntimeEndpoint) JSON(ctx context.Context, method string, params a
 }
 
 func (e tunnelRuntimeEndpoint) History(ctx context.Context, workspaceId string, sessionId string, requestId string) (string, bool, error) {
-	request := &tunnelv1.TunnelFrame{RequestId: requestId, Payload: &tunnelv1.TunnelFrame_ReadHistoryReq{ReadHistoryReq: &runtimev1.ReadWorkspaceSessionHistoryReq{WorkspaceId: workspaceId, SessionId: sessionId}}}
+	request := &shared.TunnelFrame{RequestId: requestId, Payload: &shared.TunnelFrame_ReadHistoryReq{ReadHistoryReq: &agent.ReadWorkspaceSessionHistoryReq{WorkspaceId: workspaceId, SessionId: sessionId}}}
 	response, err := e.route.request(ctx, request)
 	if err != nil {
 		return "", false, err
@@ -61,74 +61,73 @@ func (e tunnelRuntimeEndpoint) Attach(w http.ResponseWriter, r *http.Request, wo
 	return nil
 }
 
-func runtimeRequestFrame(method string, params any, requestId string) (*tunnelv1.TunnelFrame, error) {
-	frame := &tunnelv1.TunnelFrame{RequestId: requestId}
+func runtimeRequestFrame(method string, params any, requestId string) (*shared.TunnelFrame, error) {
+	frame := &shared.TunnelFrame{RequestId: requestId}
 	switch method {
 	case "workspaces":
-		frame.Payload = &tunnelv1.TunnelFrame_ListWorkspacesReq{ListWorkspacesReq: &runtimev1.ListWorkspacesReq{}}
+		frame.Payload = &shared.TunnelFrame_ListWorkspacesReq{ListWorkspacesReq: &agent.ListWorkspacesReq{}}
 	case "workspace_tree":
-		frame.Payload = &tunnelv1.TunnelFrame_WorkspaceTreeReq{WorkspaceTreeReq: &runtimev1.WorkspaceTreeReq{}}
+		frame.Payload = &shared.TunnelFrame_WorkspaceTreeReq{WorkspaceTreeReq: &agent.WorkspaceTreeReq{}}
 	case "workspace_order":
-		req, ok := params.(UpdateWorkspaceOrderReq)
+		req, ok := params.(*agent.UpdateWorkspaceOrderReq)
 		if !ok {
 			return nil, fmt.Errorf("workspace_order params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_UpdateWorkspaceOrderReq{UpdateWorkspaceOrderReq: &runtimev1.UpdateWorkspaceOrderReq{WorkspaceIds: req.WorkspaceIds}}
+		frame.Payload = &shared.TunnelFrame_UpdateWorkspaceOrderReq{UpdateWorkspaceOrderReq: req}
 	case "delete_workspace":
-		req, ok := params.(DeleteWorkspaceReq)
+		req, ok := params.(*agent.DeleteWorkspaceReq)
 		if !ok {
 			return nil, fmt.Errorf("delete_workspace params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_DeleteWorkspaceReq{DeleteWorkspaceReq: &runtimev1.DeleteWorkspaceReq{WorkspaceId: req.WorkspaceId}}
+		frame.Payload = &shared.TunnelFrame_DeleteWorkspaceReq{DeleteWorkspaceReq: req}
 	case "workspace_sessions":
-		req, ok := params.(WorkspaceSessionsReq)
+		req, ok := params.(*agent.WorkspaceSessionsReq)
 		if !ok {
 			return nil, fmt.Errorf("workspace_sessions params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_WorkspaceSessionsReq{WorkspaceSessionsReq: &runtimev1.WorkspaceSessionsReq{WorkspaceId: req.WorkspaceId}}
+		frame.Payload = &shared.TunnelFrame_WorkspaceSessionsReq{WorkspaceSessionsReq: req}
 	case "session_order":
-		req, ok := params.(WorkspaceSessionOrderReq)
+		req, ok := params.(*agent.WorkspaceSessionOrderReq)
 		if !ok {
 			return nil, fmt.Errorf("session_order params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_UpdateSessionOrderReq{UpdateSessionOrderReq: &runtimev1.WorkspaceSessionOrderReq{WorkspaceId: req.WorkspaceId, SessionIds: req.SessionIds}}
+		frame.Payload = &shared.TunnelFrame_UpdateSessionOrderReq{UpdateSessionOrderReq: req}
 	case "create_session":
-		req, ok := params.(CreateSessionReq)
+		req, ok := params.(*agent.CreateSessionReq)
 		if !ok {
 			return nil, fmt.Errorf("create_session params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_CreateSessionReq{CreateSessionReq: &runtimev1.CreateSessionReq{WorkspaceId: req.WorkspaceId, Name: req.Name, Cwd: req.Cwd, Command: req.Command, Cols: int32(req.Cols), Rows: int32(req.Rows)}}
+		frame.Payload = &shared.TunnelFrame_CreateSessionReq{CreateSessionReq: req}
 	case "rerun_session":
-		req, ok := params.(RerunWorkspaceSessionReq)
+		req, ok := params.(*agent.RerunWorkspaceSessionReq)
 		if !ok {
 			return nil, fmt.Errorf("rerun_session params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_RerunSessionReq{RerunSessionReq: &runtimev1.RerunWorkspaceSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId, Request: &runtimev1.RerunSessionReq{Cols: int32(req.Request.Cols), Rows: int32(req.Request.Rows)}}}
+		frame.Payload = &shared.TunnelFrame_RerunSessionReq{RerunSessionReq: req}
 	case "get_session":
-		req, ok := params.(WorkspaceSessionReq)
+		req, ok := params.(*agent.WorkspaceSessionReq)
 		if !ok {
 			return nil, fmt.Errorf("get_session params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_GetSessionReq{GetSessionReq: &runtimev1.WorkspaceSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId}}
+		frame.Payload = &shared.TunnelFrame_GetSessionReq{GetSessionReq: req}
 	case "update_session":
-		req, ok := params.(UpdateWorkspaceSessionReq)
+		req, ok := params.(*agent.UpdateWorkspaceSessionReq)
 		if !ok {
 			return nil, fmt.Errorf("update_session params have type %T", params)
 		}
-		name := req.Request.Name
-		frame.Payload = &tunnelv1.TunnelFrame_UpdateSessionReq{UpdateSessionReq: &runtimev1.UpdateWorkspaceSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId, Request: &runtimev1.UpdateSessionReq{Name: &name}}}
+		frame.Payload = &shared.TunnelFrame_UpdateSessionReq{UpdateSessionReq: req}
 	case "delete_session":
-		req, ok := params.(WorkspaceSessionReq)
+		req, ok := params.(*agent.WorkspaceSessionReq)
 		if !ok {
 			return nil, fmt.Errorf("delete_session params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_DeleteSessionReq{DeleteSessionReq: &runtimev1.WorkspaceSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId}}
+		frame.Payload = &shared.TunnelFrame_DeleteSessionReq{DeleteSessionReq: req}
 	case "close_session":
-		req, ok := params.(WorkspaceSessionReq)
+		req, ok := params.(*agent.WorkspaceSessionReq)
 		if !ok {
 			return nil, fmt.Errorf("close_session params have type %T", params)
 		}
-		frame.Payload = &tunnelv1.TunnelFrame_CloseSessionReq{CloseSessionReq: &runtimev1.WorkspaceSessionReq{WorkspaceId: req.WorkspaceId, SessionId: req.SessionId}}
+		frame.Payload = &shared.TunnelFrame_CloseSessionReq{CloseSessionReq: req}
 	default:
 		return nil, fmt.Errorf("unknown runtime method %q", method)
 	}

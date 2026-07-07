@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"termbridge/cmd/termbridge/cli"
+	"gitee.com/leoninew/TermBridge-go/cmd/termbridge/cli"
 )
 
 func main() {

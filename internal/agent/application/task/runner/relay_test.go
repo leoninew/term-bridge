@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	termpty "termbridge/internal/agent/infrastructure/pty"
-	"termbridge/internal/agent/model/task/process"
+	termpty "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/pty"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
 )
 
 func TestWriteInputChunkInterceptsCtrlC(t *testing.T) {

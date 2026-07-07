@@ -9,7 +9,7 @@
 <script setup lang="ts">
   import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { clampTerminalSize } from '../../protocol/terminal'
-  import type { ServerControlMessage } from '../../gen/proto/termbridge/terminal/v1/terminal'
+  import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
   import { logTerminalDiagnostic, logTerminalDiagnosticError } from './diagnostics'
   import { createXterm } from './useXterm'
   import { useTerminalSocket } from '../../features/sessions/useTerminalSocket'

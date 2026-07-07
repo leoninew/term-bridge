@@ -5,7 +5,6 @@ import (
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/base64"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -15,9 +14,11 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	clouddevice "termbridge/internal/cloud/repository/user/device"
-	sharedauth "termbridge/internal/shared/common/auth"
-	"termbridge/internal/shared/dto/protocol/tunnel"
+	clouddevice "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/device"
+	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
+	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
 func TestCurrentDeviceReportBindsDeviceToCloudUserAndTunnelUsesPublicKey(t *testing.T) {
@@ -44,12 +45,12 @@ func TestCurrentDeviceReportBindsDeviceToCloudUserAndTunnelUsesPublicKey(t *test
 	if devicesResponse.Code != http.StatusOK {
 		t.Fatalf("devices status = %d; body=%s", devicesResponse.Code, devicesResponse.Body.String())
 	}
-	var devices ListDevicesResp
-	if err := json.Unmarshal(devicesResponse.Body.Bytes(), &devices); err != nil {
+	var devices cloud.ListDevicesResp
+	if err := codec.UnmarshalProtoJSON(devicesResponse.Body.Bytes(), &devices); err != nil {
 		t.Fatalf("decode devices: %v", err)
 	}
-	if len(devices.Items) != 1 || devices.Items[0].Id != localDevice.Id || devices.Items[0].Online {
-		t.Fatalf("devices = %#v", devices)
+	if len(devices.GetItems()) != 1 || devices.GetItems()[0].GetId() != localDevice.Id || devices.GetItems()[0].GetOnline() {
+		t.Fatalf("devices count=%d first_id=%q first_online=%v", len(devices.GetItems()), devices.GetItems()[0].GetId(), devices.GetItems()[0].GetOnline())
 	}
 	storedPublicKey, err := handler.config.DeviceRepository.PublicKey(context.Background(), localDevice.Id)
 	if err != nil {
@@ -100,12 +101,12 @@ func TestDevicesFiltersByCloudUserAndDeleteDisconnectsRoute(t *testing.T) {
 	if devicesResponse.Code != http.StatusOK {
 		t.Fatalf("devices status = %d; body=%s", devicesResponse.Code, devicesResponse.Body.String())
 	}
-	var devices ListDevicesResp
-	if err := json.Unmarshal(devicesResponse.Body.Bytes(), &devices); err != nil {
+	var devices cloud.ListDevicesResp
+	if err := codec.UnmarshalProtoJSON(devicesResponse.Body.Bytes(), &devices); err != nil {
 		t.Fatalf("decode devices: %v", err)
 	}
-	if len(devices.Items) != 1 || devices.Items[0].Id != "dev-1" || !devices.Items[0].Online {
-		t.Fatalf("devices = %#v", devices)
+	if len(devices.GetItems()) != 1 || devices.GetItems()[0].GetId() != "dev-1" || !devices.GetItems()[0].GetOnline() {
+		t.Fatalf("devices count=%d first_id=%q first_online=%v", len(devices.GetItems()), devices.GetItems()[0].GetId(), devices.GetItems()[0].GetOnline())
 	}
 
 	deleteRequest := httptest.NewRequest(http.MethodDelete, "/cloud-api/devices/dev-1", nil)

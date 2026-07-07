@@ -10,18 +10,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	repository "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/auth"
 	"io"
 	"net/url"
 	"strings"
-	repository "termbridge/internal/cloud/repository/user/auth"
 	"time"
+
+	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
-	authmodel "termbridge/internal/cloud/model/user/auth"
-	sharedauth "termbridge/internal/shared/common/auth"
+	authmodel "gitee.com/leoninew/TermBridge-go/internal/cloud/model/user/auth"
+	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
 )
 
 const (
@@ -145,26 +147,26 @@ func (s *Service) VerifyEmail(ctx context.Context, email, code string) error {
 	})
 }
 
-func (s *Service) Login(ctx context.Context, email, password string) (authmodel.Result, error) {
+func (s *Service) Login(ctx context.Context, email, password string) (*cloud.TokenResp, error) {
 	if err := s.requireRepository(); err != nil {
-		return authmodel.Result{}, authmodel.ErrInvalidCredentials
+		return nil, authmodel.ErrInvalidCredentials
 	}
 	user, err := s.repo.FindUserByEmail(ctx, email)
 	if err != nil {
-		return authmodel.Result{}, authmodel.ErrInvalidCredentials
+		return nil, authmodel.ErrInvalidCredentials
 	}
 	identity, err := s.repo.FindIdentityForUser(ctx, user.Id, repository.ProviderEmail)
 	if err != nil || !identity.PasswordHash.Valid {
-		return authmodel.Result{}, authmodel.ErrInvalidCredentials
+		return nil, authmodel.ErrInvalidCredentials
 	}
 	if !checkPassword(identity.PasswordHash.String, password) {
-		return authmodel.Result{}, authmodel.ErrInvalidCredentials
+		return nil, authmodel.ErrInvalidCredentials
 	}
 	if user.Status != repository.StatusEnabled || !user.EmailVerifiedAt.Valid {
-		return authmodel.Result{}, authmodel.ErrEmailNotVerified
+		return nil, authmodel.ErrEmailNotVerified
 	}
 	if err := s.repo.UpdateLastLogin(ctx, user.Id); err != nil {
-		return authmodel.Result{}, err
+		return nil, err
 	}
 	return s.sign(userView(user, repository.ProviderEmail))
 }
@@ -255,70 +257,70 @@ func (s *Service) GoogleAuthURL(ctx context.Context) (string, error) {
 	return s.google.AuthCodeURL(state), nil
 }
 
-func (s *Service) GoogleCallback(ctx context.Context, code, state string) (authmodel.Result, error) {
+func (s *Service) GoogleCallback(ctx context.Context, code, state string) (*cloud.TokenResp, error) {
 	if err := s.requireRepository(); err != nil {
-		return authmodel.Result{}, err
+		return nil, err
 	}
 	if s.google == nil {
-		return authmodel.Result{}, ErrOAuthDisabled
+		return nil, ErrOAuthDisabled
 	}
 	ok, err := s.repo.UseOAuthState(ctx, state)
 	if err != nil {
-		return authmodel.Result{}, err
+		return nil, err
 	}
 	if !ok {
-		return authmodel.Result{}, authmodel.ErrInvalidCredentials
+		return nil, authmodel.ErrInvalidCredentials
 	}
 	googleUser, err := s.google.ExchangeUser(ctx, code)
 	if err != nil {
-		return authmodel.Result{}, err
+		return nil, err
 	}
 	if !googleUser.EmailVerified {
-		return authmodel.Result{}, authmodel.ErrInvalidCredentials
+		return nil, authmodel.ErrInvalidCredentials
 	}
 	if strings.TrimSpace(googleUser.Subject) == "" || repository.NormalizeEmail(googleUser.Email) == "" {
-		return authmodel.Result{}, authmodel.ErrInvalidCredentials
+		return nil, authmodel.ErrInvalidCredentials
 	}
 	if ident, err := s.repo.FindIdentity(ctx, repository.ProviderGoogle, googleUser.Subject); err == nil {
 		user, err := s.repo.FindUserByID(ctx, ident.UserId)
 		if err != nil {
-			return authmodel.Result{}, err
+			return nil, err
 		}
 		_ = s.repo.UpdateLastLogin(ctx, user.Id)
 		return s.sign(userView(user, repository.ProviderGoogle))
 	} else if !repository.IsNotFound(err) {
-		return authmodel.Result{}, err
+		return nil, err
 	}
 	if _, err := s.repo.FindUserByEmail(ctx, googleUser.Email); err == nil {
-		return authmodel.Result{}, authmodel.ErrEmailAlreadyUsed
+		return nil, authmodel.ErrEmailAlreadyUsed
 	} else if !repository.IsNotFound(err) {
-		return authmodel.Result{}, err
+		return nil, err
 	}
 	user, err := s.repo.CreateGoogleUser(ctx, googleUser.Email, googleUser.Subject)
 	if err != nil {
-		return authmodel.Result{}, err
+		return nil, err
 	}
 	return s.sign(userView(user, repository.ProviderGoogle))
 }
 
-func (s *Service) IssueUserToken(ctx context.Context, userId string) (authmodel.Result, error) {
+func (s *Service) IssueUserToken(ctx context.Context, userId string) (*cloud.TokenResp, error) {
 	if err := s.requireRepository(); err != nil {
-		return authmodel.Result{}, err
+		return nil, err
 	}
 	user, err := s.repo.FindUserByID(ctx, userId)
 	if err != nil {
-		return authmodel.Result{}, err
+		return nil, err
 	}
 	return s.sign(userView(user, repository.ProviderEmail))
 }
 
-func (s *Service) UserFromClaims(ctx context.Context, claims sharedauth.Claims) (authmodel.UserView, error) {
+func (s *Service) UserFromClaims(ctx context.Context, claims sharedauth.Claims) (*cloud.User, error) {
 	if err := s.requireRepository(); err != nil {
-		return authmodel.UserView{}, err
+		return nil, err
 	}
 	user, err := s.repo.FindUserByID(ctx, claims.Sub)
 	if err != nil {
-		return authmodel.UserView{}, err
+		return nil, err
 	}
 	return userView(user, claims.Provider), nil
 }
@@ -334,12 +336,12 @@ func (s *Service) requireRepository() error {
 	return nil
 }
 
-func (s *Service) sign(user authmodel.UserView) (authmodel.Result, error) {
-	token, err := s.tokens.Sign(sharedauth.Claims{Sub: user.Id, Email: user.Email, Provider: user.Provider})
+func (s *Service) sign(user *cloud.User) (*cloud.TokenResp, error) {
+	token, err := s.tokens.Sign(sharedauth.Claims{Sub: user.GetId(), Email: user.GetEmail(), Provider: user.GetProvider()})
 	if err != nil {
-		return authmodel.Result{}, err
+		return nil, err
 	}
-	return authmodel.Result{Token: token, User: user}, nil
+	return &cloud.TokenResp{AccessToken: token, TokenType: "bearer"}, nil
 }
 
 func (s *Service) validatePassword(password string) error {
@@ -419,8 +421,8 @@ func (s *Service) verifyCodeWithRepo(ctx context.Context, repo codeRepository, e
 	return row, nil
 }
 
-func userView(user repository.User, provider string) authmodel.UserView {
-	return authmodel.UserView{Id: user.Id, Email: user.EmailNormalized, DisplayName: user.DisplayName, Provider: provider, EmailVerified: user.EmailVerifiedAt.Valid}
+func userView(user repository.User, provider string) *cloud.User {
+	return &cloud.User{Id: user.Id, Email: user.EmailNormalized, DisplayName: user.DisplayName, Provider: provider, EmailVerified: user.EmailVerifiedAt.Valid}
 }
 
 func hashPassword(password string) (string, error) {

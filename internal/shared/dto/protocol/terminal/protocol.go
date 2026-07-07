@@ -1,14 +1,14 @@
 package terminalproto
 
 import (
-	"encoding/json"
 	"fmt"
 
-	terminalv1 "termbridge/internal/gen/proto/termbridge/terminal/v1"
+	terminal "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 )
 
 const (
-	Subprotocol = "termbridge.terminal.v1"
+	Subprotocol = "termbridge.terminal"
 
 	TypeHello  = "hello"
 	TypeResize = "resize"
@@ -32,15 +32,12 @@ const (
 	MaxPingNonceBytes   = 256
 )
 
-type ClientMessage = terminalv1.ClientControlMessage
-type ServerMessage = terminalv1.ServerControlMessage
-
-func DecodeClient(data []byte) (*ClientMessage, error) {
+func DecodeClient(data []byte) (*terminal.ClientControlMessage, error) {
 	if len(data) > MaxJSONMessageBytes {
 		return nil, fmt.Errorf("control message too large: %d bytes", len(data))
 	}
-	message := &ClientMessage{}
-	if err := json.Unmarshal(data, message); err != nil {
+	message := &terminal.ClientControlMessage{}
+	if err := codec.UnmarshalProtoJSON(data, message); err != nil {
 		return nil, fmt.Errorf("decode control message: %w", err)
 	}
 	if err := ValidateClient(message); err != nil {
@@ -49,7 +46,7 @@ func DecodeClient(data []byte) (*ClientMessage, error) {
 	return message, nil
 }
 
-func ValidateClient(message *ClientMessage) error {
+func ValidateClient(message *terminal.ClientControlMessage) error {
 	if message == nil {
 		return fmt.Errorf("missing control message")
 	}
@@ -78,14 +75,14 @@ func ValidateSize(cols int, rows int) error {
 	return nil
 }
 
-func EncodeServer(message *ServerMessage) ([]byte, error) {
+func EncodeServer(message *terminal.ServerControlMessage) ([]byte, error) {
 	if err := validateServer(message); err != nil {
 		return nil, err
 	}
-	return json.Marshal(message)
+	return codec.MarshalProtoJSON(message)
 }
 
-func MustEncodeServer(message *ServerMessage) []byte {
+func MustEncodeServer(message *terminal.ServerControlMessage) []byte {
 	data, err := EncodeServer(message)
 	if err != nil {
 		panic(err)
@@ -93,7 +90,7 @@ func MustEncodeServer(message *ServerMessage) []byte {
 	return data
 }
 
-func validateServer(message *ServerMessage) error {
+func validateServer(message *terminal.ServerControlMessage) error {
 	if message == nil {
 		return fmt.Errorf("missing server message")
 	}

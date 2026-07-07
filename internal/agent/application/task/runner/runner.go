@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"time"
 
-	termpty "termbridge/internal/agent/infrastructure/pty"
-	"termbridge/internal/agent/model/task/process"
-	apperrors "termbridge/internal/shared/common/errors"
+	termpty "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/pty"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 )
 
 const defaultInterruptGrace = 1500 * time.Millisecond

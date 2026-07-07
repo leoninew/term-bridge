@@ -12,18 +12,20 @@ import (
 	"sync"
 	"time"
 
+	sessionapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/session"
+	workspaceapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/workspace"
+	termpty "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/pty"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/storage/history"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/session"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/workspace"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/repository/task/state"
+	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	"log/slog"
-	sessionapp "termbridge/internal/agent/application/task/session"
-	workspaceapp "termbridge/internal/agent/application/task/workspace"
-	termpty "termbridge/internal/agent/infrastructure/pty"
-	"termbridge/internal/agent/infrastructure/storage/history"
-	"termbridge/internal/agent/model/task/process"
-	"termbridge/internal/agent/model/task/session"
-	"termbridge/internal/agent/model/task/workspace"
-	"termbridge/internal/agent/repository/task/state"
 
-	apperrors "termbridge/internal/shared/common/errors"
-	terminalproto "termbridge/internal/shared/dto/protocol/terminal"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/prototime"
+	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 )
 
 const (
@@ -104,7 +106,7 @@ const (
 
 type Outbound struct {
 	Kind   OutboundKind
-	Text   *terminalproto.ServerMessage
+	Text   *agent.ServerControlMessage
 	Binary []byte
 }
 
@@ -161,42 +163,43 @@ func (r *Registry) workspaceForCreateSession(workspaceId string, cwd string) (wo
 	return ws, nil
 }
 
-func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReq) (CreateSessionResp, error) {
-	name := strings.TrimSpace(request.Name)
+func (r *Registry) CreateSession(ctx context.Context, request *agent.CreateSessionReq) (*agent.CreateSessionResp, error) {
+	name := strings.TrimSpace(request.GetName())
 	if name == "" {
-		return CreateSessionResp{}, apperrors.Usage("missing session name")
+		return nil, apperrors.Usage("missing session name")
 	}
-	if len(request.Command) == 0 {
-		return CreateSessionResp{}, apperrors.Usage("missing session command")
+	command := request.GetCommand()
+	if len(command) == 0 {
+		return nil, apperrors.Usage("missing session command")
 	}
-	cwd := request.Cwd
+	cwd := request.GetCwd()
 	if strings.TrimSpace(cwd) == "" {
 		cwd = r.cwd
 	}
 	absCwd, err := resolveSessionCwd(cwd)
 	if err != nil {
-		return CreateSessionResp{}, err
+		return nil, err
 	}
 	if info, err := os.Stat(absCwd); err != nil {
-		return CreateSessionResp{}, apperrors.Config("invalid session cwd", err)
+		return nil, apperrors.Config("invalid session cwd", err)
 	} else if !info.IsDir() {
-		return CreateSessionResp{}, apperrors.Config("invalid session cwd", fmt.Errorf("not a directory"))
+		return nil, apperrors.Config("invalid session cwd", fmt.Errorf("not a directory"))
 	}
-	size := process.TerminalSize{Cols: request.Cols, Rows: request.Rows}.OrDefault()
+	size := process.TerminalSize{Cols: int(request.GetCols()), Rows: int(request.GetRows())}.OrDefault()
 	if err := terminalproto.ValidateSize(size.Cols, size.Rows); err != nil {
-		return CreateSessionResp{}, apperrors.Usage(err.Error())
+		return nil, apperrors.Usage(err.Error())
 	}
-	r.logger.Info("terminal session create request", "name", name, "cwd", absCwd, "command", strings.Join(request.Command, " "), "cols", size.Cols, "rows", size.Rows)
+	r.logger.Info("terminal session create request", "name", name, "cwd", absCwd, "command", strings.Join(command, " "), "cols", size.Cols, "rows", size.Rows)
 
-	ws, err := r.workspaceForCreateSession(request.WorkspaceId, absCwd)
+	ws, err := r.workspaceForCreateSession(request.GetWorkspaceId(), absCwd)
 	if err != nil {
-		return CreateSessionResp{}, err
+		return nil, err
 	}
 
 	env := os.Environ()
 	commandRecord := session.CommandRecord{
-		Command:     request.Command[0],
-		Args:        append([]string(nil), request.Command[1:]...),
+		Command:     command[0],
+		Args:        append([]string(nil), command[1:]...),
 		EnvStrategy: "inherit",
 		EnvCount:    len(env),
 	}
@@ -214,39 +217,39 @@ func (r *Registry) CreateSession(ctx context.Context, request CreateSessionReq) 
 		},
 	})
 	if err != nil {
-		return CreateSessionResp{}, apperrors.Runtime("create session", err)
+		return nil, apperrors.Runtime("create session", err)
 	}
 
-	if err := r.startSessionRuntime(ctx, sess, request.Command, size); err != nil {
+	if err := r.startSessionRuntime(ctx, sess, command, size); err != nil {
 		r.saveSessionFailed(sess, startFailureReason(err))
-		return CreateSessionResp{}, err
+		return nil, err
 	}
-	return CreateSessionResp{SessionId: sess.Id, WorkspaceId: sess.WorkspaceId, State: string(session.StateRunning)}, nil
+	return &agent.CreateSessionResp{SessionId: sess.Id, WorkspaceId: sess.WorkspaceId, State: string(session.StateRunning)}, nil
 }
 
-func (r *Registry) RerunSession(ctx context.Context, workspaceId string, sessionId string, request RerunSessionReq) (CreateSessionResp, error) {
+func (r *Registry) RerunSession(ctx context.Context, workspaceId string, sessionId string, request *agent.RerunSessionReq) (*agent.CreateSessionResp, error) {
 	view, err := r.sessionView(workspaceId, sessionId)
 	if err != nil {
-		return CreateSessionResp{}, err
+		return nil, err
 	}
 	if !session.Terminal(view.State.State) {
-		return CreateSessionResp{}, apperrors.Usage("cannot rerun running session")
+		return nil, apperrors.Usage("cannot rerun running session")
 	}
 	command := commandFromSession(view.Session)
 	if len(command) == 0 {
 		r.saveSessionFailed(view.Session, "missing_rerun_command")
-		return CreateSessionResp{}, apperrors.Usage("missing session command")
+		return nil, apperrors.Usage("missing session command")
 	}
 	if err := validateSessionCwd(view.Session.LaunchCwd); err != nil {
 		r.saveSessionFailed(view.Session, "invalid_rerun_cwd")
-		return CreateSessionResp{}, err
+		return nil, err
 	}
-	size := process.TerminalSize{Cols: request.Cols, Rows: request.Rows}.OrDefault()
+	size := process.TerminalSize{Cols: int(request.GetCols()), Rows: int(request.GetRows())}.OrDefault()
 	if err := terminalproto.ValidateSize(size.Cols, size.Rows); err != nil {
-		return CreateSessionResp{}, apperrors.Usage(err.Error())
+		return nil, apperrors.Usage(err.Error())
 	}
 	if err := r.claimSessionStart(sessionId); err != nil {
-		return CreateSessionResp{}, err
+		return nil, err
 	}
 	defer r.releaseSessionStart(sessionId)
 
@@ -254,19 +257,19 @@ func (r *Registry) RerunSession(ctx context.Context, workspaceId string, session
 	_, err = r.archiveCurrentHistory(workspaceId, sessionId, archiveId)
 	if err != nil {
 		r.saveSessionFailed(view.Session, "archive_history_failed")
-		return CreateSessionResp{}, apperrors.Runtime("archive history", err)
+		return nil, apperrors.Runtime("archive history", err)
 	}
 	if starter, ok := r.store.(sessionRunStarter); ok {
 		if err := starter.BeginSessionRun(workspaceId, sessionId, size); err != nil {
 			r.saveSessionFailed(view.Session, "begin_session_run_failed")
-			return CreateSessionResp{}, apperrors.Runtime("begin session run", err)
+			return nil, apperrors.Runtime("begin session run", err)
 		}
 	}
 	if err := r.startClaimedSessionRuntime(ctx, view.Session, command, size); err != nil {
 		r.saveSessionFailed(view.Session, startFailureReason(err))
-		return CreateSessionResp{}, err
+		return nil, err
 	}
-	return CreateSessionResp{SessionId: view.Session.Id, WorkspaceId: view.Session.WorkspaceId, State: string(session.StateRunning)}, nil
+	return &agent.CreateSessionResp{SessionId: view.Session.Id, WorkspaceId: view.Session.WorkspaceId, State: string(session.StateRunning)}, nil
 }
 
 func (r *Registry) startSessionRuntime(ctx context.Context, sess session.Session, command []string, size process.TerminalSize) error {
@@ -456,7 +459,7 @@ func (r *Registry) Attach(workspaceId string, sessionId string) (*Client, error)
 	return runtime.attach()
 }
 
-func (r *Registry) CloseSession(workspaceId string, sessionId string, reason string) (SessionSummary, error) {
+func (r *Registry) CloseSession(workspaceId string, sessionId string, reason string) (*agent.SessionSummary, error) {
 	r.mu.Lock()
 	runtime := r.runtimes[sessionId]
 	r.mu.Unlock()
@@ -464,63 +467,63 @@ func (r *Registry) CloseSession(workspaceId string, sessionId string, reason str
 		return r.closeMissingRuntimeSession(workspaceId, sessionId, reason)
 	}
 	if err := runtime.closeSession(reason); err != nil {
-		return SessionSummary{}, err
+		return nil, err
 	}
 	return r.GetSession(workspaceId, sessionId)
 }
 
-func (r *Registry) closeMissingRuntimeSession(workspaceId string, sessionId string, reason string) (SessionSummary, error) {
+func (r *Registry) closeMissingRuntimeSession(workspaceId string, sessionId string, reason string) (*agent.SessionSummary, error) {
 	view, err := r.sessionView(workspaceId, sessionId)
 	if err != nil {
-		return SessionSummary{}, err
+		return nil, err
 	}
 	r.logger.Warn("close session missing live PTY handle", "workspace_id", workspaceId, "session_id", sessionId, "reason", reason)
 	if !session.Terminal(view.State.State) {
 		now := time.Now().UTC()
 		stateRecord := session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "missing_pty_on_close", UpdatedAt: now}
 		if err := r.store.SaveState(workspaceId, sessionId, stateRecord); err != nil {
-			return SessionSummary{}, apperrors.Runtime("save missing PTY close state", err)
+			return nil, apperrors.Runtime("save missing PTY close state", err)
 		}
 		view.State = stateRecord
 	}
 	return r.summaryFromView(view), nil
 }
 
-func (r *Registry) ListWorkspaces() ([]WorkspaceSummary, error) {
+func (r *Registry) ListWorkspaces() ([]*agent.Workspace, error) {
 	workspaces, _, err := r.store.ListWorkspaces()
 	if err != nil {
 		return nil, apperrors.Runtime("list workspaces", err)
 	}
-	out := make([]WorkspaceSummary, 0, len(workspaces))
+	out := make([]*agent.Workspace, 0, len(workspaces))
 	for _, ws := range workspaces {
 		out = append(out, summaryFromWorkspace(ws))
 	}
 	return out, nil
 }
 
-func (r *Registry) WorkspaceTree() ([]WorkspaceTreeNode, error) {
+func (r *Registry) WorkspaceTree() ([]*agent.WorkspaceTreeNode, error) {
 	workspaces, _, err := r.store.ListWorkspaces()
 	if err != nil {
 		return nil, apperrors.Runtime("list workspaces", err)
 	}
-	nodes := make([]WorkspaceTreeNode, 0, len(workspaces))
+	nodes := make([]*agent.WorkspaceTreeNode, 0, len(workspaces))
 	for _, ws := range workspaces {
 		views, _, err := r.store.ListSessionsByWorkspaceId(ws.Id)
 		if err != nil {
 			return nil, apperrors.Runtime("list workspace sessions", err)
 		}
-		nodes = append(nodes, WorkspaceTreeNode{
+		nodes = append(nodes, &agent.WorkspaceTreeNode{
 			Id:        ws.Id,
 			Name:      ws.Name,
 			Path:      ws.Path,
-			UpdatedAt: ws.UpdatedAt,
+			UpdatedAt: prototime.FromTime(ws.UpdatedAt),
 			Children:  r.workspaceSessionSummariesFromViews(views),
 		})
 	}
 	return nodes, nil
 }
 
-func (r *Registry) ListSessions() ([]SessionSummary, error) {
+func (r *Registry) ListSessions() ([]*agent.SessionSummary, error) {
 	views, _, err := r.store.ListSessions()
 	if err != nil {
 		return nil, apperrors.Runtime("list sessions", err)
@@ -528,7 +531,7 @@ func (r *Registry) ListSessions() ([]SessionSummary, error) {
 	return r.summariesFromViews(views), nil
 }
 
-func (r *Registry) ListSessionsByWorkspaceId(workspaceId string) ([]WorkspaceSessionSummary, error) {
+func (r *Registry) ListSessionsByWorkspaceId(workspaceId string) ([]*agent.SessionSummary, error) {
 	views, _, err := r.store.ListSessionsByWorkspaceId(workspaceId)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -539,7 +542,7 @@ func (r *Registry) ListSessionsByWorkspaceId(workspaceId string) ([]WorkspaceSes
 	return r.workspaceSessionSummariesFromViews(views), nil
 }
 
-func (r *Registry) UpdateSessionOrder(workspaceId string, sessionIds []string) ([]WorkspaceSessionSummary, error) {
+func (r *Registry) UpdateSessionOrder(workspaceId string, sessionIds []string) ([]*agent.SessionSummary, error) {
 	if len(sessionIds) == 0 {
 		return nil, apperrors.Usage("session_ids is required")
 	}
@@ -559,14 +562,14 @@ func (r *Registry) UpdateSessionOrder(workspaceId string, sessionIds []string) (
 	return r.workspaceSessionSummariesFromViews(views), nil
 }
 
-func (r *Registry) UpdateSession(workspaceId string, sessionId string, request UpdateSessionReq) (SessionSummary, error) {
-	name := strings.TrimSpace(request.Name)
+func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *agent.UpdateSessionReq) (*agent.SessionSummary, error) {
+	name := strings.TrimSpace(request.GetName())
 	if name == "" {
-		return SessionSummary{}, apperrors.Usage("missing session name")
+		return nil, apperrors.Usage("missing session name")
 	}
 	view, err := r.sessionView(workspaceId, sessionId)
 	if err != nil {
-		return SessionSummary{}, err
+		return nil, err
 	}
 	updated, err := r.store.UpdateSession(workspaceId, sessionId, func(value *session.Session) error {
 		value.Name = name
@@ -574,7 +577,7 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request U
 		return nil
 	})
 	if err != nil {
-		return SessionSummary{}, apperrors.Runtime("update session", err)
+		return nil, apperrors.Runtime("update session", err)
 	}
 	view.Session = updated
 	return r.summaryFromView(view), nil
@@ -594,7 +597,7 @@ func (r *Registry) DeleteSession(workspaceId string, sessionId string) error {
 	return nil
 }
 
-func (r *Registry) UpdateWorkspaceOrder(workspaceIds []string) ([]WorkspaceSummary, error) {
+func (r *Registry) UpdateWorkspaceOrder(workspaceIds []string) ([]*agent.Workspace, error) {
 	if len(workspaceIds) == 0 {
 		return nil, apperrors.Usage("workspace_ids is required")
 	}
@@ -608,7 +611,7 @@ func (r *Registry) UpdateWorkspaceOrder(workspaceIds []string) ([]WorkspaceSumma
 		}
 		return nil, apperrors.Runtime("update workspace order", err)
 	}
-	out := make([]WorkspaceSummary, 0, len(updated))
+	out := make([]*agent.Workspace, 0, len(updated))
 	for _, ws := range updated {
 		out = append(out, summaryFromWorkspace(ws))
 	}
@@ -638,10 +641,10 @@ func (r *Registry) DeleteWorkspace(workspaceId string) error {
 	return nil
 }
 
-func (r *Registry) GetSession(workspaceId string, sessionId string) (SessionSummary, error) {
+func (r *Registry) GetSession(workspaceId string, sessionId string) (*agent.SessionSummary, error) {
 	view, err := r.sessionView(workspaceId, sessionId)
 	if err != nil {
-		return SessionSummary{}, err
+		return nil, err
 	}
 	return r.summaryFromView(view), nil
 }
@@ -732,15 +735,17 @@ func (r *Registry) sessionView(workspaceId string, sessionId string) (session.Vi
 	return session.View{}, apperrors.NotFound("session not found", nil)
 }
 
-func (r *Registry) summariesFromViews(views []session.View) []SessionSummary {
+func (r *Registry) summariesFromViews(views []session.View) []*agent.SessionSummary {
 	summaries := r.sessionSummariesFromViews(views)
-	sort.Slice(summaries, func(i, j int) bool { return summaries[i].UpdatedAt.After(summaries[j].UpdatedAt) })
+	sort.Slice(summaries, func(i, j int) bool {
+		return prototime.ToTime(summaries[i].GetUpdatedAt()).After(prototime.ToTime(summaries[j].GetUpdatedAt()))
+	})
 	return summaries
 }
 
-func (r *Registry) sessionSummariesFromViews(views []session.View) []SessionSummary {
+func (r *Registry) sessionSummariesFromViews(views []session.View) []*agent.SessionSummary {
 	recoverer := session.Recoverer{Store: r.store}
-	out := make([]SessionSummary, 0, len(views))
+	out := make([]*agent.SessionSummary, 0, len(views))
 	for _, view := range views {
 		if !r.hasRuntime(view.Session.Id) {
 			refreshed, err := recoverer.Refresh(view)
@@ -753,29 +758,15 @@ func (r *Registry) sessionSummariesFromViews(views []session.View) []SessionSumm
 	return out
 }
 
-func (r *Registry) workspaceSessionSummariesFromViews(views []session.View) []WorkspaceSessionSummary {
-	summaries := r.sessionSummariesFromViews(views)
-	out := make([]WorkspaceSessionSummary, 0, len(summaries))
-	for _, summary := range summaries {
-		out = append(out, WorkspaceSessionSummary{
-			Id:              summary.Id,
-			Name:            summary.Name,
-			Command:         summary.Command,
-			Cwd:             summary.Cwd,
-			LifecycleState:  summary.LifecycleState,
-			AttachmentState: summary.AttachmentState,
-			ExitCode:        summary.ExitCode,
-			UpdatedAt:       summary.UpdatedAt,
-		})
-	}
-	return out
+func (r *Registry) workspaceSessionSummariesFromViews(views []session.View) []*agent.SessionSummary {
+	return r.sessionSummariesFromViews(views)
 }
 
-func summaryFromWorkspace(ws workspace.Workspace) WorkspaceSummary {
-	return WorkspaceSummary{Id: ws.Id, Name: ws.Name, Path: ws.Path, UpdatedAt: ws.UpdatedAt}
+func summaryFromWorkspace(ws workspace.Workspace) *agent.Workspace {
+	return &agent.Workspace{Id: ws.Id, Name: ws.Name, Path: ws.Path, UpdatedAt: prototime.FromTime(ws.UpdatedAt)}
 }
 
-func (r *Registry) summaryFromView(view session.View) SessionSummary {
+func (r *Registry) summaryFromView(view session.View) *agent.SessionSummary {
 	attachment := AttachmentUnattached
 	lifecycleState := view.State.State
 	r.mu.Lock()
@@ -784,17 +775,25 @@ func (r *Registry) summaryFromView(view session.View) SessionSummary {
 		lifecycleState = runtime.lifecycleState()
 	}
 	r.mu.Unlock()
-	return SessionSummary{
+	return &agent.SessionSummary{
 		Id:              view.Session.Id,
 		Name:            view.Session.Name,
 		WorkspaceId:     view.Session.WorkspaceId,
 		Command:         view.CommandText,
 		Cwd:             view.Session.LaunchCwd,
-		LifecycleState:  lifecycleState,
-		AttachmentState: attachment,
-		ExitCode:        view.ExitCode,
-		UpdatedAt:       view.Session.UpdatedAt,
+		LifecycleState:  string(lifecycleState),
+		AttachmentState: string(attachment),
+		ExitCode:        exitCodeFromInt(view.ExitCode),
+		UpdatedAt:       prototime.FromTime(view.Session.UpdatedAt),
 	}
+}
+
+func exitCodeFromInt(value *int) *int32 {
+	if value == nil {
+		return nil
+	}
+	converted := int32(*value)
+	return &converted
 }
 
 func (c *Client) Outbound() <-chan Outbound {
@@ -817,7 +816,7 @@ func (c *Client) CloseSession() error {
 	return c.runtime.closeSession("client_close")
 }
 
-func (c *Client) SendControl(message *terminalproto.ServerMessage) bool {
+func (c *Client) SendControl(message *agent.ServerControlMessage) bool {
 	return c.enqueue(Outbound{Kind: OutboundText, Text: message})
 }
 

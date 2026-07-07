@@ -19,11 +19,9 @@
 <script setup lang="ts">
   import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import type { SessionSummary } from '../../gen/proto/termbridge/runtime/v1/runtime'
-  import type {
-    CloudSessionSummary,
-    DeviceSummary,
-  } from '../../gen/proto/termbridge/cloud/v1/cloud'
+  import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
+  import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
+  import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
 
   const props = defineProps<{
     session: SessionSummary | null
