@@ -81,9 +81,9 @@ describe('runtime config', () => {
 
   it('uses Vite Cloud OAuth public config when runtime config is absent', () => {
     vi.stubGlobal('window', { __CONFIG__: {} })
-    vi.stubEnv('VITE_CLOUD_OAUTH_CLIENT_ID', 'termbridge-agent')
-    vi.stubEnv('VITE_CLOUD_OAUTH_REDIRECT_URL', 'http://localhost:9030/agent/oauth/callback')
-    vi.stubEnv('VITE_CLOUD_OAUTH_SCOPES', 'openid,email,profile')
+    vi.stubEnv('TERMBRIDGE_CLOUD_OAUTH_CLIENT_ID', 'termbridge-agent')
+    vi.stubEnv('TERMBRIDGE_CLOUD_OAUTH_REDIRECT_URL', 'http://localhost:9030/agent/oauth/callback')
+    vi.stubEnv('TERMBRIDGE_CLOUD_OAUTH_SCOPES', 'openid,email,profile')
 
     expect(runtimeConfig.cloudOAuth).toEqual({
       clientId: 'termbridge-agent',

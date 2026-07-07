@@ -983,7 +983,7 @@ func validateAgentOAuth(cfg AgentOAuthConfig) error {
 	if len(missing) > 0 {
 		return apperrors.Config("incomplete agent OAuth configuration", errors.New(strings.Join(missing, ", ")))
 	}
-	return validateHTTPURL("agent.oauth.redirect_url", cfg.RedirectUrl, false)
+	return validateHTTPURL("agent.oauth.redirect_url", cfg.RedirectUrl)
 }
 
 func validateCloudOAuthClient(index int, client CloudOAuthClientConfig) error {
@@ -997,15 +997,15 @@ func validateCloudOAuthClient(index int, client CloudOAuthClientConfig) error {
 	if client.RedirectUrl == "" {
 		return apperrors.Config("invalid "+prefix+".redirect_url", fmt.Errorf("empty redirect URL"))
 	}
-	return validateHTTPURL(prefix+".redirect_url", client.RedirectUrl, false)
+	return validateHTTPURL(prefix+".redirect_url", client.RedirectUrl)
 }
 
 func validateHTTPServerConfig(prefix string, listenURL string, publicURL string, apiBaseURL string, corsAllowedOrigins []string) error {
-	if err := validateHTTPURL(prefix+".listen_url", listenURL, true); err != nil {
+	if err := validateHTTPURL(prefix+".listen_url", listenURL); err != nil {
 		return err
 	}
 	if publicURL != "" {
-		if err := validateHTTPURL(prefix+".public_url", publicURL, false); err != nil {
+		if err := validateHTTPURL(prefix+".public_url", publicURL); err != nil {
 			return err
 		}
 	}
@@ -1015,7 +1015,7 @@ func validateHTTPServerConfig(prefix string, listenURL string, publicURL string,
 		}
 	}
 	for _, origin := range corsAllowedOrigins {
-		if err := validateHTTPURL(prefix+".cors_allowed_origins", origin, false); err != nil {
+		if err := validateHTTPURL(prefix+".cors_allowed_origins", origin); err != nil {
 			return err
 		}
 	}
@@ -1029,10 +1029,10 @@ func validateAPIBaseURL(key string, value string) error {
 		}
 		return nil
 	}
-	return validateHTTPURL(key, value, false)
+	return validateHTTPURL(key, value)
 }
 
-func validateHTTPURL(key string, value string, requirePort bool) error {
+func validateHTTPURL(key string, value string) error {
 	if strings.TrimSpace(value) == "" {
 		return apperrors.Config("invalid "+key, fmt.Errorf("empty URL"))
 	}
@@ -1042,9 +1042,6 @@ func validateHTTPURL(key string, value string, requirePort bool) error {
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return apperrors.Config("invalid "+key, fmt.Errorf("scheme must be http or https"))
-	}
-	if requirePort && parsed.Port() == "" {
-		return apperrors.Config("invalid "+key, fmt.Errorf("port is required"))
 	}
 	return nil
 }

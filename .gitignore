@@ -1,8 +1,6 @@
 .DS_Store
 
 .termbridge/
-/configs/config.*.yaml
-!/configs/config.develop.yaml
 /.env
 /.env.*
 !/.env.example

@@ -10,8 +10,8 @@ import (
 )
 
 var MarshalOptions = protojson.MarshalOptions{
-	UseProtoNames:   true,
-	EmitUnpopulated: false,
+	UseProtoNames:     true,
+	EmitDefaultValues: true,
 }
 
 var UnmarshalOptions = protojson.UnmarshalOptions{

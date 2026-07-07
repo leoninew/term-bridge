@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  envPrefix: 'TERMBRIDGE_',
   plugins: [vue(), tailwindcss()],
   server: {
     host: 'localhost',

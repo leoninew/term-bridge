@@ -27,7 +27,7 @@ declare global {
 
 export function getFrontendMode(): FrontendMode {
   const runtimeConfig = typeof window !== 'undefined' ? window.__CONFIG__ : undefined
-  const mode = runtimeConfig?.frontendMode || import.meta.env.VITE_FRONTEND_MODE || 'agent'
+  const mode = runtimeConfig?.frontendMode || import.meta.env.TERMBRIDGE_FRONTEND_MODE || 'agent'
   return isFrontendMode(mode) ? mode : 'agent'
 }
 
@@ -35,8 +35,8 @@ export function getApiBaseUrl(target: ApiTarget = 'agent'): string {
   const runtimeConfig = typeof window !== 'undefined' ? window.__CONFIG__ : undefined
   const value =
     target === 'cloud'
-      ? runtimeConfig?.cloudApiBaseUrl || import.meta.env.VITE_CLOUD_API_BASE_URL
-      : runtimeConfig?.agentApiBaseUrl || import.meta.env.VITE_AGENT_API_BASE_URL
+      ? runtimeConfig?.cloudApiBaseUrl || import.meta.env.TERMBRIDGE_CLOUD_API_BASE_URL
+      : runtimeConfig?.agentApiBaseUrl || import.meta.env.TERMBRIDGE_AGENT_API_BASE_URL
   return normalizeBaseUrl(value || defaultApiBaseUrls[target])
 }
 
@@ -110,15 +110,15 @@ export const runtimeConfig = {
     if (runtimeCloudOAuth) {
       return runtimeCloudOAuth
     }
-    const clientId = import.meta.env.VITE_CLOUD_OAUTH_CLIENT_ID
-    const redirectUrl = import.meta.env.VITE_CLOUD_OAUTH_REDIRECT_URL
+    const clientId = import.meta.env.TERMBRIDGE_CLOUD_OAUTH_CLIENT_ID
+    const redirectUrl = import.meta.env.TERMBRIDGE_CLOUD_OAUTH_REDIRECT_URL
     if (!clientId && !redirectUrl) {
       return undefined
     }
     return {
       clientId,
       redirectUrl,
-      scopes: splitScopes(import.meta.env.VITE_CLOUD_OAUTH_SCOPES),
+      scopes: splitScopes(import.meta.env.TERMBRIDGE_CLOUD_OAUTH_SCOPES),
     }
   },
 }

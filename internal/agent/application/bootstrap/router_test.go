@@ -60,23 +60,13 @@ func TestBackendHandlerServesStaticFilesWithSPAFallbackAndKeepsAPIRoutes(t *test
 	}
 }
 
-func TestBackendHandlerInjectsRuntimeConfigIntoIndexHTML(t *testing.T) {
+func TestBackendHandlerServesIndexHTMLWithoutRuntimeConfigInjection(t *testing.T) {
 	staticDir := t.TempDir()
 	index := "<!doctype html><html><head><!-- __RUNTIME_CONFIG__ --><title>app</title></head><body></body></html>"
 	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte(index), 0o644); err != nil {
 		t.Fatalf("WriteFile(index) error = %v", err)
 	}
-	handler := backendHandler(Config{
-		Server: ServerConfig{StaticDir: staticDir, ApiBaseUrl: "https://agent.example.com/"},
-		Cloud: CloudConnectorConfig{
-			PublicURL: "https://cloud.example.com/",
-			OAuthClient: OAuthClientConfig{
-				ClientId:    "termbridge-agent",
-				RedirectUrl: "http://127.0.0.1:9033/agent/oauth/callback",
-				Scopes:      []string{"openid", "email", "profile"},
-			},
-		},
-	}, slog.Default(), http.NotFoundHandler())
+	handler := backendHandler(Config{Server: ServerConfig{StaticDir: staticDir}}, slog.Default(), http.NotFoundHandler())
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -87,9 +77,11 @@ func TestBackendHandlerInjectsRuntimeConfigIntoIndexHTML(t *testing.T) {
 	if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 		t.Fatalf("Content-Type = %q", got)
 	}
-	want := `<script>window.__CONFIG__ = {"frontendMode":"agent","agentApiBaseUrl":"https://agent.example.com","cloudApiBaseUrl":"https://cloud.example.com/cloud-api","cloudOAuth":{"clientId":"termbridge-agent","redirectUrl":"http://127.0.0.1:9033/agent/oauth/callback","scopes":["openid","email","profile"]}};</script>`
-	if !strings.Contains(response.Body.String(), want) {
-		t.Fatalf("runtime config missing: %s", response.Body.String())
+	if response.Body.String() != index {
+		t.Fatalf("index body = %q, want original index html", response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "window.__CONFIG__") {
+		t.Fatalf("agent static handler injected runtime config: %s", response.Body.String())
 	}
 }
 

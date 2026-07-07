@@ -53,8 +53,7 @@ tasks:
   agent:
     desc: Run database migrations and start local agent server with Air
     env:
-      TERMBRIDGE_ENV: develop
-      TERMBRIDGE_AGENT__API_BASE_URL: /agent-api
+      TERMBRIDGE_ENV: development
     cmds:
       - go run cmd/termbridge/main.go migrate agent
       - air -c .air.agent.toml -- {{.CLI_ARGS}}
@@ -62,8 +61,7 @@ tasks:
   cloud:
     desc: Run database migrations and start cloud backend with Air
     env:
-      TERMBRIDGE_ENV: develop
-      TERMBRIDGE_CLOUD__API_BASE_URL: /cloud-api
+      TERMBRIDGE_ENV: development
     cmds:
       - go run cmd/termbridge/main.go migrate cloud
       - air -c .air.cloud.toml -- {{.CLI_ARGS}}
@@ -76,7 +74,7 @@ tasks:
   run:
     desc: Start web, agent, and cloud development servers together
     env:
-      TERMBRIDGE_ENV: develop
+      TERMBRIDGE_ENV: development
     cmds:
       - uv run python scripts/run.py
 
@@ -103,8 +101,7 @@ tasks:
       - env GOOS=windows GOARCH=amd64 go build -o {{.PACKAGE_ROOT}}/termbridge.exe ./cmd/termbridge
       - cp -R web/dist/. {{.PACKAGE_ROOT}}/web/
       - cp configs/config.yaml {{.PACKAGE_ROOT}}/configs/config.yaml
-      - cp .env.example {{.PACKAGE_ROOT}}/.env.example
-      - cp scripts/package/.env.local {{.PACKAGE_ROOT}}/.env.local
+      - cp configs/config.production.yaml {{.PACKAGE_ROOT}}/configs/config.production.yaml
       - cp scripts/package/start.cmd {{.PACKAGE_ROOT}}/start.cmd
       - cp scripts/package/start.sh {{.PACKAGE_ROOT}}/start.sh
       - chmod +x {{.PACKAGE_ROOT}}/start.sh

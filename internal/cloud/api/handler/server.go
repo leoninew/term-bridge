@@ -680,6 +680,9 @@ func (s *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
 		return
 	}
+	if devices == nil {
+		devices = []*cloudproto.DeviceSummary{}
+	}
 	writeJSON(w, http.StatusOK, &cloudproto.ListDevicesResp{Items: devices})
 }
 func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
