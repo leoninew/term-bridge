@@ -16,7 +16,7 @@ import type {
   UpdateSessionOrderResp,
 } from '../../gen/proto/termbridge/agent/v1/session'
 import type { AuthMeResp, TokenResp } from '../../gen/proto/termbridge/cloud/v1/auth'
-import type { CloudConnectReq, CloudConnectResp } from '../../gen/proto/termbridge/cloud/v1/session'
+import type { CloudConnectResp } from '../../gen/proto/termbridge/cloud/v1/session'
 import { agentApiClient } from '../api/client'
 import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
 
@@ -41,11 +41,8 @@ export async function authLogout(): Promise<void> {
   await agentApiClient.post('/auth/logout')
 }
 
-export async function connectCloudWithCurrentAccount(
-  cloudToken: string,
-): Promise<CloudConnectResp> {
-  const request: CloudConnectReq = { cloud_token: cloudToken }
-  const response = await agentApiClient.post<CloudConnectResp>('/cloud/connect', request)
+export async function connectCloudWithCurrentAccount(code: string): Promise<CloudConnectResp> {
+  const response = await agentApiClient.post<CloudConnectResp>('/cloud/connect', { code })
   return response.data
 }
 

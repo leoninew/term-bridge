@@ -2,14 +2,11 @@
 
 .termbridge/
 /configs/config.*.yaml
-!/configs/config.yaml
-!/configs/config.*.example.yaml
+!/configs/config.develop.yaml
 /.env
 /.env.*
 !/.env.example
 .pomelo-pw/output/
-
-/gen/
 
 data/
 bin/

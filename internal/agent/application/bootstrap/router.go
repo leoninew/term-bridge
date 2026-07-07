@@ -20,7 +20,12 @@ func backendHandler(cfg Config, logger *slog.Logger, apiHandler http.Handler) ht
 	mux.Handle("/agent-api", agentAPIHandler)
 	mux.Handle("/agent-api/", agentAPIHandler)
 	if cfg.Server.StaticDir != "" {
-		mux.Handle("/", staticHandler(cfg.Server.StaticDir, cfg.Server.ApiBaseUrl))
+		mux.Handle("/", staticHandler(cfg.Server.StaticDir, runtimeConfig{
+			FrontendMode:    "agent",
+			AgentApiBaseUrl: normalizeRuntimeAPIBaseURL(cfg.Server.ApiBaseUrl, "/agent-api"),
+			CloudApiBaseUrl: cloudRuntimeApiBaseURL(cfg.Cloud.PublicURL),
+			CloudOAuth:      cloudRuntimeOAuthConfig(cfg.Cloud.OAuthClient),
+		}))
 	}
 	return requestlog.Middleware(logger, requestlog.Config{RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit})(mux)
 }
@@ -47,7 +52,7 @@ func validateStaticDir(staticDir string) error {
 	return nil
 }
 
-func staticHandler(staticDir string, apiBaseURL string) http.Handler {
+func staticHandler(staticDir string, config runtimeConfig) http.Handler {
 	fileServer := http.FileServer(http.Dir(staticDir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -62,7 +67,7 @@ func staticHandler(staticDir string, apiBaseURL string) http.Handler {
 			fullPath := filepath.Join(staticDir, filepath.FromSlash(urlPath))
 			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
 				if filepath.Clean(fullPath) == filepath.Clean(filepath.Join(staticDir, "index.html")) {
-					serveIndexHTML(w, r, fullPath, apiBaseURL)
+					serveIndexHTML(w, r, fullPath, config)
 					return
 				}
 				fileServer.ServeHTTP(w, r)
@@ -73,11 +78,24 @@ func staticHandler(staticDir string, apiBaseURL string) http.Handler {
 				return
 			}
 		}
-		serveIndexHTML(w, r, filepath.Join(staticDir, "index.html"), apiBaseURL)
+		serveIndexHTML(w, r, filepath.Join(staticDir, "index.html"), config)
 	})
 }
 
-func serveIndexHTML(w http.ResponseWriter, r *http.Request, indexPath string, apiBaseURL string) {
+type runtimeConfig struct {
+	FrontendMode    string              `json:"frontendMode"`
+	AgentApiBaseUrl string              `json:"agentApiBaseUrl"`
+	CloudApiBaseUrl string              `json:"cloudApiBaseUrl,omitempty"`
+	CloudOAuth      *runtimeOAuthConfig `json:"cloudOAuth,omitempty"`
+}
+
+type runtimeOAuthConfig struct {
+	ClientId    string   `json:"clientId,omitempty"`
+	RedirectUrl string   `json:"redirectUrl,omitempty"`
+	Scopes      []string `json:"scopes,omitempty"`
+}
+
+func serveIndexHTML(w http.ResponseWriter, r *http.Request, indexPath string, config runtimeConfig) {
 	content, err := os.ReadFile(indexPath)
 	if err != nil {
 		http.NotFound(w, r)
@@ -87,13 +105,11 @@ func serveIndexHTML(w http.ResponseWriter, r *http.Request, indexPath string, ap
 	if r.Method == http.MethodHead {
 		return
 	}
-	_, _ = w.Write(injectRuntimeConfig(content, apiBaseURL))
+	_, _ = w.Write(injectRuntimeConfig(content, config))
 }
 
-func injectRuntimeConfig(content []byte, apiBaseURL string) []byte {
-	configValue := map[string]string{"frontendMode": "agent"}
-	configValue["agentApiBaseUrl"] = normalizeRuntimeAPIBaseURL(apiBaseURL, "/agent-api")
-	configJSON, err := json.Marshal(configValue)
+func injectRuntimeConfig(content []byte, config runtimeConfig) []byte {
+	configJSON, err := json.Marshal(config)
 	if err != nil {
 		panic("marshal runtime config: " + err.Error())
 	}
@@ -114,6 +130,31 @@ func normalizeRuntimeAPIBaseURL(value string, fallback string) string {
 		return fallback
 	}
 	return strings.TrimRight(strings.TrimSpace(value), "/")
+}
+
+func cloudRuntimeApiBaseURL(publicURL string) string {
+	if strings.TrimSpace(publicURL) == "" {
+		return ""
+	}
+	return strings.TrimRight(strings.TrimSpace(publicURL), "/") + "/cloud-api"
+}
+
+func cloudRuntimeOAuthConfig(config OAuthClientConfig) *runtimeOAuthConfig {
+	if strings.TrimSpace(config.ClientId) == "" || strings.TrimSpace(config.RedirectUrl) == "" {
+		return nil
+	}
+	return &runtimeOAuthConfig{ClientId: strings.TrimSpace(config.ClientId), RedirectUrl: strings.TrimSpace(config.RedirectUrl), Scopes: cleanRuntimeOAuthScopes(config.Scopes)}
+}
+
+func cleanRuntimeOAuthScopes(scopes []string) []string {
+	out := make([]string, 0, len(scopes))
+	for _, scope := range scopes {
+		value := strings.TrimSpace(scope)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func apiPath(path string) bool {

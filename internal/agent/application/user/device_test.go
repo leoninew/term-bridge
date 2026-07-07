@@ -18,7 +18,7 @@ func TestCloudBindingSummaryPersistsWithDeviceIdentityWithoutTokens(t *testing.T
 	}
 	connectedAt := time.Date(2026, 7, 5, 11, 0, 0, 0, time.UTC)
 	updatedAt := time.Date(2026, 7, 5, 12, 0, 0, 0, time.UTC)
-	summary := CloudBindingSummary{GateUrl: "https://cloud.example.test/", DeviceId: device.Id, DeviceName: device.Name, ConnectedAt: connectedAt}
+	summary := CloudBindingSummary{PublicUrl: "https://cloud.example.test/", DeviceId: device.Id, DeviceName: device.Name, ConnectedAt: connectedAt}
 
 	if err := SaveCloudBindingSummary(stateDir, summary, updatedAt); err != nil {
 		t.Fatalf("SaveCloudBindingSummary() error = %v", err)
@@ -34,7 +34,7 @@ func TestCloudBindingSummaryPersistsWithDeviceIdentityWithoutTokens(t *testing.T
 	if loaded.CloudBinding == nil {
 		t.Fatalf("cloud binding was not loaded with device identity")
 	}
-	if loaded.CloudBinding.GateUrl != "https://cloud.example.test" || loaded.CloudBinding.DeviceId != device.Id || loaded.CloudBinding.DeviceName != device.Name || !loaded.CloudBinding.ConnectedAt.Equal(connectedAt) {
+	if loaded.CloudBinding.PublicUrl != "https://cloud.example.test" || loaded.CloudBinding.DeviceId != device.Id || loaded.CloudBinding.DeviceName != device.Name || !loaded.CloudBinding.ConnectedAt.Equal(connectedAt) {
 		t.Fatalf("cloud binding = %#v", loaded.CloudBinding)
 	}
 
@@ -52,7 +52,7 @@ func TestCloudBindingSummaryPersistsWithDeviceIdentityWithoutTokens(t *testing.T
 	if err := json.Unmarshal(data, &persisted); err != nil {
 		t.Fatalf("decode device identity file: %v", err)
 	}
-	if persisted.CloudBinding.GateUrl != "https://cloud.example.test" || !persisted.CloudBinding.ConnectedAt.Equal(connectedAt) {
+	if persisted.CloudBinding.PublicUrl != "https://cloud.example.test" || !persisted.CloudBinding.ConnectedAt.Equal(connectedAt) {
 		t.Fatalf("persisted cloud binding = %#v", persisted.CloudBinding)
 	}
 }

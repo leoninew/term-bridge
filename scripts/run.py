@@ -150,17 +150,6 @@ def main() -> int:
     signal.signal(signal.SIGTERM, handle_shutdown_signal)
 
     env = os.environ.copy()
-    env.setdefault("TERMBRIDGE_ENV", "develop")
-    env.setdefault("TERMBRIDGE_AGENT__LISTEN_URL", "http://127.0.0.1:9031")
-    env.setdefault("TERMBRIDGE_AGENT__PUBLIC_URL", "http://localhost:9030")
-    env.setdefault("TERMBRIDGE_AGENT__API_BASE_URL", "/agent-api")
-    env.setdefault("TERMBRIDGE_CLOUD__LISTEN_URL", "http://127.0.0.1:9032")
-    env.setdefault("TERMBRIDGE_CLOUD__PUBLIC_URL", "http://localhost:9030")
-    env.setdefault("TERMBRIDGE_CLOUD__API_BASE_URL", "/cloud-api")
-    env.setdefault(
-        "TERMBRIDGE_CLOUD__OAUTH__REDIRECT_URL",
-        "http://localhost:9030/cloud/oauth/callback",
-    )
 
     migration_commands = [
         [command_path("go"), "run", "cmd/termbridge/main.go", "migrate", "agent"],

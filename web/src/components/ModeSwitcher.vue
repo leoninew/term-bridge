@@ -46,6 +46,6 @@
       await router.push({ name: 'agent-dashboard' })
       return
     }
-    await router.push(gateway.authenticated ? { name: 'cloud-dashboard' } : { name: 'login' })
+    await router.push(gateway.authenticated ? { name: 'cloud-dashboard' } : { name: 'cloud-login' })
   }
 </script>

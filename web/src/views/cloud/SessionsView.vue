@@ -12,8 +12,8 @@
 <script setup lang="ts">
   import { computed } from 'vue'
   import { useRoute } from 'vue-router'
-  import SessionsPageShell from '../components/session/SessionsPageShell.vue'
-  import { useGatewayStore } from '../store/gateway'
+  import SessionsPageShell from '../../components/session/SessionsPageShell.vue'
+  import { useGatewayStore } from '../../store/gateway'
   import {
     authLogout,
     closeSession,
@@ -27,14 +27,14 @@
     updateSession,
     updateSessionOrder,
     updateWorkspaceOrder,
-  } from '../features/cloud/api'
-  import type { SessionRuntimeApi } from '../features/sessions/runtime'
-  import type { RuntimeTarget } from '../features/runtimeTarget'
+  } from '../../features/cloud/api'
+  import type { SessionRuntimeApi } from '../../features/sessions/runtime'
+  import type { RuntimeTarget } from '../../features/runtimeTarget'
   import type {
     CreateSessionReq,
     RerunSessionReq,
     UpdateSessionReq,
-  } from '../gen/proto/termbridge/agent/v1/session'
+  } from '../../gen/proto/termbridge/agent/v1/session'
 
   const route = useRoute()
   const gateway = useGatewayStore()

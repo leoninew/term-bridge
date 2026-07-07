@@ -35,9 +35,9 @@
         <div v-if="connection" class="space-y-2 px-2 py-2 text-xs text-[var(--color-text-muted)]">
           <div>
             <p class="font-medium text-[var(--color-text)]">
-              {{ t('dashboard.cloudConnectionGate') }}
+              {{ t('dashboard.cloudConnectionPublicUrl') }}
             </p>
-            <p class="mt-0.5 break-all">{{ connection.gate_url }}</p>
+            <p class="mt-0.5 break-all">{{ connection.public_url }}</p>
           </div>
           <div>
             <p class="font-medium text-[var(--color-text)]">

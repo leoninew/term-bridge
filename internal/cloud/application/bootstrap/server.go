@@ -47,8 +47,21 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		return apperrors.Config("invalid jwt.secret_key", err)
 	}
 	authService := cloudauth.New(repo, tokens, cloudauth.Config{PasswordPolicy: cloudauth.PasswordPolicy{MinLength: cfg.Auth.PasswordPolicy.MinLength, MaxLength: cfg.Auth.PasswordPolicy.MaxLength}, Code: cloudauth.CodePolicy{Length: cfg.Auth.Code.Length, Ttl: cfg.Auth.Code.Ttl, ResendCooldown: cfg.Auth.Code.ResendCooldown, MaxAttempts: cfg.Auth.Code.MaxAttempts}}, cloudemail.NewResendSender(cloudemail.Config{ApiKey: cfg.Resend.ApiKey, FromEmail: cfg.Resend.FromEmail}), cloudauth.NewOAuthGoogleClient(cloudauth.GoogleConfig{ClientID: cfg.Auth.Google.ClientID, ClientSecret: cfg.Auth.Google.ClientSecret, RedirectUrl: cfg.Auth.Google.RedirectUrl}))
-	cloudHandler := cloudapi.New(cloudapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, AgentTunnelAudience: tunnelAudience(cfg), DeviceRepository: cloudapi.NewDeviceRepository(deviceRepository), CloudGateURL: cfg.Cloud.GateURL, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey()})
+	cloudHandler := cloudapi.New(cloudapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, AgentTunnelAudience: tunnelAudience(cfg), DeviceRepository: cloudapi.NewDeviceRepository(deviceRepository), CloudPublicURL: cfg.Cloud.PublicURL, CloudOAuth: cloudapi.CloudOAuthConfig{Clients: cloudOAuthClients(cfg.Cloud.OAuth.Clients)}, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey()})
 	return serveHTTP(ctx, cfg, logger, options, cloudHandler, stdout)
+}
+
+func cloudOAuthClients(clients []CloudOAuthClientConfig) []cloudapi.CloudOAuthClientConfig {
+	out := make([]cloudapi.CloudOAuthClientConfig, 0, len(clients))
+	for _, client := range clients {
+		out = append(out, cloudapi.CloudOAuthClientConfig{
+			ClientId:     client.ClientId,
+			ClientSecret: client.ClientSecret,
+			RedirectUrl:  client.RedirectUrl,
+			Scopes:       append([]string(nil), client.Scopes...),
+		})
+	}
+	return out
 }
 
 func serveHTTP(ctx context.Context, cfg Config, logger *slog.Logger, options Options, cloudHandler http.Handler, stdout io.Writer) error {
@@ -117,8 +130,8 @@ func normalizeServeError(err error) error {
 }
 
 func tunnelAudience(cfg Config) string {
-	if strings.TrimSpace(cfg.Cloud.GateURL) != "" {
-		return cfg.Cloud.GateURL
+	if strings.TrimSpace(cfg.Cloud.PublicURL) != "" {
+		return cfg.Cloud.PublicURL
 	}
 	return cfg.Server.ListenURL
 }

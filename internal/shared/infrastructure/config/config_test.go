@@ -85,8 +85,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Cloud.ListenUrl != "http://127.0.0.1:9030" {
 		t.Fatalf("Cloud.ListenUrl = %q, want default listen URL", cfg.Cloud.ListenUrl)
 	}
-	if cfg.Cloud.GateUrl != "" {
-		t.Fatalf("Cloud.GateUrl = %q, want empty by default", cfg.Cloud.GateUrl)
+	if cfg.Cloud.PublicUrl != "" {
+		t.Fatalf("Cloud.PublicUrl = %q, want empty by default", cfg.Cloud.PublicUrl)
 	}
 	if cfg.Auth.LocalAdmin.Username != DefaultAuthUsername || cfg.Auth.LocalAdmin.Password != DefaultAuthPassword {
 		t.Fatalf("Auth.LocalAdmin = %#v, want default PoC auth", cfg.Auth.LocalAdmin)
@@ -622,6 +622,51 @@ func TestLoadRejectsIncompleteIntegrationConfig(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "TERMBRIDGE_RESEND__FROM_EMAIL") {
 		t.Fatalf("Load() error = %v, want missing resend from email", err)
+	}
+}
+
+func TestLoadAgentOAuthConfig(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeEnvConfig(t, cwd, "develop", "agent:\n  oauth:\n    client_id: termbridge-agent\n    client_secret: agent-secret\n    redirect_url: http://localhost:9030/agent/oauth/callback/\n    scopes: openid,email,profile\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Agent.OAuth.ClientId != "termbridge-agent" {
+		t.Fatalf("Agent.OAuth.ClientId = %q", cfg.Agent.OAuth.ClientId)
+	}
+	if cfg.Agent.OAuth.ClientSecret != "agent-secret" {
+		t.Fatalf("Agent.OAuth.ClientSecret = %q", cfg.Agent.OAuth.ClientSecret)
+	}
+	if cfg.Agent.OAuth.RedirectUrl != "http://localhost:9030/agent/oauth/callback" {
+		t.Fatalf("Agent.OAuth.RedirectUrl = %q", cfg.Agent.OAuth.RedirectUrl)
+	}
+	wantScopes := []string{"openid", "email", "profile"}
+	if !reflect.DeepEqual(cfg.Agent.OAuth.Scopes, wantScopes) {
+		t.Fatalf("Agent.OAuth.Scopes = %#v, want %#v", cfg.Agent.OAuth.Scopes, wantScopes)
+	}
+}
+
+func TestLoadRejectsIncompleteAgentOAuthConfig(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeEnvConfig(t, cwd, "develop", "agent:\n  oauth:\n    client_id: termbridge-agent\n    client_secret: \"\"\n    redirect_url: \"\"\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "incomplete agent OAuth configuration") {
+		t.Fatalf("Load() error = %v, want incomplete agent OAuth configuration", err)
+	}
+	if !strings.Contains(err.Error(), "TERMBRIDGE_AGENT__OAUTH__CLIENT_SECRET") || !strings.Contains(err.Error(), "TERMBRIDGE_AGENT__OAUTH__REDIRECT_URL") {
+		t.Fatalf("Load() error = %v, want missing agent OAuth env names", err)
 	}
 }
 

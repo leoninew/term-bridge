@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"golang.org/x/oauth2"
 	"google.golang.org/protobuf/proto"
 
 	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
@@ -30,7 +31,8 @@ type Config struct {
 	DebugErrors         bool
 	Logger              *slog.Logger
 	AuthService         AuthService
-	CloudGateURL        string
+	CloudPublicURL      string
+	OAuthClient         OAuthClientConfig
 	LocalDevice         agentapp.Device
 	LocalDeviceStateDir string
 	LocalRuntime        agentapp.RuntimeAccess
@@ -38,10 +40,22 @@ type Config struct {
 	OnLocalCloudSession func(*cloudproto.CloudSessionSummary) // shared auth via sharedAuth
 }
 
+type OAuthClientConfig struct {
+	ClientId     string
+	ClientSecret string
+	RedirectUrl  string
+	Scopes       []string
+}
+
 type AuthService interface {
 	Login(ctx context.Context, email, password string) (*cloudproto.TokenResp, error)
 	UserFromClaims(ctx context.Context, claims sharedAuth.Claims) (*cloudproto.User, error)
 	VerifyToken(token string) (sharedAuth.Claims, error)
+}
+
+type cloudConnectRequest struct {
+	CloudToken string `json:"cloud_token"`
+	Code       string `json:"code"`
 }
 
 type Handler struct {
@@ -199,11 +213,11 @@ func (s *Handler) setLocalCloudSession(summary *cloudproto.CloudSessionSummary) 
 }
 
 func cloudSessionSummaryFromBinding(summary agentapp.CloudBindingSummary) *cloudproto.CloudSessionSummary {
-	return &cloudproto.CloudSessionSummary{GateUrl: summary.GateUrl, DeviceId: summary.DeviceId, DeviceName: summary.DeviceName, ConnectedAt: prototime.FromTime(summary.ConnectedAt)}
+	return &cloudproto.CloudSessionSummary{PublicUrl: summary.PublicUrl, DeviceId: summary.DeviceId, DeviceName: summary.DeviceName, ConnectedAt: prototime.FromTime(summary.ConnectedAt)}
 }
 
 func cloudBindingSummaryFromSession(summary *cloudproto.CloudSessionSummary) agentapp.CloudBindingSummary {
-	return agentapp.CloudBindingSummary{GateUrl: summary.GetGateUrl(), DeviceId: summary.GetDeviceId(), DeviceName: summary.GetDeviceName(), ConnectedAt: prototime.ToTime(summary.GetConnectedAt())}
+	return agentapp.CloudBindingSummary{PublicUrl: summary.GetPublicUrl(), DeviceId: summary.GetDeviceId(), DeviceName: summary.GetDeviceName(), ConnectedAt: prototime.ToTime(summary.GetConnectedAt())}
 }
 
 func (s *Handler) claimsFromRequest(r *http.Request) (sharedAuth.Claims, bool) {
@@ -219,17 +233,26 @@ func (s *Handler) handleCloudConnect(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if strings.TrimSpace(s.config.CloudGateURL) == "" {
-		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud Gate is not configured.", nil)
+	if strings.TrimSpace(s.config.CloudPublicURL) == "" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud public URL is not configured.", nil)
 		return
 	}
-	var req cloudproto.CloudConnectReq
-	if !s.decodeJSONRequest(w, r, &req) {
+	var req cloudConnectRequest
+	if !s.decodeJSONStructRequest(w, r, &req) {
 		return
 	}
 	cloudToken := strings.TrimSpace(req.CloudToken)
+	if cloudToken == "" && strings.TrimSpace(req.Code) != "" {
+		var err error
+		cloudToken, err = s.cloudAccessTokenFromCode(r.Context(), strings.TrimSpace(req.Code))
+		if err != nil {
+			s.config.Logger.Warn("cloud oauth token exchange failed", "error", err)
+			s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+			return
+		}
+	}
 	if cloudToken == "" {
-		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud token is required.", nil)
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud token or authorization code is required.", nil)
 		return
 	}
 	summary, err := s.connectCloudWithToken(r.Context(), cloudToken)
@@ -502,6 +525,30 @@ func writeTerminalControl(conn *websocket.Conn, message *agent.ServerControlMess
 	return conn.Write(context.Background(), websocket.MessageText, data)
 }
 
+func (s *Handler) cloudAccessTokenFromCode(ctx context.Context, code string) (string, error) {
+	if s.config.OAuthClient.ClientId == "" || s.config.OAuthClient.ClientSecret == "" || s.config.OAuthClient.RedirectUrl == "" {
+		return "", fmt.Errorf("agent OAuth client is not configured")
+	}
+	cfg := oauth2.Config{
+		ClientID:     s.config.OAuthClient.ClientId,
+		ClientSecret: s.config.OAuthClient.ClientSecret,
+		RedirectURL:  s.config.OAuthClient.RedirectUrl,
+		Scopes:       append([]string(nil), s.config.OAuthClient.Scopes...),
+		Endpoint: oauth2.Endpoint{
+			TokenURL:  s.config.CloudPublicURL + "/cloud-api/oauth2/token",
+			AuthStyle: oauth2.AuthStyleInParams,
+		},
+	}
+	token, err := cfg.Exchange(ctx, code)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(token.AccessToken) == "" {
+		return "", fmt.Errorf("cloud oauth token response missing access token")
+	}
+	return token.AccessToken, nil
+}
+
 func (s *Handler) connectCloudWithToken(ctx context.Context, cloudToken string) (*cloudproto.CloudSessionSummary, error) {
 	device := s.config.LocalDevice
 	if device.Id == "" || device.Name == "" {
@@ -514,7 +561,7 @@ func (s *Handler) connectCloudWithToken(ctx context.Context, cloudToken string) 
 	if err != nil {
 		return nil, err
 	}
-	reportReq, err := http.NewRequestWithContext(ctx, http.MethodPost, s.config.CloudGateURL+"/cloud-api/devices/current", bytes.NewReader(reportBody))
+	reportReq, err := http.NewRequestWithContext(ctx, http.MethodPost, s.config.CloudPublicURL+"/cloud-api/devices/current", bytes.NewReader(reportBody))
 	if err != nil {
 		return nil, err
 	}
@@ -528,7 +575,7 @@ func (s *Handler) connectCloudWithToken(ctx context.Context, cloudToken string) 
 	if reportResp.StatusCode < 200 || reportResp.StatusCode >= 300 {
 		return nil, fmt.Errorf("cloud device report status %d", reportResp.StatusCode)
 	}
-	return &cloudproto.CloudSessionSummary{GateUrl: s.config.CloudGateURL, DeviceId: device.Id, DeviceName: device.Name, ConnectedAt: prototime.FromTime(time.Now().UTC())}, nil
+	return &cloudproto.CloudSessionSummary{PublicUrl: s.config.CloudPublicURL, DeviceId: device.Id, DeviceName: device.Name, ConnectedAt: prototime.FromTime(time.Now().UTC())}, nil
 }
 
 func (s *Handler) cachedJSON(deviceId string, kind string) (json.RawMessage, bool) {
@@ -601,7 +648,7 @@ func normalizeConfig(config Config) Config {
 	if config.Logger == nil {
 		panic("agent api logger is required")
 	}
-	config.CloudGateURL = strings.TrimRight(strings.TrimSpace(config.CloudGateURL), "/")
+	config.CloudPublicURL = strings.TrimRight(strings.TrimSpace(config.CloudPublicURL), "/")
 	config.CORSAllowedOrigins = cleanOrigins(config.CORSAllowedOrigins)
 	return config
 }

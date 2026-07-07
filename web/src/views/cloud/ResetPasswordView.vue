@@ -7,7 +7,7 @@
       @submit.prevent="submit"
     >
       <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
-        {{ t('gateway.forgotPassword') }}
+        {{ t('gateway.resetPassword') }}
       </h1>
       <input
         v-model="email"
@@ -15,8 +15,20 @@
         class="mt-4 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 outline-none"
         :placeholder="t('gateway.email')"
       />
+      <input
+        v-model="code"
+        class="mt-3 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 uppercase outline-none"
+        maxlength="6"
+        placeholder="ABC123"
+      />
+      <input
+        v-model="password"
+        type="password"
+        class="mt-3 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 outline-none"
+        :placeholder="t('gateway.newPassword')"
+      />
       <button class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50">
-        {{ t('gateway.sendResetCode') }}
+        {{ t('gateway.resetPassword') }}
       </button>
     </form>
   </section>
@@ -24,13 +36,16 @@
 <script setup lang="ts">
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { useRouter } from 'vue-router'
-  import { authPasswordResetRequest } from '../features/cloud/api'
+  import { useRoute, useRouter } from 'vue-router'
+  import { authPasswordResetConfirm } from '../../features/cloud/api'
   const { t } = useI18n()
+  const route = useRoute()
   const router = useRouter()
-  const email = ref('')
+  const email = ref(String(route.query.email ?? ''))
+  const code = ref('')
+  const password = ref('')
   async function submit() {
-    await authPasswordResetRequest(email.value)
-    await router.push({ name: 'reset-password', query: { email: email.value } })
+    await authPasswordResetConfirm(email.value, code.value, password.value)
+    await router.push({ name: 'cloud-login' })
   }
 </script>

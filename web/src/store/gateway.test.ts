@@ -64,7 +64,7 @@ describe('gateway store', () => {
     mocks.authMe.mockResolvedValueOnce({
       authenticated: false,
       cloud_session: {
-        gate_url: 'https://cloud.example.test',
+        public_url: 'https://cloud.example.test',
         device_id: 'dev-1',
         device_name: 'agent-device',
         connected_at: '2026-06-29T10:00:00Z',
@@ -75,7 +75,7 @@ describe('gateway store', () => {
     await store.initializeAuth()
 
     expect(store.authenticated).toBe(false)
-    expect(store.cloudSession?.gate_url).toBe('https://cloud.example.test')
+    expect(store.cloudSession?.public_url).toBe('https://cloud.example.test')
     expect(store.cloudSession?.device_name).toBe('agent-device')
     expect(store.currentDevice).toEqual(store.cloudSession)
 

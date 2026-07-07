@@ -28,3 +28,28 @@ func TestUnmarshalProtoJSONRejectsUnknownFields(t *testing.T) {
 		t.Fatal("UnmarshalProtoJSON() error = nil, want unknown field error")
 	}
 }
+
+func TestDecodeJSONStruct(t *testing.T) {
+	var target struct {
+		Code string `json:"code"`
+	}
+
+	err := DecodeJSONStruct(strings.NewReader(`{"code":"oauth-code"}`), &target)
+	if err != nil {
+		t.Fatalf("DecodeJSONStruct() error = %v", err)
+	}
+	if target.Code != "oauth-code" {
+		t.Fatalf("Code = %q, want oauth-code", target.Code)
+	}
+}
+
+func TestDecodeJSONStructRejectsUnknownFields(t *testing.T) {
+	var target struct {
+		Code string `json:"code"`
+	}
+
+	err := DecodeJSONStruct(strings.NewReader(`{"code":"oauth-code","extra":"nope"}`), &target)
+	if err == nil {
+		t.Fatal("DecodeJSONStruct() error = nil, want unknown field error")
+	}
+}

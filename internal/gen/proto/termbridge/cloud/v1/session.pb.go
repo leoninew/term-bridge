@@ -24,7 +24,7 @@ const (
 
 type CloudSessionSummary struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	GateUrl       string                 `protobuf:"bytes,1,opt,name=gate_url,json=gateUrl,proto3" json:"gate_url,omitempty"`
+	PublicUrl     string                 `protobuf:"bytes,1,opt,name=public_url,json=publicUrl,proto3" json:"public_url,omitempty"`
 	DeviceId      string                 `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
 	DeviceName    string                 `protobuf:"bytes,3,opt,name=device_name,json=deviceName,proto3" json:"device_name,omitempty"`
 	ConnectedAt   *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=connected_at,json=connectedAt,proto3" json:"connected_at,omitempty"`
@@ -62,9 +62,9 @@ func (*CloudSessionSummary) Descriptor() ([]byte, []int) {
 	return file_termbridge_cloud_v1_session_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CloudSessionSummary) GetGateUrl() string {
+func (x *CloudSessionSummary) GetPublicUrl() string {
 	if x != nil {
-		return x.GateUrl
+		return x.PublicUrl
 	}
 	return ""
 }
@@ -182,9 +182,10 @@ var File_termbridge_cloud_v1_session_proto protoreflect.FileDescriptor
 
 const file_termbridge_cloud_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"!termbridge/cloud/v1/session.proto\x12\x10termbridge.cloud\x1a\x1fgoogle/protobuf/timestamp.proto\"\xad\x01\n" +
-	"\x13CloudSessionSummary\x12\x19\n" +
-	"\bgate_url\x18\x01 \x01(\tR\agateUrl\x12\x1b\n" +
+	"!termbridge/cloud/v1/session.proto\x12\x10termbridge.cloud\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb1\x01\n" +
+	"\x13CloudSessionSummary\x12\x1d\n" +
+	"\n" +
+	"public_url\x18\x01 \x01(\tR\tpublicUrl\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x12\x1f\n" +
 	"\vdevice_name\x18\x03 \x01(\tR\n" +
 	"deviceName\x12=\n" +

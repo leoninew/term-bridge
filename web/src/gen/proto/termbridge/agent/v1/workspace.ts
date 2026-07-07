@@ -6,57 +6,60 @@
 
 /* eslint-disable */
 
-export const protobufPackage = 'termbridge.agent'
+export const protobufPackage = "termbridge.agent";
 
 export interface Workspace {
-  id: string
-  name: string
-  path: string
-  updated_at: string | undefined
+  id: string;
+  name: string;
+  path: string;
+  updated_at: string | undefined;
 }
 
 export interface WorkspaceTreeNode {
-  id: string
-  name: string
-  path: string
-  updated_at: string | undefined
-  children: SessionSummary[]
+  id: string;
+  name: string;
+  path: string;
+  updated_at: string | undefined;
+  children: SessionSummary[];
 }
 
 export interface SessionSummary {
-  id: string
-  workspace_id: string
-  name: string
-  command: string
-  cwd: string
-  lifecycle_state: string
-  attachment_state: string
-  exit_code?: number | undefined
-  updated_at: string | undefined
+  id: string;
+  workspace_id: string;
+  name: string;
+  command: string;
+  cwd: string;
+  lifecycle_state: string;
+  attachment_state: string;
+  exit_code?: number | undefined;
+  updated_at: string | undefined;
 }
 
-export interface ListWorkspacesReq {}
+export interface ListWorkspacesReq {
+}
 
 export interface ListWorkspacesResp {
-  items: Workspace[]
+  items: Workspace[];
 }
 
-export interface WorkspaceTreeReq {}
+export interface WorkspaceTreeReq {
+}
 
 export interface WorkspaceTreeResp {
-  items: WorkspaceTreeNode[]
+  items: WorkspaceTreeNode[];
 }
 
 export interface UpdateWorkspaceOrderReq {
-  workspace_ids: string[]
+  workspace_ids: string[];
 }
 
 export interface UpdateWorkspaceOrderResp {
-  items: Workspace[]
+  items: Workspace[];
 }
 
 export interface DeleteWorkspaceReq {
-  workspace_id: string
+  workspace_id: string;
 }
 
-export interface DeleteWorkspaceResp {}
+export interface DeleteWorkspaceResp {
+}

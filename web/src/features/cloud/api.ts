@@ -106,6 +106,13 @@ export async function authGoogleCallback(code: string, state: string): Promise<T
   return response.data
 }
 
+export async function cloudOAuthAuthorize(authorizePath: string): Promise<string> {
+  const response = await cloudApiClient.post<{ redirect_url: string }>(
+    `/oauth2/authorize${queryFromPath(authorizePath)}`,
+  )
+  return response.data.redirect_url
+}
+
 export async function deleteDevice(deviceId: string): Promise<void> {
   await cloudApiClient.delete(`/devices/${encodeURIComponent(deviceId)}`)
 }
@@ -254,6 +261,14 @@ function cloudRuntimePath(target: RuntimeTarget, path: string): string {
     throw new Error('cloud runtime API requires a cloud target')
   }
   return `/devices/${encodeURIComponent(target.deviceId)}${path}`
+}
+
+function queryFromPath(path: string): string {
+  const queryStart = path.indexOf('?')
+  if (queryStart < 0) {
+    return ''
+  }
+  return path.slice(queryStart)
 }
 
 function offline(response: AxiosResponse): boolean {

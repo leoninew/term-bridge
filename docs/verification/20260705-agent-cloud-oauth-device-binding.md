@@ -14,14 +14,14 @@ Review status: Accepted
 | Agent runtime 业务表保留 `device_id` 数据归属，但不依赖本机 `devices` 外键 | 通过 | Agent sqlite/mysql migration 移除本机 `devices` 表和 `device_id -> devices(id)` 外键，保留 `device_id` 字段与索引。 |
 | Agent 不再暴露 Cloud OAuth start/callback | 通过 | 活跃 Go/TS/Vue/YAML/proto 搜索未发现 `cloud-oauth`、`CloudOAuth`、`/oauth2/authorize`、`/cloud-api/oauth2/token` 等旧连接云端业务引用。 |
 | Cloud 不再暴露设备绑定专用 OAuth authorize/token endpoint | 通过 | Cloud handler 删除 `/cloud-api/cloud-oauth/authorize` 与 `/cloud-api/oauth2/token` 注册和相关 code store；保留 Cloud Google 登录与 device endpoints。 |
-| Agent 连接 Cloud 只做设备上报 | 通过 | `/agent-api/cloud/connect` 读取请求体 `cloud_token`，再 POST `cloud.gate_url + /cloud-api/devices/current`，请求体只包含当前本机 device id/name/public_key。 |
+| Agent 连接 Cloud 只做设备上报 | 通过 | `/agent-api/cloud/connect` 读取请求体 `cloud_token`，再 POST `cloud.public_url + /cloud-api/devices/current`，请求体只包含当前本机 device id/name/public_key。 |
 | Device 信息不进入账号登录/OAuth state/code/callback | 通过 | 旧 Agent Cloud OAuth state/callback 已删除；device 信息只在 `/cloud-api/devices/current` report body 中出现。 |
 | `device.json` 不持久化 Cloud token | 通过 | Agent handler 测试覆盖连接成功后本地 summary 持久化，并断言文件内容不包含 `access_token`、`refresh_token`、`cloud-token`、`bearer`。 |
 | 不再依赖 `capabilities.cloud_oauth_enabled` | 通过 | 前后端能力开关与 AuthCapabilities 业务已移除；Dashboard 用显式三步业务表达连接流程。 |
 | Cloud 登录后未上报设备时，设备列表为空是正确行为 | 通过 | 当前设计要求 Cloud 登录和设备上报分离；只有 `/cloud-api/devices/current` 成功后 Cloud DB 才出现绑定设备。 |
 | Device report 写入 Cloud `devices` / `user_devices` | 通过 | Cloud handler 测试覆盖 `/cloud-api/devices/current` 的设备上报、用户设备绑定、设备列表过滤与 tunnel 公钥验签。 |
-| 缺少 `cloud.gate_url` 时明确失败 | 通过 | Agent `/agent-api/cloud/connect` 在 `CloudGateURL` 为空时返回明确 bad request，而不是隐藏入口。 |
-| develop / hybrid 配置不再含 `cloud.oauth.*` | 通过 | `configs/config.yaml`、`configs/config.develop.yaml`、`Taskfile.yml` 已移除 `cloud.oauth` / `TERMBRIDGE_CLOUD__OAUTH__REDIRECT_URL` 残留，只保留 `cloud.gate_url`。 |
+| 缺少 `cloud.public_url` 时明确失败 | 通过 | Agent `/agent-api/cloud/connect` 在 `CloudPublicURL` 为空时返回明确 bad request，而不是隐藏入口。 |
+| develop / hybrid 配置不再含 `cloud.oauth.*` | 通过 | `configs/config.yaml`、`configs/config.develop.yaml`、`Taskfile.yml` 已移除 `cloud.oauth` / `TERMBRIDGE_CLOUD__OAUTH__REDIRECT_URL` 残留，只保留 `cloud.public_url`。 |
 | Cloud tunnel 认证继续基于本机私钥签名与 Cloud DB 公钥验签 | 通过 | Cloud tunnel 相关 handler 测试仍覆盖 Cloud DB public key 验签路径。 |
 
 ## Spec alignment
@@ -65,7 +65,7 @@ Review status: Accepted
 | Agent Cloud connect | 应修改 | 已修改，删除 start/callback，保留 `/agent-api/cloud/connect` 设备上报入口。 |
 | Cloud account auth vs device binding | 应修改 | 已修改，保留 Google 登录；删除设备绑定专用 OAuth authorize/token；device report 继续写 Cloud DB。 |
 | Proto / frontend store / dashboard | 应修改 | 已修改，移除 CloudOAuth 类型/API/路由，Dashboard 表达 session、Cloud 登录、设备上报连接三步。 |
-| develop config / Taskfile / requirement | 应修改 | 已修改，只保留 `cloud.gate_url`，删除 `cloud.oauth.*`。 |
+| develop config / Taskfile / requirement | 应修改 | 已修改，只保留 `cloud.public_url`，删除 `cloud.oauth.*`。 |
 | 无关过程文档和其它主题改动 | 不属于本需求核心 | 实际存在，需要提交前人工确认是否拆分。 |
 
 ## Acceptance checklist

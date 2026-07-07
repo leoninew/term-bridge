@@ -66,7 +66,17 @@ func TestBackendHandlerInjectsRuntimeConfigIntoIndexHTML(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte(index), 0o644); err != nil {
 		t.Fatalf("WriteFile(index) error = %v", err)
 	}
-	handler := backendHandler(Config{Server: ServerConfig{StaticDir: staticDir, ApiBaseUrl: "https://agent.example.com/"}}, slog.Default(), http.NotFoundHandler())
+	handler := backendHandler(Config{
+		Server: ServerConfig{StaticDir: staticDir, ApiBaseUrl: "https://agent.example.com/"},
+		Cloud: CloudConnectorConfig{
+			PublicURL: "https://cloud.example.com/",
+			OAuthClient: OAuthClientConfig{
+				ClientId:    "termbridge-agent",
+				RedirectUrl: "http://127.0.0.1:9033/agent/oauth/callback",
+				Scopes:      []string{"openid", "email", "profile"},
+			},
+		},
+	}, slog.Default(), http.NotFoundHandler())
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -77,7 +87,7 @@ func TestBackendHandlerInjectsRuntimeConfigIntoIndexHTML(t *testing.T) {
 	if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 		t.Fatalf("Content-Type = %q", got)
 	}
-	want := `<script>window.__CONFIG__ = {"agentApiBaseUrl":"https://agent.example.com","frontendMode":"agent"};</script>`
+	want := `<script>window.__CONFIG__ = {"frontendMode":"agent","agentApiBaseUrl":"https://agent.example.com","cloudApiBaseUrl":"https://cloud.example.com/cloud-api","cloudOAuth":{"clientId":"termbridge-agent","redirectUrl":"http://127.0.0.1:9033/agent/oauth/callback","scopes":["openid","email","profile"]}};</script>`
 	if !strings.Contains(response.Body.String(), want) {
 		t.Fatalf("runtime config missing: %s", response.Body.String())
 	}

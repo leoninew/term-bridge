@@ -42,10 +42,20 @@ agent:
   # 前端运行时 Agent API base URL；空值表示同源 /agent-api。
   api_base_url: ""
   # 跨域 API Origin allowlist；空列表表示不开放跨域。
+  # 终端 WebSocket 也会使用该列表校验浏览器 Origin；同源访问不需要配置。
   cors_allowed_origins: []
   # 是否在 agent API 错误响应中暴露内部错误细节。
   # 仅建议本地调试打开；生产保持 false。
   expose_errors: false
+
+  # Agent 作为 OAuth2 client 接入 Cloud。client_secret 只给 Agent 后端使用，不注入浏览器运行时配置。
+  # 默认值面向本地开发；其他环境通过 configs/config.<env>.yaml 或环境变量覆盖。
+  oauth:
+    client_id: termbridge-agent
+    client_secret: agent-secret
+    redirect_url: http://localhost:9030/agent/oauth/callback
+    scopes: [openid, email, profile]
+
   # Agent 独立数据库，与 cloud 分离，避免 migration 校验误报部分表存在。
   database:
     driver: sqlite
@@ -61,17 +71,25 @@ cloud:
   listen_url: http://127.0.0.1:9030
   # Web 静态资源目录；为空时只提供 API，部署场景可指向已构建前端目录。
   static_dir: ""
-  # 浏览器访问 cloud 前端的地址。
-  public_url: http://localhost:9030
+  # Cloud 对外访问地址。Agent 连接云端和云端 OAuth/API 入口使用该地址。
+  public_url: ""
   # 前端运行时 Cloud API base URL；空值表示同源 /cloud-api。
   api_base_url: ""
   # 跨域 API Origin allowlist；空列表表示不开放跨域。
+  # 终端 WebSocket 也会使用该列表校验浏览器 Origin；同源访问不需要配置。
   cors_allowed_origins: []
   # 是否在 cloud API 错误响应中暴露内部错误细节。
   # 仅建议本地调试打开；生产保持 false。
   expose_errors: false
-  # 固定 Cloud Gate 的外部访问地址。Agent 连接云端时用该地址上报当前设备。
-  gate_url: ""
+
+  # Cloud 作为 OAuth2 Authorization Server 时接受的 client registry。
+  # 默认值面向本地开发；其他环境通过 configs/config.<env>.yaml 或环境变量覆盖。
+  oauth:
+    clients:
+      - client_id: termbridge-agent
+        client_secret: agent-secret
+        redirect_url: http://localhost:9030/agent/oauth/callback
+        scopes: [openid, email, profile]
 
   # Cloud 独立数据库，与 agent 分离，避免 migration 校验误报部分表存在。
   database:

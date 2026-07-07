@@ -109,6 +109,17 @@ func writeJSON(w http.ResponseWriter, status int, message proto.Message) {
 	_, _ = w.Write(data)
 }
 
+func writeJSONObject(w http.ResponseWriter, status int, body any) {
+	data, err := json.Marshal(body)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write(data)
+}
+
 func (h *Handler) responseErrorText(safeError string, cause error) string {
 	if !h.config.DebugErrors || cause == nil {
 		return safeError

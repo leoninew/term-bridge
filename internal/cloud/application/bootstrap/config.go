@@ -82,5 +82,17 @@ type ResendConfig struct {
 }
 
 type CloudConfig struct {
-	GateURL string
+	PublicURL string
+	OAuth     CloudOAuthConfig
+}
+
+type CloudOAuthConfig struct {
+	Clients []CloudOAuthClientConfig
+}
+
+type CloudOAuthClientConfig struct {
+	ClientId     string
+	ClientSecret string
+	RedirectUrl  string
+	Scopes       []string
 }

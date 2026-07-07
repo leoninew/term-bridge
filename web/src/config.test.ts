@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildApiUrl, buildApiWebSocketUrl, getApiBaseUrl, getFrontendMode } from './config'
+import { buildApiUrl, buildApiWebSocketUrl, getApiBaseUrl, getFrontendMode, runtimeConfig } from './config'
 
 describe('runtime config', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
   it('uses explicit agent and cloud API paths by default', () => {
@@ -76,5 +77,18 @@ describe('runtime config', () => {
     vi.stubGlobal('window', { __CONFIG__: { frontendMode: 'invalid' } })
 
     expect(getFrontendMode()).toBe('agent')
+  })
+
+  it('uses Vite Cloud OAuth public config when runtime config is absent', () => {
+    vi.stubGlobal('window', { __CONFIG__: {} })
+    vi.stubEnv('VITE_CLOUD_OAUTH_CLIENT_ID', 'termbridge-agent')
+    vi.stubEnv('VITE_CLOUD_OAUTH_REDIRECT_URL', 'http://localhost:9030/agent/oauth/callback')
+    vi.stubEnv('VITE_CLOUD_OAUTH_SCOPES', 'openid,email,profile')
+
+    expect(runtimeConfig.cloudOAuth).toEqual({
+      clientId: 'termbridge-agent',
+      redirectUrl: 'http://localhost:9030/agent/oauth/callback',
+      scopes: ['openid', 'email', 'profile'],
+    })
   })
 })

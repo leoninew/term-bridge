@@ -11,7 +11,7 @@
           </p>
         </header>
 
-        <section class="grid gap-3 lg:grid-cols-3">
+        <section class="grid gap-3 lg:grid-cols-2">
           <RouterLink
             class="group flex flex-col gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl transition hover:border-blue-500/60 hover:bg-[var(--color-control-hover)]"
             :to="{ name: 'agent-sessions' }"
@@ -31,48 +31,10 @@
             </span>
           </RouterLink>
 
-          <RouterLink
-            v-if="!gateway.cloudToken"
-            class="group flex flex-col gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl transition hover:border-blue-500/60 hover:bg-[var(--color-control-hover)]"
-            :to="{ name: 'login', query: { redirect: '/agent/dashboard' } }"
-          >
-            <span
-              class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
-            >
-              <UserRound class="size-5" />
-            </span>
-            <span class="space-y-1">
-              <span class="block text-base font-medium text-[var(--color-text-strong)]">
-                {{ t('dashboard.cloudLoginAction') }}
-              </span>
-              <span class="block text-sm text-[var(--color-text-muted)]">
-                {{ t('dashboard.cloudLoginDescription') }}
-              </span>
-            </span>
-          </RouterLink>
-          <div
-            v-else
-            class="flex flex-col gap-4 rounded-xl border border-emerald-500/40 bg-[var(--color-surface)] p-5 shadow-xl"
-          >
-            <span
-              class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500"
-            >
-              <UserCheck class="size-5" />
-            </span>
-            <span class="space-y-1">
-              <span class="block text-base font-medium text-[var(--color-text-strong)]">
-                {{ t('dashboard.cloudLoginActive') }}
-              </span>
-              <span class="block text-sm text-[var(--color-text-muted)]">
-                {{ t('dashboard.cloudLoginActiveDescription') }}
-              </span>
-            </span>
-          </div>
-
           <button
             type="button"
             class="group flex flex-col gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-left shadow-xl transition enabled:hover:border-blue-500/60 enabled:hover:bg-[var(--color-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="!gateway.cloudToken || connectingCloud"
+            :disabled="connectingCloud"
             @click="connectCloud"
           >
             <span
@@ -84,8 +46,8 @@
               <span class="block text-base font-medium text-[var(--color-text-strong)]">
                 {{
                   gateway.cloudSession
-                    ? t('dashboard.cloudDeviceConnected')
-                    : t('dashboard.connectCloudDeviceAction')
+                    ? t('dashboard.reconnectCloudAccount')
+                    : t('dashboard.connectCloudAccount')
                 }}
               </span>
               <span class="block text-sm text-[var(--color-text-muted)]">
@@ -95,7 +57,7 @@
                 v-if="gateway.cloudSession"
                 class="block truncate text-xs text-[var(--color-text-subtle)]"
               >
-                {{ gateway.cloudSession.gate_url }} · {{ gateway.cloudSession.device_name }}
+                {{ gateway.cloudSession.public_url }} · {{ gateway.cloudSession.device_name }}
               </span>
             </span>
           </button>
@@ -109,42 +71,39 @@
 <script setup lang="ts">
   import { computed, ref } from 'vue'
   import { RouterLink } from 'vue-router'
-  import { Cloud, Monitor, UserCheck, UserRound } from '@lucide/vue'
+  import { Cloud, Monitor } from '@lucide/vue'
   import { useI18n } from 'vue-i18n'
   import { ToastProvider } from 'reka-ui'
-  import ToastHost from '../components/session/ToastHost.vue'
-  import { connectCloudWithCurrentAccount } from '../features/agent/api'
-  import { useGatewayStore } from '../store/gateway'
-  import { useNotificationsStore } from '../store/notifications'
+  import ToastHost from '../../components/session/ToastHost.vue'
+  import { cloudOAuthConfigured, startCloudOAuth } from '../../features/cloud/oauth'
+  import { useNotificationsStore } from '../../store/notifications'
+  import { useGatewayStore } from '../../store/gateway'
 
   const { t } = useI18n()
   const gateway = useGatewayStore()
   const notifications = useNotificationsStore()
   const connectingCloud = ref(false)
 
-  const cloudConnectionDescription = computed(() => {
-    if (!gateway.cloudToken) {
-      return t('dashboard.connectCloudDeviceRequiresLogin')
-    }
-    if (gateway.cloudSession) {
-      return t('dashboard.connectCloudDeviceConnectedDescription')
-    }
-    return t('dashboard.connectCloudDeviceDescription')
-  })
+  const cloudConnectionDescription = computed(() =>
+    gateway.cloudSession
+      ? t('dashboard.cloudConnectionConnectedDescription')
+      : t('dashboard.cloudConnectionNotConnectedDescription'),
+  )
 
-  async function connectCloud() {
-    if (!gateway.cloudToken || connectingCloud.value) {
+  function connectCloud() {
+    if (connectingCloud.value) {
+      return
+    }
+    if (!cloudOAuthConfigured()) {
+      notifications.notifyError(t('dashboard.cloudGateNotConfigured'), new Error('Cloud OAuth is not configured'))
       return
     }
     connectingCloud.value = true
     try {
-      const result = await connectCloudWithCurrentAccount(gateway.cloudToken)
-      gateway.setCloudSession(result.cloud_session ?? null)
-      await gateway.initializeAuth({ force: true })
+      startCloudOAuth('/agent/dashboard')
     } catch (err) {
-      notifications.notifyError(t('gateway.connectFailed'), err)
-    } finally {
       connectingCloud.value = false
+      notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
     }
   }
 </script>

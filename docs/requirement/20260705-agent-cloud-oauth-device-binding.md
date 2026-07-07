@@ -38,12 +38,12 @@ Review status: Accepted
 7. Agent 连接 Cloud 统一收敛为设备上报：
    - 前端在已登录 Cloud 账号后调用 Agent `/agent-api/cloud/connect`。
    - 请求体携带浏览器当前 Cloud token。
-   - Agent 读取本机 `device.json` 与 public key，向 `cloud.gate_url + /cloud-api/devices/current` POST 当前设备。
+   - Agent 读取本机 `device.json` 与 public key，向 `cloud.public_url + /cloud-api/devices/current` POST 当前设备。
    - Cloud 用 Cloud token 识别用户，并写入 `devices` / `user_devices`。
 8. 移除 `cloud-oauth-attempts.json` 及其相关实现，不再用本地 JSON 文件保存 Cloud OAuth attempt。
 9. 移除 `device_binding_codes` 及其相关实现；设备绑定只通过明确的设备上报接口完成。
 10. 移除 `capabilities.cloud_oauth_enabled` 这类前端能力开关；入口由页面业务流程表达，配置缺失时由 API 返回明确错误。
-11. 本地 develop / hybrid 配置只需要 `cloud.gate_url` 指向 Cloud Gate；不再配置 `cloud.oauth.*`。
+11. 本地 develop / hybrid 配置只需要 `cloud.public_url` 指向 Cloud；不再配置 `cloud.oauth.*`。
 12. Cloud tunnel 认证继续基于 Agent 本地私钥签名与 Cloud DB 公钥验签。
 
 ## Non-goal
@@ -85,7 +85,7 @@ Review status: Accepted
     - `devices.public_key = 本机 public key`
     - `user_devices.user_id = 当前 Cloud 用户 id`
     - `user_devices.device_id = 本机 device id`
-13. 如果 `cloud.gate_url` 缺失，Agent `/agent-api/cloud/connect` 返回明确错误，而不是通过 capability 隐藏入口。
+13. 如果 `cloud.public_url` 缺失，Agent `/agent-api/cloud/connect` 返回明确错误，而不是通过 capability 隐藏入口。
 14. 本地 develop / hybrid 配置应支持完整链路：Cloud 账号登录、Agent device report、Cloud 设备落库、Agent tunnel 验签。
 15. Cloud tunnel 认证继续基于设备私钥签名和 Cloud DB 公钥验签，不使用浏览器 Agent token 或 Cloud browser token。
 
@@ -104,7 +104,7 @@ Review status: Accepted
 7. Agent 连接 Cloud 不再生成 state，不再 callback，不再 exchange token，只做 device report。
 8. 移除 `cloud-oauth-attempts.json` 文件态 attempt store。
 9. 移除 `capabilities.cloud_oauth_enabled`，Agent Cloud 连接入口不再由 capability 开关控制。
-10. 本地 develop / hybrid 只保留 `cloud.gate_url` 作为 Agent 上报设备时的 Cloud Gate 地址。
+10. 本地 develop / hybrid 只保留 `cloud.public_url` 作为 Agent 上报设备时的 Cloud 地址。
 11. Agent 已绑定 Cloud 后需要继续在 `data/device.json` 更新非 token 的绑定摘要。
 
 ## Risk

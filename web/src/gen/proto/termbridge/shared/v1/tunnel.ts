@@ -5,7 +5,7 @@
 // source: termbridge/shared/v1/tunnel.proto
 
 /* eslint-disable */
-import type { ReadHistoryResp, ReadWorkspaceSessionHistoryReq } from '../../agent/v1/history'
+import type { ReadHistoryResp, ReadWorkspaceSessionHistoryReq } from "../../agent/v1/history";
 import type {
   CloseSessionResp,
   CreateSessionReq,
@@ -20,7 +20,7 @@ import type {
   WorkspaceSessionReq,
   WorkspaceSessionsReq,
   WorkspaceSessionsResp,
-} from '../../agent/v1/session'
+} from "../../agent/v1/session";
 import type {
   DeleteWorkspaceReq,
   DeleteWorkspaceResp,
@@ -30,95 +30,95 @@ import type {
   UpdateWorkspaceOrderResp,
   WorkspaceTreeReq,
   WorkspaceTreeResp,
-} from '../../agent/v1/workspace'
-import type { ErrorResp } from './common'
+} from "../../agent/v1/workspace";
+import type { ErrorResp } from "./common";
 
-export const protobufPackage = 'termbridge.shared'
+export const protobufPackage = "termbridge.shared";
 
 export interface TunnelFrame {
-  stream_id: string
-  request_id: string
-  hello?: Hello | undefined
-  hello_ack?: HelloAck | undefined
-  ping?: Ping | undefined
-  pong?: Pong | undefined
-  list_workspaces_req?: ListWorkspacesReq | undefined
-  workspace_tree_req?: WorkspaceTreeReq | undefined
-  workspace_sessions_req?: WorkspaceSessionsReq | undefined
-  create_session_req?: CreateSessionReq | undefined
-  get_session_req?: WorkspaceSessionReq | undefined
-  rerun_session_req?: RerunWorkspaceSessionReq | undefined
-  update_session_req?: UpdateWorkspaceSessionReq | undefined
-  close_session_req?: WorkspaceSessionReq | undefined
-  delete_session_req?: WorkspaceSessionReq | undefined
-  read_history_req?: ReadWorkspaceSessionHistoryReq | undefined
-  update_workspace_order_req?: UpdateWorkspaceOrderReq | undefined
-  update_session_order_req?: WorkspaceSessionOrderReq | undefined
-  delete_workspace_req?: DeleteWorkspaceReq | undefined
-  list_workspaces_resp?: ListWorkspacesResp | undefined
-  workspace_tree_resp?: WorkspaceTreeResp | undefined
-  workspace_sessions_resp?: WorkspaceSessionsResp | undefined
-  create_session_resp?: CreateSessionResp | undefined
-  get_session_resp?: GetSessionResp | undefined
-  rerun_session_resp?: CreateSessionResp | undefined
-  update_session_resp?: UpdateSessionResp | undefined
-  close_session_resp?: CloseSessionResp | undefined
-  delete_session_resp?: DeleteSessionResp | undefined
-  read_history_resp?: ReadHistoryResp | undefined
-  update_workspace_order_resp?: UpdateWorkspaceOrderResp | undefined
-  update_session_order_resp?: UpdateSessionOrderResp | undefined
-  delete_workspace_resp?: DeleteWorkspaceResp | undefined
-  terminal_attach?: TerminalAttachReq | undefined
-  terminal_input?: TerminalInput | undefined
-  terminal_output?: TerminalOutput | undefined
-  terminal_resize?: TerminalResize | undefined
-  terminal_closed?: TerminalClosed | undefined
-  error?: ErrorResp | undefined
-  close?: Close | undefined
+  stream_id: string;
+  request_id: string;
+  hello?: Hello | undefined;
+  hello_ack?: HelloAck | undefined;
+  ping?: Ping | undefined;
+  pong?: Pong | undefined;
+  list_workspaces_req?: ListWorkspacesReq | undefined;
+  workspace_tree_req?: WorkspaceTreeReq | undefined;
+  workspace_sessions_req?: WorkspaceSessionsReq | undefined;
+  create_session_req?: CreateSessionReq | undefined;
+  get_session_req?: WorkspaceSessionReq | undefined;
+  rerun_session_req?: RerunWorkspaceSessionReq | undefined;
+  update_session_req?: UpdateWorkspaceSessionReq | undefined;
+  close_session_req?: WorkspaceSessionReq | undefined;
+  delete_session_req?: WorkspaceSessionReq | undefined;
+  read_history_req?: ReadWorkspaceSessionHistoryReq | undefined;
+  update_workspace_order_req?: UpdateWorkspaceOrderReq | undefined;
+  update_session_order_req?: WorkspaceSessionOrderReq | undefined;
+  delete_workspace_req?: DeleteWorkspaceReq | undefined;
+  list_workspaces_resp?: ListWorkspacesResp | undefined;
+  workspace_tree_resp?: WorkspaceTreeResp | undefined;
+  workspace_sessions_resp?: WorkspaceSessionsResp | undefined;
+  create_session_resp?: CreateSessionResp | undefined;
+  get_session_resp?: GetSessionResp | undefined;
+  rerun_session_resp?: CreateSessionResp | undefined;
+  update_session_resp?: UpdateSessionResp | undefined;
+  close_session_resp?: CloseSessionResp | undefined;
+  delete_session_resp?: DeleteSessionResp | undefined;
+  read_history_resp?: ReadHistoryResp | undefined;
+  update_workspace_order_resp?: UpdateWorkspaceOrderResp | undefined;
+  update_session_order_resp?: UpdateSessionOrderResp | undefined;
+  delete_workspace_resp?: DeleteWorkspaceResp | undefined;
+  terminal_attach?: TerminalAttachReq | undefined;
+  terminal_input?: TerminalInput | undefined;
+  terminal_output?: TerminalOutput | undefined;
+  terminal_resize?: TerminalResize | undefined;
+  terminal_closed?: TerminalClosed | undefined;
+  error?: ErrorResp | undefined;
+  close?: Close | undefined;
 }
 
 export interface Hello {
-  device_id: string
-  device_name: string
-  protocol_version: number
+  device_id: string;
+  device_name: string;
+  protocol_version: number;
 }
 
 export interface HelloAck {
-  protocol_version: number
+  protocol_version: number;
 }
 
 export interface Ping {
-  nonce: string
+  nonce: string;
 }
 
 export interface Pong {
-  nonce: string
+  nonce: string;
 }
 
 export interface TerminalAttachReq {
-  workspace_id: string
-  session_id: string
-  cols: number
-  rows: number
+  workspace_id: string;
+  session_id: string;
+  cols: number;
+  rows: number;
 }
 
 export interface TerminalInput {
-  data: Uint8Array
+  data: Uint8Array;
 }
 
 export interface TerminalOutput {
-  data: Uint8Array
+  data: Uint8Array;
 }
 
 export interface TerminalResize {
-  cols: number
-  rows: number
+  cols: number;
+  rows: number;
 }
 
 export interface TerminalClosed {
-  reason: string
+  reason: string;
 }
 
 export interface Close {
-  reason: string
+  reason: string;
 }

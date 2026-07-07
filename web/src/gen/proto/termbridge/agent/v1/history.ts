@@ -6,15 +6,16 @@
 
 /* eslint-disable */
 
-export const protobufPackage = 'termbridge.agent'
+export const protobufPackage = "termbridge.agent";
 
-export interface ReadHistoryReq {}
+export interface ReadHistoryReq {
+}
 
 export interface ReadWorkspaceSessionHistoryReq {
-  workspace_id: string
-  session_id: string
+  workspace_id: string;
+  session_id: string;
 }
 
 export interface ReadHistoryResp {
-  text: string
+  text: string;
 }

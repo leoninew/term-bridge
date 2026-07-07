@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	logging "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/logger"
 	"io"
 	"log/slog"
 	"strings"
@@ -21,6 +20,7 @@ import (
 	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/config"
 	basedb "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/database"
+	logging "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/logger"
 )
 
 type CommandKind string
@@ -224,7 +224,7 @@ func agentConfig(cfg config.Config) agentserver.Config {
 			ListenURL:          cfg.Agent.ListenUrl,
 			StaticDir:          cfg.Agent.StaticDir,
 			ApiBaseUrl:         cfg.Agent.ApiBaseUrl,
-			CorsAllowedOrigins: roleCorsAllowedOrigins(cfg.Agent.PublicUrl, cfg.Agent.CorsAllowedOrigins),
+			CorsAllowedOrigins: cfg.Agent.CorsAllowedOrigins,
 		},
 		Gate: agentserver.GateConfig{API: agentserver.GateApiConfig{ExposeErrors: cfg.Agent.ExposeErrors}},
 		Database: agentserver.DatabaseConfig{
@@ -235,18 +235,15 @@ func agentConfig(cfg config.Config) agentserver.Config {
 		Auth: agentserver.AuthConfig{JwtTTL: cfg.Auth.JwtTTL},
 		Jwt:  agentserver.JwtConfig{SecretKey: cfg.Jwt.SecretKey},
 		Cloud: agentserver.CloudConnectorConfig{
-			GateURL: cfg.Cloud.GateUrl,
+			PublicURL: cfg.Cloud.PublicUrl,
+			OAuthClient: agentserver.OAuthClientConfig{
+				ClientId:     cfg.Agent.OAuth.ClientId,
+				ClientSecret: cfg.Agent.OAuth.ClientSecret,
+				RedirectUrl:  cfg.Agent.OAuth.RedirectUrl,
+				Scopes:       append([]string(nil), cfg.Agent.OAuth.Scopes...),
+			},
 		},
 	}
-}
-
-func roleCorsAllowedOrigins(publicURL string, configuredOrigins []string) []string {
-	origins := make([]string, 0, len(configuredOrigins)+1)
-	if origin := strings.TrimRight(strings.TrimSpace(publicURL), "/"); origin != "" {
-		origins = append(origins, origin)
-	}
-	origins = append(origins, configuredOrigins...)
-	return origins
 }
 
 func cloudConfig(cfg config.Config) cloudserver.Config {
@@ -259,7 +256,7 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 			ListenURL:          cfg.Cloud.ListenUrl,
 			StaticDir:          cfg.Cloud.StaticDir,
 			ApiBaseUrl:         cfg.Cloud.ApiBaseUrl,
-			CorsAllowedOrigins: roleCorsAllowedOrigins(cfg.Cloud.PublicUrl, cfg.Cloud.CorsAllowedOrigins),
+			CorsAllowedOrigins: cfg.Cloud.CorsAllowedOrigins,
 		},
 		Gate: cloudserver.GateConfig{API: cloudserver.GateApiConfig{ExposeErrors: cfg.Cloud.ExposeErrors}},
 		Database: cloudserver.DatabaseConfig{
@@ -291,7 +288,21 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 			FromEmail: cfg.Resend.FromEmail,
 		},
 		Cloud: cloudserver.CloudConfig{
-			GateURL: cfg.Cloud.GateUrl,
+			PublicURL: cfg.Cloud.PublicUrl,
+			OAuth:     cloudserver.CloudOAuthConfig{Clients: cloudOAuthClients(cfg.Cloud.OAuth.Clients)},
 		},
 	}
+}
+
+func cloudOAuthClients(clients []config.CloudOAuthClientConfig) []cloudserver.CloudOAuthClientConfig {
+	out := make([]cloudserver.CloudOAuthClientConfig, 0, len(clients))
+	for _, client := range clients {
+		out = append(out, cloudserver.CloudOAuthClientConfig{
+			ClientId:     client.ClientId,
+			ClientSecret: client.ClientSecret,
+			RedirectUrl:  client.RedirectUrl,
+			Scopes:       append([]string(nil), client.Scopes...),
+		})
+	}
+	return out
 }

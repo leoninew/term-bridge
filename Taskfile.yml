@@ -54,8 +54,6 @@ tasks:
     desc: Run database migrations and start local agent server with Air
     env:
       TERMBRIDGE_ENV: develop
-      TERMBRIDGE_AGENT__LISTEN_URL: http://127.0.0.1:9031
-      TERMBRIDGE_AGENT__PUBLIC_URL: http://localhost:9030
       TERMBRIDGE_AGENT__API_BASE_URL: /agent-api
     cmds:
       - go run cmd/termbridge/main.go migrate agent
@@ -65,8 +63,6 @@ tasks:
     desc: Run database migrations and start cloud backend with Air
     env:
       TERMBRIDGE_ENV: develop
-      TERMBRIDGE_CLOUD__LISTEN_URL: http://127.0.0.1:9032
-      TERMBRIDGE_CLOUD__PUBLIC_URL: http://localhost:9030
       TERMBRIDGE_CLOUD__API_BASE_URL: /cloud-api
     cmds:
       - go run cmd/termbridge/main.go migrate cloud
@@ -79,6 +75,8 @@ tasks:
 
   run:
     desc: Start web, agent, and cloud development servers together
+    env:
+      TERMBRIDGE_ENV: develop
     cmds:
       - uv run python scripts/run.py
 

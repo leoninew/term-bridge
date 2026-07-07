@@ -129,7 +129,15 @@ type AgentConfig struct {
 	ApiBaseUrl         string
 	CorsAllowedOrigins []string
 	ExposeErrors       bool
+	OAuth              AgentOAuthConfig
 	Database           DatabaseConfig
+}
+
+type AgentOAuthConfig struct {
+	ClientId     string
+	ClientSecret string
+	RedirectUrl  string
+	Scopes       []string
 }
 
 type CloudConfig struct {
@@ -139,8 +147,19 @@ type CloudConfig struct {
 	ApiBaseUrl         string
 	CorsAllowedOrigins []string
 	ExposeErrors       bool
-	GateUrl            string
+	OAuth              CloudOAuthConfig
 	Database           DatabaseConfig
+}
+
+type CloudOAuthConfig struct {
+	Clients []CloudOAuthClientConfig
+}
+
+type CloudOAuthClientConfig struct {
+	ClientId     string   `mapstructure:"client_id"`
+	ClientSecret string   `mapstructure:"client_secret"`
+	RedirectUrl  string   `mapstructure:"redirect_url"`
+	Scopes       []string `mapstructure:"scopes"`
 }
 
 type Options struct {
@@ -241,7 +260,13 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			ApiBaseUrl:         strings.TrimSpace(v.GetString("agent.api_base_url")),
 			CorsAllowedOrigins: getStringSlice(v, "agent.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("agent.expose_errors"),
-			Database:           agentDatabase,
+			OAuth: AgentOAuthConfig{
+				ClientId:     strings.TrimSpace(v.GetString("agent.oauth.client_id")),
+				ClientSecret: strings.TrimSpace(v.GetString("agent.oauth.client_secret")),
+				RedirectUrl:  strings.TrimSpace(v.GetString("agent.oauth.redirect_url")),
+				Scopes:       getStringSlice(v, "agent.oauth.scopes"),
+			},
+			Database: agentDatabase,
 		},
 		Cloud: CloudConfig{
 			ListenUrl:          strings.TrimSpace(v.GetString("cloud.listen_url")),
@@ -250,7 +275,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			ApiBaseUrl:         strings.TrimSpace(v.GetString("cloud.api_base_url")),
 			CorsAllowedOrigins: getStringSlice(v, "cloud.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("cloud.expose_errors"),
-			GateUrl:            strings.TrimSpace(v.GetString("cloud.gate_url")),
+			OAuth:              loadCloudOAuthConfig(v),
 			Database:           cloudDatabase,
 		},
 		Auth: AuthConfig{
@@ -348,6 +373,14 @@ func GenerateFernetKey() (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(key), nil
+}
+
+func loadCloudOAuthConfig(v *viper.Viper) CloudOAuthConfig {
+	var clients []CloudOAuthClientConfig
+	if err := v.UnmarshalKey("cloud.oauth.clients", &clients); err != nil {
+		return CloudOAuthConfig{}
+	}
+	return CloudOAuthConfig{Clients: clients}
 }
 
 func loadDatabaseConfig(cwd string, v *viper.Viper, prefix string) (DatabaseConfig, error) {
@@ -579,8 +612,8 @@ func envLineKey(line string) (string, bool) {
 	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 		return "", false
 	}
-	if strings.HasPrefix(trimmed, "export ") {
-		trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "export "))
+	if value, ok := strings.CutPrefix(trimmed, "export "); ok {
+		trimmed = strings.TrimSpace(value)
 	}
 	index := strings.Index(trimmed, "=")
 	if index <= 0 {
@@ -739,6 +772,10 @@ func configKeys() []string {
 		"agent.api_base_url",
 		"agent.cors_allowed_origins",
 		"agent.expose_errors",
+		"agent.oauth.client_id",
+		"agent.oauth.client_secret",
+		"agent.oauth.redirect_url",
+		"agent.oauth.scopes",
 		"agent.database.driver",
 		"agent.database.sqlite.path",
 		"agent.database.mysql.dsn",
@@ -748,7 +785,6 @@ func configKeys() []string {
 		"cloud.api_base_url",
 		"cloud.cors_allowed_origins",
 		"cloud.expose_errors",
-		"cloud.gate_url",
 		"cloud.database.driver",
 		"cloud.database.sqlite.path",
 		"cloud.database.mysql.dsn",
@@ -868,6 +904,13 @@ func normalizeAgentConfig(cfg *Config) {
 	cfg.Agent.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.PublicUrl), "/")
 	cfg.Agent.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.ApiBaseUrl), "/")
 	cfg.Agent.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Agent.CorsAllowedOrigins)
+	cfg.Agent.OAuth.ClientId = strings.TrimSpace(cfg.Agent.OAuth.ClientId)
+	cfg.Agent.OAuth.ClientSecret = strings.TrimSpace(cfg.Agent.OAuth.ClientSecret)
+	cfg.Agent.OAuth.RedirectUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.OAuth.RedirectUrl), "/")
+	cfg.Agent.OAuth.Scopes = cleanStringSlice(cfg.Agent.OAuth.Scopes)
+	if cfg.Agent.OAuth.ClientId != "" && len(cfg.Agent.OAuth.Scopes) == 0 {
+		cfg.Agent.OAuth.Scopes = []string{"openid", "email", "profile"}
+	}
 }
 
 func normalizeHttpOrigins(values []string) []string {
@@ -892,23 +935,69 @@ func normalizeCloudConfig(cfg *Config) {
 	cfg.Cloud.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.PublicUrl), "/")
 	cfg.Cloud.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.ApiBaseUrl), "/")
 	cfg.Cloud.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Cloud.CorsAllowedOrigins)
-	cfg.Cloud.GateUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.GateUrl), "/")
+	for index := range cfg.Cloud.OAuth.Clients {
+		client := &cfg.Cloud.OAuth.Clients[index]
+		client.ClientId = strings.TrimSpace(client.ClientId)
+		client.ClientSecret = strings.TrimSpace(client.ClientSecret)
+		client.RedirectUrl = strings.TrimRight(strings.TrimSpace(client.RedirectUrl), "/")
+		client.Scopes = cleanStringSlice(client.Scopes)
+		if len(client.Scopes) == 0 {
+			client.Scopes = []string{"openid", "email", "profile"}
+		}
+	}
 }
 
 func validateAgent(cfg AgentConfig) error {
-	return validateHTTPServerConfig("agent", cfg.ListenUrl, cfg.PublicUrl, cfg.ApiBaseUrl, cfg.CorsAllowedOrigins)
+	if err := validateHTTPServerConfig("agent", cfg.ListenUrl, cfg.PublicUrl, cfg.ApiBaseUrl, cfg.CorsAllowedOrigins); err != nil {
+		return err
+	}
+	return validateAgentOAuth(cfg.OAuth)
 }
 
 func validateCloud(cfg Config) error {
 	if err := validateHTTPServerConfig("cloud", cfg.Cloud.ListenUrl, cfg.Cloud.PublicUrl, cfg.Cloud.ApiBaseUrl, cfg.Cloud.CorsAllowedOrigins); err != nil {
 		return err
 	}
-	if cfg.Cloud.GateUrl != "" {
-		if err := validateHTTPURL("cloud.gate_url", cfg.Cloud.GateUrl, false); err != nil {
+	for index, client := range cfg.Cloud.OAuth.Clients {
+		if err := validateCloudOAuthClient(index, client); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func validateAgentOAuth(cfg AgentOAuthConfig) error {
+	if cfg.ClientId == "" && cfg.ClientSecret == "" && cfg.RedirectUrl == "" {
+		return nil
+	}
+	missing := []string{}
+	if cfg.ClientId == "" {
+		missing = append(missing, envNameForKey("agent.oauth.client_id"))
+	}
+	if cfg.ClientSecret == "" {
+		missing = append(missing, envNameForKey("agent.oauth.client_secret"))
+	}
+	if cfg.RedirectUrl == "" {
+		missing = append(missing, envNameForKey("agent.oauth.redirect_url"))
+	}
+	if len(missing) > 0 {
+		return apperrors.Config("incomplete agent OAuth configuration", errors.New(strings.Join(missing, ", ")))
+	}
+	return validateHTTPURL("agent.oauth.redirect_url", cfg.RedirectUrl, false)
+}
+
+func validateCloudOAuthClient(index int, client CloudOAuthClientConfig) error {
+	prefix := fmt.Sprintf("cloud.oauth.clients[%d]", index)
+	if client.ClientId == "" {
+		return apperrors.Config("invalid "+prefix+".client_id", fmt.Errorf("empty client id"))
+	}
+	if client.ClientSecret == "" {
+		return apperrors.Config("invalid "+prefix+".client_secret", fmt.Errorf("empty client secret"))
+	}
+	if client.RedirectUrl == "" {
+		return apperrors.Config("invalid "+prefix+".redirect_url", fmt.Errorf("empty redirect URL"))
+	}
+	return validateHTTPURL(prefix+".redirect_url", client.RedirectUrl, false)
 }
 
 func validateHTTPServerConfig(prefix string, listenURL string, publicURL string, apiBaseURL string, corsAllowedOrigins []string) error {

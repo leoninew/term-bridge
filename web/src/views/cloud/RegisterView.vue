@@ -39,7 +39,7 @@
       </button>
       <RouterLink
         class="mt-3 block text-xs text-[var(--color-text-muted)]"
-        :to="{ name: 'login' }"
+        :to="{ name: 'cloud-login' }"
         >{{ t('gateway.backToLogin') }}</RouterLink
       >
     </form>
@@ -49,7 +49,7 @@
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRouter, RouterLink } from 'vue-router'
-  import { authGoogleUrl, authRegister } from '../features/cloud/api'
+  import { authGoogleUrl, authRegister } from '../../features/cloud/api'
   const { t } = useI18n()
   const router = useRouter()
   const email = ref('')
@@ -60,7 +60,7 @@
     submitting.value = true
     try {
       await authRegister(email.value, password.value)
-      await router.push({ name: 'verify-email', query: { email: email.value } })
+      await router.push({ name: 'cloud-verify-email', query: { email: email.value } })
     } finally {
       submitting.value = false
     }

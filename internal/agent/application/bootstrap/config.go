@@ -68,5 +68,13 @@ type JwtConfig struct {
 }
 
 type CloudConnectorConfig struct {
-	GateURL string
+	PublicURL   string
+	OAuthClient OAuthClientConfig
+}
+
+type OAuthClientConfig struct {
+	ClientId     string
+	ClientSecret string
+	RedirectUrl  string
+	Scopes       []string
 }

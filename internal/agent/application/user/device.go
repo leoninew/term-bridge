@@ -32,7 +32,7 @@ type Device struct {
 }
 
 type CloudBindingSummary struct {
-	GateUrl     string    `json:"gate_url"`
+	PublicUrl   string    `json:"public_url"`
 	DeviceId    string    `json:"device_id"`
 	DeviceName  string    `json:"device_name"`
 	ConnectedAt time.Time `json:"connected_at"`
@@ -140,8 +140,8 @@ func SaveCloudBindingSummary(stateDir string, summary CloudBindingSummary, now t
 	if strings.TrimSpace(stateDir) == "" {
 		return fmt.Errorf("state dir is required")
 	}
-	if strings.TrimSpace(summary.GateUrl) == "" {
-		return fmt.Errorf("cloud binding gate URL is required")
+	if strings.TrimSpace(summary.PublicUrl) == "" {
+		return fmt.Errorf("cloud binding public URL is required")
 	}
 	if strings.TrimSpace(summary.DeviceId) == "" {
 		return fmt.Errorf("cloud binding device id is required")
@@ -160,7 +160,7 @@ func SaveCloudBindingSummary(stateDir string, summary CloudBindingSummary, now t
 	if err != nil {
 		return err
 	}
-	summary.GateUrl = strings.TrimRight(strings.TrimSpace(summary.GateUrl), "/")
+	summary.PublicUrl = strings.TrimRight(strings.TrimSpace(summary.PublicUrl), "/")
 	summary.DeviceId = strings.TrimSpace(summary.DeviceId)
 	summary.DeviceName = strings.TrimSpace(summary.DeviceName)
 	summary.ConnectedAt = summary.ConnectedAt.UTC()
@@ -174,7 +174,7 @@ func cloneCloudBindingSummary(summary *CloudBindingSummary) *CloudBindingSummary
 		return nil
 	}
 	clone := *summary
-	clone.GateUrl = strings.TrimRight(strings.TrimSpace(clone.GateUrl), "/")
+	clone.PublicUrl = strings.TrimRight(strings.TrimSpace(clone.PublicUrl), "/")
 	clone.DeviceId = strings.TrimSpace(clone.DeviceId)
 	clone.DeviceName = strings.TrimSpace(clone.DeviceName)
 	clone.ConnectedAt = clone.ConnectedAt.UTC()

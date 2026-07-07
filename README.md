@@ -31,7 +31,7 @@ User -> Device -> Workspace -> Session -> Terminal
 - 本地开发采用一个 Web/Vite dev server 同时代理 agent 与 cloud。
 - 镜像交付采用前后端一体：Go 服务提供后端 API 和已构建的前端静态资源。
 
-Cloud Gate PoC 阶段仍是验证态，不是生产发布态。Browser login 已切到 `/api/auth/*` 用户系统；agent 本地入口仍支持配置里的 `admin/admin` shortcut，cloud 入口要求配置 Google OAuth 与 Resend。device 绑定、pairing、credential rotation 后续再补。
+Cloud 侧设备接入仍是验证态，不是生产发布态。Browser login 已切到 Cloud 用户系统；agent 本地入口使用本机 token，cloud 入口要求配置 Google OAuth 与 Resend。Agent 连接 Cloud 使用 `cloud.public_url` 上报当前设备。
 
 ## 开发依赖
 
@@ -138,7 +138,9 @@ TERMBRIDGE_AGENT__API_BASE_URL=/agent-api
 TERMBRIDGE_CLOUD__LISTEN_URL=http://127.0.0.1:9032
 TERMBRIDGE_CLOUD__PUBLIC_URL=http://localhost:9030
 TERMBRIDGE_CLOUD__API_BASE_URL=/cloud-api
-TERMBRIDGE_CLOUD__OAUTH__REDIRECT_URL=http://localhost:9030/cloud/oauth/callback
+TERMBRIDGE_AGENT__OAUTH__CLIENT_ID=termbridge-agent
+TERMBRIDGE_AGENT__OAUTH__CLIENT_SECRET=agent-secret
+TERMBRIDGE_AGENT__OAUTH__REDIRECT_URL=http://localhost:9030/agent/oauth/callback
 ```
 
 最终本机 agent 运行示例：
@@ -180,7 +182,7 @@ TERMBRIDGE_RESEND__FROM_EMAIL=
 
 运行角色由 CLI 子命令选择：`termbridge agent` 启动本地 agent 后端与本机控制台能力，`termbridge cloud` 启动云端门户后端。配置文件不再通过 `server.mode` 选择角色。
 
-设备身份由 `termbridge agent` 在 `<runtime.state_dir>/device.json` 中生成并读取；Cloud 绑定摘要只记录非 token 的 gate URL、device id、device name 和连接时间，业务运行中变化的配置不会写回 `configs/config.yaml`。
+设备身份由 `termbridge agent` 在 `<runtime.state_dir>/device.json` 中生成并读取；Cloud 绑定摘要只记录非 token 的 public URL、device id、device name 和连接时间，业务运行中变化的配置不会写回 `configs/config.yaml`。
 
 ## 当前边界
 

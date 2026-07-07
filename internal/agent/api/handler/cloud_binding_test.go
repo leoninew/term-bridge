@@ -26,9 +26,9 @@ func testLocalDevice() agentapp.Device {
 
 func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	authService := newTestAuthService(sharedauth.NewTokenService(testJWTKey))
-	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudGateURL: "https://cloud.example.test"})
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: "https://cloud.example.test"})
 	connectedAt := time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
-	handler.setLocalCloudSession(&cloudv1.CloudSessionSummary{GateUrl: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: prototime.FromTime(connectedAt)})
+	handler.setLocalCloudSession(&cloudv1.CloudSessionSummary{PublicUrl: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: prototime.FromTime(connectedAt)})
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil))
@@ -45,7 +45,7 @@ func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	if body.CloudSession == nil {
 		t.Fatalf("cloud_session is nil; body=%s", response.Body.String())
 	}
-	if body.CloudSession.GetGateUrl() != "https://cloud.example.test" || body.CloudSession.GetDeviceId() != "dev-1" || body.CloudSession.GetDeviceName() != "local-device" || !prototime.ToTime(body.CloudSession.GetConnectedAt()).Equal(connectedAt) {
+	if body.CloudSession.GetPublicUrl() != "https://cloud.example.test" || body.CloudSession.GetDeviceId() != "dev-1" || body.CloudSession.GetDeviceName() != "local-device" || !prototime.ToTime(body.CloudSession.GetConnectedAt()).Equal(connectedAt) {
 		t.Fatalf("cloud_session = %#v", body.CloudSession)
 	}
 }
@@ -110,7 +110,7 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer cloud.Close()
-	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudGateURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir})
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir})
 	agentToken := agentToken(t, handler)
 	request := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
 	request.Header.Set("Authorization", "Bearer "+agentToken)
@@ -126,7 +126,7 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode cloud connect response: %v", err)
 	}
-	if body.CloudSession.GetGateUrl() != cloud.URL || body.CloudSession.GetDeviceId() != device.Id || body.CloudSession.GetDeviceName() != device.Name {
+	if body.CloudSession.GetPublicUrl() != cloud.URL || body.CloudSession.GetDeviceId() != device.Id || body.CloudSession.GetDeviceName() != device.Name {
 		t.Fatalf("cloud session = %#v", body.CloudSession)
 	}
 }
@@ -156,7 +156,7 @@ func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T)
 	}))
 	defer cloud.Close()
 
-	first := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudGateURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir})
+	first := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir})
 	agentToken := agentToken(t, first)
 	connectRequest := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
 	connectRequest.Header.Set("Authorization", "Bearer "+agentToken)
@@ -169,7 +169,7 @@ func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T)
 		t.Fatalf("device report id=%q name=%q public_key=%q", deviceReport.GetId(), deviceReport.GetName(), deviceReport.GetPublicKey())
 	}
 
-	second := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudGateURL: cloud.URL, LocalDevice: agentapp.Device{Id: device.Id, Name: device.Name, PublicKey: device.PublicKey}, LocalDeviceStateDir: stateDir})
+	second := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: agentapp.Device{Id: device.Id, Name: device.Name, PublicKey: device.PublicKey}, LocalDeviceStateDir: stateDir})
 	response := httptest.NewRecorder()
 	second.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil))
 	if response.Code != http.StatusOK {
@@ -179,7 +179,7 @@ func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T)
 	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode auth me response: %v", err)
 	}
-	if body.CloudSession == nil || body.CloudSession.GetGateUrl() != cloud.URL || body.CloudSession.GetDeviceId() != device.Id || body.CloudSession.GetDeviceName() != device.Name || body.CloudSession.GetConnectedAt() == nil {
+	if body.CloudSession == nil || body.CloudSession.GetPublicUrl() != cloud.URL || body.CloudSession.GetDeviceId() != device.Id || body.CloudSession.GetDeviceName() != device.Name || body.CloudSession.GetConnectedAt() == nil {
 		t.Fatalf("cloud_session = %#v", body.CloudSession)
 	}
 	data, err := os.ReadFile(filepath.Join(stateDir, agentapp.DeviceIdentityFileName))
@@ -198,7 +198,7 @@ func TestCloudConnectRequiresCloudTokenBeforeDeviceReport(t *testing.T) {
 		t.Fatalf("cloud endpoint should not be called without cloud token")
 	}))
 	defer cloud.Close()
-	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudGateURL: cloud.URL, LocalDevice: testLocalDevice()})
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: testLocalDevice()})
 	agentToken := agentToken(t, handler)
 
 	request := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/connect", strings.NewReader(`{"cloud_token":" "}`))

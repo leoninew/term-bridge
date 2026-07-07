@@ -4,7 +4,14 @@ export type FrontendMode = 'agent' | 'cloud' | 'hybrid'
 export interface RuntimeConfig {
   agentApiBaseUrl?: string
   cloudApiBaseUrl?: string
+  cloudOAuth?: CloudOAuthRuntimeConfig
   frontendMode?: FrontendMode
+}
+
+export interface CloudOAuthRuntimeConfig {
+  clientId?: string
+  redirectUrl?: string
+  scopes?: string[]
 }
 
 const defaultApiBaseUrls: Record<ApiTarget, string> = {
@@ -38,6 +45,24 @@ export function buildApiUrl(path: string, target: ApiTarget = 'agent'): string {
   return `${getApiBaseUrl(target)}${normalizedPath}`
 }
 
+export function buildCloudPageUrl(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const baseUrl = getApiBaseUrl('cloud')
+  if (baseUrl.startsWith('/')) {
+    return normalizedPath
+  }
+  const url = new URL(baseUrl)
+  const apiPath = url.pathname.replace(/\/+$/, '')
+  if (apiPath.endsWith('/cloud-api')) {
+    url.pathname = `${apiPath.slice(0, -'/cloud-api'.length)}${normalizedPath}`
+  } else {
+    url.pathname = normalizedPath
+  }
+  url.search = ''
+  url.hash = ''
+  return url.toString()
+}
+
 export function buildApiWebSocketUrl(path: string, target: ApiTarget = 'agent'): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
   const targetBaseUrl = getApiBaseUrl(target)
@@ -61,6 +86,15 @@ function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '')
 }
 
+function splitScopes(value: string | undefined): string[] {
+  return value
+    ? value
+        .split(',')
+        .map((scope) => scope.trim())
+        .filter(Boolean)
+    : []
+}
+
 export const runtimeConfig = {
   get frontendMode() {
     return getFrontendMode()
@@ -70,5 +104,21 @@ export const runtimeConfig = {
   },
   get cloudApiBaseUrl() {
     return getApiBaseUrl('cloud')
+  },
+  get cloudOAuth(): CloudOAuthRuntimeConfig | undefined {
+    const runtimeCloudOAuth = typeof window !== 'undefined' ? window.__CONFIG__?.cloudOAuth : undefined
+    if (runtimeCloudOAuth) {
+      return runtimeCloudOAuth
+    }
+    const clientId = import.meta.env.VITE_CLOUD_OAUTH_CLIENT_ID
+    const redirectUrl = import.meta.env.VITE_CLOUD_OAUTH_REDIRECT_URL
+    if (!clientId && !redirectUrl) {
+      return undefined
+    }
+    return {
+      clientId,
+      redirectUrl,
+      scopes: splitScopes(import.meta.env.VITE_CLOUD_OAUTH_SCOPES),
+    }
   },
 }

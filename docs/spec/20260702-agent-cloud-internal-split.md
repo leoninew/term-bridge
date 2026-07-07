@@ -846,7 +846,7 @@ termbridge migrate cloud
 agent.server.*
 agent.runtime.*
 agent.cloud.gate_url
-agent.cloud.oauth.*
+agent.oauth.*
 agent.database.*
 agent.history.*
 agent.auth.local_admin.*

@@ -9,7 +9,7 @@
 </template>
 
 <script setup lang="ts">
-  import SessionsPageShell from '../components/session/SessionsPageShell.vue'
+  import SessionsPageShell from '../../components/session/SessionsPageShell.vue'
   import {
     authLogout,
     closeSession,
@@ -23,9 +23,9 @@
     updateSession,
     updateSessionOrder,
     updateWorkspaceOrder,
-  } from '../features/agent/api'
-  import type { SessionRuntimeApi } from '../features/sessions/runtime'
-  import type { RuntimeTarget } from '../features/runtimeTarget'
+  } from '../../features/agent/api'
+  import type { SessionRuntimeApi } from '../../features/sessions/runtime'
+  import type { RuntimeTarget } from '../../features/runtimeTarget'
 
   const runtimeTarget: RuntimeTarget = { mode: 'agent' }
   const runtimeApi: SessionRuntimeApi = {

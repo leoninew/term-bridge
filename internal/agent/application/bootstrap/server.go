@@ -67,7 +67,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 	cloudConnectorStarted := false
 	var cloudConnector *agentapp.Client
 	if cloudConnectorConfigured(cfg) {
-		cloudConnector = newAgentConnector(cfg, cfg.Cloud.GateURL, runtimeAccess, device, logger)
+		cloudConnector = newAgentConnector(cfg, cfg.Cloud.PublicURL, runtimeAccess, device, logger)
 	}
 	startConnector := func(connector *agentapp.Client) {
 		connectorMu.Lock()
@@ -98,7 +98,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		}()
 	}
 
-	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudGateURL: cfg.Cloud.GateURL, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(*cloud.CloudSessionSummary) {
+	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudPublicURL: cfg.Cloud.PublicURL, OAuthClient: agentapi.OAuthClientConfig{ClientId: cfg.Cloud.OAuthClient.ClientId, ClientSecret: cfg.Cloud.OAuthClient.ClientSecret, RedirectUrl: cfg.Cloud.OAuthClient.RedirectUrl, Scopes: append([]string(nil), cfg.Cloud.OAuthClient.Scopes...)}, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(*cloud.CloudSessionSummary) {
 		if cloudConnector != nil {
 			startConnector(cloudConnector)
 		}
@@ -177,7 +177,7 @@ func newAgentConnector(cfg Config, connectURL string, runtimeAccess agentapp.Run
 }
 
 func cloudConnectorConfigured(cfg Config) bool {
-	return strings.TrimSpace(cfg.Cloud.GateURL) != ""
+	return strings.TrimSpace(cfg.Cloud.PublicURL) != ""
 }
 
 func newWebTerminalRegistry(cfg Config, logger *slog.Logger, store terminalapp.RuntimeStore) *terminalapp.Registry {

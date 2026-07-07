@@ -122,20 +122,13 @@ func TestRunMigrateRunsAgentDatabaseMigrations(t *testing.T) {
 	}
 }
 
-func TestRoleCorsAllowedOriginsIncludesPublicUrl(t *testing.T) {
-	origins := roleCorsAllowedOrigins("http://localhost:9030/", []string{"https://app.example.com"})
-	if len(origins) != 2 || origins[0] != "http://localhost:9030" || origins[1] != "https://app.example.com" {
-		t.Fatalf("origins = %#v", origins)
-	}
-}
-
 func TestRunAgentStartsBackendAndConnectorFromConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: http://termbridge.lvh.me\n"
+	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  public_url: http://termbridge.lvh.me\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
 	oldRunBackendServer := runBackendServer
@@ -203,7 +196,7 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 		Name      string `json:"name"`
 		PublicKey string `json:"public_key"`
 	}
-	cloudGate := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	cloudPublic := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/cloud-api/devices/current" {
 			http.NotFound(w, r)
 			return
@@ -218,8 +211,8 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"accepted":true}`))
 	}))
-	defer cloudGate.Close()
-	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  gate_url: " + cloudGate.URL + "\n"
+	defer cloudPublic.Close()
+	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  public_url: " + cloudPublic.URL + "\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
 	oldRunBackendServer := runBackendServer
@@ -293,11 +286,11 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 	for _, client := range clientSnapshot {
 		gotTargets[client.Config().ConnectUrl] = true
 	}
-	if len(gotTargets) != 1 || !gotTargets[cloudGate.URL] {
+	if len(gotTargets) != 1 || !gotTargets[cloudPublic.URL] {
 		t.Fatalf("agent connector targets after device report = %#v", gotTargets)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "TermBridge agent connector targeting "+cloudGate.URL) {
+	if !strings.Contains(out, "TermBridge agent connector targeting "+cloudPublic.URL) {
 		t.Fatalf("stdout missing cloud connector target after device report: %s", out)
 	}
 	cancelServe()

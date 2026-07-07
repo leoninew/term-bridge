@@ -5,82 +5,83 @@
 // source: termbridge/agent/v1/session.proto
 
 /* eslint-disable */
-import type { SessionSummary } from './workspace'
+import type { SessionSummary } from "./workspace";
 
-export const protobufPackage = 'termbridge.agent'
+export const protobufPackage = "termbridge.agent";
 
 export interface CreateSessionReq {
-  workspace_id: string
-  name: string
-  cwd: string
-  command: string[]
-  cols: number
-  rows: number
+  workspace_id: string;
+  name: string;
+  cwd: string;
+  command: string[];
+  cols: number;
+  rows: number;
 }
 
 export interface CreateSessionResp {
-  session_id: string
-  workspace_id: string
-  state: string
+  session_id: string;
+  workspace_id: string;
+  state: string;
 }
 
 export interface WorkspaceSessionsReq {
-  workspace_id: string
+  workspace_id: string;
 }
 
 export interface WorkspaceSessionsResp {
-  items: SessionSummary[]
+  items: SessionSummary[];
 }
 
 export interface WorkspaceSessionReq {
-  workspace_id: string
-  session_id: string
+  workspace_id: string;
+  session_id: string;
 }
 
 export interface GetSessionResp {
-  session: SessionSummary | undefined
+  session: SessionSummary | undefined;
 }
 
 export interface RerunSessionReq {
-  cols: number
-  rows: number
+  cols: number;
+  rows: number;
 }
 
 export interface RerunWorkspaceSessionReq {
-  workspace_id: string
-  session_id: string
-  request: RerunSessionReq | undefined
+  workspace_id: string;
+  session_id: string;
+  request: RerunSessionReq | undefined;
 }
 
 export interface UpdateSessionReq {
-  name?: string | undefined
+  name?: string | undefined;
 }
 
 export interface UpdateWorkspaceSessionReq {
-  workspace_id: string
-  session_id: string
-  request: UpdateSessionReq | undefined
+  workspace_id: string;
+  session_id: string;
+  request: UpdateSessionReq | undefined;
 }
 
 export interface UpdateSessionResp {
-  session: SessionSummary | undefined
+  session: SessionSummary | undefined;
 }
 
-export interface DeleteSessionResp {}
+export interface DeleteSessionResp {
+}
 
 export interface CloseSessionResp {
-  session: SessionSummary | undefined
+  session: SessionSummary | undefined;
 }
 
 export interface UpdateSessionOrderReq {
-  session_ids: string[]
+  session_ids: string[];
 }
 
 export interface WorkspaceSessionOrderReq {
-  workspace_id: string
-  session_ids: string[]
+  workspace_id: string;
+  session_ids: string[];
 }
 
 export interface UpdateSessionOrderResp {
-  items: SessionSummary[]
+  items: SessionSummary[];
 }

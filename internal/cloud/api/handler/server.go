@@ -2,11 +2,15 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,8 +39,20 @@ type Config struct {
 	AuthService         AuthService
 	AgentTunnelAudience string
 	DeviceRepository    DeviceRepository
-	CloudGateURL        string
+	CloudPublicURL      string
+	CloudOAuth          CloudOAuthConfig
 	CORSAllowedOrigins  []string
+}
+
+type CloudOAuthConfig struct {
+	Clients []CloudOAuthClientConfig
+}
+
+type CloudOAuthClientConfig struct {
+	ClientId     string
+	ClientSecret string
+	RedirectUrl  string
+	Scopes       []string
 }
 
 type AuthService interface {
@@ -67,7 +83,18 @@ type Handler struct {
 	cacheMu            sync.Mutex
 	workspaceTreeCache map[string]json.RawMessage
 	historyCache       map[string]map[string]string
+	oauthCodeMu        sync.Mutex
+	oauthCodes         map[string]cloudOAuthCode
 }
+
+type cloudOAuthCode struct {
+	ClientId    string
+	RedirectUrl string
+	UserId      string
+	ExpiresAt   time.Time
+}
+
+const cloudOAuthCodeTtl = 10 * time.Minute
 
 type DeviceRegistry struct {
 	mu      sync.Mutex
@@ -153,7 +180,7 @@ func New(config Config) *Handler {
 
 func newHandler(config Config) *Handler {
 	config = normalizeConfig(config)
-	handler := &Handler{config: config, auth: auth.NewAuther(auth.Credentials{Username: config.Username, Password: config.Password}, auth.NewTokenService(config.JWTSecret)), authService: config.AuthService, registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
+	handler := &Handler{config: config, auth: auth.NewAuther(auth.Credentials{Username: config.Username, Password: config.Password}, auth.NewTokenService(config.JWTSecret)), authService: config.AuthService, registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}, oauthCodes: map[string]cloudOAuthCode{}}
 	return handler
 }
 
@@ -182,6 +209,8 @@ func (h *Handler) registerCloudRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/cloud-api/auth/password-reset/confirm", h.handlePasswordResetConfirm)
 	mux.HandleFunc("/cloud-api/auth/google", h.handleGoogleAuth)
 	mux.HandleFunc("/cloud-api/auth/google/callback", h.handleGoogleCallback)
+	mux.HandleFunc("/cloud-api/oauth2/authorize", h.authMiddleware(http.HandlerFunc(h.handleOAuthAuthorize)).ServeHTTP)
+	mux.HandleFunc("/cloud-api/oauth2/token", h.handleOAuthToken)
 	mux.HandleFunc("/cloud-api/devices", h.authMiddleware(http.HandlerFunc(h.handleDevices)).ServeHTTP)
 	mux.HandleFunc("/cloud-api/devices/current", h.authMiddleware(http.HandlerFunc(h.handleCurrentDevice)).ServeHTTP)
 	mux.HandleFunc("/cloud-api/devices/", h.authMiddleware(http.HandlerFunc(h.handleDevice)).ServeHTTP)
@@ -430,6 +459,140 @@ func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Handler) handleOAuthAuthorize(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if !s.requireCloudOAuth(w, r) {
+		return
+	}
+	if r.URL.Query().Get("response_type") != "code" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth response_type must be code.", nil)
+		return
+	}
+	clientId := strings.TrimSpace(r.URL.Query().Get("client_id"))
+	redirectUrl := strings.TrimSpace(r.URL.Query().Get("redirect_uri"))
+	state := strings.TrimSpace(r.URL.Query().Get("state"))
+	client, ok := s.cloudOAuthClient(clientId, redirectUrl)
+	if !ok || state == "" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth authorization request is invalid.", nil)
+		return
+	}
+	claims, ok := s.claimsFromRequest(r)
+	if !ok {
+		s.writeUnauthorized(w, r)
+		return
+	}
+	code, err := randomCloudOAuthCode()
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+		return
+	}
+	s.storeCloudOAuthCode(code, cloudOAuthCode{ClientId: clientId, RedirectUrl: client.RedirectUrl, UserId: claims.Sub, ExpiresAt: time.Now().UTC().Add(cloudOAuthCodeTtl)})
+	callback, err := url.Parse(client.RedirectUrl)
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth redirect_uri is invalid.", err)
+		return
+	}
+	query := callback.Query()
+	query.Set("code", code)
+	query.Set("state", state)
+	callback.RawQuery = query.Encode()
+	writeJSONObject(w, http.StatusOK, map[string]string{"redirect_url": callback.String()})
+}
+
+func (s *Handler) handleOAuthToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if !s.requireCloudOAuth(w, r) {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, errorMessageBadRequest, err)
+		return
+	}
+	if r.PostForm.Get("grant_type") != "authorization_code" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth grant_type must be authorization_code.", nil)
+		return
+	}
+	clientId := strings.TrimSpace(r.PostForm.Get("client_id"))
+	clientSecret := strings.TrimSpace(r.PostForm.Get("client_secret"))
+	redirectUrl := strings.TrimSpace(r.PostForm.Get("redirect_uri"))
+	code := strings.TrimSpace(r.PostForm.Get("code"))
+	if !s.validCloudOAuthClientSecret(clientId, redirectUrl, clientSecret) {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth token request is invalid.", nil)
+		return
+	}
+	storedCode, ok := s.consumeCloudOAuthCode(code, time.Now().UTC())
+	if !ok || storedCode.ClientId != clientId || storedCode.RedirectUrl != redirectUrl {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth authorization code is invalid or expired.", nil)
+		return
+	}
+	if s.authService == nil {
+		s.writeNotFound(w, r)
+		return
+	}
+	result, err := s.authService.IssueUserToken(r.Context(), storedCode.UserId)
+	if err != nil {
+		s.writeAuthError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Handler) requireCloudOAuth(w http.ResponseWriter, r *http.Request) bool {
+	if len(s.config.CloudOAuth.Clients) == 0 {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud OAuth is not configured.", nil)
+		return false
+	}
+	return true
+}
+
+func (s *Handler) cloudOAuthClient(clientId string, redirectUrl string) (CloudOAuthClientConfig, bool) {
+	for _, client := range s.config.CloudOAuth.Clients {
+		if client.ClientId == clientId && client.RedirectUrl == redirectUrl {
+			return client, true
+		}
+	}
+	return CloudOAuthClientConfig{}, false
+}
+
+func (s *Handler) validCloudOAuthClientSecret(clientId string, redirectUrl string, clientSecret string) bool {
+	client, ok := s.cloudOAuthClient(clientId, redirectUrl)
+	if !ok {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(client.ClientSecret), []byte(clientSecret)) == 1
+}
+
+func (s *Handler) storeCloudOAuthCode(code string, value cloudOAuthCode) {
+	s.oauthCodeMu.Lock()
+	defer s.oauthCodeMu.Unlock()
+	s.oauthCodes[code] = value
+}
+
+func (s *Handler) consumeCloudOAuthCode(code string, now time.Time) (cloudOAuthCode, bool) {
+	s.oauthCodeMu.Lock()
+	defer s.oauthCodeMu.Unlock()
+	value, ok := s.oauthCodes[code]
+	delete(s.oauthCodes, code)
+	if !ok || !value.ExpiresAt.After(now) {
+		return cloudOAuthCode{}, false
+	}
+	return value, true
+}
+
+func randomCloudOAuthCode() (string, error) {
+	var data [32]byte
+	if _, err := rand.Read(data[:]); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(data[:]), nil
 }
 
 func (s *Handler) authMiddleware(next http.Handler) http.Handler {
@@ -1095,7 +1258,25 @@ func normalizeConfig(config Config) Config {
 	if config.Logger == nil {
 		panic("cloud api logger is required")
 	}
-	config.CloudGateURL = strings.TrimRight(strings.TrimSpace(config.CloudGateURL), "/")
+	config.CloudPublicURL = strings.TrimRight(strings.TrimSpace(config.CloudPublicURL), "/")
+	for index := range config.CloudOAuth.Clients {
+		client := &config.CloudOAuth.Clients[index]
+		client.ClientId = strings.TrimSpace(client.ClientId)
+		client.ClientSecret = strings.TrimSpace(client.ClientSecret)
+		client.RedirectUrl = strings.TrimRight(strings.TrimSpace(client.RedirectUrl), "/")
+		client.Scopes = cleanCloudOAuthScopes(client.Scopes)
+	}
 	config.CORSAllowedOrigins = cleanOrigins(config.CORSAllowedOrigins)
 	return config
+}
+
+func cleanCloudOAuthScopes(scopes []string) []string {
+	out := make([]string, 0, len(scopes))
+	for _, scope := range scopes {
+		value := strings.TrimSpace(scope)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }

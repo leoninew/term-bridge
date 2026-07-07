@@ -46,10 +46,10 @@
         {{ googleLoggingIn ? t('gateway.signingIn') : t('gateway.continueWithGoogle') }}
       </button>
       <div class="mt-3 flex justify-between text-xs text-[var(--color-text-muted)]">
-        <RouterLink class="hover:text-[var(--color-text)]" :to="{ name: 'register' }">
+        <RouterLink class="hover:text-[var(--color-text)]" :to="{ name: 'cloud-register' }">
           {{ t('gateway.register') }}
         </RouterLink>
-        <RouterLink class="hover:text-[var(--color-text)]" :to="{ name: 'forgot-password' }">
+        <RouterLink class="hover:text-[var(--color-text)]" :to="{ name: 'cloud-forgot-password' }">
           {{ t('gateway.forgotPassword') }}
         </RouterLink>
       </div>

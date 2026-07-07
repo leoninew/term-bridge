@@ -269,6 +269,24 @@
               <LayoutDashboard class="size-4 text-[var(--color-text-subtle)]" />
               {{ t('dashboard.title') }}
             </DropdownMenuItem>
+            <DropdownMenuItem v-if="props.helpHref" as-child>
+              <a
+                :href="props.helpHref"
+                class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
+              >
+                <CircleHelp class="size-4 text-[var(--color-text-subtle)]" />
+                {{ t('common.help') }}
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem v-else as-child>
+              <RouterLink
+                :to="{ name: 'cloud-help' }"
+                class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
+              >
+                <CircleHelp class="size-4 text-[var(--color-text-subtle)]" />
+                {{ t('common.help') }}
+              </RouterLink>
+            </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger
                 class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
@@ -353,9 +371,11 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
+  import { RouterLink } from 'vue-router'
   import {
     Check,
     ChevronRight,
+    CircleHelp,
     CircleStop,
     Folder,
     FolderOpen,
@@ -413,6 +433,7 @@
     rerunningSessionId: string | null
     deletingSessionId: string | null
     removingWorkspaceId: string | null
+    helpHref?: string
   }>()
 
   const emit = defineEmits<{

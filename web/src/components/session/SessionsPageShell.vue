@@ -31,6 +31,7 @@
           @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
           @reorder-workspaces="reorderWorkspaces"
           @reorder-sessions="reorderSessions"
+          :help-href="helpHref"
           @logout="handleLogout"
           @open-dashboard="openDashboard"
         />
@@ -124,6 +125,7 @@
   import { useCreateSessionDraft } from '../../composable/useCreateSessionDraft'
   import { useSessionDialogs } from '../../composable/useSessionDialogs'
   import { useTerminalSize } from '../../composable/useTerminalSize'
+  import { buildCloudPageUrl } from '../../config'
   import { terminalWsUrl, type SessionRuntimeApi } from '../../features/sessions/runtime'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
@@ -175,6 +177,7 @@
     () => gateway.user?.display_name || gateway.user?.email || t('dashboard.signedIn'),
   )
   const workbenchDevice = computed(() => props.currentDevice ?? gateway.currentDevice)
+  const helpHref = computed(() => (isAgentMode.value ? buildCloudPageUrl('/help') : ''))
 
   const activeSession = computed(() => {
     const tab = workbench.activeTab
@@ -221,7 +224,7 @@
       await router.push({ name: props.dashboardRouteName })
       return
     }
-    await router.push({ name: 'login', query: { redirect: props.loginRedirect } })
+    await router.push({ name: 'cloud-login', query: { redirect: props.loginRedirect } })
   }
 
   async function handleLogout() {
@@ -234,7 +237,7 @@
     gateway.passwordInput = ''
     workspaceSessions.reset()
     workbench.resetForSourceChange()
-    await router.replace(isAgentMode.value ? { name: 'agent-dashboard' } : { name: 'login' })
+    await router.replace(isAgentMode.value ? { name: 'agent-dashboard' } : { name: 'cloud-login' })
   }
 
   async function startSession() {

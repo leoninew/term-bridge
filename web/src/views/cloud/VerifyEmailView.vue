@@ -7,7 +7,7 @@
       @submit.prevent="submit"
     >
       <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
-        {{ t('gateway.resetPassword') }}
+        {{ t('gateway.verifyEmailTitle') }}
       </h1>
       <input
         v-model="email"
@@ -21,14 +21,15 @@
         maxlength="6"
         placeholder="ABC123"
       />
-      <input
-        v-model="password"
-        type="password"
-        class="mt-3 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 outline-none"
-        :placeholder="t('gateway.newPassword')"
-      />
       <button class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50">
-        {{ t('gateway.resetPassword') }}
+        {{ t('gateway.verifyEmail') }}
+      </button>
+      <button
+        type="button"
+        class="mt-2 h-9 w-full rounded-md border border-[var(--color-border)]"
+        @click="resend"
+      >
+        {{ t('gateway.resendCode') }}
       </button>
     </form>
   </section>
@@ -37,15 +38,17 @@
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
-  import { authPasswordResetConfirm } from '../features/cloud/api'
+  import { authResendVerification, authVerifyEmail } from '../../features/cloud/api'
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
   const email = ref(String(route.query.email ?? ''))
   const code = ref('')
-  const password = ref('')
   async function submit() {
-    await authPasswordResetConfirm(email.value, code.value, password.value)
-    await router.push({ name: 'login' })
+    await authVerifyEmail(email.value, code.value)
+    await router.push({ name: 'cloud-login' })
+  }
+  async function resend() {
+    await authResendVerification(email.value)
   }
 </script>

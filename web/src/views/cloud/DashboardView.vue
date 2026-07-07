@@ -91,10 +91,10 @@
   import { Monitor, RefreshCw, User } from '@lucide/vue'
   import { useI18n } from 'vue-i18n'
   import { ToastProvider } from 'reka-ui'
-  import ToastHost from '../components/session/ToastHost.vue'
-  import type { DeviceSummary } from '../gen/proto/termbridge/cloud/v1/device'
-  import { useGatewayStore } from '../store/gateway'
-  import { useNotificationsStore } from '../store/notifications'
+  import ToastHost from '../../components/session/ToastHost.vue'
+  import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
+  import { useGatewayStore } from '../../store/gateway'
+  import { useNotificationsStore } from '../../store/notifications'
 
   const { t } = useI18n()
   const router = useRouter()

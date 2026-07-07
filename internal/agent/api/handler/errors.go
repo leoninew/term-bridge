@@ -98,6 +98,14 @@ func (h *Handler) decodeJSONRequest(w http.ResponseWriter, r *http.Request, mess
 	return true
 }
 
+func (h *Handler) decodeJSONStructRequest(w http.ResponseWriter, r *http.Request, target any) bool {
+	if err := codec.DecodeJSONStruct(http.MaxBytesReader(w, r.Body, terminalproto.MaxJSONMessageBytes), target); err != nil {
+		h.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, errorMessageBadRequest, err)
+		return false
+	}
+	return true
+}
+
 func writeJSON(w http.ResponseWriter, status int, message proto.Message) {
 	data, err := codec.MarshalProtoJSON(message)
 	if err != nil {

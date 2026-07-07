@@ -14,25 +14,27 @@
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
   import { ToastProvider } from 'reka-ui'
-  import ToastHost from '../components/session/ToastHost.vue'
-  import { authGoogleCallback } from '../features/cloud/api'
-  import { readStorageValue, removeStorageValue } from '../store/storage'
-  import { useGatewayStore } from '../store/gateway'
-  import { useNotificationsStore } from '../store/notifications'
+  import ToastHost from '../../components/session/ToastHost.vue'
+  import { authGoogleCallback } from '../../features/cloud/api'
+  import { useGatewayStore } from '../../store/gateway'
+  import { useNotificationsStore } from '../../store/notifications'
+  import { readStorageValue, removeStorageValue } from '../../store/storage'
 
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
   const gateway = useGatewayStore()
   const notifications = useNotificationsStore()
-  const OAUTH_REDIRECT_KEY = 'termbridge.oauth_redirect'
+  const cloudLoginRedirectKey = 'termbridge.cloud.login_redirect'
 
   function redirectAfterLogin() {
-    const redirect = readStorageValue(OAUTH_REDIRECT_KEY)
-    removeStorageValue(OAUTH_REDIRECT_KEY)
-    return redirect && redirect.startsWith('/') && !redirect.startsWith('//')
-      ? redirect
-      : { name: 'cloud-dashboard' }
+    const redirect = readStorageValue(cloudLoginRedirectKey)
+    removeStorageValue(cloudLoginRedirectKey)
+    return safeRedirect(redirect) || { name: 'cloud-dashboard' }
+  }
+
+  function safeRedirect(value: string | null) {
+    return value && value.startsWith('/') && !value.startsWith('//') ? value : ''
   }
 
   onMounted(async () => {
@@ -40,7 +42,7 @@
     const state = typeof route.query.state === 'string' ? route.query.state : ''
     if (!code || !state) {
       notifications.notifyError(t('gateway.googleLoginFailed'), new Error('missing code or state'))
-      await router.replace({ name: 'login' })
+      await router.replace({ name: 'cloud-login' })
       return
     }
     try {
@@ -49,7 +51,7 @@
       await router.replace(redirectAfterLogin())
     } catch (err) {
       notifications.notifyError(t('gateway.googleLoginFailed'), err)
-      await router.replace({ name: 'login' })
+      await router.replace({ name: 'cloud-login' })
     }
   })
 </script>
