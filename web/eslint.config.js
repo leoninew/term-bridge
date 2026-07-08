@@ -2,6 +2,8 @@ import js from '@eslint/js'
 import eslintConfigPrettier from 'eslint-config-prettier'
 import tseslint from 'typescript-eslint'
 import vue from 'eslint-plugin-vue'
+import importX from 'eslint-plugin-import-x'
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript'
 
 export default tseslint.config(
   {
@@ -37,6 +39,25 @@ export default tseslint.config(
         MessageEvent: 'readonly',
         ResizeObserver: 'readonly',
       },
+    },
+  },
+  {
+    plugins: {
+      'import-x': importX,
+    },
+    settings: {
+      'import-x/resolver-next': [
+        createTypeScriptImportResolver({
+          alwaysTryTypes: true,
+          project: './tsconfig.json',
+        }),
+      ],
+    },
+  },
+  {
+    files: ['**/*.{ts,vue,mjs}'],
+    rules: {
+      'import-x/no-unresolved': ['error', { caseSensitive: true, caseSensitiveStrict: false }],
     },
   },
   {

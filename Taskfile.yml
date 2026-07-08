@@ -32,9 +32,9 @@ tasks:
   check:
     desc: Run frontend and backend checks
     cmds:
-      - cd web && yarn typecheck
-      - cd web && yarn format
-      - cd web && yarn lint
+      - yarn --cwd web typecheck
+      - yarn --cwd web lint:fix
+      - yarn --cwd web format:fix
       - ./bin/golangci-lint fmt ./cmd/... ./internal/...
       - ./bin/golangci-lint run ./cmd/... ./internal/...
 

@@ -1,6 +1,7 @@
 {
   "name": "termbridge-web",
   "description": "Web terminal prototype for TermBridge Gate precursor.",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -8,11 +9,13 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview --host localhost",
-    "lint": "eslint . --fix --cache",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint src --cache",
+    "lint:fix": "eslint src --fix --fix-type=problem --cache",
+    "format": "prettier src --check --ignore-unknown",
+    "format:fix": "prettier src --write --ignore-unknown",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "vue-tsc --noEmit"
+    "test:cov": "vitest run --coverage"
   },
   "dependencies": {
     "@lucide/vue": "^1.21.0",
@@ -33,6 +36,8 @@
     "@vitejs/plugin-vue": "6.0.7",
     "eslint": "10.4.1",
     "eslint-config-prettier": "10.1.8",
+    "eslint-import-resolver-typescript": "4.4.5",
+    "eslint-plugin-import-x": "4.17.1",
     "eslint-plugin-vue": "10.9.2",
     "prettier": "3.8.3",
     "tailwindcss": "4.3.0",
