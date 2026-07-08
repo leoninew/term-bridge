@@ -12,19 +12,20 @@ const cloudAccountAuthRoutes = [
   'cloud-reset-password',
 ]
 
-const agentAuthWhitelistRoutes = ['agent-oauth-callback']
+const homeRoute = 'home'
 
-const cloudAuthWhitelistRoutes = [...cloudAccountAuthRoutes]
+const agentAuthWhitelistRoutes = [homeRoute, 'agent-oauth-callback']
+
+const cloudAuthWhitelistRoutes = [homeRoute, ...cloudAccountAuthRoutes]
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
-      redirect: () => {
-        const appMode = useAppModeStore()
-        return { name: appMode.dashboardRouteName() }
-      },
+      name: homeRoute,
+      component: () => import('../views/agent/DashboardView.vue'),
+      meta: { mode: 'both' },
     },
     {
       path: '/login',
