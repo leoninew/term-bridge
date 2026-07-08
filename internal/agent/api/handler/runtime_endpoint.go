@@ -223,16 +223,21 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 				return nil
 			}
 			if outbound.Kind == terminalapp.OutboundBinary {
-				if err := conn.Write(r.Context(), websocket.MessageBinary, outbound.Binary); err != nil {
+				err := conn.Write(r.Context(), websocket.MessageBinary, outbound.Binary)
+				stream.MarkSent(outbound)
+				if err != nil {
 					return err
 				}
 				continue
 			}
 			data, err := terminalproto.EncodeServer(outbound.Text)
 			if err != nil {
+				stream.MarkSent(outbound)
 				return err
 			}
-			if err := conn.Write(r.Context(), websocket.MessageText, data); err != nil {
+			err = conn.Write(r.Context(), websocket.MessageText, data)
+			stream.MarkSent(outbound)
+			if err != nil {
 				return err
 			}
 		}

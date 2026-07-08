@@ -36,6 +36,8 @@ const (
 
 	DefaultClientQueueSize  = 64
 	DefaultClientQueueBytes = 4 * 1024 * 1024
+	DefaultReplayMaxBytes   = 1024 * 1024
+	DefaultReplayChunkBytes = 64 * 1024
 )
 
 type AttachmentState string
@@ -80,6 +82,8 @@ type Config struct {
 	Logger           *slog.Logger
 	ClientQueueSize  int
 	ClientQueueBytes int
+	ReplayMaxBytes   int64
+	ReplayChunkBytes int
 }
 
 type Registry struct {
@@ -91,6 +95,8 @@ type Registry struct {
 	logger           *slog.Logger
 	clientQueueSize  int
 	clientQueueBytes int
+	replayMaxBytes   int64
+	replayChunkBytes int
 
 	mu        sync.Mutex
 	runtimes  map[string]*SessionRuntime
@@ -130,6 +136,14 @@ func NewRegistry(config Config) *Registry {
 	if queueBytes <= 0 {
 		queueBytes = DefaultClientQueueBytes
 	}
+	replayMaxBytes := config.ReplayMaxBytes
+	if replayMaxBytes <= 0 {
+		replayMaxBytes = DefaultReplayMaxBytes
+	}
+	replayChunkBytes := config.ReplayChunkBytes
+	if replayChunkBytes <= 0 {
+		replayChunkBytes = DefaultReplayChunkBytes
+	}
 	return &Registry{
 		cwd:              config.Cwd,
 		store:            config.Store,
@@ -139,6 +153,8 @@ func NewRegistry(config Config) *Registry {
 		logger:           config.Logger,
 		clientQueueSize:  queueSize,
 		clientQueueBytes: queueBytes,
+		replayMaxBytes:   replayMaxBytes,
+		replayChunkBytes: replayChunkBytes,
 		runtimes:         map[string]*SessionRuntime{},
 		launching:        map[string]bool{},
 	}
@@ -419,7 +435,7 @@ func (r *Registry) archiveCurrentHistory(workspaceId string, sessionId string, a
 		}
 		return "", err
 	}
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		archiveName := "history." + archiveId + archiveSuffix(i) + ".log"
 		archivePath := filepath.Join(filepath.Dir(historyPath), archiveName)
 		if _, err := os.Stat(archivePath); err == nil {
@@ -836,6 +852,12 @@ func (c *Client) enqueue(outbound Outbound) bool {
 		c.markSent(outbound)
 		return false
 	}
+}
+
+func (c *Client) canEnqueue(size int) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.queuedBytes+size <= c.runtime.registry.clientQueueBytes && len(c.queue) < cap(c.queue)
 }
 
 func (c *Client) MarkSent(outbound Outbound) {

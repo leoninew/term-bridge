@@ -360,7 +360,11 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 			}
 			data := outboundData(outbound)
 			output := &shared.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &shared.TunnelFrame_TerminalOutput{TerminalOutput: &shared.TerminalOutput{Data: data}}}
-			_ = writeTunnelFrame(ctx, conn, writeMu, output)
+			if err := writeTunnelFrame(ctx, conn, writeMu, output); err != nil {
+				stream.MarkSent(outbound)
+				return
+			}
+			stream.MarkSent(outbound)
 		}
 	}
 }

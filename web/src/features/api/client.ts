@@ -81,7 +81,10 @@ function configureApiClient(client: typeof apiClient, target: ApiTarget): void {
           appMode.allowsMode('cloud') &&
           router.currentRoute.value.name !== 'cloud-login'
         ) {
-          router.push({ name: 'cloud-login', query: { redirect: router.currentRoute.value.fullPath } })
+          router.push({
+            name: 'cloud-login',
+            query: { redirect: router.currentRoute.value.fullPath },
+          })
         }
       }
       return Promise.reject(errorFromResponse(error.response))

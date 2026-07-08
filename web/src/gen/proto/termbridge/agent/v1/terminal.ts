@@ -6,27 +6,27 @@
 
 /* eslint-disable */
 
-export const protobufPackage = "termbridge.agent";
+export const protobufPackage = 'termbridge.agent'
 
 export interface ClientControlMessage {
-  type: string;
-  cols: number;
-  rows: number;
-  nonce: string;
+  type: string
+  cols: number
+  rows: number
+  nonce: string
 }
 
 export interface ServerControlMessage {
-  type: string;
-  session_id: string;
-  workspace_id: string;
-  state: string;
-  lifecycle_state: string;
-  attachment_state: string;
-  reason: string;
-  exit_code?: number | undefined;
-  code: string;
-  message: string;
-  error: string;
-  nonce: string;
-  truncated?: boolean | undefined;
+  type: string
+  session_id: string
+  workspace_id: string
+  state: string
+  lifecycle_state: string
+  attachment_state: string
+  reason: string
+  exit_code?: number | undefined
+  code: string
+  message: string
+  error: string
+  nonce: string
+  truncated?: boolean | undefined
 }

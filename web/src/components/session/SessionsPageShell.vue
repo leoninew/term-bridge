@@ -21,6 +21,7 @@
           :deleting-session-id="deletingSessionId"
           :removing-workspace-id="removingWorkspaceId"
           @select="openSessionTab"
+          :help-href="helpHref"
           @refresh="refresh"
           @new-session="openCreateSessionForm"
           @edit-session="dialogs.openEditDialog"
@@ -31,7 +32,6 @@
           @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
           @reorder-workspaces="reorderWorkspaces"
           @reorder-sessions="reorderSessions"
-          :help-href="helpHref"
           @logout="handleLogout"
           @open-dashboard="openDashboard"
         />

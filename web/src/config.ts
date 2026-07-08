@@ -106,7 +106,8 @@ export const runtimeConfig = {
     return getApiBaseUrl('cloud')
   },
   get cloudOAuth(): CloudOAuthRuntimeConfig | undefined {
-    const runtimeCloudOAuth = typeof window !== 'undefined' ? window.__CONFIG__?.cloudOAuth : undefined
+    const runtimeCloudOAuth =
+      typeof window !== 'undefined' ? window.__CONFIG__?.cloudOAuth : undefined
     if (runtimeCloudOAuth) {
       return runtimeCloudOAuth
     }

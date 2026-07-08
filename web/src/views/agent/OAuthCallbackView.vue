@@ -30,7 +30,10 @@
     const code = typeof route.query.code === 'string' ? route.query.code : ''
     const state = typeof route.query.state === 'string' ? route.query.state : ''
     if (!code || !state) {
-      notifications.notifyError(t('dashboard.cloudConnectionFailed'), new Error('missing code or state'))
+      notifications.notifyError(
+        t('dashboard.cloudConnectionFailed'),
+        new Error('missing code or state'),
+      )
       await router.replace({ name: 'agent-dashboard' })
       return
     }

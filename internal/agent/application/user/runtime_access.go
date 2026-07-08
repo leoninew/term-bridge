@@ -26,6 +26,7 @@ type RuntimeAccess interface {
 
 type TerminalStream interface {
 	Outbound() <-chan terminalapp.Outbound
+	MarkSent(terminalapp.Outbound)
 	WriteInput(data []byte) error
 	Resize(cols int, rows int) error
 	Detach(reason string)

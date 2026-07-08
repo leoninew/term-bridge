@@ -28,6 +28,11 @@ const (
 
 	DefaultAuthUsername = "admin"
 	DefaultAuthPassword = "admin"
+
+	DefaultTerminalReplayMaxBytes      int64 = 1024 * 1024
+	DefaultTerminalReplayChunkBytes          = 64 * 1024
+	DefaultTerminalClientQueueMessages       = 64
+	DefaultTerminalClientQueueBytes          = 4 * 1024 * 1024
 )
 
 type Config struct {
@@ -39,6 +44,7 @@ type Config struct {
 	LogDir            string
 	LogHTTP           LogHTTPConfig
 	History           HistoryConfig
+	Terminal          TerminalConfig
 	Runtime           RuntimeConfig
 	Agent             AgentConfig
 	Cloud             CloudConfig
@@ -116,6 +122,25 @@ type HistoryConfig struct {
 	MaxLines     int
 	MaxBytes     int64
 	MaxLineBytes int
+}
+
+type TerminalConfig struct {
+	Replay TerminalReplayConfig
+	Client TerminalClientConfig
+}
+
+type TerminalReplayConfig struct {
+	MaxBytes   int64
+	ChunkBytes int
+}
+
+type TerminalClientConfig struct {
+	Queue TerminalClientQueueConfig
+}
+
+type TerminalClientQueueConfig struct {
+	MaxMessages int
+	MaxBytes    int
 }
 
 type RuntimeConfig struct {
@@ -252,6 +277,16 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			MaxBytes:     v.GetInt64("history.max_bytes"),
 			MaxLineBytes: v.GetInt("history.max_line_bytes"),
 		},
+		Terminal: TerminalConfig{
+			Replay: TerminalReplayConfig{
+				MaxBytes:   v.GetInt64("terminal.replay.max_bytes"),
+				ChunkBytes: v.GetInt("terminal.replay.chunk_bytes"),
+			},
+			Client: TerminalClientConfig{Queue: TerminalClientQueueConfig{
+				MaxMessages: v.GetInt("terminal.client.queue.max_messages"),
+				MaxBytes:    v.GetInt("terminal.client.queue.max_bytes"),
+			}},
+		},
 		Runtime: RuntimeConfig{StateDir: stateDir},
 		Agent: AgentConfig{
 			ListenUrl:          strings.TrimSpace(v.GetString("agent.listen_url")),
@@ -315,6 +350,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	}
 
 	normalizeLogBodyLimits(&cfg)
+	normalizeTerminalConfig(&cfg)
 	normalizeAgentConfig(&cfg)
 	normalizeCloudConfig(&cfg)
 	if ensureDirs {
@@ -335,6 +371,9 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 		return Config{}, err
 	}
 	if err := validateHistory(cfg.History); err != nil {
+		return Config{}, err
+	}
+	if err := validateTerminal(cfg.Terminal); err != nil {
 		return Config{}, err
 	}
 	if err := validateAgent(cfg.Agent); err != nil {
@@ -765,6 +804,10 @@ func configKeys() []string {
 		"history.max_lines",
 		"history.max_bytes",
 		"history.max_line_bytes",
+		"terminal.replay.max_bytes",
+		"terminal.replay.chunk_bytes",
+		"terminal.client.queue.max_messages",
+		"terminal.client.queue.max_bytes",
 		"runtime.state_dir",
 		"agent.listen_url",
 		"agent.static_dir",
@@ -895,6 +938,43 @@ func validateHistory(cfg HistoryConfig) error {
 	}
 	if cfg.MaxLineBytes < 1 {
 		return apperrors.Config("invalid history.max_line_bytes", fmt.Errorf("must be positive"))
+	}
+	return nil
+}
+
+func normalizeTerminalConfig(cfg *Config) {
+	if cfg.Terminal.Replay.MaxBytes <= 0 {
+		cfg.Terminal.Replay.MaxBytes = DefaultTerminalReplayMaxBytes
+	}
+	if cfg.Terminal.Replay.ChunkBytes <= 0 {
+		cfg.Terminal.Replay.ChunkBytes = DefaultTerminalReplayChunkBytes
+	}
+	if cfg.Terminal.Client.Queue.MaxMessages <= 0 {
+		cfg.Terminal.Client.Queue.MaxMessages = DefaultTerminalClientQueueMessages
+	}
+	if cfg.Terminal.Client.Queue.MaxBytes <= 0 {
+		cfg.Terminal.Client.Queue.MaxBytes = DefaultTerminalClientQueueBytes
+	}
+}
+
+func validateTerminal(cfg TerminalConfig) error {
+	if cfg.Replay.MaxBytes < 1 {
+		return apperrors.Config("invalid terminal.replay.max_bytes", fmt.Errorf("must be positive"))
+	}
+	if cfg.Replay.ChunkBytes < 1 {
+		return apperrors.Config("invalid terminal.replay.chunk_bytes", fmt.Errorf("must be positive"))
+	}
+	if int64(cfg.Replay.ChunkBytes) > cfg.Replay.MaxBytes {
+		return apperrors.Config("invalid terminal.replay.chunk_bytes", fmt.Errorf("must not exceed terminal.replay.max_bytes"))
+	}
+	if cfg.Client.Queue.MaxMessages < 1 {
+		return apperrors.Config("invalid terminal.client.queue.max_messages", fmt.Errorf("must be positive"))
+	}
+	if cfg.Client.Queue.MaxBytes < 1 {
+		return apperrors.Config("invalid terminal.client.queue.max_bytes", fmt.Errorf("must be positive"))
+	}
+	if cfg.Replay.MaxBytes >= int64(cfg.Client.Queue.MaxBytes) {
+		return apperrors.Config("invalid terminal.replay.max_bytes", fmt.Errorf("must be less than terminal.client.queue.max_bytes"))
 	}
 	return nil
 }

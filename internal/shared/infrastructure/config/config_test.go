@@ -64,6 +64,12 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.History.MaxLines != 10000 || cfg.History.MaxBytes != 5242880 || cfg.History.MaxLineBytes != 65536 {
 		t.Fatalf("History = %#v", cfg.History)
 	}
+	if cfg.Terminal.Replay.MaxBytes != 1048576 || cfg.Terminal.Replay.ChunkBytes != 65536 {
+		t.Fatalf("Terminal.Replay = %#v", cfg.Terminal.Replay)
+	}
+	if cfg.Terminal.Client.Queue.MaxMessages != 64 || cfg.Terminal.Client.Queue.MaxBytes != 4194304 {
+		t.Fatalf("Terminal.Client.Queue = %#v", cfg.Terminal.Client.Queue)
+	}
 	if cfg.Agent.ExposeErrors {
 		t.Fatal("Agent.ExposeErrors = true, want false")
 	}

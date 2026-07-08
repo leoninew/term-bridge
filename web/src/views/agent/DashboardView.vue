@@ -95,7 +95,10 @@
       return
     }
     if (!cloudOAuthConfigured()) {
-      notifications.notifyError(t('dashboard.cloudGateNotConfigured'), new Error('Cloud OAuth is not configured'))
+      notifications.notifyError(
+        t('dashboard.cloudGateNotConfigured'),
+        new Error('Cloud OAuth is not configured'),
+      )
       return
     }
     connectingCloud.value = true

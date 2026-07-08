@@ -12,6 +12,7 @@ type Config struct {
 	LogDir   string
 	LogHTTP  LogHTTPConfig
 	History  history.Config
+	Terminal TerminalConfig
 	Runtime  RuntimeConfig
 	Server   ServerConfig
 	Gate     GateConfig
@@ -24,6 +25,25 @@ type Config struct {
 type LogHTTPConfig struct {
 	RequestBodyLimit  int
 	ResponseBodyLimit int
+}
+
+type TerminalConfig struct {
+	Replay TerminalReplayConfig
+	Client TerminalClientConfig
+}
+
+type TerminalReplayConfig struct {
+	MaxBytes   int64
+	ChunkBytes int
+}
+
+type TerminalClientConfig struct {
+	Queue TerminalClientQueueConfig
+}
+
+type TerminalClientQueueConfig struct {
+	MaxMessages int
+	MaxBytes    int
 }
 
 type RuntimeConfig struct {

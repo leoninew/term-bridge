@@ -155,8 +155,7 @@ export const messages = {
       cloudConnectionFailed: 'Cloud 连接失败',
       cloudConnectionDetails: '云端账号连接状态',
       cloudConnectionConnectedDescription: '当前本机设备已完成 Cloud 授权，可被云端账号看到。',
-      cloudConnectionNotConnectedDescription:
-        '当前本机设备尚未连接 Cloud；这里不是本地登录状态。',
+      cloudConnectionNotConnectedDescription: '当前本机设备尚未连接 Cloud；这里不是本地登录状态。',
       cloudConnectionPublicUrl: 'Cloud',
       cloudConnectionDevice: '本机设备',
       cloudConnectionConnectedAt: '连接时间',

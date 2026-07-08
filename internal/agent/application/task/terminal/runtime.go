@@ -3,6 +3,7 @@ package terminal
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -96,22 +97,74 @@ func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentStat
 		return err
 	}
 	historyPath := r.registry.store.HistoryPath(r.session.WorkspaceId, r.session.Id)
-	data, err := os.ReadFile(historyPath)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	data, truncated, err := r.readReplayTail(historyPath)
+	if err != nil {
 		return err
 	}
+	replayFinished := Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeReplayFinished, Truncated: &truncated}}
 	if len(data) > 0 {
-		r.registry.logger.Info("terminal replay enqueue history", "session_id", r.session.Id, "client_id", client.Id(), "bytes", len(data))
-		if !client.enqueue(Outbound{Kind: OutboundBinary, Binary: data}) {
-			return fmt.Errorf("client queue full")
+		r.registry.logger.Info("terminal replay enqueue history", "session_id", r.session.Id, "client_id", client.Id(), "bytes", len(data), "truncated", truncated)
+		if !r.enqueueReplayChunks(client, data, replayFinished) {
+			truncated = true
+			r.registry.logger.Warn("terminal replay truncated by client queue", "session_id", r.session.Id, "client_id", client.Id(), "queued_bytes", client.QueuedBytes(), "queue_bytes", r.registry.clientQueueBytes)
 		}
 	}
-	truncated := false
-	if !client.enqueue(Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeReplayFinished, Truncated: &truncated}}) {
+	if !client.enqueue(replayFinished) {
 		return fmt.Errorf("client queue full")
 	}
-	r.registry.logger.Info("terminal replay enqueue finish", "session_id", r.session.Id, "client_id", client.Id(), "queued_bytes", client.QueuedBytes())
+	r.registry.logger.Info("terminal replay enqueue finish", "session_id", r.session.Id, "client_id", client.Id(), "queued_bytes", client.QueuedBytes(), "truncated", truncated)
 	return nil
+}
+
+func (r *SessionRuntime) readReplayTail(historyPath string) ([]byte, bool, error) {
+	file, err := os.Open(historyPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = file.Close() }()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, false, err
+	}
+	maxBytes := r.registry.replayMaxBytes
+	if maxBytes <= 0 {
+		return nil, false, nil
+	}
+	size := info.Size()
+	start := int64(0)
+	truncated := false
+	if size > maxBytes {
+		start = size - maxBytes
+		truncated = true
+	}
+	if _, err := file.Seek(start, io.SeekStart); err != nil {
+		return nil, false, err
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, false, err
+	}
+	return data, truncated, nil
+}
+
+func (r *SessionRuntime) enqueueReplayChunks(client *Client, data []byte, reserved Outbound) bool {
+	chunkBytes := r.registry.replayChunkBytes
+	if chunkBytes <= 0 {
+		chunkBytes = DefaultReplayChunkBytes
+	}
+	for start := 0; start < len(data); start += chunkBytes {
+		end := min(start+chunkBytes, len(data))
+		if !client.canEnqueue(outboundSize(reserved) + end - start) {
+			return false
+		}
+		if !client.enqueue(Outbound{Kind: OutboundBinary, Binary: copyBytes(data[start:end])}) {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *SessionRuntime) attachmentState() AttachmentState {
@@ -270,6 +323,7 @@ func (r *SessionRuntime) publishBinary(chunk []byte) {
 	clients := r.clientsSnapshot()
 	for _, client := range clients {
 		if ok := client.enqueue(Outbound{Kind: OutboundBinary, Binary: chunk}); !ok {
+			r.registry.logger.Warn("terminal client queue full", "session_id", r.session.Id, "client_id", client.Id(), "queued_bytes", client.QueuedBytes(), "queue_bytes", r.registry.clientQueueBytes, "queue_messages", r.registry.clientQueueSize, "reason", "client_queue_full")
 			client.Detach("client_queue_full")
 		}
 	}
@@ -279,6 +333,7 @@ func (r *SessionRuntime) broadcastText(message *agent.ServerControlMessage) {
 	clients := r.clientsSnapshot()
 	for _, client := range clients {
 		if ok := client.enqueue(Outbound{Kind: OutboundText, Text: message}); !ok {
+			r.registry.logger.Warn("terminal client queue full", "session_id", r.session.Id, "client_id", client.Id(), "queued_bytes", client.QueuedBytes(), "queue_bytes", r.registry.clientQueueBytes, "queue_messages", r.registry.clientQueueSize, "reason", "client_queue_full")
 			client.Detach("client_queue_full")
 		}
 	}

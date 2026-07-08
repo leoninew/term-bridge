@@ -182,11 +182,15 @@ func cloudConnectorConfigured(cfg Config) bool {
 
 func newWebTerminalRegistry(cfg Config, logger *slog.Logger, store terminalapp.RuntimeStore) *terminalapp.Registry {
 	return terminalapp.NewRegistry(terminalapp.Config{
-		Cwd:     cfg.Cwd,
-		Store:   store,
-		LogDir:  cfg.LogDir,
-		History: cfg.History,
-		Manager: gopty.NewManager(),
-		Logger:  logger,
+		Cwd:              cfg.Cwd,
+		Store:            store,
+		LogDir:           cfg.LogDir,
+		History:          cfg.History,
+		Manager:          gopty.NewManager(),
+		Logger:           logger,
+		ReplayMaxBytes:   cfg.Terminal.Replay.MaxBytes,
+		ReplayChunkBytes: cfg.Terminal.Replay.ChunkBytes,
+		ClientQueueSize:  cfg.Terminal.Client.Queue.MaxMessages,
+		ClientQueueBytes: cfg.Terminal.Client.Queue.MaxBytes,
 	})
 }

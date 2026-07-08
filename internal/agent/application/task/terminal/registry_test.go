@@ -18,6 +18,7 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/workspace"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/repository/task/state"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
+	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 )
 
 func TestCreateSessionExpandsHomeCwd(t *testing.T) {
@@ -234,7 +235,7 @@ func TestSlowClientDetachDoesNotStopRuntimeOrHistory(t *testing.T) {
 		t.Fatalf("Attach() error = %v", err)
 	}
 	drainClient(t, client)
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		fake.output <- []byte("TERM_BRIDGE_LARGE_OUTPUT_" + strings.Repeat("x", 128) + "\n")
 	}
 	waitRuntimeAttachment(t, registry, response.SessionId, AttachmentDetached)
@@ -247,6 +248,69 @@ func TestSlowClientDetachDoesNotStopRuntimeOrHistory(t *testing.T) {
 	}
 	if !registry.hasRuntime(response.SessionId) {
 		t.Fatal("runtime stopped after slow client detach")
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
+}
+
+func TestAttachReplaysBoundedChunkedHistory(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 4096, MaxLineBytes: 4096}, Manager: &fakeManager{session: fake}, ClientQueueSize: 16, ClientQueueBytes: 4096, ReplayMaxBytes: 1024, ReplayChunkBytes: 256})
+	response, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{Name: "Replay tail", Command: []string{"go", "version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	fake.output <- []byte("old-" + strings.Repeat("x", 2048) + "recent-" + strings.Repeat("y", 1024) + "\n")
+	for {
+		data, err := registry.History(response.WorkspaceId, response.SessionId)
+		if err != nil {
+			t.Fatalf("History() error = %v", err)
+		}
+		if strings.Contains(string(data), "recent-") {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	client, err := registry.Attach(response.WorkspaceId, response.SessionId)
+	if err != nil {
+		t.Fatalf("Attach() error = %v", err)
+	}
+	var binaryChunks int
+	var binaryBytes int
+	var truncated bool
+	for {
+		select {
+		case outbound := <-client.Outbound():
+			if outbound.Kind == OutboundBinary {
+				binaryChunks++
+				binaryBytes += len(outbound.Binary)
+				if len(outbound.Binary) > 256 {
+					t.Fatalf("replay chunk bytes = %d, want <= 256", len(outbound.Binary))
+				}
+			}
+			if outbound.Text != nil && outbound.Text.Type == terminalproto.TypeReplayFinished {
+				truncated = outbound.Text.GetTruncated()
+				client.MarkSent(outbound)
+				goto replayDone
+			}
+			client.MarkSent(outbound)
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for replay finish")
+		}
+	}
+
+replayDone:
+	if !truncated {
+		t.Fatal("replay truncated = false, want true")
+	}
+	if binaryChunks != 4 || binaryBytes != 1024 {
+		t.Fatalf("replay chunks/bytes = %d/%d, want 4/1024", binaryChunks, binaryBytes)
+	}
+	if client.QueuedBytes() != 0 {
+		t.Fatalf("QueuedBytes() = %d, want released", client.QueuedBytes())
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
 	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)

@@ -23,7 +23,10 @@ export function startCloudOAuth(postAuthRedirect: string) {
   const config = requireCloudOAuthConfig()
   const state = randomState()
   writeLocalStorageValue(cloudOAuthStateKey, state)
-  writeLocalStorageValue(cloudOAuthRedirectKey, safeLocalRedirect(postAuthRedirect) || '/agent/dashboard')
+  writeLocalStorageValue(
+    cloudOAuthRedirectKey,
+    safeLocalRedirect(postAuthRedirect) || '/agent/dashboard',
+  )
   window.location.href = cloudAuthorizeUrl(config, state)
 }
 

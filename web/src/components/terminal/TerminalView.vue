@@ -43,6 +43,9 @@
       }
       if (message.type === 'replay_finished') {
         replaying.value = false
+        if (message.truncated) {
+          xterm?.terminal.writeln('\r\n[termbridge] 当前仅显示最近终端历史，较早输出已截断。')
+        }
       }
       if (message.type === 'error') {
         logTerminalDiagnosticError('socket.control.error', {
@@ -50,9 +53,7 @@
           code: message.code,
           message: message.message,
         })
-        xterm?.terminal.writeln(
-          `\r\n[termbridge:${message.code}] ${safeTerminalText(message.message)}`,
-        )
+        xterm?.terminal.writeln(`\r\n[termbridge] ${terminalErrorText(message)}`)
       }
       if (message.type === 'exited') {
         xterm?.terminal.writeln(`\r\n[termbridge] process exited with code ${message.exit_code}`)
@@ -79,6 +80,13 @@
       rows: lastTerminalSize?.rows,
     })
     socket.connect(url.toString())
+  }
+
+  function terminalErrorText(message: ServerControlMessage): string {
+    if (message.code === 'terminal_stream_error' && message.message === 'client queue full') {
+      return '当前浏览器连接消费终端输出过慢，已断开以保护会话。重新连接可继续查看最新输出。'
+    }
+    return `${message.code}: ${safeTerminalText(message.message)}`
   }
 
   function safeTerminalText(value: string): string {

@@ -5,70 +5,70 @@
 // source: termbridge/cloud/v1/auth.proto
 
 /* eslint-disable */
-import type { CloudSessionSummary } from "./session";
+import type { CloudSessionSummary } from './session'
 
-export const protobufPackage = "termbridge.cloud";
+export const protobufPackage = 'termbridge.cloud'
 
 export interface User {
-  id: string;
-  email: string;
-  display_name: string;
-  email_verified: boolean;
-  provider: string;
+  id: string
+  email: string
+  display_name: string
+  email_verified: boolean
+  provider: string
 }
 
 export interface AuthLoginReq {
-  email: string;
-  username: string;
-  password: string;
+  email: string
+  username: string
+  password: string
 }
 
 export interface AuthRegisterReq {
-  email: string;
-  password: string;
+  email: string
+  password: string
 }
 
 export interface AuthVerifyEmailReq {
-  email: string;
-  code: string;
+  email: string
+  code: string
 }
 
 export interface AuthResendVerificationReq {
-  email: string;
+  email: string
 }
 
 export interface AuthChangePasswordReq {
-  current_password: string;
-  new_password: string;
+  current_password: string
+  new_password: string
 }
 
 export interface AuthPasswordResetRequestReq {
-  email: string;
+  email: string
 }
 
 export interface AuthPasswordResetConfirmReq {
-  email: string;
-  code: string;
-  new_password: string;
+  email: string
+  code: string
+  new_password: string
 }
 
 export interface AuthGoogleCallbackReq {
-  code: string;
-  state: string;
+  code: string
+  state: string
 }
 
 export interface TokenResp {
-  access_token: string;
-  token_type: string;
+  access_token: string
+  token_type: string
 }
 
 export interface GoogleAuthUrlResp {
-  auth_url: string;
+  auth_url: string
 }
 
 export interface AuthMeResp {
-  authenticated: boolean;
-  username: string;
-  user: User | undefined;
-  cloud_session: CloudSessionSummary | undefined;
+  authenticated: boolean
+  username: string
+  user: User | undefined
+  cloud_session: CloudSessionSummary | undefined
 }

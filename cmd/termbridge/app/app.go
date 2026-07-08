@@ -219,6 +219,16 @@ func agentConfig(cfg config.Config) agentserver.Config {
 			MaxBytes:     cfg.History.MaxBytes,
 			MaxLineBytes: cfg.History.MaxLineBytes,
 		},
+		Terminal: agentserver.TerminalConfig{
+			Replay: agentserver.TerminalReplayConfig{
+				MaxBytes:   cfg.Terminal.Replay.MaxBytes,
+				ChunkBytes: cfg.Terminal.Replay.ChunkBytes,
+			},
+			Client: agentserver.TerminalClientConfig{Queue: agentserver.TerminalClientQueueConfig{
+				MaxMessages: cfg.Terminal.Client.Queue.MaxMessages,
+				MaxBytes:    cfg.Terminal.Client.Queue.MaxBytes,
+			}},
+		},
 		Runtime: agentserver.RuntimeConfig{StateDir: cfg.Runtime.StateDir},
 		Server: agentserver.ServerConfig{
 			ListenURL:          cfg.Agent.ListenUrl,

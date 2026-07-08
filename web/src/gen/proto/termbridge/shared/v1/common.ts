@@ -6,15 +6,15 @@
 
 /* eslint-disable */
 
-export const protobufPackage = "termbridge.shared";
+export const protobufPackage = 'termbridge.shared'
 
 export interface ErrorResp {
-  code: string;
-  error: string;
-  request_id: string;
-  details: { [key: string]: any } | undefined;
+  code: string
+  error: string
+  request_id: string
+  details: { [key: string]: any } | undefined
 }
 
 export interface HealthResp {
-  status: string;
+  status: string
 }

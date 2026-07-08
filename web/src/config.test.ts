@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildApiUrl, buildApiWebSocketUrl, getApiBaseUrl, getFrontendMode, runtimeConfig } from './config'
+import {
+  buildApiUrl,
+  buildApiWebSocketUrl,
+  getApiBaseUrl,
+  getFrontendMode,
+  runtimeConfig,
+} from './config'
 
 describe('runtime config', () => {
   afterEach(() => {
