@@ -15,6 +15,6 @@
   const router = useRouter()
 
   onMounted(async () => {
-    await router.replace({ name: 'agent-dashboard' })
+    await router.replace({ name: 'home' })
   })
 </script>

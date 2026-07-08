@@ -56,3 +56,39 @@ func TestCloudBindingSummaryPersistsWithDeviceIdentityWithoutTokens(t *testing.T
 		t.Fatalf("persisted cloud binding = %#v", persisted.CloudBinding)
 	}
 }
+
+func TestClearCloudBindingSummaryDisconnectsLocalCloudWithoutChangingDeviceIdentity(t *testing.T) {
+	stateDir := t.TempDir()
+	createdAt := time.Date(2026, 7, 5, 10, 0, 0, 0, time.UTC)
+	device, err := LoadOrCreateDevice(DeviceOptions{StateDir: stateDir, Now: func() time.Time { return createdAt }})
+	if err != nil {
+		t.Fatalf("LoadOrCreateDevice() error = %v", err)
+	}
+	connectedAt := time.Date(2026, 7, 5, 11, 0, 0, 0, time.UTC)
+	if err := SaveCloudBindingSummary(stateDir, CloudBindingSummary{PublicUrl: "https://cloud.example.test/", DeviceId: device.Id, DeviceName: device.Name, ConnectedAt: connectedAt}, connectedAt); err != nil {
+		t.Fatalf("SaveCloudBindingSummary() error = %v", err)
+	}
+	disconnectedAt := time.Date(2026, 7, 5, 12, 0, 0, 0, time.UTC)
+
+	if err := ClearCloudBindingSummary(stateDir, disconnectedAt); err != nil {
+		t.Fatalf("ClearCloudBindingSummary() error = %v", err)
+	}
+
+	loaded, err := LoadOrCreateDevice(DeviceOptions{StateDir: stateDir, Now: func() time.Time { return disconnectedAt.Add(time.Hour) }})
+	if err != nil {
+		t.Fatalf("LoadOrCreateDevice(reload) error = %v", err)
+	}
+	if loaded.Id != device.Id || loaded.Name != device.Name || loaded.PublicKey != device.PublicKey {
+		t.Fatalf("device identity changed after cloud disconnect: before=%#v after=%#v", device, loaded)
+	}
+	if loaded.CloudBinding != nil {
+		t.Fatalf("cloud binding after disconnect = %#v, want nil", loaded.CloudBinding)
+	}
+	data, err := os.ReadFile(filepath.Join(stateDir, DeviceIdentityFileName))
+	if err != nil {
+		t.Fatalf("read device identity file error = %v", err)
+	}
+	if strings.Contains(string(data), "cloud_binding") {
+		t.Fatalf("device identity still persisted cloud binding after disconnect: %s", string(data))
+	}
+}

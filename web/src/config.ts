@@ -45,16 +45,25 @@ export function buildApiUrl(path: string, target: ApiTarget = 'agent'): string {
   return `${getApiBaseUrl(target)}${normalizedPath}`
 }
 
+export function buildAgentPageUrl(path: string): string {
+  return buildPageUrl(path, 'agent')
+}
+
 export function buildCloudPageUrl(path: string): string {
+  return buildPageUrl(path, 'cloud')
+}
+
+function buildPageUrl(path: string, target: ApiTarget): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  const baseUrl = getApiBaseUrl('cloud')
+  const baseUrl = getApiBaseUrl(target)
   if (baseUrl.startsWith('/')) {
     return normalizedPath
   }
   const url = new URL(baseUrl)
   const apiPath = url.pathname.replace(/\/+$/, '')
-  if (apiPath.endsWith('/cloud-api')) {
-    url.pathname = `${apiPath.slice(0, -'/cloud-api'.length)}${normalizedPath}`
+  const apiSuffix = `/${target}-api`
+  if (apiPath.endsWith(apiSuffix)) {
+    url.pathname = `${apiPath.slice(0, -apiSuffix.length)}${normalizedPath}`
   } else {
     url.pathname = normalizedPath
   }

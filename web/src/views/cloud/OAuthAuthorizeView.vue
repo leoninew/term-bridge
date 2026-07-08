@@ -42,7 +42,7 @@
       window.location.href = await cloudOAuthAuthorize(route.fullPath)
     } catch (err) {
       notifications.notifyError(t('gateway.loginFailed'), err)
-      await router.replace({ name: 'cloud-dashboard' })
+      await router.replace({ name: 'home' })
     }
   })
 </script>

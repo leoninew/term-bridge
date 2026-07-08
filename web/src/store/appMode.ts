@@ -40,10 +40,6 @@ export const useAppModeStore = defineStore('appMode', () => {
     }
   }
 
-  function dashboardRouteName(mode: ActiveMode = effectiveMode.value) {
-    return mode === 'agent' ? 'agent-dashboard' : 'cloud-dashboard'
-  }
-
   return {
     frontendMode,
     activeMode,
@@ -53,7 +49,6 @@ export const useAppModeStore = defineStore('appMode', () => {
     allowsRouteMode,
     setActiveMode,
     activateRouteMode,
-    dashboardRouteName,
   }
 })
 

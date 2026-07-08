@@ -25,7 +25,7 @@ export function startCloudOAuth(postAuthRedirect: string) {
   writeLocalStorageValue(cloudOAuthStateKey, state)
   writeLocalStorageValue(
     cloudOAuthRedirectKey,
-    safeLocalRedirect(postAuthRedirect) || '/agent/dashboard',
+    safeLocalRedirect(postAuthRedirect) || '/',
   )
   window.location.href = cloudAuthorizeUrl(config, state)
 }
@@ -41,7 +41,7 @@ export function assertCloudOAuthState(state: string) {
 export function consumeCloudOAuthRedirect(): string {
   const redirect = safeLocalRedirect(readLocalStorageValue(cloudOAuthRedirectKey))
   removeLocalStorageValue(cloudOAuthRedirectKey)
-  return redirect || '/agent/dashboard'
+  return redirect || '/'
 }
 
 function cloudAuthorizeUrl(config: CloudOAuthConfig, state: string): string {

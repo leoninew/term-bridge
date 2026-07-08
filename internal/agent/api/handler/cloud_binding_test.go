@@ -192,6 +192,79 @@ func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T)
 	}
 }
 
+func TestCloudDisconnectClearsLocalCloudSessionWithoutUnbindingCloudDevice(t *testing.T) {
+	authService := NewLocalAuthService(sharedauth.NewTokenService(testJWTKey))
+	stateDir := t.TempDir()
+	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir, Now: func() time.Time { return time.Date(2026, 7, 5, 10, 0, 0, 0, time.UTC) }})
+	if err != nil {
+		t.Fatalf("LoadOrCreateDevice() error = %v", err)
+	}
+	var cloudRequestPaths []string
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cloudRequestPaths = append(cloudRequestPaths, r.Method+" "+r.URL.Path)
+		if r.URL.Path != "/cloud-api/devices/current" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected cloud request = %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer cloud.Close()
+	var sessionEvents []*cloudv1.CloudSessionSummary
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir, OnLocalCloudSession: func(summary *cloudv1.CloudSessionSummary) {
+		if summary == nil {
+			sessionEvents = append(sessionEvents, nil)
+			return
+		}
+		sessionEvents = append(sessionEvents, proto.Clone(summary).(*cloudv1.CloudSessionSummary))
+	}})
+	agentToken := agentToken(t, handler)
+	connectRequest := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
+	connectRequest.Header.Set("Authorization", "Bearer "+agentToken)
+	connectResponse := httptest.NewRecorder()
+	handler.ServeHTTP(connectResponse, connectRequest)
+	if connectResponse.Code != http.StatusOK {
+		t.Fatalf("cloud connect status = %d; body=%s", connectResponse.Code, connectResponse.Body.String())
+	}
+
+	disconnectRequest := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/disconnect", nil)
+	disconnectRequest.Header.Set("Authorization", "Bearer "+agentToken)
+	disconnectResponse := httptest.NewRecorder()
+	handler.ServeHTTP(disconnectResponse, disconnectRequest)
+	if disconnectResponse.Code != http.StatusNoContent {
+		t.Fatalf("cloud disconnect status = %d; body=%s", disconnectResponse.Code, disconnectResponse.Body.String())
+	}
+
+	meRequest := httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil)
+	meRequest.Header.Set("Authorization", "Bearer "+agentToken)
+	meResponse := httptest.NewRecorder()
+	handler.ServeHTTP(meResponse, meRequest)
+	if meResponse.Code != http.StatusOK {
+		t.Fatalf("auth me status = %d; body=%s", meResponse.Code, meResponse.Body.String())
+	}
+	var me cloudv1.AuthMeResp
+	if err := codec.UnmarshalProtoJSON(meResponse.Body.Bytes(), &me); err != nil {
+		t.Fatalf("decode auth me response: %v", err)
+	}
+	if me.CloudSession != nil {
+		t.Fatalf("cloud_session after disconnect = %#v, want nil", me.CloudSession)
+	}
+	loaded, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir})
+	if err != nil {
+		t.Fatalf("LoadOrCreateDevice(reload) error = %v", err)
+	}
+	if loaded.Id != device.Id || loaded.Name != device.Name || loaded.PublicKey != device.PublicKey {
+		t.Fatalf("device identity changed after cloud disconnect: before=%#v after=%#v", device, loaded)
+	}
+	if loaded.CloudBinding != nil {
+		t.Fatalf("cloud binding after disconnect = %#v, want nil", loaded.CloudBinding)
+	}
+	if len(cloudRequestPaths) != 1 || cloudRequestPaths[0] != "POST /cloud-api/devices/current" {
+		t.Fatalf("cloud requests = %#v, want only device report and no unbind/delete", cloudRequestPaths)
+	}
+	if len(sessionEvents) != 2 || sessionEvents[0] == nil || sessionEvents[1] != nil {
+		t.Fatalf("local cloud session events = %#v, want connect summary then nil", sessionEvents)
+	}
+}
+
 func TestCloudConnectRequiresCloudTokenBeforeDeviceReport(t *testing.T) {
 	authService := NewLocalAuthService(sharedauth.NewTokenService(testJWTKey))
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

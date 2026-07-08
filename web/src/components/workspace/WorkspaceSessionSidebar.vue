@@ -6,6 +6,14 @@
       class="flex h-11 shrink-0 items-center border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2"
     >
       <div class="flex w-full items-center gap-1.5">
+        <RouterLink
+          :to="{ name: props.homeRouteName }"
+          class="flex size-8 shrink-0 items-center justify-center rounded-md bg-blue-600 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:bg-blue-500 focus:outline-none"
+          aria-label="TermBridge"
+          title="TermBridge"
+        >
+          TB
+        </RouterLink>
         <label class="relative min-w-0 flex-1">
           <span class="sr-only">{{ t('sidebar.searchSessions') }}</span>
           <Search
@@ -267,7 +275,7 @@
               @select="emit('openDashboard')"
             >
               <LayoutDashboard class="size-4 text-[var(--color-text-subtle)]" />
-              {{ t('dashboard.title') }}
+              {{ t('dashboard.home') }}
             </DropdownMenuItem>
             <DropdownMenuItem v-if="props.helpHref" as-child>
               <a
@@ -434,6 +442,7 @@
     deletingSessionId: string | null
     removingWorkspaceId: string | null
     helpHref?: string
+    homeRouteName: string
   }>()
 
   const emit = defineEmits<{

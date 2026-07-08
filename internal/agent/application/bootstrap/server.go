@@ -63,47 +63,87 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 	defer cancel()
 	backendReady := make(chan struct{})
 	errCh := make(chan error, 3)
-	var connectorMu sync.Mutex
-	cloudConnectorStarted := false
-	var cloudConnector *agentapp.Client
-	if cloudConnectorConfigured(cfg) {
-		cloudConnector = newAgentConnector(cfg, cfg.Cloud.PublicURL, runtimeAccess, device, logger)
-	}
-	startConnector := func(connector *agentapp.Client) {
-		connectorMu.Lock()
-		if connector == cloudConnector {
-			if cloudConnectorStarted {
-				connectorMu.Unlock()
-				return
-			}
-			cloudConnectorStarted = true
-		}
-		connectorMu.Unlock()
-		_, _ = fmt.Fprintf(stdout, "TermBridge agent connector targeting %s\n", connector.Config().ConnectUrl)
-		go func() {
-			for {
-				err := normalizeServeError(runClient(options, serveCtx, connector))
-				if err == nil {
-					errCh <- nil
-					return
-				}
-				logger.Warn("termbridge agent connector failed; agent dashboard remains available", "target", connector.Config().ConnectUrl, "error", err)
-				select {
-				case <-serveCtx.Done():
-					errCh <- nil
-					return
-				case <-time.After(2 * time.Second):
-				}
-			}
-		}()
-	}
+	cloudConnector := newCloudConnectorLifecycle(serveCtx, cfg, runtimeAccess, device, logger, options, stdout)
 
-	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudPublicURL: cfg.Cloud.PublicURL, OAuthClient: agentapi.OAuthClientConfig{ClientId: cfg.Cloud.OAuthClient.ClientId, ClientSecret: cfg.Cloud.OAuthClient.ClientSecret, RedirectUrl: cfg.Cloud.OAuthClient.RedirectUrl, Scopes: append([]string(nil), cfg.Cloud.OAuthClient.Scopes...)}, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(*cloud.CloudSessionSummary) {
-		if cloudConnector != nil {
-			startConnector(cloudConnector)
+	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudPublicURL: cfg.Cloud.PublicURL, OAuthClient: agentapi.OAuthClientConfig{ClientId: cfg.Cloud.OAuthClient.ClientId, ClientSecret: cfg.Cloud.OAuthClient.ClientSecret, RedirectUrl: cfg.Cloud.OAuthClient.RedirectUrl, Scopes: append([]string(nil), cfg.Cloud.OAuthClient.Scopes...)}, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(summary *cloud.CloudSessionSummary) {
+		if summary == nil {
+			cloudConnector.Stop()
+			return
 		}
+		cloudConnector.Start()
 	}})
 	return serveHTTP(serveCtx, cfg, logger, options, agentHandler, stdout, backendReady, errCh)
+}
+
+type cloudConnectorLifecycle struct {
+	rootCtx       context.Context
+	cfg           Config
+	runtimeAccess agentapp.RuntimeAccess
+	device        agentapp.Device
+	logger        *slog.Logger
+	options       Options
+	stdout        io.Writer
+	mu            sync.Mutex
+	cancel        context.CancelFunc
+	generation    uint64
+}
+
+func newCloudConnectorLifecycle(rootCtx context.Context, cfg Config, runtimeAccess agentapp.RuntimeAccess, device agentapp.Device, logger *slog.Logger, options Options, stdout io.Writer) *cloudConnectorLifecycle {
+	return &cloudConnectorLifecycle{rootCtx: rootCtx, cfg: cfg, runtimeAccess: runtimeAccess, device: device, logger: logger, options: options, stdout: stdout}
+}
+
+func (c *cloudConnectorLifecycle) Start() {
+	if !cloudConnectorConfigured(c.cfg) {
+		return
+	}
+	c.mu.Lock()
+	if c.cancel != nil {
+		c.mu.Unlock()
+		return
+	}
+	connectorCtx, cancel := context.WithCancel(c.rootCtx)
+	c.cancel = cancel
+	c.generation++
+	generation := c.generation
+	connector := newAgentConnector(c.cfg, c.cfg.Cloud.PublicURL, c.runtimeAccess, c.device, c.logger)
+	c.mu.Unlock()
+
+	_, _ = fmt.Fprintf(c.stdout, "TermBridge agent connector targeting %s\n", connector.Config().ConnectUrl)
+	go c.run(connectorCtx, generation, connector)
+}
+
+func (c *cloudConnectorLifecycle) Stop() {
+	c.mu.Lock()
+	cancel := c.cancel
+	c.cancel = nil
+	c.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (c *cloudConnectorLifecycle) run(ctx context.Context, generation uint64, connector *agentapp.Client) {
+	defer func() {
+		c.mu.Lock()
+		if c.generation == generation {
+			c.cancel = nil
+		}
+		c.mu.Unlock()
+	}()
+	for {
+		err := normalizeServeError(runClient(c.options, ctx, connector))
+		if err == nil {
+			return
+		}
+		if c.logger != nil {
+			c.logger.Warn("termbridge agent connector failed; agent dashboard remains available", "target", connector.Config().ConnectUrl, "error", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(2 * time.Second):
+		}
+	}
 }
 
 func serveHTTP(ctx context.Context, cfg Config, logger *slog.Logger, options Options, agentHandler http.Handler, stdout io.Writer, backendReady chan struct{}, errCh chan error) error {

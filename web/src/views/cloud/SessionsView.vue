@@ -2,7 +2,7 @@
   <SessionsPageShell
     :runtime-target="runtimeTarget"
     :runtime-api="runtimeApi"
-    dashboard-route-name="cloud-dashboard"
+    home-route-name="home"
     :login-redirect="loginRedirect"
     :current-device="currentDevice"
     :logout="authLogout"
@@ -41,7 +41,7 @@
   const deviceId = computed(() => String(route.params.deviceId ?? ''))
   const runtimeTarget = computed<RuntimeTarget>(() => ({ mode: 'cloud', deviceId: deviceId.value }))
   const loginRedirect = computed(
-    () => `/cloud/devices/${encodeURIComponent(deviceId.value)}/sessions`,
+    () => `/devices/${encodeURIComponent(deviceId.value)}/sessions`,
   )
   const currentDevice = computed(
     () => gateway.devices.find((device) => device.id === deviceId.value) ?? null,

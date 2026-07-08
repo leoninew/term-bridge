@@ -2,7 +2,7 @@
   <SessionsPageShell
     :runtime-target="runtimeTarget"
     :runtime-api="runtimeApi"
-    dashboard-route-name="agent-dashboard"
+    home-route-name="home"
     login-redirect="/agent/sessions"
     :logout="authLogout"
   />

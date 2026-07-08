@@ -21,6 +21,7 @@
           :deleting-session-id="deletingSessionId"
           :removing-workspace-id="removingWorkspaceId"
           :help-href="helpHref"
+          :home-route-name="props.homeRouteName"
           @select="openSessionTab"
           @refresh="refresh"
           @new-session="openCreateSessionForm"
@@ -52,11 +53,6 @@
           :active-tab="workbench.activeTab"
           :active-session="activeSession"
           :current-device="workbenchDevice"
-          :authenticated="gateway.authenticated"
-          :user-display-name="userDisplayName"
-          :user-email="gateway.user?.email ?? ''"
-          :user-action-label="userActionLabel"
-          :user-action-disabled="userActionDisabled"
           :create-session-form-open="workbench.createSessionFormOpen"
           :create-cwd="createDraft.cwd"
           :create-name="createDraft.sessionName"
@@ -76,8 +72,6 @@
           @create-workbench="createSessionWorkbench = $event"
           @terminal-state="handleTerminalState"
           @terminal-error="handleTerminalError"
-          @open-dashboard="openDashboard"
-          @open-user-auth="openUserAuth"
         />
       </SplitterPanel>
     </SplitterGroup>
@@ -143,7 +137,7 @@
   const props = defineProps<{
     runtimeTarget: RuntimeTarget
     runtimeApi: SessionRuntimeApi
-    dashboardRouteName: string
+    homeRouteName: string
     loginRedirect: string
     currentDevice?: DeviceSummary | CloudSessionSummary | null
     logout: () => Promise<void>
@@ -169,13 +163,6 @@
   const removingWorkspaceId = ref<string | null>(null)
 
   const isAgentMode = computed(() => props.runtimeTarget.mode === 'agent')
-  const userActionDisabled = computed(() => false)
-  const userActionLabel = computed(() =>
-    isAgentMode.value ? t('dashboard.connectCloudDeviceAction') : t('dashboard.signIn'),
-  )
-  const userDisplayName = computed(
-    () => gateway.user?.display_name || gateway.user?.email || t('dashboard.signedIn'),
-  )
   const workbenchDevice = computed(() => props.currentDevice ?? gateway.currentDevice)
   const helpHref = computed(() => (isAgentMode.value ? buildCloudPageUrl('/help') : ''))
 
@@ -213,18 +200,7 @@
   }
 
   async function openDashboard() {
-    await router.push({ name: props.dashboardRouteName })
-  }
-
-  async function openUserAuth() {
-    if (gateway.authenticated) {
-      return
-    }
-    if (isAgentMode.value) {
-      await router.push({ name: props.dashboardRouteName })
-      return
-    }
-    await router.push({ name: 'cloud-login', query: { redirect: props.loginRedirect } })
+    await router.push({ name: props.homeRouteName })
   }
 
   async function handleLogout() {
@@ -237,7 +213,7 @@
     gateway.passwordInput = ''
     workspaceSessions.reset()
     workbench.resetForSourceChange()
-    await router.replace(isAgentMode.value ? { name: 'agent-dashboard' } : { name: 'cloud-login' })
+    await router.replace(isAgentMode.value ? { name: props.homeRouteName } : { name: 'cloud-login' })
   }
 
   async function startSession() {

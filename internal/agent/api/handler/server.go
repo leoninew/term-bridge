@@ -108,6 +108,7 @@ func (h *Handler) registerCommonRoutes(mux *http.ServeMux) {
 
 func (h *Handler) registerAgentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/agent-api/cloud/connect", h.authMiddleware(http.HandlerFunc(h.handleCloudConnect)).ServeHTTP)
+	mux.HandleFunc("/agent-api/cloud/disconnect", h.authMiddleware(http.HandlerFunc(h.handleCloudDisconnect)).ServeHTTP)
 	mux.HandleFunc("/agent-api/workspaces", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
 	mux.HandleFunc("/agent-api/workspaces/", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
 	mux.HandleFunc("/agent-api/sessions", h.authMiddleware(http.HandlerFunc(h.handleLocalSessions)).ServeHTTP)
@@ -280,6 +281,25 @@ func (s *Handler) persistLocalCloudSession(w http.ResponseWriter, r *http.Reques
 		s.config.OnLocalCloudSession(summary)
 	}
 	return true
+}
+
+func (s *Handler) handleCloudDisconnect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if s.config.LocalDeviceStateDir != "" {
+		if err := agentapp.ClearCloudBindingSummary(s.config.LocalDeviceStateDir, time.Now().UTC()); err != nil {
+			s.config.Logger.Warn("clear local cloud session", "error", err)
+			s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+			return
+		}
+	}
+	s.setLocalCloudSession(nil)
+	if s.config.OnLocalCloudSession != nil {
+		s.config.OnLocalCloudSession(nil)
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Handler) handleLocalWorkspaces(w http.ResponseWriter, r *http.Request) {

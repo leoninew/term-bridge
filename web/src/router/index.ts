@@ -24,7 +24,7 @@ export const router = createRouter({
     {
       path: '/',
       name: homeRoute,
-      component: () => import('../views/agent/DashboardView.vue'),
+      component: () => import('../views/HomeView.vue'),
       meta: { mode: 'both' },
     },
     {
@@ -76,12 +76,6 @@ export const router = createRouter({
       meta: { mode: 'agent' },
     },
     {
-      path: '/agent/dashboard',
-      name: 'agent-dashboard',
-      component: () => import('../views/agent/DashboardView.vue'),
-      meta: { mode: 'agent' },
-    },
-    {
       path: '/agent/oauth/callback',
       name: 'agent-oauth-callback',
       component: () => import('../views/agent/OAuthCallbackView.vue'),
@@ -94,13 +88,13 @@ export const router = createRouter({
       meta: { mode: 'agent' },
     },
     {
-      path: '/cloud/dashboard',
+      path: '/dashboard',
       name: 'cloud-dashboard',
       component: () => import('../views/cloud/DashboardView.vue'),
       meta: { mode: 'cloud' },
     },
     {
-      path: '/cloud/devices/:deviceId/sessions',
+      path: '/devices/:deviceId/sessions',
       name: 'cloud-sessions',
       component: () => import('../views/cloud/SessionsView.vue'),
       meta: { mode: 'cloud' },
@@ -127,7 +121,7 @@ router.beforeEach(async (to) => {
   const routeMode = (to.meta.mode as RouteMode | undefined) ?? 'both'
 
   if (!appMode.allowsRouteMode(routeMode)) {
-    return { name: appMode.dashboardRouteName() }
+    return { name: homeRoute }
   }
   appMode.activateRouteMode(routeMode)
 
@@ -140,7 +134,7 @@ router.beforeEach(async (to) => {
   await gateway.initializeAuth()
   if (!gateway.authenticated) {
     if (appMode.effectiveMode === 'agent') {
-      return routeName === 'agent-dashboard' ? undefined : { name: 'agent-dashboard' }
+      return { name: homeRoute }
     }
     return {
       name: 'cloud-login',

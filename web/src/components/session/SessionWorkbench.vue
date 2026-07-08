@@ -60,27 +60,6 @@
             </div>
           </VueDraggable>
         </TabsList>
-        <div class="ml-auto flex shrink-0 items-center gap-1.5">
-          <button
-            type="button"
-            class="inline-flex size-8 items-center justify-center rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-text)] hover:bg-[var(--color-control-hover)]"
-            :aria-label="t('dashboard.title')"
-            :title="t('dashboard.title')"
-            @click="emit('openDashboard')"
-          >
-            <LayoutDashboard class="size-4 text-[var(--color-text-subtle)]" />
-          </button>
-          <button
-            type="button"
-            :disabled="!authenticated && userActionDisabled"
-            class="inline-flex size-8 items-center justify-center rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-text)] hover:bg-[var(--color-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            :aria-label="accountLabel"
-            :title="accountLabel"
-            @click="emit('openUserAuth')"
-          >
-            <User class="size-4 text-[var(--color-text-subtle)]" />
-          </button>
-        </div>
       </div>
 
       <CreateSessionPanel
@@ -129,9 +108,8 @@
 </template>
 
 <script setup lang="ts">
-  import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { LayoutDashboard, SquareTerminal, User, X } from '@lucide/vue'
+  import { SquareTerminal, X } from '@lucide/vue'
   import { TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
   import CreateSessionPanel from './CreateSessionPanel.vue'
@@ -143,17 +121,12 @@
   import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
   import type { OpenSessionTab } from '../../store/workbench'
 
-  const props = defineProps<{
+  defineProps<{
     openedTabs: OpenSessionTab[]
     activeSessionId: string | null
     activeTab: OpenSessionTab | null
     activeSession: SessionSummary | null
     currentDevice: DeviceSummary | CloudSessionSummary | null
-    authenticated: boolean
-    userDisplayName: string
-    userEmail: string
-    userActionLabel: string
-    userActionDisabled: boolean
     createSessionFormOpen: boolean
     createCwd: string
     createName: string
@@ -176,12 +149,7 @@
     createWorkbench: [element: HTMLElement | null]
     terminalState: [message: ServerControlMessage]
     terminalError: [message: string]
-    openDashboard: []
-    openUserAuth: []
   }>()
 
   const { t } = useI18n()
-  const accountLabel = computed(() =>
-    props.authenticated ? props.userEmail || props.userDisplayName : props.userActionLabel,
-  )
 </script>

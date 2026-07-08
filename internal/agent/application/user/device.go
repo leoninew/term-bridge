@@ -169,6 +169,29 @@ func SaveCloudBindingSummary(stateDir string, summary CloudBindingSummary, now t
 	return writeDeviceIdentity(path, identity)
 }
 
+func ClearCloudBindingSummary(stateDir string, now time.Time) error {
+	if strings.TrimSpace(stateDir) == "" {
+		return fmt.Errorf("state dir is required")
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	path := filepath.Join(stateDir, DeviceIdentityFileName)
+	identity, err := readDeviceIdentity(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if identity.CloudBinding == nil {
+		return nil
+	}
+	identity.CloudBinding = nil
+	identity.UpdatedAt = now.UTC()
+	return writeDeviceIdentity(path, identity)
+}
+
 func cloneCloudBindingSummary(summary *CloudBindingSummary) *CloudBindingSummary {
 	if summary == nil {
 		return nil

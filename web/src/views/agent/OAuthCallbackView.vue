@@ -34,7 +34,7 @@
         t('dashboard.cloudConnectionFailed'),
         new Error('missing code or state'),
       )
-      await router.replace({ name: 'agent-dashboard' })
+      await router.replace({ name: 'home' })
       return
     }
     try {
@@ -45,7 +45,7 @@
       await router.replace(consumeCloudOAuthRedirect())
     } catch (err) {
       notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
-      await router.replace({ name: 'agent-dashboard' })
+      await router.replace({ name: 'home' })
     }
   })
 </script>

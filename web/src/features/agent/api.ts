@@ -46,6 +46,10 @@ export async function connectCloudWithCurrentAccount(code: string): Promise<Clou
   return response.data
 }
 
+export async function disconnectCloud(): Promise<void> {
+  await agentApiClient.post('/cloud/disconnect')
+}
+
 export async function createSession(
   workspaceId: string | null,
   request: CreateSessionReq,
