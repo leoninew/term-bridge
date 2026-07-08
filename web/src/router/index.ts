@@ -139,7 +139,7 @@ router.beforeEach(async (to) => {
   await gateway.initializeAuth()
   if (!gateway.authenticated) {
     if (appMode.effectiveMode === 'agent') {
-      return { name: 'agent-dashboard' }
+      return routeName === 'agent-dashboard' ? undefined : { name: 'agent-dashboard' }
     }
     return {
       name: 'cloud-login',
