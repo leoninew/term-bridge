@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { readStorageValue, writeStorageValue } from './storage'
+import { readLocalStorageValue, writeLocalStorageValue } from './storage'
 
 export const themes = ['light', 'dark'] as const
 export type AppTheme = (typeof themes)[number]
@@ -13,7 +13,7 @@ export function isAppTheme(value: unknown): value is AppTheme {
 }
 
 export function resolveInitialTheme(): AppTheme {
-  const savedTheme = readStorageValue(themeStorageKey)
+  const savedTheme = readLocalStorageValue(themeStorageKey)
   return isAppTheme(savedTheme) ? savedTheme : defaultTheme
 }
 
@@ -34,7 +34,7 @@ export const useThemeStore = defineStore('theme', () => {
 
   function setTheme(value: AppTheme) {
     theme.value = value
-    writeStorageValue(themeStorageKey, value)
+    writeLocalStorageValue(themeStorageKey, value)
     applyTheme()
   }
 

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { readStorageValue, removeStorageValue, writeStorageValue } from './storage'
+import { readLocalStorageValue, removeLocalStorageValue, writeLocalStorageValue } from './storage'
 import { authLoginViaAgent, authMe } from '../features/agent/api'
 import { authLogin, authMeViaCloud, listDevices } from '../features/cloud/api'
 import { useAppModeStore } from './appMode'
@@ -18,8 +18,8 @@ type InitializeAuthOptions = {
 }
 
 export const useGatewayStore = defineStore('gateway', () => {
-  const agentToken = ref<string | null>(readStorageValue(AGENT_TOKEN_KEY))
-  const cloudToken = ref<string | null>(readStorageValue(CLOUD_TOKEN_KEY))
+  const agentToken = ref<string | null>(readLocalStorageValue(AGENT_TOKEN_KEY))
+  const cloudToken = ref<string | null>(readLocalStorageValue(CLOUD_TOKEN_KEY))
   const authInitialized = ref(false)
   const authenticated = ref(false)
   const loggingIn = ref(false)
@@ -52,26 +52,26 @@ export const useGatewayStore = defineStore('gateway', () => {
 
   function setAgentToken(newToken: string) {
     agentToken.value = newToken
-    writeStorageValue(AGENT_TOKEN_KEY, newToken)
+    writeLocalStorageValue(AGENT_TOKEN_KEY, newToken)
     resetAuthState()
   }
 
   function setCloudToken(newToken: string) {
     cloudToken.value = newToken
-    writeStorageValue(CLOUD_TOKEN_KEY, newToken)
+    writeLocalStorageValue(CLOUD_TOKEN_KEY, newToken)
     resetAuthState()
     resetDeviceState()
   }
 
   function clearAgentToken() {
     agentToken.value = null
-    removeStorageValue(AGENT_TOKEN_KEY)
+    removeLocalStorageValue(AGENT_TOKEN_KEY)
     resetAuthState()
   }
 
   function clearCloudToken() {
     cloudToken.value = null
-    removeStorageValue(CLOUD_TOKEN_KEY)
+    removeLocalStorageValue(CLOUD_TOKEN_KEY)
     resetAuthState()
     resetDeviceState()
   }

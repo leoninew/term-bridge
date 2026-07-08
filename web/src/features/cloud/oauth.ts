@@ -1,5 +1,9 @@
 import { buildCloudPageUrl, runtimeConfig } from '../../config'
-import { readStorageValue, removeStorageValue, writeStorageValue } from '../../store/storage'
+import {
+  readLocalStorageValue,
+  removeLocalStorageValue,
+  writeLocalStorageValue,
+} from '../../store/storage'
 
 const cloudOAuthStateKey = 'termbridge.cloud.oauth2.state'
 const cloudOAuthRedirectKey = 'termbridge.cloud.oauth2.redirect'
@@ -18,22 +22,22 @@ export function cloudOAuthConfigured(): boolean {
 export function startCloudOAuth(postAuthRedirect: string) {
   const config = requireCloudOAuthConfig()
   const state = randomState()
-  writeStorageValue(cloudOAuthStateKey, state)
-  writeStorageValue(cloudOAuthRedirectKey, safeLocalRedirect(postAuthRedirect) || '/agent/dashboard')
+  writeLocalStorageValue(cloudOAuthStateKey, state)
+  writeLocalStorageValue(cloudOAuthRedirectKey, safeLocalRedirect(postAuthRedirect) || '/agent/dashboard')
   window.location.href = cloudAuthorizeUrl(config, state)
 }
 
 export function assertCloudOAuthState(state: string) {
-  const storedState = readStorageValue(cloudOAuthStateKey)
-  removeStorageValue(cloudOAuthStateKey)
+  const storedState = readLocalStorageValue(cloudOAuthStateKey)
+  removeLocalStorageValue(cloudOAuthStateKey)
   if (!storedState || state !== storedState) {
     throw new Error('Cloud OAuth state mismatch')
   }
 }
 
 export function consumeCloudOAuthRedirect(): string {
-  const redirect = safeLocalRedirect(readStorageValue(cloudOAuthRedirectKey))
-  removeStorageValue(cloudOAuthRedirectKey)
+  const redirect = safeLocalRedirect(readLocalStorageValue(cloudOAuthRedirectKey))
+  removeLocalStorageValue(cloudOAuthRedirectKey)
   return redirect || '/agent/dashboard'
 }
 

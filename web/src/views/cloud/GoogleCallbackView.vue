@@ -18,7 +18,7 @@
   import { authGoogleCallback } from '../../features/cloud/api'
   import { useGatewayStore } from '../../store/gateway'
   import { useNotificationsStore } from '../../store/notifications'
-  import { readStorageValue, removeStorageValue } from '../../store/storage'
+  import { readLocalStorageValue, removeLocalStorageValue } from '../../store/storage'
 
   const { t } = useI18n()
   const route = useRoute()
@@ -28,8 +28,8 @@
   const cloudLoginRedirectKey = 'termbridge.cloud.login_redirect'
 
   function redirectAfterLogin() {
-    const redirect = readStorageValue(cloudLoginRedirectKey)
-    removeStorageValue(cloudLoginRedirectKey)
+    const redirect = readLocalStorageValue(cloudLoginRedirectKey)
+    removeLocalStorageValue(cloudLoginRedirectKey)
     return safeRedirect(redirect) || { name: 'cloud-dashboard' }
   }
 

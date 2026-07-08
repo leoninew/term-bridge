@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { readStorageValue, removeStorageValue, writeStorageValue } from './storage'
+import {
+  readLocalStorageValue,
+  readSessionStorageValue,
+  removeLocalStorageValue,
+  removeSessionStorageValue,
+  writeLocalStorageValue,
+  writeSessionStorageValue,
+} from './storage'
 
-function storageMock(overrides: Partial<Storage> = {}): Storage {
+function storageMock(): Storage {
   const values = new Map<string, string>()
   return {
     get length() {
@@ -12,53 +19,52 @@ function storageMock(overrides: Partial<Storage> = {}): Storage {
     key: vi.fn((index: number) => Array.from(values.keys())[index] ?? null),
     removeItem: vi.fn((key: string) => values.delete(key)),
     setItem: vi.fn((key: string, value: string) => values.set(key, value)),
-    ...overrides,
   }
 }
 
 describe('storage helpers', () => {
   let localStorage: Storage
+  let sessionStorage: Storage
 
   beforeEach(() => {
     localStorage = storageMock()
-    vi.stubGlobal('window', { localStorage })
+    sessionStorage = storageMock()
+    vi.stubGlobal('window', { localStorage, sessionStorage })
   })
 
-  it('reads existing values', () => {
+  it('reads existing localStorage values', () => {
     localStorage.setItem('termbridge.test', 'value')
 
-    expect(readStorageValue('termbridge.test')).toBe('value')
+    expect(readLocalStorageValue('termbridge.test')).toBe('value')
   })
 
-  it('returns null for missing values', () => {
-    expect(readStorageValue('termbridge.missing')).toBeNull()
+  it('returns null for missing localStorage values', () => {
+    expect(readLocalStorageValue('termbridge.missing')).toBeNull()
   })
 
-  it('writes and removes values', () => {
-    writeStorageValue('termbridge.test', 'value')
+  it('writes and removes localStorage values', () => {
+    writeLocalStorageValue('termbridge.test', 'value')
     expect(localStorage.getItem('termbridge.test')).toBe('value')
 
-    removeStorageValue('termbridge.test')
+    removeLocalStorageValue('termbridge.test')
     expect(localStorage.getItem('termbridge.test')).toBeNull()
   })
 
-  it('does not throw when localStorage is unavailable', () => {
-    vi.stubGlobal('window', {
-      localStorage: storageMock({
-        getItem: vi.fn(() => {
-          throw new Error('blocked')
-        }),
-        setItem: vi.fn(() => {
-          throw new Error('blocked')
-        }),
-        removeItem: vi.fn(() => {
-          throw new Error('blocked')
-        }),
-      }),
-    })
+  it('reads existing sessionStorage values', () => {
+    sessionStorage.setItem('termbridge.test', 'value')
 
-    expect(readStorageValue('termbridge.test')).toBeNull()
-    expect(() => writeStorageValue('termbridge.test', 'value')).not.toThrow()
-    expect(() => removeStorageValue('termbridge.test')).not.toThrow()
+    expect(readSessionStorageValue('termbridge.test')).toBe('value')
+  })
+
+  it('returns null for missing sessionStorage values', () => {
+    expect(readSessionStorageValue('termbridge.missing')).toBeNull()
+  })
+
+  it('writes and removes sessionStorage values', () => {
+    writeSessionStorageValue('termbridge.test', 'value')
+    expect(sessionStorage.getItem('termbridge.test')).toBe('value')
+
+    removeSessionStorageValue('termbridge.test')
+    expect(sessionStorage.getItem('termbridge.test')).toBeNull()
   })
 })

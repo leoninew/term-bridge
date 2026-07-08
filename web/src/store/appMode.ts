@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getFrontendMode, type FrontendMode } from '../config'
-import { readStorageValue, writeStorageValue } from './storage'
+import { readSessionStorageValue, writeSessionStorageValue } from './storage'
 
 export type ActiveMode = 'agent' | 'cloud'
 export type RouteMode = ActiveMode | 'both'
@@ -30,7 +30,7 @@ export const useAppModeStore = defineStore('appMode', () => {
       return false
     }
     activeMode.value = mode
-    writeStorageValue(ACTIVE_MODE_KEY, mode)
+    writeSessionStorageValue(ACTIVE_MODE_KEY, mode)
     return true
   }
 
@@ -61,6 +61,6 @@ function initialActiveMode(frontendMode: FrontendMode): ActiveMode {
   if (frontendMode === 'agent' || frontendMode === 'cloud') {
     return frontendMode
   }
-  const saved = readStorageValue(ACTIVE_MODE_KEY)
+  const saved = readSessionStorageValue(ACTIVE_MODE_KEY)
   return saved === 'cloud' ? 'cloud' : 'agent'
 }

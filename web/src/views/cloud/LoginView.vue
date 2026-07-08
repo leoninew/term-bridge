@@ -33,7 +33,7 @@
   import { authGoogleUrl } from '../../features/cloud/api'
   import { useGatewayStore } from '../../store/gateway'
   import { useNotificationsStore } from '../../store/notifications'
-  import { removeStorageValue, writeStorageValue } from '../../store/storage'
+  import { removeLocalStorageValue, writeLocalStorageValue } from '../../store/storage'
 
   const { t } = useI18n()
   const route = useRoute()
@@ -78,9 +78,9 @@
         typeof route.query.redirect === 'string' ? route.query.redirect : '',
       )
       if (redirect) {
-        writeStorageValue(cloudLoginRedirectKey, redirect)
+        writeLocalStorageValue(cloudLoginRedirectKey, redirect)
       } else {
-        removeStorageValue(cloudLoginRedirectKey)
+        removeLocalStorageValue(cloudLoginRedirectKey)
       }
       window.location.href = await authGoogleUrl()
     } catch (err) {
