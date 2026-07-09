@@ -48,14 +48,9 @@ type OAuthClientConfig struct {
 }
 
 type AuthService interface {
-	Login(ctx context.Context, email, password string) (*cloudproto.TokenResp, error)
+	Login(ctx context.Context, email, password string) (*cloudproto.LocalAuthLoginResp, error)
 	UserFromClaims(ctx context.Context, claims sharedAuth.Claims) (*cloudproto.User, error)
 	VerifyToken(token string) (sharedAuth.Claims, error)
-}
-
-type cloudConnectRequest struct {
-	CloudToken string `json:"cloud_token"`
-	Code       string `json:"code"`
 }
 
 type Handler struct {
@@ -75,15 +70,6 @@ type Handler struct {
 func New(config Config) *Handler {
 	config = normalizeConfig(config)
 	handler := &Handler{config: config, auth: sharedAuth.NewAuther(sharedAuth.Credentials{}, sharedAuth.NewTokenService(config.JWTSecret)), authService: config.AuthService, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
-	if config.LocalDevice.CloudBinding != nil {
-		handler.setLocalCloudSession(cloudSessionSummaryFromBinding(*config.LocalDevice.CloudBinding))
-	} else if config.LocalDeviceStateDir != "" {
-		if summary, err := agentapp.LoadCloudBindingSummary(config.LocalDeviceStateDir); err == nil && summary != nil {
-			handler.setLocalCloudSession(cloudSessionSummaryFromBinding(*summary))
-		} else if err != nil {
-			config.Logger.Warn("load local cloud session", "error", err)
-		}
-	}
 	if config.LocalRuntime != nil {
 		handler.localRuntime = localRuntimeEndpoint{runtime: config.LocalRuntime, handler: handler}
 	}
@@ -109,6 +95,7 @@ func (h *Handler) registerCommonRoutes(mux *http.ServeMux) {
 func (h *Handler) registerAgentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/local-api/cloud/connect", h.authMiddleware(http.HandlerFunc(h.handleCloudConnect)).ServeHTTP)
 	mux.HandleFunc("/local-api/cloud/disconnect", h.authMiddleware(http.HandlerFunc(h.handleCloudDisconnect)).ServeHTTP)
+	mux.HandleFunc("/local-api/cloud/oauth/exchange", h.authMiddleware(http.HandlerFunc(h.handleExchangeOAuthCode)).ServeHTTP)
 	mux.HandleFunc("/local-api/workspaces", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
 	mux.HandleFunc("/local-api/workspaces/", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
 	mux.HandleFunc("/local-api/sessions", h.authMiddleware(http.HandlerFunc(h.handleLocalSessions)).ServeHTTP)
@@ -147,7 +134,7 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, "Failed to sign token", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, &cloudproto.TokenResp{AccessToken: token, TokenType: "bearer"})
+	writeJSON(w, http.StatusOK, &cloudproto.LocalAuthLoginResp{AccessToken: token, TokenType: "bearer"})
 }
 
 func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -222,14 +209,6 @@ func (s *Handler) setLocalCloudSession(summary *cloudproto.CloudSessionSummary) 
 	s.cloudSession = proto.Clone(summary).(*cloudproto.CloudSessionSummary)
 }
 
-func cloudSessionSummaryFromBinding(summary agentapp.CloudBindingSummary) *cloudproto.CloudSessionSummary {
-	return &cloudproto.CloudSessionSummary{PublicUrl: summary.PublicUrl, DeviceId: summary.DeviceId, DeviceName: summary.DeviceName, ConnectedAt: prototime.FromTime(summary.ConnectedAt)}
-}
-
-func cloudBindingSummaryFromSession(summary *cloudproto.CloudSessionSummary) agentapp.CloudBindingSummary {
-	return agentapp.CloudBindingSummary{PublicUrl: summary.GetPublicUrl(), DeviceId: summary.GetDeviceId(), DeviceName: summary.GetDeviceName(), ConnectedAt: prototime.ToTime(summary.GetConnectedAt())}
-}
-
 func (s *Handler) claimsFromRequest(r *http.Request) (sharedAuth.Claims, bool) {
 	token := sharedAuth.ExtractBearerToken(r)
 	if token == "" || s.authService == nil {
@@ -247,22 +226,13 @@ func (s *Handler) handleCloudConnect(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud public URL is not configured.", nil)
 		return
 	}
-	var req cloudConnectRequest
-	if !s.decodeJSONStructRequest(w, r, &req) {
+	var req cloudproto.CloudConnectReq
+	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
-	cloudToken := strings.TrimSpace(req.CloudToken)
-	if cloudToken == "" && strings.TrimSpace(req.Code) != "" {
-		var err error
-		cloudToken, err = s.cloudAccessTokenFromCode(r.Context(), strings.TrimSpace(req.Code))
-		if err != nil {
-			s.config.Logger.Warn("cloud oauth token exchange failed", "error", err)
-			s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
-			return
-		}
-	}
+	cloudToken := strings.TrimSpace(req.GetCloudToken())
 	if cloudToken == "" {
-		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud token or authorization code is required.", nil)
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud token is required.", nil)
 		return
 	}
 	summary, err := s.connectCloudWithToken(r.Context(), cloudToken)
@@ -271,25 +241,15 @@ func (s *Handler) handleCloudConnect(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
 		return
 	}
-	if !s.persistLocalCloudSession(w, r, summary) {
-		return
-	}
+	s.persistLocalCloudSession(summary)
 	writeJSON(w, http.StatusOK, &cloudproto.CloudConnectResp{CloudSession: summary})
 }
 
-func (s *Handler) persistLocalCloudSession(w http.ResponseWriter, r *http.Request, summary *cloudproto.CloudSessionSummary) bool {
-	if s.config.LocalDeviceStateDir != "" {
-		if err := agentapp.SaveCloudBindingSummary(s.config.LocalDeviceStateDir, cloudBindingSummaryFromSession(summary), time.Now().UTC()); err != nil {
-			s.config.Logger.Warn("persist local cloud session", "error", err)
-			s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
-			return false
-		}
-	}
+func (s *Handler) persistLocalCloudSession(summary *cloudproto.CloudSessionSummary) {
 	s.setLocalCloudSession(summary)
 	if s.config.OnLocalCloudSession != nil {
 		s.config.OnLocalCloudSession(summary)
 	}
-	return true
 }
 
 func (s *Handler) handleCloudDisconnect(w http.ResponseWriter, r *http.Request) {
@@ -297,18 +257,11 @@ func (s *Handler) handleCloudDisconnect(w http.ResponseWriter, r *http.Request) 
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if s.config.LocalDeviceStateDir != "" {
-		if err := agentapp.ClearCloudBindingSummary(s.config.LocalDeviceStateDir, time.Now().UTC()); err != nil {
-			s.config.Logger.Warn("clear local cloud session", "error", err)
-			s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
-			return
-		}
-	}
 	s.setLocalCloudSession(nil)
 	if s.config.OnLocalCloudSession != nil {
 		s.config.OnLocalCloudSession(nil)
 	}
-	w.WriteHeader(http.StatusNoContent)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Handler) handleLocalWorkspaces(w http.ResponseWriter, r *http.Request) {
@@ -554,10 +507,38 @@ func writeTerminalControl(conn *websocket.Conn, message *agent.ServerControlMess
 	return conn.Write(context.Background(), websocket.MessageText, data)
 }
 
-func (s *Handler) cloudAccessTokenFromCode(ctx context.Context, code string) (string, error) {
-	if s.config.OAuthClient.ClientId == "" || s.config.OAuthClient.ClientSecret == "" || s.config.OAuthClient.RedirectUrl == "" {
-		return "", fmt.Errorf("agent OAuth client is not configured")
+func (s *Handler) handleExchangeOAuthCode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodPost)
+		return
 	}
+	if strings.TrimSpace(s.config.CloudPublicURL) == "" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud public URL is not configured.", nil)
+		return
+	}
+	if s.config.OAuthClient.ClientId == "" || s.config.OAuthClient.ClientSecret == "" || s.config.OAuthClient.RedirectUrl == "" {
+		s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeServiceUnavailable, "Cloud OAuth is not configured.", nil)
+		return
+	}
+	var req cloudproto.CloudOAuthExchangeReq
+	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	code := strings.TrimSpace(req.GetCode())
+	if code == "" {
+		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Authorization code is required.", nil)
+		return
+	}
+	accessToken, err := s.exchangeCloudOAuthCode(r.Context(), code)
+	if err != nil {
+		s.config.Logger.Warn("cloud oauth token exchange failed", "error", err)
+		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, &cloudproto.CloudOAuthExchangeResp{AccessToken: accessToken, TokenType: "bearer"})
+}
+
+func (s *Handler) exchangeCloudOAuthCode(ctx context.Context, code string) (string, error) {
 	cfg := oauth2.Config{
 		ClientID:     s.config.OAuthClient.ClientId,
 		ClientSecret: s.config.OAuthClient.ClientSecret,

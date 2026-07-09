@@ -1,12 +1,17 @@
+import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
 import { useRuntimeConfigStore } from '../../store/runtimeConfig'
 import {
   readLocalStorageValue,
+  readSessionStorageValue,
   removeLocalStorageValue,
+  removeSessionStorageValue,
   writeLocalStorageValue,
+  writeSessionStorageValue,
 } from '../../store/storage'
 
 const cloudOAuthStateKey = 'termbridge.cloud.oauth2.state'
 const cloudOAuthRedirectKey = 'termbridge.cloud.oauth2.redirect'
+const cloudConnectionConnectedAtKey = 'termbridge.cloud.connection.connected_at'
 
 export function cloudOAuthConfigured(): boolean {
   const config = useRuntimeConfigStore().config.local.cloudOAuth
@@ -33,6 +38,37 @@ export function consumeCloudOAuthRedirect(): string {
   const redirect = safeLocalRedirect(readLocalStorageValue(cloudOAuthRedirectKey))
   removeLocalStorageValue(cloudOAuthRedirectKey)
   return redirect || '/'
+}
+
+export function applyCloudConnectionTime(
+  summary: CloudSessionSummary | null,
+): CloudSessionSummary | null {
+  if (!summary) {
+    return null
+  }
+  return {
+    ...summary,
+    connected_at: readSessionStorageValue(cloudConnectionConnectedAtKey) ?? summary.connected_at,
+  }
+}
+
+export function markCloudConnected(
+  summary: CloudSessionSummary | undefined,
+): CloudSessionSummary | null {
+  if (!summary) {
+    return null
+  }
+  const connectedAt = new Date().toISOString()
+  writeSessionStorageValue(cloudConnectionConnectedAtKey, connectedAt)
+  return { ...summary, connected_at: connectedAt }
+}
+
+export function clearCloudConnectionTime() {
+  removeSessionStorageValue(cloudConnectionConnectedAtKey)
+}
+
+export function hasCloudConnectionTime(): boolean {
+  return readSessionStorageValue(cloudConnectionConnectedAtKey) !== null
 }
 
 function cloudAuthorizeUrl(

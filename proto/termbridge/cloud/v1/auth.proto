@@ -55,7 +55,31 @@ message AuthGoogleCallbackReq {
   string state = 2;
 }
 
-message TokenResp {
+message CloudOAuthExchangeReq {
+  string code = 1;
+}
+
+message CloudOAuthExchangeResp {
+  string access_token = 1;
+  string token_type = 2;
+}
+
+message AuthLoginResp {
+  string access_token = 1;
+  string token_type = 2;
+}
+
+message AuthGoogleCallbackResp {
+  string access_token = 1;
+  string token_type = 2;
+}
+
+message LocalAuthLoginResp {
+  string access_token = 1;
+  string token_type = 2;
+}
+
+message CloudOAuthTokenResp {
   string access_token = 1;
   string token_type = 2;
 }

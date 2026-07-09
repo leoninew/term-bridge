@@ -15,15 +15,15 @@
   import { useRoute, useRouter } from 'vue-router'
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../../components/session/ToastHost.vue'
-  import { connectCloudWithCurrentAccount } from '../../features/local/api'
+  import { exchangeOAuthCode } from '../../features/local/api'
   import { assertCloudOAuthState, consumeCloudOAuthRedirect } from '../../features/cloud/oauth'
-  import { useLocalAuthStore } from '../../store/localAuth'
+  import { useAuthTokensStore } from '../../store/authTokens'
   import { useNotificationsStore } from '../../store/notifications'
 
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
-  const localAuth = useLocalAuthStore()
+  const authTokens = useAuthTokensStore()
   const notifications = useNotificationsStore()
 
   onMounted(async () => {
@@ -38,10 +38,9 @@
       return
     }
     try {
-      await localAuth.ensureToken()
       assertCloudOAuthState(state)
-      const response = await connectCloudWithCurrentAccount(code)
-      localAuth.setCloudSession(response.cloud_session ?? null)
+      const accessToken = await exchangeOAuthCode(code)
+      authTokens.setCloudToken(accessToken)
       await router.replace(consumeCloudOAuthRedirect())
     } catch (err) {
       notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)

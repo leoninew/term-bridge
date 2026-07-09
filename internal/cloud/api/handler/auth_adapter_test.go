@@ -16,7 +16,7 @@ func newTestAuthService(tokens sharedauth.TokenService) AuthService {
 	return testAuthService{tokens: tokens}
 }
 
-func (s testAuthService) Login(ctx context.Context, email, password string) (*cloud.TokenResp, error) {
+func (s testAuthService) Login(ctx context.Context, email, password string) (*cloud.AuthLoginResp, error) {
 	return nil, cloudauth.ErrInvalidCredentials
 }
 
@@ -52,17 +52,17 @@ func (s testAuthService) GoogleAuthURL(ctx context.Context) (string, error) {
 	return "", cloudauth.ErrProviderUnsupported
 }
 
-func (s testAuthService) GoogleCallback(ctx context.Context, code, state string) (*cloud.TokenResp, error) {
+func (s testAuthService) GoogleCallback(ctx context.Context, code, state string) (*cloud.AuthGoogleCallbackResp, error) {
 	return nil, cloudauth.ErrProviderUnsupported
 }
 
-func (s testAuthService) IssueUserToken(ctx context.Context, userID string) (*cloud.TokenResp, error) {
+func (s testAuthService) IssueUserToken(ctx context.Context, userID string) (*cloud.CloudOAuthTokenResp, error) {
 	email := userID + "@example.test"
 	token, err := s.tokens.Sign(sharedauth.Claims{Sub: userID, Email: email, Provider: "email"})
 	if err != nil {
 		return nil, err
 	}
-	return &cloud.TokenResp{AccessToken: token, TokenType: "bearer"}, nil
+	return &cloud.CloudOAuthTokenResp{AccessToken: token, TokenType: "bearer"}, nil
 }
 
 func (s testAuthService) VerifyToken(token string) (sharedauth.Claims, error) {

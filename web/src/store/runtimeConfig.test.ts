@@ -79,10 +79,7 @@ describe('runtime config store', () => {
     vi.stubEnv('TERMBRIDGE_LOCAL__PUBLIC_URL', 'http://localhost:9030')
     vi.stubEnv('TERMBRIDGE_LOCAL__API_BASE_URL', '/local-api')
     vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__CLIENT_ID', 'termbridge-agent')
-    vi.stubEnv(
-      'TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL',
-      'http://localhost:9030/oauth/callback',
-    )
+    vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL', 'http://localhost:9030/oauth/callback')
     vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__SCOPES', 'openid,email,profile')
     vi.stubEnv('TERMBRIDGE_CLOUD__PUBLIC_URL', 'https://cloud.example.com/')
     vi.stubEnv('TERMBRIDGE_CLOUD__API_BASE_URL', 'https://cloud.example.com/cloud-api/')
@@ -117,10 +114,7 @@ describe('runtime config store', () => {
     vi.stubEnv('TERMBRIDGE_LOCAL__PUBLIC_URL', 'http://localhost:9030')
     vi.stubEnv('TERMBRIDGE_LOCAL__API_BASE_URL', '/local-api')
     vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__CLIENT_ID', 'termbridge-agent')
-    vi.stubEnv(
-      'TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL',
-      'http://localhost:9030/oauth/callback',
-    )
+    vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL', 'http://localhost:9030/oauth/callback')
     vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__SCOPES', 'openid,email,profile')
     vi.stubEnv('TERMBRIDGE_CLOUD__PUBLIC_URL', 'http://localhost:9030')
     vi.stubEnv('TERMBRIDGE_CLOUD__API_BASE_URL', '/cloud-api')

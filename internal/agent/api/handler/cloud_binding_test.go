@@ -84,7 +84,7 @@ func TestAgentLoginIssuesLocalTokenAndProtectsBusinessRoutes(t *testing.T) {
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d, want 200; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
-	var tokenResp cloudv1.TokenResp
+	var tokenResp cloudv1.LocalAuthLoginResp
 	if err := codec.UnmarshalProtoJSON(loginResponse.Body.Bytes(), &tokenResp); err != nil {
 		t.Fatalf("decode login response: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 	}
 }
 
-func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T) {
+func TestCloudConnectDoesNotPersistLocalCloudSession(t *testing.T) {
 	authService := NewLocalAuthService(sharedauth.NewTokenService(testJWTKey))
 	stateDir := t.TempDir()
 	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir, Now: func() time.Time { return time.Date(2026, 7, 5, 10, 0, 0, 0, time.UTC) }})
@@ -198,16 +198,16 @@ func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T)
 	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode auth me response: %v", err)
 	}
-	if body.CloudSession == nil || body.CloudSession.GetPublicUrl() != cloud.URL || body.CloudSession.GetDeviceId() != device.Id || body.CloudSession.GetDeviceName() != device.Name || body.CloudSession.GetConnectedAt() == nil {
-		t.Fatalf("cloud_session = %#v", body.CloudSession)
+	if body.CloudSession != nil {
+		t.Fatalf("cloud_session after handler restart = %#v, want nil", body.CloudSession)
 	}
 	data, err := os.ReadFile(filepath.Join(stateDir, agentapp.DeviceIdentityFileName))
 	if err != nil {
 		t.Fatalf("read device identity file error = %v", err)
 	}
 	serialized := strings.ToLower(string(data))
-	if strings.Contains(serialized, "access_token") || strings.Contains(serialized, "refresh_token") || strings.Contains(serialized, "cloud-token") || strings.Contains(serialized, "bearer") {
-		t.Fatalf("device identity persisted token material: %s", string(data))
+	if strings.Contains(serialized, "cloud_binding") || strings.Contains(serialized, "access_token") || strings.Contains(serialized, "refresh_token") || strings.Contains(serialized, "cloud-token") || strings.Contains(serialized, "bearer") {
+		t.Fatalf("device identity persisted cloud session material: %s", string(data))
 	}
 }
 
@@ -248,7 +248,7 @@ func TestCloudDisconnectClearsLocalCloudSessionWithoutUnbindingCloudDevice(t *te
 	disconnectRequest.Header.Set("Authorization", "Bearer "+localToken)
 	disconnectResponse := httptest.NewRecorder()
 	handler.ServeHTTP(disconnectResponse, disconnectRequest)
-	if disconnectResponse.Code != http.StatusNoContent {
+	if disconnectResponse.Code != http.StatusOK {
 		t.Fatalf("cloud disconnect status = %d; body=%s", disconnectResponse.Code, disconnectResponse.Body.String())
 	}
 
@@ -273,8 +273,12 @@ func TestCloudDisconnectClearsLocalCloudSessionWithoutUnbindingCloudDevice(t *te
 	if loaded.Id != device.Id || loaded.Name != device.Name || loaded.PublicKey != device.PublicKey {
 		t.Fatalf("device identity changed after cloud disconnect: before=%#v after=%#v", device, loaded)
 	}
-	if loaded.CloudBinding != nil {
-		t.Fatalf("cloud binding after disconnect = %#v, want nil", loaded.CloudBinding)
+	data, err := os.ReadFile(filepath.Join(stateDir, agentapp.DeviceIdentityFileName))
+	if err != nil {
+		t.Fatalf("read device identity file error = %v", err)
+	}
+	if strings.Contains(string(data), "cloud_binding") {
+		t.Fatalf("device identity persisted cloud binding after disconnect: %s", string(data))
 	}
 	if len(cloudRequestPaths) != 1 || cloudRequestPaths[0] != "POST /cloud-api/devices/current" {
 		t.Fatalf("cloud requests = %#v, want only device report and no unbind/delete", cloudRequestPaths)
@@ -302,6 +306,137 @@ func TestCloudConnectRequiresCloudTokenBeforeDeviceReport(t *testing.T) {
 	}
 }
 
+func TestExchangeOAuthCodeReturnsAccessToken(t *testing.T) {
+	const expectedToken = "exchanged-cloud-token"
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/cloud-api/oauth2/token" {
+			t.Fatalf("unexpected cloud token path = %s", r.URL.Path)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse token request form: %v", err)
+		}
+		if got := r.Form.Get("code"); got != "auth-code" {
+			t.Fatalf("exchange code = %q, want auth-code", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"` + expectedToken + `","token_type":"bearer","expires_in":3600}`))
+	}))
+	defer cloud.Close()
+	handler := New(Config{
+		JWTSecret:      testJWTKey,
+		Logger:         slog.Default(),
+		AuthService:    NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
+		CloudPublicURL: cloud.URL,
+		OAuthClient:    testOAuthClientConfig(),
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
+	request.Header.Set("Authorization", "Bearer "+localToken(t, handler))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("exchange status = %d; body=%s", response.Code, response.Body.String())
+	}
+	var body cloudv1.CloudOAuthExchangeResp
+	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode exchange response: %v", err)
+	}
+	if body.GetAccessToken() != expectedToken {
+		t.Fatalf("access_token = %q, want %q", body.GetAccessToken(), expectedToken)
+	}
+}
+
+func TestExchangeOAuthCodeRequiresCode(t *testing.T) {
+	handler := New(Config{
+		JWTSecret:      testJWTKey,
+		Logger:         slog.Default(),
+		AuthService:    NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
+		CloudPublicURL: "https://cloud.example.test",
+		OAuthClient:    testOAuthClientConfig(),
+	})
+	localToken := localToken(t, handler)
+
+	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/oauth/exchange", strings.NewReader(`{"code":"  "}`))
+	request.Header.Set("Authorization", "Bearer "+localToken)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("exchange status = %d, want 400; body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestExchangeOAuthCodeReturnsServiceUnavailableWithoutOAuthConfig(t *testing.T) {
+	handler := New(Config{
+		JWTSecret:      testJWTKey,
+		Logger:         slog.Default(),
+		AuthService:    NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
+		CloudPublicURL: "https://cloud.example.test",
+	})
+	localToken := localToken(t, handler)
+
+	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
+	request.Header.Set("Authorization", "Bearer "+localToken)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("exchange status = %d, want 503; body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestExchangeOAuthCodeReturnsBadGatewayOnCloudError(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"invalid_grant"}`))
+	}))
+	defer cloud.Close()
+	handler := New(Config{
+		JWTSecret:      testJWTKey,
+		Logger:         slog.Default(),
+		AuthService:    NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
+		CloudPublicURL: cloud.URL,
+		OAuthClient:    testOAuthClientConfig(),
+	})
+	localToken := localToken(t, handler)
+
+	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/oauth/exchange", strings.NewReader(`{"code":"bad-code"}`))
+	request.Header.Set("Authorization", "Bearer "+localToken)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadGateway {
+		t.Fatalf("exchange status = %d, want 502; body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCloudConnectRequiresCloudTokenWithoutCodeBranch(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("cloud endpoint should not be called without cloud token")
+	}))
+	defer cloud.Close()
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)), CloudPublicURL: cloud.URL, LocalDevice: testLocalDevice()})
+	localToken := localToken(t, handler)
+
+	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"code":"some-code"}`))
+	request.Header.Set("Authorization", "Bearer "+localToken)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("cloud connect status = %d, want 400; body=%s", response.Code, response.Body.String())
+	}
+}
+
+func testOAuthClientConfig() OAuthClientConfig {
+	return OAuthClientConfig{
+		ClientId:     "test-client-id",
+		ClientSecret: "test-client-secret",
+		RedirectUrl:  "https://local.example.test/oauth/callback",
+		Scopes:       []string{"read", "write"},
+	}
+}
+
 func decodeProtoJSONBody(r *http.Request, message proto.Message) error {
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -317,7 +452,7 @@ func localToken(t *testing.T, handler *Handler) string {
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
-	var token cloudv1.TokenResp
+	var token cloudv1.LocalAuthLoginResp
 	if err := codec.UnmarshalProtoJSON(loginResponse.Body.Bytes(), &token); err != nil {
 		t.Fatalf("decode login response: %v", err)
 	}

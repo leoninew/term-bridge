@@ -29,7 +29,9 @@
               <button
                 type="button"
                 class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-subtle)]"
-                :disabled="connectingCloud || (!cloudSession && !cloudConnectEnabled)"
+                :disabled="
+                  connectingCloud || (!cloudSession && !tokens.cloudToken && !cloudConnectEnabled)
+                "
                 :title="cloudConnectionActionTitle"
                 @click="toggleCloudConnection"
               >
@@ -184,11 +186,24 @@
   import { RouterLink, useRouter } from 'vue-router'
   import CloudAccountConnectionMenu from './CloudAccountConnectionMenu.vue'
   import DisplayControls from './DisplayControls.vue'
-  import { authMe, disconnectCloud, listWorkspaces } from '../../features/local/api'
-  import { cloudOAuthConfigured, startCloudOAuth } from '../../features/cloud/oauth'
+  import {
+    authMe,
+    connectCloudWithToken,
+    disconnectCloud,
+    listWorkspaces,
+  } from '../../features/local/api'
+  import {
+    applyCloudConnectionTime,
+    clearCloudConnectionTime,
+    cloudOAuthConfigured,
+    hasCloudConnectionTime,
+    markCloudConnected,
+    startCloudOAuth,
+  } from '../../features/cloud/oauth'
   import type { Workspace } from '../../gen/proto/termbridge/agent/v1/workspace'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
+  import { useAuthTokensStore } from '../../store/authTokens'
   import { useLocalAuthStore } from '../../store/localAuth'
   import { useRuntimeConfigStore } from '../../store/runtimeConfig'
   import { useNotificationsStore } from '../../store/notifications'
@@ -199,6 +214,7 @@
   const { t } = useI18n()
   const router = useRouter()
   const runtimeConfig = useRuntimeConfigStore()
+  const tokens = useAuthTokensStore()
   const localAuth = useLocalAuthStore()
   const notifications = useNotificationsStore()
   const connectingCloud = ref(false)
@@ -214,7 +230,9 @@
     cloudSession.value ? t('dashboard.disconnectCloudAccount') : t('dashboard.connectCloudAccount'),
   )
   const cloudConnectionActionTitle = computed(() =>
-    cloudSession.value || cloudConnectEnabled.value ? '' : t('dashboard.cloudConnectionNotConfigured'),
+    cloudSession.value || tokens.cloudToken || cloudConnectEnabled.value
+      ? ''
+      : t('dashboard.cloudConnectionNotConfigured'),
   )
   const localUserLabel = computed(() => localUser.value || t('dashboard.todoLocalUser'))
   const projectVersionLabel = computed(() => t('dashboard.todoProjectVersion'))
@@ -226,11 +244,15 @@
     workspaceError.value = ''
     try {
       await localAuth.ensureToken()
-      const [me, workspaceResponse] = await Promise.all([authMe(), listWorkspaces()])
+      const me = await authMe()
       localUser.value = me.user?.display_name || me.user?.email || ''
       localDevice.value = me.device ?? null
-      cloudSession.value = me.cloud_session ?? null
-      localAuth.setCloudSession(cloudSession.value)
+      try {
+        await reconcileCloudConnection(me.cloud_session ?? null)
+      } catch (err) {
+        notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
+      }
+      const workspaceResponse = await listWorkspaces()
       workspaces.value = workspaceResponse.data
     } catch (err) {
       workspaceError.value = t('dashboard.loadWorkspacesFailed')
@@ -238,6 +260,45 @@
     } finally {
       workspacesLoading.value = false
     }
+  }
+
+  async function reconcileCloudConnection(reportedSession: CloudSessionSummary | null) {
+    if (hasCloudConnectionTime()) {
+      const connectedSession = applyCloudConnectionTime(reportedSession)
+      if (connectedSession) {
+        setCloudConnection(connectedSession)
+        return
+      }
+      clearCloudConnectionTime()
+    }
+    if (await connectStoredCloudToken()) {
+      return
+    }
+    setCloudConnection(null)
+  }
+
+  async function connectStoredCloudToken(): Promise<boolean> {
+    const cloudToken = tokens.cloudToken
+    if (!cloudToken || connectingCloud.value) {
+      return false
+    }
+    connectingCloud.value = true
+    try {
+      const response = await connectCloudWithToken(cloudToken)
+      const connectedSession = markCloudConnected(response.cloud_session)
+      if (!connectedSession) {
+        throw new Error('Cloud connect response missing cloud_session')
+      }
+      setCloudConnection(connectedSession)
+      return true
+    } finally {
+      connectingCloud.value = false
+    }
+  }
+
+  function setCloudConnection(summary: CloudSessionSummary | null) {
+    cloudSession.value = summary
+    localAuth.setCloudSession(summary)
   }
 
   async function toggleCloudConnection() {
@@ -248,12 +309,20 @@
       connectingCloud.value = true
       try {
         await disconnectCloud()
-        cloudSession.value = null
-        localAuth.setCloudSession(null)
+        clearCloudConnectionTime()
+        setCloudConnection(null)
       } catch (err) {
         notifications.notifyError(t('dashboard.cloudDisconnectionFailed'), err)
       } finally {
         connectingCloud.value = false
+      }
+      return
+    }
+    if (tokens.cloudToken) {
+      try {
+        await connectStoredCloudToken()
+      } catch (err) {
+        notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
       }
       return
     }

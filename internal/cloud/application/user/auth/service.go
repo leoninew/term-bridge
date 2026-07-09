@@ -148,7 +148,7 @@ func (s *Service) VerifyEmail(ctx context.Context, email, code string) error {
 	})
 }
 
-func (s *Service) Login(ctx context.Context, email, password string) (*cloud.TokenResp, error) {
+func (s *Service) Login(ctx context.Context, email, password string) (*cloud.AuthLoginResp, error) {
 	if err := s.requireRepository(); err != nil {
 		return nil, authmodel.ErrInvalidCredentials
 	}
@@ -169,7 +169,12 @@ func (s *Service) Login(ctx context.Context, email, password string) (*cloud.Tok
 	if err := s.repo.UpdateLastLogin(ctx, user.Id); err != nil {
 		return nil, err
 	}
-	return s.sign(userView(user, repository.ProviderEmail))
+	userProto := userView(user, repository.ProviderEmail)
+	token, err := s.tokens.Sign(sharedauth.Claims{Sub: userProto.GetId(), Email: userProto.GetEmail(), Provider: userProto.GetProvider()})
+	if err != nil {
+		return nil, err
+	}
+	return &cloud.AuthLoginResp{AccessToken: token, TokenType: "bearer"}, nil
 }
 
 func (s *Service) VerifyBasic(ctx context.Context, username, password string) bool {
@@ -258,7 +263,7 @@ func (s *Service) GoogleAuthURL(ctx context.Context) (string, error) {
 	return s.google.AuthCodeURL(state), nil
 }
 
-func (s *Service) GoogleCallback(ctx context.Context, code, state string) (*cloud.TokenResp, error) {
+func (s *Service) GoogleCallback(ctx context.Context, code, state string) (*cloud.AuthGoogleCallbackResp, error) {
 	if err := s.requireRepository(); err != nil {
 		return nil, err
 	}
@@ -288,7 +293,12 @@ func (s *Service) GoogleCallback(ctx context.Context, code, state string) (*clou
 			return nil, err
 		}
 		_ = s.repo.UpdateLastLogin(ctx, user.Id)
-		return s.sign(userView(user, repository.ProviderGoogle))
+		userProto := userView(user, repository.ProviderGoogle)
+		token, err := s.tokens.Sign(sharedauth.Claims{Sub: userProto.GetId(), Email: userProto.GetEmail(), Provider: userProto.GetProvider()})
+		if err != nil {
+			return nil, err
+		}
+		return &cloud.AuthGoogleCallbackResp{AccessToken: token, TokenType: "bearer"}, nil
 	} else if !repository.IsNotFound(err) {
 		return nil, err
 	}
@@ -301,10 +311,15 @@ func (s *Service) GoogleCallback(ctx context.Context, code, state string) (*clou
 	if err != nil {
 		return nil, err
 	}
-	return s.sign(userView(user, repository.ProviderGoogle))
+	userProto := userView(user, repository.ProviderGoogle)
+	token, err := s.tokens.Sign(sharedauth.Claims{Sub: userProto.GetId(), Email: userProto.GetEmail(), Provider: userProto.GetProvider()})
+	if err != nil {
+		return nil, err
+	}
+	return &cloud.AuthGoogleCallbackResp{AccessToken: token, TokenType: "bearer"}, nil
 }
 
-func (s *Service) IssueUserToken(ctx context.Context, userId string) (*cloud.TokenResp, error) {
+func (s *Service) IssueUserToken(ctx context.Context, userId string) (*cloud.CloudOAuthTokenResp, error) {
 	if err := s.requireRepository(); err != nil {
 		return nil, err
 	}
@@ -312,7 +327,12 @@ func (s *Service) IssueUserToken(ctx context.Context, userId string) (*cloud.Tok
 	if err != nil {
 		return nil, err
 	}
-	return s.sign(userView(user, repository.ProviderEmail))
+	userProto := userView(user, repository.ProviderEmail)
+	token, err := s.tokens.Sign(sharedauth.Claims{Sub: userProto.GetId(), Email: userProto.GetEmail(), Provider: userProto.GetProvider()})
+	if err != nil {
+		return nil, err
+	}
+	return &cloud.CloudOAuthTokenResp{AccessToken: token, TokenType: "bearer"}, nil
 }
 
 func (s *Service) UserFromClaims(ctx context.Context, claims sharedauth.Claims) (*cloud.User, error) {
@@ -335,14 +355,6 @@ func (s *Service) requireRepository() error {
 		return authmodel.ErrProviderUnsupported
 	}
 	return nil
-}
-
-func (s *Service) sign(user *cloud.User) (*cloud.TokenResp, error) {
-	token, err := s.tokens.Sign(sharedauth.Claims{Sub: user.GetId(), Email: user.GetEmail(), Provider: user.GetProvider()})
-	if err != nil {
-		return nil, err
-	}
-	return &cloud.TokenResp{AccessToken: token, TokenType: "bearer"}, nil
 }
 
 func (s *Service) validatePassword(password string) error {

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { authLogin, authMeViaCloud } from '../features/cloud/api'
 import { useAuthTokensStore } from './authTokens'
 import { useCloudDevicesStore } from './cloudDevices'
-import type { TokenResp, User as UserInfo } from '../gen/proto/termbridge/cloud/v1/auth'
+import type { AuthLoginResp, User as UserInfo } from '../gen/proto/termbridge/cloud/v1/auth'
 
 type InitializeAuthOptions = {
   force?: boolean
@@ -45,7 +45,7 @@ export const useCloudAuthStore = defineStore('cloudAuth', () => {
     }
     loggingIn.value = true
     try {
-      const response: TokenResp = await authLogin(usernameInput.value, passwordInput.value)
+      const response: AuthLoginResp = await authLogin(usernameInput.value, passwordInput.value)
       setToken(response.access_token)
       passwordInput.value = ''
     } finally {

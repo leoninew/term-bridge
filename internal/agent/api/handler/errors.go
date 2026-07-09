@@ -22,14 +22,15 @@ import (
 const requestIdHeader = "X-Request-ID"
 
 const (
-	errorCodeBadRequest       = "bad_request"
-	errorCodeUnauthorized     = "unauthorized"
-	errorCodeNotFound         = "not_found"
-	errorCodeMethodNotAllowed = "method_not_allowed"
-	errorCodeDeviceOffline    = "device_offline"
-	errorCodeUpstream         = "upstream_error"
-	errorCodeConflict         = "conflict"
-	errorCodeInternal         = "internal_error"
+	errorCodeBadRequest         = "bad_request"
+	errorCodeUnauthorized       = "unauthorized"
+	errorCodeNotFound           = "not_found"
+	errorCodeMethodNotAllowed   = "method_not_allowed"
+	errorCodeDeviceOffline      = "device_offline"
+	errorCodeUpstream           = "upstream_error"
+	errorCodeConflict           = "conflict"
+	errorCodeInternal           = "internal_error"
+	errorCodeServiceUnavailable = "service_unavailable"
 )
 
 const (

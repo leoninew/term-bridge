@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { authLoginViaLocal, authMe } from '../features/local/api'
 import { useAuthTokensStore } from './authTokens'
-import type { TokenResp, User as UserInfo } from '../gen/proto/termbridge/cloud/v1/auth'
+import type { LocalAuthLoginResp, User as UserInfo } from '../gen/proto/termbridge/cloud/v1/auth'
 import type { CloudSessionSummary } from '../gen/proto/termbridge/cloud/v1/session'
 
 type InitializeAuthOptions = {
@@ -21,7 +21,7 @@ export const useLocalAuthStore = defineStore('localAuth', () => {
     if (tokens.localToken) {
       return
     }
-    const response: TokenResp = await authLoginViaLocal()
+    const response: LocalAuthLoginResp = await authLoginViaLocal()
     tokens.setLocalToken(response.access_token)
     reset()
   }

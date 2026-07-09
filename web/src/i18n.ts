@@ -150,13 +150,11 @@ export const messages = {
       localSessionsAction: '进入本机 session',
       localSessionsDescription: '直接管理这台机器上的 workspace 和 session，不需要云端账号。',
       cloudLoginAction: '登录云端账号',
-      cloudLoginDescription:
-        '使用云端登录拿到账号 token；这一步只表示账号已登录，还不会绑定设备。',
+      cloudLoginDescription: '使用云端登录拿到账号 token；这一步只表示账号已登录，还不会绑定设备。',
       cloudLoginActive: '云端账号已登录',
       cloudLoginActiveDescription: '账号 token 已可用；现在可以把当前本机设备连接到该账号。',
       connectCloudDeviceAction: '连接当前本机设备到云端',
-      connectCloudDeviceDescription:
-        '使用已登录的云端账号上报当前设备，不再重新发起 OAuth2 流程。',
+      connectCloudDeviceDescription: '使用已登录的云端账号上报当前设备，不再重新发起 OAuth2 流程。',
       connectCloudDeviceRequiresLogin: '请先登录云端账号，登录完成后才能连接当前设备。',
       connectCloudDeviceConnectedDescription:
         '当前本机设备已经连接到云端账号，可在云端设备列表中看到。',
@@ -183,8 +181,7 @@ export const messages = {
       cloudDisconnectionFailed: '云端断开失败',
       cloudConnectionDevice: '本机设备',
       connectGuideTitle: '连接本机设备',
-      connectGuideDescription:
-        '在要加入账号的机器上打开本地工作台，再从那里发起云端授权。',
+      connectGuideDescription: '在要加入账号的机器上打开本地工作台，再从那里发起云端授权。',
       connectStepServe: '在目标机器上启动 termbridge agent。',
       connectStepCloud: '在本地工作台打开连接云端流程，并使用当前云端账号授权。',
       connectStepRefresh: '绑定完成后回到此页面刷新设备列表。',

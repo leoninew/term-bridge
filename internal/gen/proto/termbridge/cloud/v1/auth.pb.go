@@ -513,28 +513,27 @@ func (x *AuthGoogleCallbackReq) GetState() string {
 	return ""
 }
 
-type TokenResp struct {
+type CloudOAuthExchangeReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
-	TokenType     string                 `protobuf:"bytes,2,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TokenResp) Reset() {
-	*x = TokenResp{}
+func (x *CloudOAuthExchangeReq) Reset() {
+	*x = CloudOAuthExchangeReq{}
 	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TokenResp) String() string {
+func (x *CloudOAuthExchangeReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TokenResp) ProtoMessage() {}
+func (*CloudOAuthExchangeReq) ProtoMessage() {}
 
-func (x *TokenResp) ProtoReflect() protoreflect.Message {
+func (x *CloudOAuthExchangeReq) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -546,19 +545,272 @@ func (x *TokenResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TokenResp.ProtoReflect.Descriptor instead.
-func (*TokenResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use CloudOAuthExchangeReq.ProtoReflect.Descriptor instead.
+func (*CloudOAuthExchangeReq) Descriptor() ([]byte, []int) {
 	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *TokenResp) GetAccessToken() string {
+func (x *CloudOAuthExchangeReq) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+type CloudOAuthExchangeResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	TokenType     string                 `protobuf:"bytes,2,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloudOAuthExchangeResp) Reset() {
+	*x = CloudOAuthExchangeResp{}
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudOAuthExchangeResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudOAuthExchangeResp) ProtoMessage() {}
+
+func (x *CloudOAuthExchangeResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudOAuthExchangeResp.ProtoReflect.Descriptor instead.
+func (*CloudOAuthExchangeResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CloudOAuthExchangeResp) GetAccessToken() string {
 	if x != nil {
 		return x.AccessToken
 	}
 	return ""
 }
 
-func (x *TokenResp) GetTokenType() string {
+func (x *CloudOAuthExchangeResp) GetTokenType() string {
+	if x != nil {
+		return x.TokenType
+	}
+	return ""
+}
+
+type AuthLoginResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	TokenType     string                 `protobuf:"bytes,2,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthLoginResp) Reset() {
+	*x = AuthLoginResp{}
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthLoginResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthLoginResp) ProtoMessage() {}
+
+func (x *AuthLoginResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthLoginResp.ProtoReflect.Descriptor instead.
+func (*AuthLoginResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AuthLoginResp) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
+	}
+	return ""
+}
+
+func (x *AuthLoginResp) GetTokenType() string {
+	if x != nil {
+		return x.TokenType
+	}
+	return ""
+}
+
+type AuthGoogleCallbackResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	TokenType     string                 `protobuf:"bytes,2,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthGoogleCallbackResp) Reset() {
+	*x = AuthGoogleCallbackResp{}
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthGoogleCallbackResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthGoogleCallbackResp) ProtoMessage() {}
+
+func (x *AuthGoogleCallbackResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthGoogleCallbackResp.ProtoReflect.Descriptor instead.
+func (*AuthGoogleCallbackResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AuthGoogleCallbackResp) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
+	}
+	return ""
+}
+
+func (x *AuthGoogleCallbackResp) GetTokenType() string {
+	if x != nil {
+		return x.TokenType
+	}
+	return ""
+}
+
+type LocalAuthLoginResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	TokenType     string                 `protobuf:"bytes,2,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LocalAuthLoginResp) Reset() {
+	*x = LocalAuthLoginResp{}
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LocalAuthLoginResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LocalAuthLoginResp) ProtoMessage() {}
+
+func (x *LocalAuthLoginResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LocalAuthLoginResp.ProtoReflect.Descriptor instead.
+func (*LocalAuthLoginResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *LocalAuthLoginResp) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
+	}
+	return ""
+}
+
+func (x *LocalAuthLoginResp) GetTokenType() string {
+	if x != nil {
+		return x.TokenType
+	}
+	return ""
+}
+
+type CloudOAuthTokenResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	TokenType     string                 `protobuf:"bytes,2,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloudOAuthTokenResp) Reset() {
+	*x = CloudOAuthTokenResp{}
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudOAuthTokenResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudOAuthTokenResp) ProtoMessage() {}
+
+func (x *CloudOAuthTokenResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudOAuthTokenResp.ProtoReflect.Descriptor instead.
+func (*CloudOAuthTokenResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *CloudOAuthTokenResp) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
+	}
+	return ""
+}
+
+func (x *CloudOAuthTokenResp) GetTokenType() string {
 	if x != nil {
 		return x.TokenType
 	}
@@ -574,7 +826,7 @@ type GoogleAuthUrlResp struct {
 
 func (x *GoogleAuthUrlResp) Reset() {
 	*x = GoogleAuthUrlResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[10]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -586,7 +838,7 @@ func (x *GoogleAuthUrlResp) String() string {
 func (*GoogleAuthUrlResp) ProtoMessage() {}
 
 func (x *GoogleAuthUrlResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[10]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -599,7 +851,7 @@ func (x *GoogleAuthUrlResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GoogleAuthUrlResp.ProtoReflect.Descriptor instead.
 func (*GoogleAuthUrlResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{10}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GoogleAuthUrlResp) GetAuthUrl() string {
@@ -622,7 +874,7 @@ type AuthMeResp struct {
 
 func (x *AuthMeResp) Reset() {
 	*x = AuthMeResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[11]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -634,7 +886,7 @@ func (x *AuthMeResp) String() string {
 func (*AuthMeResp) ProtoMessage() {}
 
 func (x *AuthMeResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[11]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -647,7 +899,7 @@ func (x *AuthMeResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthMeResp.ProtoReflect.Descriptor instead.
 func (*AuthMeResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{11}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AuthMeResp) GetAuthenticated() bool {
@@ -719,8 +971,26 @@ const file_termbridge_cloud_v1_auth_proto_rawDesc = "" +
 	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\"A\n" +
 	"\x15AuthGoogleCallbackReq\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
-	"\x05state\x18\x02 \x01(\tR\x05state\"M\n" +
-	"\tTokenResp\x12!\n" +
+	"\x05state\x18\x02 \x01(\tR\x05state\"+\n" +
+	"\x15CloudOAuthExchangeReq\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\"Z\n" +
+	"\x16CloudOAuthExchangeResp\x12!\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
+	"\n" +
+	"token_type\x18\x02 \x01(\tR\ttokenType\"Q\n" +
+	"\rAuthLoginResp\x12!\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
+	"\n" +
+	"token_type\x18\x02 \x01(\tR\ttokenType\"Z\n" +
+	"\x16AuthGoogleCallbackResp\x12!\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
+	"\n" +
+	"token_type\x18\x02 \x01(\tR\ttokenType\"V\n" +
+	"\x12LocalAuthLoginResp\x12!\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
+	"\n" +
+	"token_type\x18\x02 \x01(\tR\ttokenType\"W\n" +
+	"\x13CloudOAuthTokenResp\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
 	"\n" +
 	"token_type\x18\x02 \x01(\tR\ttokenType\".\n" +
@@ -747,7 +1017,7 @@ func file_termbridge_cloud_v1_auth_proto_rawDescGZIP() []byte {
 	return file_termbridge_cloud_v1_auth_proto_rawDescData
 }
 
-var file_termbridge_cloud_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_termbridge_cloud_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_termbridge_cloud_v1_auth_proto_goTypes = []any{
 	(*User)(nil),                        // 0: termbridge.cloud.User
 	(*AuthLoginReq)(nil),                // 1: termbridge.cloud.AuthLoginReq
@@ -758,16 +1028,21 @@ var file_termbridge_cloud_v1_auth_proto_goTypes = []any{
 	(*AuthPasswordResetRequestReq)(nil), // 6: termbridge.cloud.AuthPasswordResetRequestReq
 	(*AuthPasswordResetConfirmReq)(nil), // 7: termbridge.cloud.AuthPasswordResetConfirmReq
 	(*AuthGoogleCallbackReq)(nil),       // 8: termbridge.cloud.AuthGoogleCallbackReq
-	(*TokenResp)(nil),                   // 9: termbridge.cloud.TokenResp
-	(*GoogleAuthUrlResp)(nil),           // 10: termbridge.cloud.GoogleAuthUrlResp
-	(*AuthMeResp)(nil),                  // 11: termbridge.cloud.AuthMeResp
-	(*CloudSessionSummary)(nil),         // 12: termbridge.cloud.CloudSessionSummary
-	(*DeviceSummary)(nil),               // 13: termbridge.cloud.DeviceSummary
+	(*CloudOAuthExchangeReq)(nil),       // 9: termbridge.cloud.CloudOAuthExchangeReq
+	(*CloudOAuthExchangeResp)(nil),      // 10: termbridge.cloud.CloudOAuthExchangeResp
+	(*AuthLoginResp)(nil),               // 11: termbridge.cloud.AuthLoginResp
+	(*AuthGoogleCallbackResp)(nil),      // 12: termbridge.cloud.AuthGoogleCallbackResp
+	(*LocalAuthLoginResp)(nil),          // 13: termbridge.cloud.LocalAuthLoginResp
+	(*CloudOAuthTokenResp)(nil),         // 14: termbridge.cloud.CloudOAuthTokenResp
+	(*GoogleAuthUrlResp)(nil),           // 15: termbridge.cloud.GoogleAuthUrlResp
+	(*AuthMeResp)(nil),                  // 16: termbridge.cloud.AuthMeResp
+	(*CloudSessionSummary)(nil),         // 17: termbridge.cloud.CloudSessionSummary
+	(*DeviceSummary)(nil),               // 18: termbridge.cloud.DeviceSummary
 }
 var file_termbridge_cloud_v1_auth_proto_depIdxs = []int32{
 	0,  // 0: termbridge.cloud.AuthMeResp.user:type_name -> termbridge.cloud.User
-	12, // 1: termbridge.cloud.AuthMeResp.cloud_session:type_name -> termbridge.cloud.CloudSessionSummary
-	13, // 2: termbridge.cloud.AuthMeResp.device:type_name -> termbridge.cloud.DeviceSummary
+	17, // 1: termbridge.cloud.AuthMeResp.cloud_session:type_name -> termbridge.cloud.CloudSessionSummary
+	18, // 2: termbridge.cloud.AuthMeResp.device:type_name -> termbridge.cloud.DeviceSummary
 	3,  // [3:3] is the sub-list for method output_type
 	3,  // [3:3] is the sub-list for method input_type
 	3,  // [3:3] is the sub-list for extension type_name
@@ -788,7 +1063,7 @@ func file_termbridge_cloud_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_termbridge_cloud_v1_auth_proto_rawDesc), len(file_termbridge_cloud_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

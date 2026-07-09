@@ -2,7 +2,9 @@ import type { AxiosResponse } from 'axios'
 import type {
   AuthChangePasswordReq,
   AuthGoogleCallbackReq,
+  AuthGoogleCallbackResp,
   AuthLoginReq,
+  AuthLoginResp,
   AuthMeResp,
   AuthPasswordResetConfirmReq,
   AuthPasswordResetRequestReq,
@@ -10,7 +12,6 @@ import type {
   AuthResendVerificationReq,
   AuthVerifyEmailReq,
   GoogleAuthUrlResp,
-  TokenResp,
 } from '../../gen/proto/termbridge/cloud/v1/auth'
 import type { DeviceSummary, ListDevicesResp } from '../../gen/proto/termbridge/cloud/v1/device'
 import type {
@@ -51,9 +52,9 @@ export async function authMeViaCloud(): Promise<AuthMeResp> {
   }
 }
 
-export async function authLogin(email: string, password: string): Promise<TokenResp> {
+export async function authLogin(email: string, password: string): Promise<AuthLoginResp> {
   const request: AuthLoginReq = { email, username: '', password }
-  const response = await cloudApiClient.post<TokenResp>('/auth/login', request)
+  const response = await cloudApiClient.post<AuthLoginResp>('/auth/login', request)
   return response.data
 }
 
@@ -106,9 +107,15 @@ export async function authGoogleUrl(): Promise<string> {
   return response.data.auth_url
 }
 
-export async function authGoogleCallback(code: string, state: string): Promise<TokenResp> {
+export async function authGoogleCallback(
+  code: string,
+  state: string,
+): Promise<AuthGoogleCallbackResp> {
   const request: AuthGoogleCallbackReq = { code, state }
-  const response = await cloudApiClient.post<TokenResp>('/auth/google/callback', request)
+  const response = await cloudApiClient.post<AuthGoogleCallbackResp>(
+    '/auth/google/callback',
+    request,
+  )
   return response.data
 }
 

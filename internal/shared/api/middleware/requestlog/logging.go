@@ -56,8 +56,8 @@ func Middleware(logger *slog.Logger, config sharedconfig.LogHTTPConfig) func(htt
 			responseWriter := NewLoggingResponseWriter(w, config.ResponseBodyLimit)
 			next.ServeHTTP(responseWriter, r)
 
-			status := responseWriter.Status()
-			if deferStartedLog && status == http.StatusOK {
+			okStatus := responseWriter.Status() == http.StatusOK || responseWriter.Status() == http.StatusNotModified
+			if deferStartedLog && okStatus {
 				return
 			}
 			if deferStartedLog {
@@ -66,7 +66,7 @@ func Middleware(logger *slog.Logger, config sharedconfig.LogHTTPConfig) func(htt
 
 			completedAttrs := append([]any{}, requestAttrs...)
 			completedAttrs = append(completedAttrs,
-				"status", status,
+				"status", responseWriter.Status(),
 				"bytes", responseWriter.BytesWritten(),
 				"duration_ms", time.Since(startedAt).Milliseconds(),
 			)

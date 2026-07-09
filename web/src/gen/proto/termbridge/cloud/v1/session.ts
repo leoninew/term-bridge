@@ -6,19 +6,19 @@
 
 /* eslint-disable */
 
-export const protobufPackage = 'termbridge.cloud'
+export const protobufPackage = "termbridge.cloud";
 
 export interface CloudSessionSummary {
-  public_url: string
-  device_id: string
-  device_name: string
-  connected_at: string | undefined
+  public_url: string;
+  device_id: string;
+  device_name: string;
+  connected_at: string | undefined;
 }
 
 export interface CloudConnectReq {
-  cloud_token: string
+  cloud_token: string;
 }
 
 export interface CloudConnectResp {
-  cloud_session: CloudSessionSummary | undefined
+  cloud_session: CloudSessionSummary | undefined;
 }

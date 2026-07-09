@@ -6,28 +6,28 @@
 
 /* eslint-disable */
 
-export const protobufPackage = 'termbridge.cloud'
+export const protobufPackage = "termbridge.cloud";
 
 export interface DeviceSummary {
-  id: string
-  name: string
-  online: boolean
-  status: string
-  connected_at: string | undefined
-  last_seen: string | undefined
+  id: string;
+  name: string;
+  online: boolean;
+  status: string;
+  connected_at: string | undefined;
+  last_seen: string | undefined;
 }
 
 export interface ListDevicesResp {
-  items: DeviceSummary[]
+  items: DeviceSummary[];
 }
 
 export interface CurrentDeviceReq {
-  id: string
-  name: string
-  public_key: string
+  id: string;
+  name: string;
+  public_key: string;
 }
 
 export interface CurrentDeviceResp {
-  accepted: boolean
-  device: DeviceSummary | undefined
+  accepted: boolean;
+  device: DeviceSummary | undefined;
 }

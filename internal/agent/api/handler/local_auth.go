@@ -23,7 +23,7 @@ func NewLocalAuthService(tokens sharedauth.TokenService) AuthService {
 	return localAuthService{tokens: tokens}
 }
 
-func (s localAuthService) Login(ctx context.Context, email, password string) (*cloud.TokenResp, error) {
+func (s localAuthService) Login(ctx context.Context, email, password string) (*cloud.LocalAuthLoginResp, error) {
 	_, _, _ = ctx, email, password
 	return s.sign(s.localUser())
 }
@@ -40,12 +40,12 @@ func (s localAuthService) VerifyToken(token string) (sharedauth.Claims, error) {
 	return s.tokens.Verify(token)
 }
 
-func (s localAuthService) sign(user *cloud.User) (*cloud.TokenResp, error) {
+func (s localAuthService) sign(user *cloud.User) (*cloud.LocalAuthLoginResp, error) {
 	token, err := s.tokens.Sign(sharedauth.Claims{Sub: user.GetId(), Email: user.GetEmail(), Provider: user.GetProvider()})
 	if err != nil {
 		return nil, err
 	}
-	return &cloud.TokenResp{AccessToken: token, TokenType: "bearer"}, nil
+	return &cloud.LocalAuthLoginResp{AccessToken: token, TokenType: "bearer"}, nil
 }
 
 func (s localAuthService) localUser() *cloud.User {

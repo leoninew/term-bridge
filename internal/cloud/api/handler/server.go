@@ -56,7 +56,7 @@ type CloudOAuthClientConfig struct {
 }
 
 type AuthService interface {
-	Login(ctx context.Context, email, password string) (*cloudproto.TokenResp, error)
+	Login(ctx context.Context, email, password string) (*cloudproto.AuthLoginResp, error)
 	UserFromClaims(ctx context.Context, claims auth.Claims) (*cloudproto.User, error)
 	Register(ctx context.Context, email, password string) error
 	VerifyEmail(ctx context.Context, email, code string) error
@@ -65,8 +65,8 @@ type AuthService interface {
 	RequestPasswordReset(ctx context.Context, email string) error
 	ConfirmPasswordReset(ctx context.Context, email, code, newPassword string) error
 	GoogleAuthURL(ctx context.Context) (string, error)
-	GoogleCallback(ctx context.Context, code, state string) (*cloudproto.TokenResp, error)
-	IssueUserToken(ctx context.Context, userId string) (*cloudproto.TokenResp, error)
+	GoogleCallback(ctx context.Context, code, state string) (*cloudproto.AuthGoogleCallbackResp, error)
+	IssueUserToken(ctx context.Context, userId string) (*cloudproto.CloudOAuthTokenResp, error)
 	VerifyToken(token string) (auth.Claims, error)
 	VerifyBasic(ctx context.Context, username, password string) bool
 }
@@ -261,7 +261,7 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, "Failed to sign token", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, &cloudproto.TokenResp{AccessToken: token, TokenType: "bearer"})
+	writeJSON(w, http.StatusOK, &cloudproto.AuthLoginResp{AccessToken: token, TokenType: "bearer"})
 }
 
 func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {

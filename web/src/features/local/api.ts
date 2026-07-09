@@ -15,8 +15,13 @@ import type {
   UpdateSessionReq,
   UpdateSessionOrderResp,
 } from '../../gen/proto/termbridge/agent/v1/session'
-import type { AuthMeResp, TokenResp } from '../../gen/proto/termbridge/cloud/v1/auth'
-import type { CloudConnectResp } from '../../gen/proto/termbridge/cloud/v1/session'
+import type {
+  AuthMeResp,
+  CloudOAuthExchangeReq,
+  CloudOAuthExchangeResp,
+  LocalAuthLoginResp,
+} from '../../gen/proto/termbridge/cloud/v1/auth'
+import type { CloudConnectReq, CloudConnectResp } from '../../gen/proto/termbridge/cloud/v1/session'
 import { localApiClient } from '../api/client'
 import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
 
@@ -38,8 +43,8 @@ export async function authMe(): Promise<AuthMeResp> {
   }
 }
 
-export async function authLoginViaLocal(): Promise<TokenResp> {
-  const response = await localApiClient.post<TokenResp>('/auth/login')
+export async function authLoginViaLocal(): Promise<LocalAuthLoginResp> {
+  const response = await localApiClient.post<LocalAuthLoginResp>('/auth/login')
   return response.data
 }
 
@@ -47,13 +52,23 @@ export async function authLogout(): Promise<void> {
   await localApiClient.post('/auth/logout')
 }
 
-export async function connectCloudWithCurrentAccount(code: string): Promise<CloudConnectResp> {
-  const response = await localApiClient.post<CloudConnectResp>('/cloud/connect', { code })
+export async function connectCloudWithToken(cloudToken: string): Promise<CloudConnectResp> {
+  const request: CloudConnectReq = { cloud_token: cloudToken }
+  const response = await localApiClient.post<CloudConnectResp>('/cloud/connect', request)
   return response.data
 }
 
 export async function disconnectCloud(): Promise<void> {
   await localApiClient.post('/cloud/disconnect')
+}
+
+export async function exchangeOAuthCode(code: string): Promise<string> {
+  const request: CloudOAuthExchangeReq = { code }
+  const response = await localApiClient.post<CloudOAuthExchangeResp>(
+    '/cloud/oauth/exchange',
+    request,
+  )
+  return response.data.access_token
 }
 
 export async function createSession(

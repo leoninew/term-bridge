@@ -15,7 +15,7 @@ func newTestAuthService(tokens sharedauth.TokenService) AuthService {
 	return testAuthService{tokens: tokens}
 }
 
-func (s testAuthService) Login(ctx context.Context, email, password string) (*cloud.TokenResp, error) {
+func (s testAuthService) Login(ctx context.Context, email, password string) (*cloud.LocalAuthLoginResp, error) {
 	return nil, ErrInvalidCredentials
 }
 
