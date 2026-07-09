@@ -27,19 +27,29 @@
           <section
             class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
           >
-            <div class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
+            <div
+              class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
+            >
               <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
                 {{ t('dashboard.devicesTitle') }}
               </h1>
-              <button
-                type="button"
-                class="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 text-sm text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]"
-                :disabled="loading"
-                @click="refreshDevices"
-              >
-                <RefreshCw class="size-3.5 text-[var(--color-text-subtle)]" :class="loading ? 'animate-spin' : ''" />
-                {{ loading ? t('dashboard.refreshing') : t('dashboard.refreshDevices') }}
-              </button>
+              <div class="flex items-center gap-2">
+                <RouterLink
+                  :to="{ name: 'home' }"
+                  class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
+                >
+                  {{ t('dashboard.home') }}
+                </RouterLink>
+                <button
+                  type="button"
+                  class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]"
+                  :disabled="loading"
+                  @click="refreshDevices"
+                >
+                  <RefreshCw class="size-3.5" :class="loading ? 'animate-spin' : ''" />
+                  {{ loading ? t('dashboard.refreshing') : t('dashboard.refreshDevices') }}
+                </button>
+              </div>
             </div>
 
             <div v-if="loading" class="p-5 text-sm text-[var(--color-text-muted)]">
@@ -48,7 +58,10 @@
             <div v-else-if="deviceError" class="p-5 text-sm text-[var(--color-danger-text)]">
               {{ deviceError }}
             </div>
-            <div v-else-if="gateway.devices.length === 0" class="p-5 text-sm text-[var(--color-text-muted)]">
+            <div
+              v-else-if="gateway.devices.length === 0"
+              class="p-5 text-sm text-[var(--color-text-muted)]"
+            >
               {{ t('dashboard.emptyTitle') }}
             </div>
             <ul v-else class="divide-y divide-[var(--color-border)]">
@@ -77,12 +90,19 @@
                 </div>
                 <button
                   type="button"
-                  class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-blue-700 bg-blue-600 px-3 text-sm text-slate-50 outline-none hover:bg-blue-500 focus:bg-blue-500 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-[var(--color-control-bg)] disabled:text-[var(--color-text-muted)]"
+                  class="inline-flex size-8 shrink-0 items-center justify-center rounded-md outline-none disabled:cursor-not-allowed"
                   :disabled="!device.online"
+                  :aria-label="t('dashboard.openWorkbench')"
                   @click="openCloudSessions(device.id)"
                 >
-                  {{ device.online ? t('dashboard.openWorkbench') : t('dashboard.offlineAction') }}
-                  <ArrowRight class="size-3.5" :class="device.online ? 'text-slate-100' : 'text-[var(--color-text-subtle)]'" />
+                  <ArrowRight
+                    class="size-5"
+                    :class="
+                      device.online
+                        ? 'text-[var(--color-text-subtle)]'
+                        : 'text-[var(--color-text-muted)]'
+                    "
+                  />
                 </button>
               </li>
             </ul>
@@ -210,11 +230,19 @@
       return
     }
     if (!currentPassword.value) {
-      notifications.pushToast('error', t('gateway.changePasswordFailed'), t('message.currentPasswordRequired'))
+      notifications.pushToast(
+        'error',
+        t('gateway.changePasswordFailed'),
+        t('message.currentPasswordRequired'),
+      )
       return
     }
     if (!newPassword.value) {
-      notifications.pushToast('error', t('gateway.changePasswordFailed'), t('message.newPasswordRequired'))
+      notifications.pushToast(
+        'error',
+        t('gateway.changePasswordFailed'),
+        t('message.newPasswordRequired'),
+      )
       return
     }
     changingPassword.value = true

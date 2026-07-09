@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAppModeStore, type RouteMode } from '../store/appMode'
+import type { AgentMode } from '../config'
 import { useGatewayStore } from '../store/gateway'
+import { useRuntimeConfigStore } from '../store/runtimeConfig'
 
 const cloudAccountAuthRoutes = [
   'cloud-login',
@@ -25,7 +26,7 @@ export const router = createRouter({
       path: '/',
       name: homeRoute,
       component: () => import('../views/HomeView.vue'),
-      meta: { mode: 'both' },
+      meta: { mode: 'hybrid' },
     },
     {
       path: '/login',
@@ -82,7 +83,7 @@ export const router = createRouter({
       meta: { mode: 'agent' },
     },
     {
-      path: '/agent/sessions',
+      path: '/sessions',
       name: 'agent-sessions',
       component: () => import('../views/agent/SessionsView.vue'),
       meta: { mode: 'agent' },
@@ -116,24 +117,27 @@ export const router = createRouter({
 
 router.beforeEach(async (to) => {
   const gateway = useGatewayStore()
-  const appMode = useAppModeStore()
+  const runtimeConfig = useRuntimeConfigStore()
   const routeName = to.name as string
-  const routeMode = (to.meta.mode as RouteMode | undefined) ?? 'both'
+  const routeMode = (to.meta.mode as AgentMode | undefined) ?? 'hybrid'
+  const configuredMode = runtimeConfig.config.agent.mode
 
-  if (!appMode.allowsRouteMode(routeMode)) {
+  if (routeMode !== 'hybrid' && configuredMode !== 'hybrid' && configuredMode !== routeMode) {
     return { name: homeRoute }
   }
-  appMode.activateRouteMode(routeMode)
+  if (routeMode === 'agent' || routeMode === 'cloud') {
+    runtimeConfig.switchMode(routeMode)
+  }
 
   const authWhitelistRoutes =
-    appMode.effectiveMode === 'agent' ? agentAuthWhitelistRoutes : cloudAuthWhitelistRoutes
+    runtimeConfig.view.mode === 'agent' ? agentAuthWhitelistRoutes : cloudAuthWhitelistRoutes
   if (authWhitelistRoutes.includes(routeName)) {
     return
   }
 
   await gateway.initializeAuth()
   if (!gateway.authenticated) {
-    if (appMode.effectiveMode === 'agent') {
+    if (runtimeConfig.view.mode === 'agent') {
       return { name: homeRoute }
     }
     return {

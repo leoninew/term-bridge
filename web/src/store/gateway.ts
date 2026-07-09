@@ -1,14 +1,13 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { readLocalStorageValue, removeLocalStorageValue, writeLocalStorageValue } from './storage'
 import { authLoginViaAgent, authMe } from '../features/agent/api'
 import { authLogin, authMeViaCloud, listDevices } from '../features/cloud/api'
-import { useAppModeStore } from './appMode'
+import { useRuntimeConfigStore } from './runtimeConfig'
 import type { CloudSessionSummary } from '../gen/proto/termbridge/cloud/v1/session'
 import type { DeviceSummary } from '../gen/proto/termbridge/cloud/v1/device'
 import type { TokenResp, User as UserInfo } from '../gen/proto/termbridge/cloud/v1/auth'
-import type { RuntimeTarget } from '../features/runtimeTarget'
-import type { ApiTarget } from '../config'
+import type { RuntimeMode } from './runtimeConfig'
 
 const AGENT_TOKEN_KEY = 'termbridge_agent_token'
 const CLOUD_TOKEN_KEY = 'termbridge_cloud_token'
@@ -29,24 +28,6 @@ export const useGatewayStore = defineStore('gateway', () => {
   const cloudSession = ref<CloudSessionSummary | null>(null)
   const devices = ref<DeviceSummary[]>([])
   const selectedDeviceId = ref('')
-  const token = computed(() => {
-    const appMode = useAppModeStore()
-    return tokenForTarget(appMode.effectiveMode)
-  })
-  const runtimeTarget = computed<RuntimeTarget | null>(() => {
-    const appMode = useAppModeStore()
-    if (appMode.effectiveMode === 'agent') {
-      return { mode: 'agent' }
-    }
-    return selectedDeviceId.value ? { mode: 'cloud', deviceId: selectedDeviceId.value } : null
-  })
-  const currentDevice = computed<DeviceSummary | CloudSessionSummary | null>(() => {
-    const appMode = useAppModeStore()
-    if (appMode.effectiveMode === 'agent') {
-      return devices.value[0] ?? cloudSession.value
-    }
-    return devices.value.find((device) => device.id === selectedDeviceId.value) ?? null
-  })
   let initializedToken: string | null | undefined
   let initializedMode: 'agent' | 'cloud' | undefined
 
@@ -76,7 +57,7 @@ export const useGatewayStore = defineStore('gateway', () => {
     resetDeviceState()
   }
 
-  function clearTokenForTarget(target: ApiTarget) {
+  function clearTokenForTarget(target: RuntimeMode) {
     if (target === 'agent') {
       clearAgentToken()
       return
@@ -84,7 +65,7 @@ export const useGatewayStore = defineStore('gateway', () => {
     clearCloudToken()
   }
 
-  function tokenForTarget(target: ApiTarget): string | null {
+  function tokenForTarget(target: RuntimeMode): string | null {
     return target === 'agent' ? agentToken.value : cloudToken.value
   }
 
@@ -97,8 +78,8 @@ export const useGatewayStore = defineStore('gateway', () => {
   }
 
   async function initializeAuth(options: InitializeAuthOptions = {}) {
-    const appMode = useAppModeStore()
-    const mode = appMode.effectiveMode
+    const runtime = useRuntimeConfigStore()
+    const mode = runtime.view.mode
     if (mode === 'agent') {
       await ensureAgentToken()
     }
@@ -182,7 +163,6 @@ export const useGatewayStore = defineStore('gateway', () => {
   }
 
   return {
-    token,
     agentToken,
     cloudToken,
     authInitialized,
@@ -194,8 +174,6 @@ export const useGatewayStore = defineStore('gateway', () => {
     cloudSession,
     devices,
     selectedDeviceId,
-    runtimeTarget,
-    currentDevice,
     setAgentToken,
     setCloudToken,
     clearAgentToken,

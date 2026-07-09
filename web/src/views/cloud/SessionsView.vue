@@ -40,9 +40,7 @@
   const gateway = useGatewayStore()
   const deviceId = computed(() => String(route.params.deviceId ?? ''))
   const runtimeTarget = computed<RuntimeTarget>(() => ({ mode: 'cloud', deviceId: deviceId.value }))
-  const loginRedirect = computed(
-    () => `/devices/${encodeURIComponent(deviceId.value)}/sessions`,
-  )
+  const loginRedirect = computed(() => `/devices/${encodeURIComponent(deviceId.value)}/sessions`)
   const currentDevice = computed(
     () => gateway.devices.find((device) => device.id === deviceId.value) ?? null,
   )

@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { useAppModeStore } from './appMode'
 import { useGatewayStore } from './gateway'
+import { useRuntimeConfigStore } from './runtimeConfig'
 
 const mocks = vi.hoisted(() => ({
   authLoginViaAgent: vi.fn(),
@@ -39,8 +39,31 @@ describe('gateway store', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.authLoginViaAgent.mockResolvedValue({ access_token: 'agent-token', token_type: 'bearer' })
-    vi.stubGlobal('window', { localStorage: storageMock(), __CONFIG__: {} })
+    vi.stubGlobal('window', {
+      localStorage: storageMock(),
+      sessionStorage: storageMock(),
+      __CONFIG__: {
+        agent: {
+          mode: 'hybrid',
+          publicUrl: 'http://localhost:9030',
+          apiBaseUrl: '/agent-api',
+          cloudOAuth: {
+            clientId: 'termbridge-agent',
+            redirectUrl: 'http://localhost:9030/agent/oauth/callback',
+            scopes: ['openid', 'email', 'profile'],
+          },
+        },
+        cloud: {
+          publicUrl: 'http://localhost:9030',
+          apiBaseUrl: '/cloud-api',
+        },
+      },
+    })
     setActivePinia(createPinia())
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
   it('logs into agent locally before loading agent auth state', async () => {
@@ -52,7 +75,6 @@ describe('gateway store', () => {
     await store.initializeAuth()
 
     expect(store.authenticated).toBe(false)
-    expect(store.runtimeTarget).toEqual({ mode: 'agent' })
     expect(store.cloudSession).toBeNull()
     expect(store.agentToken).toBe('agent-token')
     expect(mocks.authLoginViaAgent).toHaveBeenCalledTimes(1)
@@ -77,7 +99,6 @@ describe('gateway store', () => {
     expect(store.authenticated).toBe(false)
     expect(store.cloudSession?.public_url).toBe('https://cloud.example.test')
     expect(store.cloudSession?.device_name).toBe('agent-device')
-    expect(store.currentDevice).toEqual(store.cloudSession)
 
     store.clearAgentToken()
 
@@ -85,9 +106,8 @@ describe('gateway store', () => {
   })
 
   it('uses cloud auth endpoint when active mode is cloud', async () => {
-    vi.stubGlobal('window', { localStorage: storageMock(), __CONFIG__: { frontendMode: 'cloud' } })
-    const appMode = useAppModeStore()
-    appMode.setActiveMode('cloud')
+    const runtimeConfig = useRuntimeConfigStore()
+    runtimeConfig.switchMode('cloud')
     mocks.authMeViaCloud.mockResolvedValueOnce({
       authenticated: true,
       user: {
@@ -132,9 +152,8 @@ describe('gateway store', () => {
   })
 
   it('auto-selects the only online device for dashboard workbench entry', async () => {
-    vi.stubGlobal('window', { localStorage: storageMock(), __CONFIG__: { frontendMode: 'cloud' } })
-    const appMode = useAppModeStore()
-    appMode.setActiveMode('cloud')
+    const runtimeConfig = useRuntimeConfigStore()
+    runtimeConfig.switchMode('cloud')
     mocks.listDevices.mockResolvedValueOnce([
       {
         id: 'dev-1',
@@ -150,7 +169,5 @@ describe('gateway store', () => {
     await store.loadDevices()
 
     expect(store.selectedDeviceId).toBe('dev-1')
-    expect(store.runtimeTarget).toEqual({ mode: 'cloud', deviceId: 'dev-1' })
-    expect(store.currentDevice).toEqual(store.devices[0])
   })
 })

@@ -615,6 +615,7 @@ type AuthMeResp struct {
 	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
 	User          *User                  `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
 	CloudSession  *CloudSessionSummary   `protobuf:"bytes,4,opt,name=cloud_session,json=cloudSession,proto3" json:"cloud_session,omitempty"`
+	Device        *DeviceSummary         `protobuf:"bytes,5,opt,name=device,proto3" json:"device,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -677,6 +678,13 @@ func (x *AuthMeResp) GetCloudSession() *CloudSessionSummary {
 	return nil
 }
 
+func (x *AuthMeResp) GetDevice() *DeviceSummary {
+	if x != nil {
+		return x.Device
+	}
+	return nil
+}
+
 var File_termbridge_cloud_v1_auth_proto protoreflect.FileDescriptor
 
 const file_termbridge_cloud_v1_auth_proto_rawDesc = "" +
@@ -717,13 +725,14 @@ const file_termbridge_cloud_v1_auth_proto_rawDesc = "" +
 	"\n" +
 	"token_type\x18\x02 \x01(\tR\ttokenType\".\n" +
 	"\x11GoogleAuthUrlResp\x12\x19\n" +
-	"\bauth_url\x18\x01 \x01(\tR\aauthUrl\"\xc6\x01\n" +
+	"\bauth_url\x18\x01 \x01(\tR\aauthUrl\"\xff\x01\n" +
 	"\n" +
 	"AuthMeResp\x12$\n" +
 	"\rauthenticated\x18\x01 \x01(\bR\rauthenticated\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12*\n" +
 	"\x04user\x18\x03 \x01(\v2\x16.termbridge.cloud.UserR\x04user\x12J\n" +
-	"\rcloud_session\x18\x04 \x01(\v2%.termbridge.cloud.CloudSessionSummaryR\fcloudSessionB\xcb\x01\n" +
+	"\rcloud_session\x18\x04 \x01(\v2%.termbridge.cloud.CloudSessionSummaryR\fcloudSession\x127\n" +
+	"\x06device\x18\x05 \x01(\v2\x1f.termbridge.cloud.DeviceSummaryR\x06deviceB\xcb\x01\n" +
 	"\x14com.termbridge.cloudB\tAuthProtoP\x01ZGgitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1\xa2\x02\x03TCX\xaa\x02\x10Termbridge.Cloud\xca\x02\x10Termbridge\\Cloud\xe2\x02\x1cTermbridge\\Cloud\\GPBMetadata\xea\x02\x11Termbridge::Cloudb\x06proto3"
 
 var (
@@ -753,15 +762,17 @@ var file_termbridge_cloud_v1_auth_proto_goTypes = []any{
 	(*GoogleAuthUrlResp)(nil),           // 10: termbridge.cloud.GoogleAuthUrlResp
 	(*AuthMeResp)(nil),                  // 11: termbridge.cloud.AuthMeResp
 	(*CloudSessionSummary)(nil),         // 12: termbridge.cloud.CloudSessionSummary
+	(*DeviceSummary)(nil),               // 13: termbridge.cloud.DeviceSummary
 }
 var file_termbridge_cloud_v1_auth_proto_depIdxs = []int32{
 	0,  // 0: termbridge.cloud.AuthMeResp.user:type_name -> termbridge.cloud.User
 	12, // 1: termbridge.cloud.AuthMeResp.cloud_session:type_name -> termbridge.cloud.CloudSessionSummary
-	2,  // [2:2] is the sub-list for method output_type
-	2,  // [2:2] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	13, // 2: termbridge.cloud.AuthMeResp.device:type_name -> termbridge.cloud.DeviceSummary
+	3,  // [3:3] is the sub-list for method output_type
+	3,  // [3:3] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_termbridge_cloud_v1_auth_proto_init() }

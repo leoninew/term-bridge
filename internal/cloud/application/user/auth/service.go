@@ -10,11 +10,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	repository "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/auth"
 	"io"
 	"net/url"
 	"strings"
 	"time"
+
+	repository "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/auth"
 
 	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 

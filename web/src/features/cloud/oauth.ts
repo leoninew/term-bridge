@@ -1,4 +1,4 @@
-import { buildCloudPageUrl, runtimeConfig } from '../../config'
+import { useRuntimeConfigStore } from '../../store/runtimeConfig'
 import {
   readLocalStorageValue,
   removeLocalStorageValue,
@@ -8,25 +8,16 @@ import {
 const cloudOAuthStateKey = 'termbridge.cloud.oauth2.state'
 const cloudOAuthRedirectKey = 'termbridge.cloud.oauth2.redirect'
 
-export type CloudOAuthConfig = {
-  clientId: string
-  redirectUrl: string
-  scopes: string[]
-}
-
 export function cloudOAuthConfigured(): boolean {
-  const config = runtimeConfig.cloudOAuth
-  return Boolean(config?.clientId && config.redirectUrl && isAbsoluteCloudApiBaseUrl())
+  const config = useRuntimeConfigStore().config.agent.cloudOAuth
+  return !!config
 }
 
 export function startCloudOAuth(postAuthRedirect: string) {
-  const config = requireCloudOAuthConfig()
+  const config = useRuntimeConfigStore().config.agent.cloudOAuth
   const state = randomState()
   writeLocalStorageValue(cloudOAuthStateKey, state)
-  writeLocalStorageValue(
-    cloudOAuthRedirectKey,
-    safeLocalRedirect(postAuthRedirect) || '/',
-  )
+  writeLocalStorageValue(cloudOAuthRedirectKey, safeLocalRedirect(postAuthRedirect) || '/')
   window.location.href = cloudAuthorizeUrl(config, state)
 }
 
@@ -44,30 +35,18 @@ export function consumeCloudOAuthRedirect(): string {
   return redirect || '/'
 }
 
-function cloudAuthorizeUrl(config: CloudOAuthConfig, state: string): string {
-  const url = new URL(buildCloudPageUrl('/oauth2/authorize'), window.location.origin)
+function cloudAuthorizeUrl(
+  config: { clientId: string; redirectUrl: string; scopes: string[] },
+  state: string,
+): string {
+  const runtimeConfig = useRuntimeConfigStore().config
+  const url = new URL('/oauth2/authorize', runtimeConfig.cloud.publicUrl)
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('client_id', config.clientId)
   url.searchParams.set('redirect_uri', config.redirectUrl)
-  if (config.scopes.length > 0) {
-    url.searchParams.set('scope', config.scopes.join(' '))
-  }
+  url.searchParams.set('scope', config.scopes.join(' '))
   url.searchParams.set('state', state)
   return url.toString()
-}
-
-function requireCloudOAuthConfig(): CloudOAuthConfig {
-  const config = runtimeConfig.cloudOAuth
-  const clientId = config?.clientId
-  const redirectUrl = config?.redirectUrl
-  if (!clientId || !redirectUrl || !isAbsoluteCloudApiBaseUrl()) {
-    throw new Error('Cloud OAuth is not configured')
-  }
-  return { clientId, redirectUrl, scopes: config.scopes ?? [] }
-}
-
-function isAbsoluteCloudApiBaseUrl(): boolean {
-  return /^https?:\/\//.test(runtimeConfig.cloudApiBaseUrl)
 }
 
 function randomState(): string {

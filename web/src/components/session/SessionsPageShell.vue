@@ -119,7 +119,7 @@
   import { useCreateSessionDraft } from '../../composable/useCreateSessionDraft'
   import { useSessionDialogs } from '../../composable/useSessionDialogs'
   import { useTerminalSize } from '../../composable/useTerminalSize'
-  import { buildCloudPageUrl } from '../../config'
+  import { useRuntimeConfigStore } from '../../store/runtimeConfig'
   import { terminalWsUrl, type SessionRuntimeApi } from '../../features/sessions/runtime'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
@@ -146,6 +146,7 @@
   const { t } = useI18n()
   const router = useRouter()
   const gateway = useGatewayStore()
+  const runtimeConfig = useRuntimeConfigStore()
   const workspaceSessions = useWorkspaceSessionsStore()
   const workbench = useWorkbenchStore()
   const notifications = useNotificationsStore()
@@ -163,8 +164,10 @@
   const removingWorkspaceId = ref<string | null>(null)
 
   const isAgentMode = computed(() => props.runtimeTarget.mode === 'agent')
-  const workbenchDevice = computed(() => props.currentDevice ?? gateway.currentDevice)
-  const helpHref = computed(() => (isAgentMode.value ? buildCloudPageUrl('/help') : ''))
+  const workbenchDevice = computed(() => props.currentDevice ?? gateway.cloudSession)
+  const helpHref = computed(() =>
+    isAgentMode.value ? new URL('/help', runtimeConfig.config.cloud.publicUrl).toString() : '',
+  )
 
   const activeSession = computed(() => {
     const tab = workbench.activeTab
@@ -213,7 +216,9 @@
     gateway.passwordInput = ''
     workspaceSessions.reset()
     workbench.resetForSourceChange()
-    await router.replace(isAgentMode.value ? { name: props.homeRouteName } : { name: 'cloud-login' })
+    await router.replace(
+      isAgentMode.value ? { name: props.homeRouteName } : { name: 'cloud-login' },
+    )
   }
 
   async function startSession() {

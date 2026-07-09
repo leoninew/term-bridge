@@ -12,11 +12,17 @@ linters:
     - ineffassign
     - staticcheck
     - unused
+  exclusions:
+    paths:
+      - ^internal/gen/proto/
 
 formatters:
   enable:
     - gofmt
     - goimports
+  exclusions:
+    paths:
+      - ^internal/gen/proto/
 
 issues:
   max-issues-per-linter: 0

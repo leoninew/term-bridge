@@ -1,8 +1,6 @@
 package app
 
 import (
-	"bytes"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
@@ -20,7 +18,7 @@ func backendHandler(cfg Config, logger *slog.Logger, apiHandler http.Handler) ht
 	mux.Handle("/cloud-api", cloudAPIHandler)
 	mux.Handle("/cloud-api/", cloudAPIHandler)
 	if cfg.Server.StaticDir != "" {
-		mux.Handle("/", staticHandler(cfg.Server.StaticDir, cfg.Server.ApiBaseUrl))
+		mux.Handle("/", staticHandler(cfg.Server.StaticDir))
 	}
 	return requestlog.Middleware(logger, requestlog.Config{RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit})(mux)
 }
@@ -47,7 +45,7 @@ func validateStaticDir(staticDir string) error {
 	return nil
 }
 
-func staticHandler(staticDir string, apiBaseURL string) http.Handler {
+func staticHandler(staticDir string) http.Handler {
 	fileServer := http.FileServer(http.Dir(staticDir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -61,10 +59,6 @@ func staticHandler(staticDir string, apiBaseURL string) http.Handler {
 		if urlPath != "" {
 			fullPath := filepath.Join(staticDir, filepath.FromSlash(urlPath))
 			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
-				if filepath.Clean(fullPath) == filepath.Clean(filepath.Join(staticDir, "index.html")) {
-					serveIndexHTML(w, r, fullPath, apiBaseURL)
-					return
-				}
 				fileServer.ServeHTTP(w, r)
 				return
 			}
@@ -73,11 +67,11 @@ func staticHandler(staticDir string, apiBaseURL string) http.Handler {
 				return
 			}
 		}
-		serveIndexHTML(w, r, filepath.Join(staticDir, "index.html"), apiBaseURL)
+		serveIndexHTML(w, r, filepath.Join(staticDir, "index.html"))
 	})
 }
 
-func serveIndexHTML(w http.ResponseWriter, r *http.Request, indexPath string, apiBaseURL string) {
+func serveIndexHTML(w http.ResponseWriter, r *http.Request, indexPath string) {
 	content, err := os.ReadFile(indexPath)
 	if err != nil {
 		http.NotFound(w, r)
@@ -87,33 +81,7 @@ func serveIndexHTML(w http.ResponseWriter, r *http.Request, indexPath string, ap
 	if r.Method == http.MethodHead {
 		return
 	}
-	_, _ = w.Write(injectRuntimeConfig(content, apiBaseURL))
-}
-
-func injectRuntimeConfig(content []byte, apiBaseURL string) []byte {
-	configValue := map[string]string{"frontendMode": "cloud"}
-	configValue["cloudApiBaseUrl"] = normalizeRuntimeAPIBaseURL(apiBaseURL, "/cloud-api")
-	configJSON, err := json.Marshal(configValue)
-	if err != nil {
-		panic("marshal runtime config: " + err.Error())
-	}
-	script := []byte("<script>window.__CONFIG__ = " + string(configJSON) + ";</script>")
-	placeholder := []byte("<!-- __RUNTIME_CONFIG__ -->")
-	if bytes.Contains(content, placeholder) {
-		return bytes.Replace(content, placeholder, script, 1)
-	}
-	headEnd := []byte("</head>")
-	if bytes.Contains(content, headEnd) {
-		return bytes.Replace(content, headEnd, append(script, headEnd...), 1)
-	}
-	return content
-}
-
-func normalizeRuntimeAPIBaseURL(value string, fallback string) string {
-	if strings.TrimSpace(value) == "" {
-		return fallback
-	}
-	return strings.TrimRight(strings.TrimSpace(value), "/")
+	_, _ = w.Write(content)
 }
 
 func apiPath(path string) bool {

@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AxiosHeaders, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
+import type { BrowserRuntimeConfig } from '../../config'
 import {
   ApiClientError,
   ApiContractMismatchError,
@@ -19,16 +20,56 @@ vi.mock('../../router', () => ({
   },
 }))
 
+function storageMock(): Storage {
+  const values = new Map<string, string>()
+  return {
+    get length() {
+      return values.size
+    },
+    clear: vi.fn(() => values.clear()),
+    getItem: vi.fn((key: string) => values.get(key) ?? null),
+    key: vi.fn((index: number) => Array.from(values.keys())[index] ?? null),
+    removeItem: vi.fn((key: string) => values.delete(key)),
+    setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+  }
+}
+
+function runtimeConfig(overrides: BrowserRuntimeConfig = {}): BrowserRuntimeConfig {
+  return {
+    agent: {
+      mode: 'hybrid',
+      publicUrl: 'http://localhost:9030',
+      apiBaseUrl: '/agent-api',
+      cloudOAuth: {
+        clientId: 'termbridge-agent',
+        redirectUrl: 'http://localhost:9030/agent/oauth/callback',
+        scopes: ['openid', 'email', 'profile'],
+      },
+      ...overrides.agent,
+    },
+    cloud: {
+      publicUrl: 'http://localhost:9030',
+      apiBaseUrl: '/cloud-api',
+      ...overrides.cloud,
+    },
+  }
+}
+
+function stubBrowser(config: BrowserRuntimeConfig = runtimeConfig(), localStorage = storageMock()) {
+  vi.stubGlobal('window', {
+    __CONFIG__: config,
+    localStorage,
+    sessionStorage: storageMock(),
+  })
+}
+
 beforeEach(() => {
   setActivePinia(createPinia())
-  globalThis.localStorage = {
-    getItem: vi.fn(),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
-    clear: vi.fn(),
-    length: 0,
-    key: vi.fn(),
-  }
+  stubBrowser()
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 function requestConfig(headers?: Record<string, string>): InternalAxiosRequestConfig {
@@ -91,10 +132,8 @@ describe('api client', () => {
   })
 
   it('uses agent API base URL for agent requests', async () => {
-    vi.stubGlobal('window', {
-      localStorage: globalThis.localStorage,
-      __CONFIG__: { agentApiBaseUrl: 'https://agent.example.com/' },
-    })
+    stubBrowser(runtimeConfig({ agent: { apiBaseUrl: 'https://agent.example.com/' } }))
+    setActivePinia(createPinia())
 
     const result = await apiClient.get<string>('/history', {
       adapter: async (config) => ({
@@ -107,14 +146,11 @@ describe('api client', () => {
     })
 
     expect(result.data).toBe('https://agent.example.com')
-    vi.unstubAllGlobals()
   })
 
   it('uses cloud API base URL for cloud requests', async () => {
-    vi.stubGlobal('window', {
-      localStorage: globalThis.localStorage,
-      __CONFIG__: { agentApiBaseUrl: '/agent-api', cloudApiBaseUrl: '/cloud-api' },
-    })
+    stubBrowser(runtimeConfig({ cloud: { apiBaseUrl: '/cloud-api' } }))
+    setActivePinia(createPinia())
 
     const result = await cloudApiClient.get<string>('/devices', {
       adapter: async (config) => ({
@@ -127,25 +163,13 @@ describe('api client', () => {
     })
 
     expect(result.data).toBe('/cloud-api')
-    vi.unstubAllGlobals()
   })
 
   it('sends only the token for the requested API target', async () => {
-    vi.stubGlobal('window', {
-      localStorage: {
-        getItem: vi.fn((key: string) => {
-          if (key === 'termbridge_agent_token') return 'agent-token'
-          if (key === 'termbridge_cloud_token') return 'cloud-token'
-          return null
-        }),
-        setItem: vi.fn(),
-        removeItem: vi.fn(),
-        clear: vi.fn(),
-        length: 0,
-        key: vi.fn(),
-      },
-      __CONFIG__: { agentApiBaseUrl: '/agent-api', cloudApiBaseUrl: '/cloud-api' },
-    })
+    const localStorage = storageMock()
+    localStorage.setItem('termbridge_agent_token', 'agent-token')
+    localStorage.setItem('termbridge_cloud_token', 'cloud-token')
+    stubBrowser(runtimeConfig(), localStorage)
     setActivePinia(createPinia())
 
     const agentResult = await agentApiClient.get<string>('/auth/me', {
@@ -169,7 +193,6 @@ describe('api client', () => {
 
     expect(agentResult.data).toBe('Bearer agent-token')
     expect(cloudResult.data).toBe('Bearer cloud-token')
-    vi.unstubAllGlobals()
   })
 
   it('does not parse successful text responses as JSON', async () => {

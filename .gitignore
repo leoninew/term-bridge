@@ -1,9 +1,16 @@
 .DS_Store
 
 .termbridge/
+# Root runtime env files are machine-local and may contain secrets.
 /.env
 /.env.*
 !/.env.example
+
+# Frontend Vite mode config files are committed build inputs.
+!/web/.env.development
+!/web/.env.agent
+!/web/.env.cloud
+/web/.env.production
 .pomelo-pw/output/
 
 data/

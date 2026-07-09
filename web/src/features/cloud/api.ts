@@ -39,7 +39,13 @@ export async function authMeViaCloud(): Promise<AuthMeResp> {
     return response.data
   } catch (err) {
     if (isUnauthorizedApiError(err)) {
-      return { authenticated: false, username: '', user: undefined, cloud_session: undefined }
+      return {
+        authenticated: false,
+        username: '',
+        user: undefined,
+        cloud_session: undefined,
+        device: undefined,
+      }
     }
     throw err
   }

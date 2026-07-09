@@ -165,9 +165,10 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.authService != nil {
 		cloudSession := s.localCloudSessionSummary()
+		device := s.localDeviceSummary()
 		claims, ok := s.claimsFromRequest(r)
 		if !ok {
-			writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: false, CloudSession: cloudSession})
+			writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: false, CloudSession: cloudSession, Device: device})
 			return
 		}
 		user, err := s.authService.UserFromClaims(r.Context(), claims)
@@ -175,10 +176,10 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 			s.writeUnauthorized(w, r)
 			return
 		}
-		writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, User: user, CloudSession: cloudSession})
+		writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, User: user, CloudSession: cloudSession, Device: device})
 		return
 	}
-	writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, Username: s.auth.UsernameFromRequest(r)})
+	writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, Username: s.auth.UsernameFromRequest(r), Device: s.localDeviceSummary()})
 }
 
 func (s *Handler) authMiddleware(next http.Handler) http.Handler {
@@ -201,6 +202,14 @@ func (s *Handler) localCloudSessionSummary() *cloudproto.CloudSessionSummary {
 		return nil
 	}
 	return proto.Clone(s.cloudSession).(*cloudproto.CloudSessionSummary)
+}
+
+func (s *Handler) localDeviceSummary() *cloudproto.DeviceSummary {
+	device := s.config.LocalDevice
+	if strings.TrimSpace(device.Id) == "" && strings.TrimSpace(device.Name) == "" {
+		return nil
+	}
+	return &cloudproto.DeviceSummary{Id: device.Id, Name: device.Name, Online: true, Status: "online"}
 }
 
 func (s *Handler) setLocalCloudSession(summary *cloudproto.CloudSessionSummary) {

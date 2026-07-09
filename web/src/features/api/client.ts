@@ -5,8 +5,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios'
 import type { ErrorResp } from '../../gen/proto/termbridge/shared/v1/common'
-import { runtimeConfig, type ApiTarget } from '../../config'
-import { useAppModeStore } from '../../store/appMode'
+import { useRuntimeConfigStore, type RuntimeMode } from '../../store/runtimeConfig'
 import { useGatewayStore } from '../../store/gateway'
 import { router } from '../../router'
 
@@ -48,9 +47,11 @@ export const cloudApiClient = axios.create()
 configureApiClient(apiClient, 'agent')
 configureApiClient(cloudApiClient, 'cloud')
 
-function configureApiClient(client: typeof apiClient, target: ApiTarget): void {
+function configureApiClient(client: typeof apiClient, target: RuntimeMode): void {
   client.interceptors.request.use((cfg) => {
-    cfg.baseURL = target === 'cloud' ? runtimeConfig.cloudApiBaseUrl : runtimeConfig.agentApiBaseUrl
+    const runtimeConfig = useRuntimeConfigStore().config
+    cfg.baseURL =
+      target === 'cloud' ? runtimeConfig.cloud.apiBaseUrl : runtimeConfig.agent.apiBaseUrl
     return cfg
   })
 
@@ -74,11 +75,12 @@ function configureApiClient(client: typeof apiClient, target: ApiTarget): void {
       }
       if (error.response.status === 401) {
         const gateway = useGatewayStore()
-        const appMode = useAppModeStore()
+        const runtimeConfig = useRuntimeConfigStore()
         gateway.clearTokenForTarget(target)
         if (
           target === 'cloud' &&
-          appMode.allowsMode('cloud') &&
+          (runtimeConfig.config.agent.mode === 'cloud' ||
+            runtimeConfig.config.agent.mode === 'hybrid') &&
           router.currentRoute.value.name !== 'cloud-login'
         ) {
           router.push({

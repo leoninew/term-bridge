@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	migrations "gitee.com/leoninew/TermBridge-go/migrations/agent"
 	"io/fs"
 	"strings"
+
+	migrations "gitee.com/leoninew/TermBridge-go/migrations/agent"
 
 	"github.com/pressly/goose/v3"
 

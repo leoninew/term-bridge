@@ -5,6 +5,7 @@
 // source: termbridge/cloud/v1/auth.proto
 
 /* eslint-disable */
+import type { DeviceSummary } from './device'
 import type { CloudSessionSummary } from './session'
 
 export const protobufPackage = 'termbridge.cloud'
@@ -71,4 +72,5 @@ export interface AuthMeResp {
   username: string
   user: User | undefined
   cloud_session: CloudSessionSummary | undefined
+  device: DeviceSummary | undefined
 }

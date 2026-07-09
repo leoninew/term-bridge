@@ -7,7 +7,7 @@ Review status: Accepted
 
 ## Requirement alignment
 
-按 `docs/requirement/20260708-home-cloud-mode-frontend.md` 核对：
+按 `docs/requirement/20260709-runtime-config-finish.md` 核对：
 
 1. Home 页 agent 模式保留本机工作台、工作区列表、连接云端和切换 Cloud 模式入口。
 2. Home 页 cloud 模式已改为产品入口首页，不作为管理后台或企业/项目介绍页；页面使用约 1200px 内容区，并避免整页大卡片承载。
@@ -41,7 +41,7 @@ Review status: Accepted
 
 - `.golangci.yml`
   - 新增 Go lint 配置入口。
-- `docs/requirement/20260708-home-cloud-mode-frontend.md`
+- `docs/requirement/20260709-runtime-config-finish.md`
   - 记录 Cloud Home、Dashboard、路由、Agent 断开云端连接语义和用户审查意见。
 - `docs/verification/20260708-home-cloud-mode-frontend.md`
   - 新增本验证文档。
@@ -87,7 +87,7 @@ Review status: Accepted
 
 | 范围 | 预期 | 实际 | 结论 |
 | --- | --- | --- | --- |
-| 需求文档 | 更新 cloud Home 与 Agent 断开语义 | 已更新 `docs/requirement/20260708-home-cloud-mode-frontend.md` | 符合 |
+| 需求文档 | 更新 cloud Home 与 Agent 断开语义 | 已更新 `docs/requirement/20260709-runtime-config-finish.md` | 符合 |
 | 验证文档 | 进入 Verification 后新增文档 | 已新增本文档 | 符合 |
 | Cloud Home | 新增产品入口首页 | 已由 `HomeView.vue` 在 cloud 模式渲染 | 符合 |
 | Agent Home | 不回退，新增断开云端可用动作 | 已保留本机工作台，并接入 `disconnectCloud()` | 符合 |
@@ -207,4 +207,4 @@ npm --prefix web test
 
 ## Conclusion
 
-本轮实现与 `docs/requirement/20260708-home-cloud-mode-frontend.md` 对齐。核心验收项包括 Cloud Home 产品入口、Dashboard 路由、Cloud sessions 路由、旧 agent dashboard 删除，以及 Agent 侧本地断开云端连接能力。目标 Go 测试、Web 类型检查、Web lint 和 Web 测试均通过。实现可交付人工验收。
+本轮实现与 `docs/requirement/20260709-runtime-config-finish.md` 对齐。核心验收项包括 Cloud Home 产品入口、Dashboard 路由、Cloud sessions 路由、旧 agent dashboard 删除，以及 Agent 侧本地断开云端连接能力。目标 Go 测试、Web 类型检查、Web lint 和 Web 测试均通过。实现可交付人工验收。

@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"log/slog"
+
 	sessionapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/session"
 	workspaceapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/workspace"
 	termpty "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/pty"
@@ -21,7 +23,6 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/workspace"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/repository/task/state"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
-	"log/slog"
 
 	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/prototime"

@@ -3,7 +3,7 @@
     :runtime-target="runtimeTarget"
     :runtime-api="runtimeApi"
     home-route-name="home"
-    login-redirect="/agent/sessions"
+    login-redirect="/sessions"
     :logout="authLogout"
   />
 </template>

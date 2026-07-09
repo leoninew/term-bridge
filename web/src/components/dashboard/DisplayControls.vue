@@ -33,7 +33,8 @@
   const themeStore = useThemeStore()
 
   const languageLabel = computed(
-    () => `${t('common.language')}: ${localeLabels[locale.value as AppLocale] ?? String(locale.value)}`,
+    () =>
+      `${t('common.language')}: ${localeLabels[locale.value as AppLocale] ?? String(locale.value)}`,
   )
   const themeLabel = computed(() => `${t('common.theme')}: ${t(`theme.${themeStore.theme}`)}`)
   const languageIcon = computed(() => (locale.value === 'zh-CN' ? Languages : Globe))

@@ -1,4 +1,4 @@
-import { buildApiWebSocketUrl } from '../../config'
+import { useRuntimeConfigStore } from '../../store/runtimeConfig'
 import { clampTerminalSize } from '../../protocol/terminal'
 import type {
   SessionSummary,
@@ -11,7 +11,7 @@ import type {
   RerunSessionReq,
   UpdateSessionReq,
 } from '../../gen/proto/termbridge/agent/v1/session'
-import { runtimeApiTarget, runtimePath, type RuntimeTarget } from '../runtimeTarget'
+import { runtimePath, type RuntimeTarget } from '../runtimeTarget'
 
 export type ApiResult<T> = {
   data: T
@@ -59,10 +59,29 @@ export function terminalWsUrl(
   }
   const query = params.toString()
   const pathWithQuery = query ? `${path}?${query}` : path
-  return buildApiWebSocketUrl(pathWithQuery, runtimeApiTarget(target))
+  const runtimeConfig = useRuntimeConfigStore().config
+  const apiBaseUrl =
+    target.mode === 'cloud' ? runtimeConfig.cloud.apiBaseUrl : runtimeConfig.agent.apiBaseUrl
+  return buildApiWebSocketUrl(apiBaseUrl, pathWithQuery)
 }
 
 export function workspaceSessionPath(workspaceId: string, sessionId?: string): string {
   const base = `/workspaces/${encodeURIComponent(workspaceId)}/sessions`
   return sessionId ? `${base}/${encodeURIComponent(sessionId)}` : base
+}
+
+function buildApiWebSocketUrl(apiBaseUrl: string, path: string): string {
+  const url = joinBaseAndPath(apiBaseUrl, path)
+  if (apiBaseUrl.startsWith('/')) {
+    return url
+  }
+  const parsed = new URL(url)
+  parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
+  return parsed.toString()
+}
+
+function joinBaseAndPath(baseUrl: string, path: string): string {
+  const normalizedBase = baseUrl.replace(/\/+$/, '')
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${normalizedBase}${normalizedPath}`
 }

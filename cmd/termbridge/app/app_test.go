@@ -373,6 +373,38 @@ func TestRunWorkspaceAndSessionList(t *testing.T) {
 	}
 }
 
+func TestFrontendStaticEntryConfigUsesModeSpecificBuildInputs(t *testing.T) {
+	agentEnv := readRepoFile(t, "web", ".env.agent")
+	cloudEnv := readRepoFile(t, "web", ".env.cloud")
+	developmentEnv := readRepoFile(t, "web", ".env.development")
+
+	if !strings.Contains(developmentEnv, "TERMBRIDGE_AGENT__MODE=hybrid") {
+		t.Fatalf("development frontend entry must use hybrid mode")
+	}
+	if !strings.Contains(agentEnv, "TERMBRIDGE_AGENT__MODE=agent") {
+		t.Fatalf("agent frontend entry must use agent mode")
+	}
+	if !strings.Contains(cloudEnv, "TERMBRIDGE_AGENT__MODE=cloud") {
+		t.Fatalf("cloud frontend entry must use cloud mode")
+	}
+	if !strings.Contains(readRepoFile(t, "Dockerfile"), "RUN yarn build:cloud") {
+		t.Fatalf("Dockerfile must build the cloud frontend entry")
+	}
+	if !strings.Contains(readRepoFile(t, "Dockerfile.cn"), "RUN yarn build:cloud") {
+		t.Fatalf("Dockerfile.cn must build the cloud frontend entry")
+	}
+}
+
+func readRepoFile(t *testing.T, path ...string) string {
+	t.Helper()
+	parts := append([]string{"..", "..", ".."}, path...)
+	content, err := os.ReadFile(filepath.Join(parts...))
+	if err != nil {
+		t.Fatalf("ReadFile(%s) error = %v", filepath.Join(path...), err)
+	}
+	return string(content)
+}
+
 func writeDefaultConfig(t *testing.T, dir string) {
 	t.Helper()
 	content, err := os.ReadFile(filepath.Join("..", "..", "..", "configs", "config.yaml"))

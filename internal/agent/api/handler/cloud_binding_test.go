@@ -50,6 +50,25 @@ func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	}
 }
 
+func TestAuthMeReturnsLocalDeviceSummary(t *testing.T) {
+	authService := newTestAuthService(sharedauth.NewTokenService(testJWTKey))
+	device := testLocalDevice()
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, LocalDevice: device})
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
+	}
+	var body cloudv1.AuthMeResp
+	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode auth me response: %v", err)
+	}
+	if body.GetDevice().GetId() != device.Id || body.GetDevice().GetName() != device.Name {
+		t.Fatalf("device id=%q name=%q", body.GetDevice().GetId(), body.GetDevice().GetName())
+	}
+}
+
 func TestAgentLoginIssuesLocalTokenAndProtectsBusinessRoutes(t *testing.T) {
 	authService := NewLocalAuthService(sharedauth.NewTokenService(testJWTKey))
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService})
