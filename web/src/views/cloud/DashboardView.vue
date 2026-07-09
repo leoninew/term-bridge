@@ -12,9 +12,9 @@
         <div class="flex items-center gap-3">
           <DisplayControls />
           <CloudAccountMenu
-            :authenticated="gateway.authenticated"
+            :authenticated="cloudAuth.authenticated"
             :user-display-name="userDisplayName"
-            :user-email="gateway.user?.email ?? ''"
+            :user-email="cloudAuth.user?.email ?? ''"
             @login="openCloudLogin"
             @logout="logoutCloud"
             @change-password="changePasswordDialogOpen = true"
@@ -59,14 +59,14 @@
               {{ deviceError }}
             </div>
             <div
-              v-else-if="gateway.devices.length === 0"
+              v-else-if="cloudDevices.devices.length === 0"
               class="p-5 text-sm text-[var(--color-text-muted)]"
             >
               {{ t('dashboard.emptyTitle') }}
             </div>
             <ul v-else class="divide-y divide-[var(--color-border)]">
               <li
-                v-for="device in gateway.devices"
+                v-for="device in cloudDevices.devices"
                 :key="device.id"
                 class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
               >
@@ -81,7 +81,7 @@
                       {{ device.name }}
                     </span>
                     <span class="shrink-0 text-sm text-[var(--color-text-muted)]">
-                      {{ device.online ? t('gateway.online') : t('gateway.offline') }}
+                      {{ device.online ? t('cloud.online') : t('cloud.offline') }}
                     </span>
                   </div>
                   <p class="mt-1 truncate pl-8 text-sm text-[var(--color-text-muted)]">
@@ -115,19 +115,19 @@
       <DialogPortal>
         <DialogOverlay class="dialog-overlay" />
         <DialogContent class="dialog-content">
-          <DialogTitle class="dialog-title">{{ t('gateway.changePassword') }}</DialogTitle>
+          <DialogTitle class="dialog-title">{{ t('cloud.changePassword') }}</DialogTitle>
           <form class="mt-4 space-y-3" @submit.prevent="submitChangePassword">
             <input
               v-model="currentPassword"
               type="password"
               class="h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-sm text-[var(--color-text)] outline-none"
-              :placeholder="t('gateway.currentPassword')"
+              :placeholder="t('cloud.currentPassword')"
             />
             <input
               v-model="newPassword"
               type="password"
               class="h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-sm text-[var(--color-text)] outline-none"
-              :placeholder="t('gateway.newPassword')"
+              :placeholder="t('cloud.newPassword')"
             />
             <div class="flex justify-end gap-2 pt-2">
               <DialogClose as-child>
@@ -143,7 +143,7 @@
                 class="h-8 rounded-md border border-blue-700 bg-blue-600 px-3 text-sm text-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="changingPassword"
               >
-                {{ changingPassword ? t('gateway.changingPassword') : t('gateway.changePassword') }}
+                {{ changingPassword ? t('cloud.changingPassword') : t('cloud.changePassword') }}
               </button>
             </div>
           </form>
@@ -174,7 +174,8 @@
   import ToastHost from '../../components/session/ToastHost.vue'
   import { authChangePassword, authLogout } from '../../features/cloud/api'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
-  import { useGatewayStore } from '../../store/gateway'
+  import { useCloudAuthStore } from '../../store/cloudAuth'
+  import { useCloudDevicesStore } from '../../store/cloudDevices'
   import { useNotificationsStore } from '../../store/notifications'
 
   const logoDataUrl =
@@ -182,7 +183,8 @@
 
   const { t } = useI18n()
   const router = useRouter()
-  const gateway = useGatewayStore()
+  const cloudAuth = useCloudAuthStore()
+  const cloudDevices = useCloudDevicesStore()
   const notifications = useNotificationsStore()
   const loading = ref(false)
   const deviceError = ref('')
@@ -192,7 +194,7 @@
   const newPassword = ref('')
 
   const userDisplayName = computed(
-    () => gateway.user?.display_name || gateway.user?.email || t('dashboard.signedIn'),
+    () => cloudAuth.user?.display_name || cloudAuth.user?.email || t('dashboard.signedIn'),
   )
 
   async function refreshDevices() {
@@ -202,7 +204,7 @@
     loading.value = true
     deviceError.value = ''
     try {
-      await gateway.loadDevices()
+      await cloudDevices.loadDevices()
     } catch (err) {
       deviceError.value = t('dashboard.loadDevicesFailed')
       notifications.notifyError(t('dashboard.loadDevicesFailed'), err)
@@ -221,7 +223,7 @@
     } catch {
       // ignore logout API errors — clear local state anyway
     }
-    gateway.clearCloudToken()
+    cloudAuth.clearToken()
     await router.replace({ name: 'home' })
   }
 
@@ -232,7 +234,7 @@
     if (!currentPassword.value) {
       notifications.pushToast(
         'error',
-        t('gateway.changePasswordFailed'),
+        t('cloud.changePasswordFailed'),
         t('message.currentPasswordRequired'),
       )
       return
@@ -240,7 +242,7 @@
     if (!newPassword.value) {
       notifications.pushToast(
         'error',
-        t('gateway.changePasswordFailed'),
+        t('cloud.changePasswordFailed'),
         t('message.newPasswordRequired'),
       )
       return
@@ -251,16 +253,16 @@
       currentPassword.value = ''
       newPassword.value = ''
       changePasswordDialogOpen.value = false
-      notifications.pushToast('success', t('gateway.changePasswordSucceeded'), '')
+      notifications.pushToast('success', t('cloud.changePasswordSucceeded'), '')
     } catch (err) {
-      notifications.notifyError(t('gateway.changePasswordFailed'), err)
+      notifications.notifyError(t('cloud.changePasswordFailed'), err)
     } finally {
       changingPassword.value = false
     }
   }
 
   async function openCloudSessions(deviceId: string) {
-    if (gateway.selectedDeviceId !== deviceId && !gateway.selectDeviceId(deviceId)) {
+    if (cloudDevices.selectedDeviceId !== deviceId && !cloudDevices.selectDeviceId(deviceId)) {
       return
     }
     await router.push({ name: 'cloud-sessions', params: { deviceId } })

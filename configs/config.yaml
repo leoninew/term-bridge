@@ -42,15 +42,15 @@ runtime:
   state_dir: data
 
 # Agent HTTP/API server 配置。
-# baseline 面向最终本机运行：agent 自己提供 Web/API，对浏览器暴露 /agent-api，不依赖 Vite dev proxy。
-agent:
+# baseline 面向最终本机运行：agent 自己提供 Web/API，对浏览器暴露 /local-api，不依赖 Vite dev proxy。
+local:
   # termbridge agent 暴露的本机 Web/API 地址。
   listen_url: http://127.0.0.1:9030
   # Web 静态资源目录；为空时只提供 API，打包或部署场景可指向已构建前端目录。
   static_dir: ""
-  # 浏览器访问 agent 前端/setup 的地址，用于 Agent dashboard 与云端授权回跳。
+  # 浏览器访问本地前端/setup 的地址，用于本地工作台与云端授权回跳。
   public_url: http://localhost:9030
-  # 前端运行时 Agent API base URL；空值表示同源 /agent-api。
+  # 前端运行时本地 API base URL；空值表示同源 /local-api。
   api_base_url: ""
   # 跨域 API Origin allowlist；空列表表示不开放跨域。
   # 终端 WebSocket 也会使用该列表校验浏览器 Origin；同源访问不需要配置。
@@ -64,7 +64,7 @@ agent:
   oauth:
     client_id: termbridge-agent
     client_secret: agent-secret
-    redirect_url: http://localhost:9030/agent/oauth/callback
+    redirect_url: http://localhost:9030/oauth/callback
     scopes: [openid, email, profile]
 
   # Agent 独立数据库，与 cloud 分离，避免 migration 校验误报部分表存在。
@@ -99,7 +99,7 @@ cloud:
     clients:
       - client_id: termbridge-agent
         client_secret: agent-secret
-        redirect_url: http://localhost:9030/agent/oauth/callback
+        redirect_url: http://localhost:9030/oauth/callback
         scopes: [openid, email, profile]
 
   # Cloud 独立数据库，与 agent 分离，避免 migration 校验误报部分表存在。

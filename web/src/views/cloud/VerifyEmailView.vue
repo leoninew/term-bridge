@@ -7,13 +7,13 @@
       @submit.prevent="submit"
     >
       <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
-        {{ t('gateway.verifyEmailTitle') }}
+        {{ t('cloud.verifyEmailTitle') }}
       </h1>
       <input
         v-model="email"
         type="email"
         class="mt-4 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 outline-none"
-        :placeholder="t('gateway.email')"
+        :placeholder="t('cloud.email')"
       />
       <input
         v-model="code"
@@ -22,14 +22,14 @@
         placeholder="ABC123"
       />
       <button class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50">
-        {{ t('gateway.verifyEmail') }}
+        {{ t('cloud.verifyEmail') }}
       </button>
       <button
         type="button"
         class="mt-2 h-9 w-full rounded-md border border-[var(--color-border)]"
         @click="resend"
       >
-        {{ t('gateway.resendCode') }}
+        {{ t('cloud.resendCode') }}
       </button>
     </form>
   </section>

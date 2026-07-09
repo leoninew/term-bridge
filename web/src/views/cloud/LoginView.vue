@@ -1,20 +1,20 @@
 <template>
   <ToastProvider>
     <section
-      v-if="!gateway.authInitialized"
+      v-if="!cloudAuth.authInitialized"
       class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
     >
-      {{ t('gateway.checkingAuth') }}
+      {{ t('cloudAuth.checkingAuth') }}
     </section>
 
     <LoginPanel
       v-else
-      :username="gateway.usernameInput"
-      :password="gateway.passwordInput"
-      :logging-in="gateway.loggingIn"
+      :username="cloudAuth.usernameInput"
+      :password="cloudAuth.passwordInput"
+      :logging-in="cloudAuth.loggingIn"
       :google-logging-in="googleLoggingIn"
-      @update:username="gateway.usernameInput = $event"
-      @update:password="gateway.passwordInput = $event"
+      @update:username="cloudAuth.usernameInput = $event"
+      @update:password="cloudAuth.passwordInput = $event"
       @submit="login"
       @google="loginWithGoogle"
     />
@@ -31,31 +31,33 @@
   import LoginPanel from '../../components/session/LoginPanel.vue'
   import ToastHost from '../../components/session/ToastHost.vue'
   import { authGoogleUrl } from '../../features/cloud/api'
-  import { useGatewayStore } from '../../store/gateway'
+  import { useAuthTokensStore } from '../../store/authTokens'
+  import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useNotificationsStore } from '../../store/notifications'
   import { removeLocalStorageValue, writeLocalStorageValue } from '../../store/storage'
 
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
-  const gateway = useGatewayStore()
+  const cloudAuth = useCloudAuthStore()
+  const tokens = useAuthTokensStore()
   const notifications = useNotificationsStore()
   const googleLoggingIn = ref(false)
-  const cloudLoginRedirectKey = 'termbridge.cloud.login_redirect'
+  const cloudLoginRedirectKey = 'termbridge.cloudAuth.login_redirect'
 
   onMounted(async () => {
-    await gateway.initializeAuth()
-    if (gateway.cloudToken) {
+    await cloudAuth.initializeAuth()
+    if (tokens.cloudToken) {
       await router.replace(redirectAfterLogin())
     }
   })
 
   async function login() {
     try {
-      await gateway.login()
+      await cloudAuth.login()
       await router.replace(redirectAfterLogin())
     } catch (err) {
-      notifications.notifyError(t('gateway.loginFailed'), err)
+      notifications.notifyError(t('cloudAuth.loginFailed'), err)
     }
   }
 
@@ -85,7 +87,7 @@
       window.location.href = await authGoogleUrl()
     } catch (err) {
       googleLoggingIn.value = false
-      notifications.notifyError(t('gateway.googleLoginFailed'), err)
+      notifications.notifyError(t('cloudAuth.googleLoginFailed'), err)
     }
   }
 </script>

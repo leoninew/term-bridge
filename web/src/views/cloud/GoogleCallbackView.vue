@@ -3,7 +3,7 @@
     <section
       class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
     >
-      {{ t('gateway.googleSigningIn') }}
+      {{ t('cloud.googleSigningIn') }}
     </section>
     <ToastHost />
   </ToastProvider>
@@ -16,14 +16,14 @@
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../../components/session/ToastHost.vue'
   import { authGoogleCallback } from '../../features/cloud/api'
-  import { useGatewayStore } from '../../store/gateway'
+  import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useNotificationsStore } from '../../store/notifications'
   import { readLocalStorageValue, removeLocalStorageValue } from '../../store/storage'
 
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
-  const gateway = useGatewayStore()
+  const cloudAuth = useCloudAuthStore()
   const notifications = useNotificationsStore()
   const cloudLoginRedirectKey = 'termbridge.cloud.login_redirect'
 
@@ -41,16 +41,16 @@
     const code = typeof route.query.code === 'string' ? route.query.code : ''
     const state = typeof route.query.state === 'string' ? route.query.state : ''
     if (!code || !state) {
-      notifications.notifyError(t('gateway.googleLoginFailed'), new Error('missing code or state'))
+      notifications.notifyError(t('cloud.googleLoginFailed'), new Error('missing code or state'))
       await router.replace({ name: 'cloud-login' })
       return
     }
     try {
       const response = await authGoogleCallback(code, state)
-      gateway.setCloudToken(response.access_token)
+      cloudAuth.setToken(response.access_token)
       await router.replace(redirectAfterLogin())
     } catch (err) {
-      notifications.notifyError(t('gateway.googleLoginFailed'), err)
+      notifications.notifyError(t('cloud.googleLoginFailed'), err)
       await router.replace({ name: 'cloud-login' })
     }
   })

@@ -8,7 +8,7 @@
 
 # Frontend Vite mode config files are committed build inputs.
 !/web/.env.development
-!/web/.env.agent
+!/web/.env.local
 !/web/.env.cloud
 /web/.env.production
 .pomelo-pw/output/

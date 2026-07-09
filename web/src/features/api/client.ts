@@ -6,7 +6,7 @@ import axios, {
 } from 'axios'
 import type { ErrorResp } from '../../gen/proto/termbridge/shared/v1/common'
 import { useRuntimeConfigStore, type RuntimeMode } from '../../store/runtimeConfig'
-import { useGatewayStore } from '../../store/gateway'
+import { useAuthTokensStore } from '../../store/authTokens'
 import { router } from '../../router'
 
 export const requestIdHeader = 'X-Request-ID'
@@ -41,24 +41,24 @@ export class ApiContractMismatchError extends Error {
 }
 
 export const apiClient = axios.create()
-export const agentApiClient = apiClient
+export const localApiClient = apiClient
 export const cloudApiClient = axios.create()
 
-configureApiClient(apiClient, 'agent')
+configureApiClient(apiClient, 'local')
 configureApiClient(cloudApiClient, 'cloud')
 
 function configureApiClient(client: typeof apiClient, target: RuntimeMode): void {
   client.interceptors.request.use((cfg) => {
     const runtimeConfig = useRuntimeConfigStore().config
     cfg.baseURL =
-      target === 'cloud' ? runtimeConfig.cloud.apiBaseUrl : runtimeConfig.agent.apiBaseUrl
+      target === 'cloud' ? runtimeConfig.cloud.apiBaseUrl : runtimeConfig.local.apiBaseUrl
     return cfg
   })
 
   client.interceptors.request.use((cfg) => {
     ensureRequestId(cfg)
-    const gateway = useGatewayStore()
-    const token = gateway.tokenForTarget(target)
+    const tokens = useAuthTokensStore()
+    const token = tokens.tokenForTarget(target)
     if (token) {
       const headers = AxiosHeaders.from(cfg.headers)
       headers.set('Authorization', `Bearer ${token}`)
@@ -74,13 +74,13 @@ function configureApiClient(client: typeof apiClient, target: RuntimeMode): void
         return Promise.reject(error)
       }
       if (error.response.status === 401) {
-        const gateway = useGatewayStore()
+        const tokens = useAuthTokensStore()
         const runtimeConfig = useRuntimeConfigStore()
-        gateway.clearTokenForTarget(target)
+        tokens.clearTokenForTarget(target)
         if (
           target === 'cloud' &&
-          (runtimeConfig.config.agent.mode === 'cloud' ||
-            runtimeConfig.config.agent.mode === 'hybrid') &&
+          (runtimeConfig.config.local.mode === 'cloud' ||
+            runtimeConfig.config.local.mode === 'hybrid') &&
           router.currentRoute.value.name !== 'cloud-login'
         ) {
           router.push({

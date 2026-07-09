@@ -97,11 +97,11 @@ tasks:
     cmds:
       - rm -rf bin/package {{.PACKAGE_ZIP}}
       - mkdir -p {{.PACKAGE_ROOT}}/web {{.PACKAGE_ROOT}}/configs
-      - cd web && yarn build
+      - cd web && yarn build:local
       - env GOOS=windows GOARCH=amd64 go build -o {{.PACKAGE_ROOT}}/termbridge.exe ./cmd/termbridge
       - cp -R web/dist/. {{.PACKAGE_ROOT}}/web/
       - cp configs/config.yaml {{.PACKAGE_ROOT}}/configs/config.yaml
-      - cp configs/config.production.yaml {{.PACKAGE_ROOT}}/configs/config.production.yaml
+      - cp scripts/package/.env.local {{.PACKAGE_ROOT}}/.env.local
       - cp scripts/package/start.cmd {{.PACKAGE_ROOT}}/start.cmd
       - cp scripts/package/start.sh {{.PACKAGE_ROOT}}/start.sh
       - chmod +x {{.PACKAGE_ROOT}}/start.sh

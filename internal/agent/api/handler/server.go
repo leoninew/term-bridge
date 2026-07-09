@@ -94,24 +94,24 @@ func (h *Handler) Handler() http.Handler {
 	mux := http.NewServeMux()
 	h.registerCommonRoutes(mux)
 	h.registerAgentRoutes(mux)
-	mux.HandleFunc("/agent-api", h.writeNotFound)
-	mux.HandleFunc("/agent-api/", h.writeNotFound)
+	mux.HandleFunc("/local-api", h.writeNotFound)
+	mux.HandleFunc("/local-api/", h.writeNotFound)
 	return mux
 }
 
 func (h *Handler) registerCommonRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/agent-api/health", h.handleHealth)
-	mux.HandleFunc("/agent-api/auth/login", h.handleAuthLogin)
-	mux.HandleFunc("/agent-api/auth/logout", h.authMiddleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
-	mux.HandleFunc("/agent-api/auth/me", h.handleAuthMe)
+	mux.HandleFunc("/local-api/health", h.handleHealth)
+	mux.HandleFunc("/local-api/auth/login", h.handleAuthLogin)
+	mux.HandleFunc("/local-api/auth/logout", h.authMiddleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
+	mux.HandleFunc("/local-api/auth/me", h.handleAuthMe)
 }
 
 func (h *Handler) registerAgentRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/agent-api/cloud/connect", h.authMiddleware(http.HandlerFunc(h.handleCloudConnect)).ServeHTTP)
-	mux.HandleFunc("/agent-api/cloud/disconnect", h.authMiddleware(http.HandlerFunc(h.handleCloudDisconnect)).ServeHTTP)
-	mux.HandleFunc("/agent-api/workspaces", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
-	mux.HandleFunc("/agent-api/workspaces/", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
-	mux.HandleFunc("/agent-api/sessions", h.authMiddleware(http.HandlerFunc(h.handleLocalSessions)).ServeHTTP)
+	mux.HandleFunc("/local-api/cloud/connect", h.authMiddleware(http.HandlerFunc(h.handleCloudConnect)).ServeHTTP)
+	mux.HandleFunc("/local-api/cloud/disconnect", h.authMiddleware(http.HandlerFunc(h.handleCloudDisconnect)).ServeHTTP)
+	mux.HandleFunc("/local-api/workspaces", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
+	mux.HandleFunc("/local-api/workspaces/", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
+	mux.HandleFunc("/local-api/sessions", h.authMiddleware(http.HandlerFunc(h.handleLocalSessions)).ServeHTTP)
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { h.Handler().ServeHTTP(w, r) }
@@ -312,7 +312,7 @@ func (s *Handler) handleCloudDisconnect(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Handler) handleLocalWorkspaces(w http.ResponseWriter, r *http.Request) {
-	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/agent-api/workspaces"), "/")
+	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/local-api/workspaces"), "/")
 	parts := []string{"", "workspaces"}
 	if path != "" {
 		parts = append(parts, strings.Split(path, "/")...)
@@ -321,7 +321,7 @@ func (s *Handler) handleLocalWorkspaces(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Handler) handleLocalSessions(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/agent-api/sessions" {
+	if r.URL.Path != "/local-api/sessions" {
 		s.writeNotFound(w, r)
 		return
 	}

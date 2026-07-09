@@ -7,17 +7,17 @@
       @submit.prevent="submit"
     >
       <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
-        {{ t('gateway.registerTitle') }}
+        {{ t('cloud.registerTitle') }}
       </h1>
       <label class="mt-4 block"
-        ><span>{{ t('gateway.email') }}</span
+        ><span>{{ t('cloud.email') }}</span
         ><input
           v-model="email"
           type="email"
           class="mt-1 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 outline-none"
       /></label>
       <label class="mt-3 block"
-        ><span>{{ t('gateway.password') }}</span
+        ><span>{{ t('cloud.password') }}</span
         ><input
           v-model="password"
           type="password"
@@ -27,7 +27,7 @@
         class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50 disabled:opacity-60"
         :disabled="submitting || googleSubmitting"
       >
-        {{ submitting ? t('common.creating') : t('gateway.register') }}
+        {{ submitting ? t('common.creating') : t('cloud.register') }}
       </button>
       <button
         type="button"
@@ -35,12 +35,12 @@
         :disabled="submitting || googleSubmitting"
         @click="registerWithGoogle"
       >
-        {{ googleSubmitting ? t('gateway.signingIn') : t('gateway.continueWithGoogle') }}
+        {{ googleSubmitting ? t('cloud.signingIn') : t('cloud.continueWithGoogle') }}
       </button>
       <RouterLink
         class="mt-3 block text-xs text-[var(--color-text-muted)]"
         :to="{ name: 'cloud-login' }"
-        >{{ t('gateway.backToLogin') }}</RouterLink
+        >{{ t('cloud.backToLogin') }}</RouterLink
       >
     </form>
   </section>

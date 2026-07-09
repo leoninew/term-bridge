@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "yarn build:cloud",
-    "build:agent": "vue-tsc --noEmit && vite build --mode agent",
+    "build:local": "vue-tsc --noEmit && vite build",
     "build:cloud": "vue-tsc --noEmit && vite build --mode cloud",
     "preview": "vite preview --host localhost",
     "typecheck": "vue-tsc --noEmit",

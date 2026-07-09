@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 import { defineStore } from 'pinia'
-import type { AgentMode, BrowserRuntimeConfig, CloudOAuthConfig, RuntimeConfig } from '../config'
+import type { LocalMode, BrowserRuntimeConfig, CloudOAuthConfig, RuntimeConfig } from '../config'
 import { readSessionStorageValue, writeSessionStorageValue } from './storage'
 
 declare global {
@@ -9,16 +9,16 @@ declare global {
   }
 }
 
-export type RuntimeMode = 'agent' | 'cloud'
+export type RuntimeMode = 'local' | 'cloud'
 
 const ACTIVE_MODE_KEY = 'termbridge.active_mode'
 
 export const useRuntimeConfigStore = defineStore('runtimeConfig', () => {
   const config = parseRuntimeConfig(runtimeConfigSource())
-  const view = reactive({ mode: initialViewMode(config.agent.mode) })
+  const view = reactive({ mode: initialViewMode(config.local.mode) })
 
   function switchMode(mode: RuntimeMode) {
-    if (config.agent.mode !== 'hybrid' && config.agent.mode !== mode) {
+    if (config.local.mode !== 'hybrid' && config.local.mode !== mode) {
       return false
     }
     view.mode = mode
@@ -45,14 +45,14 @@ function runtimeConfigSource(): RuntimeConfigSource {
   return {
     name: 'import.meta.env',
     value: {
-      agent: {
-        mode: import.meta.env.TERMBRIDGE_AGENT__MODE as AgentMode | undefined,
-        publicUrl: import.meta.env.TERMBRIDGE_AGENT__PUBLIC_URL,
-        apiBaseUrl: import.meta.env.TERMBRIDGE_AGENT__API_BASE_URL,
+      local: {
+        mode: import.meta.env.TERMBRIDGE_LOCAL__MODE as LocalMode | undefined,
+        publicUrl: import.meta.env.TERMBRIDGE_LOCAL__PUBLIC_URL,
+        apiBaseUrl: import.meta.env.TERMBRIDGE_LOCAL__API_BASE_URL,
         cloudOAuth: {
-          clientId: import.meta.env.TERMBRIDGE_AGENT__OAUTH__CLIENT_ID,
-          redirectUrl: import.meta.env.TERMBRIDGE_AGENT__OAUTH__REDIRECT_URL,
-          scopes: splitScopes(import.meta.env.TERMBRIDGE_AGENT__OAUTH__SCOPES),
+          clientId: import.meta.env.TERMBRIDGE_LOCAL__OAUTH__CLIENT_ID,
+          redirectUrl: import.meta.env.TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL,
+          scopes: splitScopes(import.meta.env.TERMBRIDGE_LOCAL__OAUTH__SCOPES),
         },
       },
       cloud: {
@@ -66,27 +66,27 @@ function runtimeConfigSource(): RuntimeConfigSource {
 function injectedRuntimeConfig(
   config: BrowserRuntimeConfig | undefined,
 ): config is BrowserRuntimeConfig {
-  return !!config?.agent || !!config?.cloud
+  return !!config?.local || !!config?.cloud
 }
 
 function parseRuntimeConfig(source: RuntimeConfigSource): RuntimeConfig {
   const errors: string[] = []
-  const agent = source.value.agent
+  const local = source.value.local
   const cloud = source.value.cloud
 
-  if (!agent) {
-    errors.push('agent is required')
+  if (!local) {
+    errors.push('local is required')
   }
   if (!cloud) {
     errors.push('cloud is required')
   }
 
   const config = {
-    agent: {
-      mode: parseAgentMode(agent?.mode, errors),
-      publicUrl: requiredHTTPURL('agent.publicUrl', agent?.publicUrl, errors),
-      apiBaseUrl: requiredApiBaseUrl('agent.apiBaseUrl', agent?.apiBaseUrl, errors),
-      cloudOAuth: parseCloudOAuth(agent?.cloudOAuth, errors),
+    local: {
+      mode: parseLocalMode(local?.mode, errors),
+      publicUrl: requiredHTTPURL('local.publicUrl', local?.publicUrl, errors),
+      apiBaseUrl: requiredApiBaseUrl('local.apiBaseUrl', local?.apiBaseUrl, errors),
+      cloudOAuth: parseCloudOAuth(local?.cloudOAuth, errors),
     },
     cloud: {
       publicUrl: requiredHTTPURL('cloud.publicUrl', cloud?.publicUrl, errors),
@@ -101,13 +101,13 @@ function parseRuntimeConfig(source: RuntimeConfigSource): RuntimeConfig {
   return config
 }
 
-function parseAgentMode(value: string | undefined, errors: string[]): AgentMode {
-  const mode = requiredString('agent.mode', value, errors)
-  if (mode === 'agent' || mode === 'cloud' || mode === 'hybrid') {
+function parseLocalMode(value: string | undefined, errors: string[]): LocalMode {
+  const mode = requiredString('local.mode', value, errors)
+  if (mode === 'local' || mode === 'cloud' || mode === 'hybrid') {
     return mode
   }
-  errors.push('agent.mode must be agent, cloud, or hybrid')
-  return 'agent'
+  errors.push('local.mode must be local, cloud, or hybrid')
+  return 'local'
 }
 
 function parseCloudOAuth(
@@ -115,14 +115,14 @@ function parseCloudOAuth(
   errors: string[],
 ): CloudOAuthConfig {
   if (!value) {
-    errors.push('agent.cloudOAuth is required')
+    errors.push('local.cloudOAuth is required')
     return { clientId: '', redirectUrl: '', scopes: [] }
   }
-  const clientId = requiredString('agent.cloudOAuth.clientId', value.clientId, errors)
-  const redirectUrl = requiredHTTPURL('agent.cloudOAuth.redirectUrl', value.redirectUrl, errors)
+  const clientId = requiredString('local.cloudOAuth.clientId', value.clientId, errors)
+  const redirectUrl = requiredHTTPURL('local.cloudOAuth.redirectUrl', value.redirectUrl, errors)
   const scopes = value.scopes ?? []
   if (scopes.length === 0) {
-    errors.push('agent.cloudOAuth.scopes is required')
+    errors.push('local.cloudOAuth.scopes is required')
   }
   return { clientId, redirectUrl, scopes }
 }
@@ -183,10 +183,10 @@ function splitScopes(value: string | undefined): string[] {
     : []
 }
 
-function initialViewMode(configuredMode: AgentMode): RuntimeMode {
-  if (configuredMode === 'agent' || configuredMode === 'cloud') {
+function initialViewMode(configuredMode: LocalMode): RuntimeMode {
+  if (configuredMode === 'local' || configuredMode === 'cloud') {
     return configuredMode
   }
   const saved = readSessionStorageValue(ACTIVE_MODE_KEY)
-  return saved === 'cloud' ? 'cloud' : 'agent'
+  return saved === 'cloud' ? 'cloud' : 'local'
 }

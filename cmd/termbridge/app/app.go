@@ -122,7 +122,7 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	case CommandSession:
 		return runSessionList(ctx, cfg, options.Stdout)
 	case CommandAgent:
-		logger.Info("termbridge agent command parsed", "cwd", cfg.Cwd, "server_listen_url", cfg.Agent.ListenUrl, "config", cfg.DefaultConfigFile)
+		logger.Info("termbridge agent command parsed", "cwd", cfg.Cwd, "server_listen_url", cfg.Local.ListenUrl, "config", cfg.DefaultConfigFile)
 		return runAgent(ctx, cfg, logger.Slog, options)
 	case CommandCloud:
 		logger.Info("termbridge cloud command parsed", "cwd", cfg.Cwd, "server_listen_url", cfg.Cloud.ListenUrl, "config", cfg.DefaultConfigFile)
@@ -171,7 +171,7 @@ func selectRoleDatabase(cfg config.Config, role string) config.DatabaseConfig {
 	case "cloud":
 		return cfg.Cloud.Database
 	default:
-		return cfg.Agent.Database
+		return cfg.Local.Database
 	}
 }
 
@@ -231,26 +231,26 @@ func agentConfig(cfg config.Config) agentserver.Config {
 		},
 		Runtime: agentserver.RuntimeConfig{StateDir: cfg.Runtime.StateDir},
 		Server: agentserver.ServerConfig{
-			ListenURL:          cfg.Agent.ListenUrl,
-			StaticDir:          cfg.Agent.StaticDir,
-			ApiBaseUrl:         cfg.Agent.ApiBaseUrl,
-			CorsAllowedOrigins: cfg.Agent.CorsAllowedOrigins,
+			ListenURL:          cfg.Local.ListenUrl,
+			StaticDir:          cfg.Local.StaticDir,
+			ApiBaseUrl:         cfg.Local.ApiBaseUrl,
+			CorsAllowedOrigins: cfg.Local.CorsAllowedOrigins,
 		},
-		Gate: agentserver.GateConfig{API: agentserver.GateApiConfig{ExposeErrors: cfg.Agent.ExposeErrors}},
+		Gate: agentserver.GateConfig{API: agentserver.GateApiConfig{ExposeErrors: cfg.Local.ExposeErrors}},
 		Database: agentserver.DatabaseConfig{
-			Driver: cfg.Agent.Database.Driver,
-			SQLite: agentserver.SQLiteConfig{Path: cfg.Agent.Database.SQLite.Path},
-			MySQL:  agentserver.MySQLConfig{Dsn: cfg.Agent.Database.MySQL.Dsn},
+			Driver: cfg.Local.Database.Driver,
+			SQLite: agentserver.SQLiteConfig{Path: cfg.Local.Database.SQLite.Path},
+			MySQL:  agentserver.MySQLConfig{Dsn: cfg.Local.Database.MySQL.Dsn},
 		},
 		Auth: agentserver.AuthConfig{JwtTTL: cfg.Auth.JwtTTL},
 		Jwt:  agentserver.JwtConfig{SecretKey: cfg.Jwt.SecretKey},
 		Cloud: agentserver.CloudConnectorConfig{
 			PublicURL: cfg.Cloud.PublicUrl,
 			OAuthClient: agentserver.OAuthClientConfig{
-				ClientId:     cfg.Agent.OAuth.ClientId,
-				ClientSecret: cfg.Agent.OAuth.ClientSecret,
-				RedirectUrl:  cfg.Agent.OAuth.RedirectUrl,
-				Scopes:       append([]string(nil), cfg.Agent.OAuth.Scopes...),
+				ClientId:     cfg.Local.OAuth.ClientId,
+				ClientSecret: cfg.Local.OAuth.ClientSecret,
+				RedirectUrl:  cfg.Local.OAuth.RedirectUrl,
+				Scopes:       append([]string(nil), cfg.Local.OAuth.Scopes...),
 			},
 		},
 	}

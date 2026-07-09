@@ -64,7 +64,7 @@ cloud: http://127.0.0.1:9032
 Vite dev proxy：
 
 ```text
-/agent-api/* -> http://127.0.0.1:9031
+/local-api/* -> http://127.0.0.1:9031
 /cloud-api/* -> http://127.0.0.1:9032
 ```
 
@@ -100,18 +100,20 @@ configs/config.yaml
 
 前端公开配置由 Vite mode 在构建期固化：
 
-- `web/.env.development`：本地联调入口，`TERMBRIDGE_AGENT__MODE=hybrid`。
-- `web/.env.agent`：Agent 制品入口，`TERMBRIDGE_AGENT__MODE=agent`。
-- `web/.env.cloud`：Cloud 镜像入口，`TERMBRIDGE_AGENT__MODE=cloud`。
+- `web/.env.development`：本地联调入口，`TERMBRIDGE_LOCAL__MODE=hybrid`。
+- `web/.env.local`：本地制品入口，`TERMBRIDGE_LOCAL__MODE=local`。
+- `web/.env.cloud`：云端镜像入口，`TERMBRIDGE_LOCAL__MODE=cloud`。
 
 发布构建使用明确产品线脚本：
 
 ```bash
-yarn --cwd web build:agent
+yarn --cwd web build:local
 yarn --cwd web build:cloud
 ```
 
 前端不使用 `web/.env.production` 作为制品配置。Docker runtime env 只影响 Go 后端配置，不会改写已经构建进 JS 的前端公开配置。
+
+Windows portable package 是本地 Agent 包：`task package` 使用 `build:local` 构建前端，启动脚本设置 `TERMBRIDGE_ENV=local`，运行时读取包根目录 `.env.local`。该 `.env.local` 是 Go 后端运行时配置，负责本地静态目录、本机访问地址、云端地址和 Agent OAuth client secret；不要和前端构建输入 `web/.env.local` 混淆。
 
 ## 运行角色
 

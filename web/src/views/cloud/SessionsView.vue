@@ -13,7 +13,7 @@
   import { computed } from 'vue'
   import { useRoute } from 'vue-router'
   import SessionsPageShell from '../../components/session/SessionsPageShell.vue'
-  import { useGatewayStore } from '../../store/gateway'
+  import { useCloudDevicesStore } from '../../store/cloudDevices'
   import {
     authLogout,
     closeSession,
@@ -37,12 +37,12 @@
   } from '../../gen/proto/termbridge/agent/v1/session'
 
   const route = useRoute()
-  const gateway = useGatewayStore()
+  const cloudDevices = useCloudDevicesStore()
   const deviceId = computed(() => String(route.params.deviceId ?? ''))
   const runtimeTarget = computed<RuntimeTarget>(() => ({ mode: 'cloud', deviceId: deviceId.value }))
   const loginRedirect = computed(() => `/devices/${encodeURIComponent(deviceId.value)}/sessions`)
   const currentDevice = computed(
-    () => gateway.devices.find((device) => device.id === deviceId.value) ?? null,
+    () => cloudDevices.devices.find((device) => device.id === deviceId.value) ?? null,
   )
   const runtimeApi = computed<SessionRuntimeApi>(() => ({
     createSession(workspaceId: string | null, request: CreateSessionReq) {

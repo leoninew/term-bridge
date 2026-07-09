@@ -11,9 +11,9 @@
       <div class="flex items-center gap-3">
         <DisplayControls />
         <CloudAccountMenu
-          :authenticated="gateway.authenticated"
+          :authenticated="cloudAuth.authenticated"
           :user-display-name="cloudUserDisplayName"
-          :user-email="gateway.user?.email ?? ''"
+          :user-email="cloudAuth.user?.email ?? ''"
           @login="openCloudLogin"
           @logout="logoutCloud"
           @change-password="changePasswordDialogOpen = true"
@@ -38,13 +38,13 @@
 
             <div class="flex flex-wrap items-center gap-2">
               <button
-                v-if="!gateway.authenticated"
+                v-if="!cloudAuth.authenticated"
                 type="button"
                 class="inline-flex h-8 items-center gap-1.5 rounded-md border border-blue-700 bg-blue-600 px-3 text-sm text-slate-50 outline-none hover:bg-blue-500 focus:bg-blue-500 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-[var(--color-control-bg)] disabled:text-[var(--color-text-muted)]"
                 :disabled="cloudAuthLoading"
                 @click="openCloudLogin"
               >
-                {{ cloudAuthLoading ? t('gateway.checkingAuth') : t('dashboard.cloudSignInCta') }}
+                {{ cloudAuthLoading ? t('cloud.checkingAuth') : t('dashboard.cloudSignInCta') }}
                 <ArrowRight class="size-3.5 text-slate-100" />
               </button>
               <RouterLink
@@ -58,9 +58,9 @@
               <button
                 type="button"
                 class="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 text-sm text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
-                @click="openAgentEntry"
+                @click="openLocalEntry"
               >
-                {{ agentEntryLabel }}
+                {{ localEntryLabel }}
               </button>
             </div>
           </div>
@@ -83,19 +83,19 @@
       <DialogPortal>
         <DialogOverlay class="dialog-overlay" />
         <DialogContent class="dialog-content">
-          <DialogTitle class="dialog-title">{{ t('gateway.changePassword') }}</DialogTitle>
+          <DialogTitle class="dialog-title">{{ t('cloud.changePassword') }}</DialogTitle>
           <form class="mt-4 space-y-3" @submit.prevent="submitChangePassword">
             <input
               v-model="currentPassword"
               type="password"
               class="h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-sm text-[var(--color-text)] outline-none"
-              :placeholder="t('gateway.currentPassword')"
+              :placeholder="t('cloud.currentPassword')"
             />
             <input
               v-model="newPassword"
               type="password"
               class="h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-sm text-[var(--color-text)] outline-none"
-              :placeholder="t('gateway.newPassword')"
+              :placeholder="t('cloud.newPassword')"
             />
             <div class="flex justify-end gap-2 pt-2">
               <DialogClose as-child>
@@ -111,7 +111,7 @@
                 class="h-8 rounded-md border border-blue-700 bg-blue-600 px-3 text-sm text-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="changingPassword"
               >
-                {{ changingPassword ? t('gateway.changingPassword') : t('gateway.changePassword') }}
+                {{ changingPassword ? t('cloud.changingPassword') : t('cloud.changePassword') }}
               </button>
             </div>
           </form>
@@ -138,7 +138,7 @@
   import CloudAccountMenu from './CloudAccountMenu.vue'
   import DisplayControls from './DisplayControls.vue'
   import { authChangePassword, authLogout } from '../../features/cloud/api'
-  import { useGatewayStore } from '../../store/gateway'
+  import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useRuntimeConfigStore } from '../../store/runtimeConfig'
   import { useNotificationsStore } from '../../store/notifications'
 
@@ -148,7 +148,7 @@
   const { t } = useI18n()
   const router = useRouter()
   const runtimeConfig = useRuntimeConfigStore()
-  const gateway = useGatewayStore()
+  const cloudAuth = useCloudAuthStore()
   const notifications = useNotificationsStore()
   const cloudAuthLoading = ref(false)
   const changePasswordDialogOpen = ref(false)
@@ -157,31 +157,31 @@
   const newPassword = ref('')
 
   const cloudUserDisplayName = computed(
-    () => gateway.user?.display_name || gateway.user?.email || t('dashboard.signedIn'),
+    () => cloudAuth.user?.display_name || cloudAuth.user?.email || t('dashboard.signedIn'),
   )
-  const agentEntryLabel = computed(() =>
-    runtimeConfig.config.agent.mode === 'cloud'
-      ? t('dashboard.openAgentPage')
-      : t('dashboard.switchToAgentMode'),
+  const localEntryLabel = computed(() =>
+    runtimeConfig.config.local.mode === 'cloud'
+      ? t('dashboard.openLocalPage')
+      : t('dashboard.switchToLocalMode'),
   )
   async function loadCloudHome() {
     cloudAuthLoading.value = true
     try {
-      await gateway.initializeAuth({ force: true })
+      await cloudAuth.initializeAuth({ force: true })
     } catch (err) {
-      notifications.notifyError(t('gateway.loginFailed'), err)
+      notifications.notifyError(t('cloud.loginFailed'), err)
       return
     } finally {
       cloudAuthLoading.value = false
     }
   }
 
-  async function openAgentEntry() {
-    if (runtimeConfig.config.agent.mode === 'cloud') {
-      window.open(runtimeConfig.config.agent.publicUrl, '_blank', 'noopener,noreferrer')
+  async function openLocalEntry() {
+    if (runtimeConfig.config.local.mode === 'cloud') {
+      window.open(runtimeConfig.config.local.publicUrl, '_blank', 'noopener,noreferrer')
       return
     }
-    if (!runtimeConfig.switchMode('agent')) {
+    if (!runtimeConfig.switchMode('local')) {
       return
     }
     await router.push({ name: 'home' })
@@ -197,7 +197,7 @@
     } catch {
       // ignore logout API errors — clear local state anyway
     }
-    gateway.clearCloudToken()
+    cloudAuth.clearToken()
     await router.replace({ name: 'home' })
   }
 
@@ -208,7 +208,7 @@
     if (!currentPassword.value) {
       notifications.pushToast(
         'error',
-        t('gateway.changePasswordFailed'),
+        t('cloud.changePasswordFailed'),
         t('message.currentPasswordRequired'),
       )
       return
@@ -216,7 +216,7 @@
     if (!newPassword.value) {
       notifications.pushToast(
         'error',
-        t('gateway.changePasswordFailed'),
+        t('cloud.changePasswordFailed'),
         t('message.newPasswordRequired'),
       )
       return
@@ -227,9 +227,9 @@
       currentPassword.value = ''
       newPassword.value = ''
       changePasswordDialogOpen.value = false
-      notifications.pushToast('success', t('gateway.changePasswordSucceeded'), '')
+      notifications.pushToast('success', t('cloud.changePasswordSucceeded'), '')
     } catch (err) {
-      notifications.notifyError(t('gateway.changePasswordFailed'), err)
+      notifications.notifyError(t('cloud.changePasswordFailed'), err)
     } finally {
       changingPassword.value = false
     }

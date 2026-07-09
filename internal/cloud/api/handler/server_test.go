@@ -104,7 +104,7 @@ func TestOAuthAuthorizationCodeCanBeExchangedOnce(t *testing.T) {
 			Clients: []CloudOAuthClientConfig{{
 				ClientId:     "termbridge-agent",
 				ClientSecret: "agent-secret",
-				RedirectUrl:  "http://127.0.0.1:9033/agent/oauth/callback",
+				RedirectUrl:  "http://127.0.0.1:9033/oauth/callback",
 				Scopes:       []string{"openid", "email", "profile"},
 			}},
 		},
@@ -113,7 +113,7 @@ func TestOAuthAuthorizationCodeCanBeExchangedOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sign user token: %v", err)
 	}
-	callbackUrl := "http://127.0.0.1:9033/agent/oauth/callback"
+	callbackUrl := "http://127.0.0.1:9033/oauth/callback"
 	authorizeValues := url.Values{}
 	authorizeValues.Set("response_type", "code")
 	authorizeValues.Set("client_id", "termbridge-agent")

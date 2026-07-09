@@ -70,20 +70,20 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Terminal.Client.Queue.MaxMessages != 64 || cfg.Terminal.Client.Queue.MaxBytes != 4194304 {
 		t.Fatalf("Terminal.Client.Queue = %#v", cfg.Terminal.Client.Queue)
 	}
-	if cfg.Agent.ExposeErrors {
-		t.Fatal("Agent.ExposeErrors = true, want false")
+	if cfg.Local.ExposeErrors {
+		t.Fatal("Local.ExposeErrors = true, want false")
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9030" {
-		t.Fatalf("Agent.ListenUrl = %q, want default listen URL", cfg.Agent.ListenUrl)
+	if cfg.Local.ListenUrl != "http://127.0.0.1:9030" {
+		t.Fatalf("Local.ListenUrl = %q, want default listen URL", cfg.Local.ListenUrl)
 	}
-	if cfg.Agent.PublicUrl != "http://localhost:9030" {
-		t.Fatalf("Agent.PublicUrl = %q, want local frontend URL", cfg.Agent.PublicUrl)
+	if cfg.Local.PublicUrl != "http://localhost:9030" {
+		t.Fatalf("Local.PublicUrl = %q, want local frontend URL", cfg.Local.PublicUrl)
 	}
-	if cfg.Agent.ApiBaseUrl != "" {
-		t.Fatalf("Agent.ApiBaseUrl = %q, want empty", cfg.Agent.ApiBaseUrl)
+	if cfg.Local.ApiBaseUrl != "" {
+		t.Fatalf("Local.ApiBaseUrl = %q, want empty", cfg.Local.ApiBaseUrl)
 	}
-	if len(cfg.Agent.CorsAllowedOrigins) != 0 {
-		t.Fatalf("Agent.CorsAllowedOrigins = %#v, want empty", cfg.Agent.CorsAllowedOrigins)
+	if len(cfg.Local.CorsAllowedOrigins) != 0 {
+		t.Fatalf("Local.CorsAllowedOrigins = %#v, want empty", cfg.Local.CorsAllowedOrigins)
 	}
 	if cfg.Cloud.ExposeErrors {
 		t.Fatal("Cloud.ExposeErrors = true, want false")
@@ -97,8 +97,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Auth.LocalAdmin.Username != DefaultAuthUsername || cfg.Auth.LocalAdmin.Password != DefaultAuthPassword {
 		t.Fatalf("Auth.LocalAdmin = %#v, want default PoC auth", cfg.Auth.LocalAdmin)
 	}
-	if cfg.Agent.StaticDir != "" {
-		t.Fatalf("Agent.StaticDir = %q, want empty", cfg.Agent.StaticDir)
+	if cfg.Local.StaticDir != "" {
+		t.Fatalf("Local.StaticDir = %q, want empty", cfg.Local.StaticDir)
 	}
 	if !reflect.DeepEqual(cfg.Command, []string{"pwsh"}) {
 		t.Fatalf("Command = %#v", cfg.Command)
@@ -112,7 +112,7 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "configured-logs")
 	stateDir := filepath.Join(cwd, "configured-state")
-	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\nagent:\n  expose_errors: true\n  listen_url: http://0.0.0.0:9090\n  static_dir: web/dist\n  public_url: https://configured.example.com/app/\n  api_base_url: https://api.configured.example.com/\n  cors_allowed_origins:\n    - https://configured.example.com/\n    - https://preview.configured.example.com\n")
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\nlocal:\n  expose_errors: true\n  listen_url: http://0.0.0.0:9090\n  static_dir: web/dist\n  public_url: https://configured.example.com/app/\n  api_base_url: https://api.configured.example.com/\n  cors_allowed_origins:\n    - https://configured.example.com/\n    - https://preview.configured.example.com\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -135,30 +135,30 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(stateDir) {
 		t.Fatalf("StateDir = %q, want %q", cfg.Runtime.StateDir, stateDir)
 	}
-	if filepath.Clean(cfg.Agent.StaticDir) != filepath.Join(cwd, "web", "dist") {
-		t.Fatalf("Agent.StaticDir = %q", cfg.Agent.StaticDir)
+	if filepath.Clean(cfg.Local.StaticDir) != filepath.Join(cwd, "web", "dist") {
+		t.Fatalf("Local.StaticDir = %q", cfg.Local.StaticDir)
 	}
-	if cfg.Agent.PublicUrl != "https://configured.example.com/app" {
-		t.Fatalf("Agent.PublicUrl = %q", cfg.Agent.PublicUrl)
+	if cfg.Local.PublicUrl != "https://configured.example.com/app" {
+		t.Fatalf("Local.PublicUrl = %q", cfg.Local.PublicUrl)
 	}
-	if cfg.Agent.ApiBaseUrl != "https://api.configured.example.com" {
-		t.Fatalf("Agent.ApiBaseUrl = %q", cfg.Agent.ApiBaseUrl)
+	if cfg.Local.ApiBaseUrl != "https://api.configured.example.com" {
+		t.Fatalf("Local.ApiBaseUrl = %q", cfg.Local.ApiBaseUrl)
 	}
 	wantOrigins := []string{"https://configured.example.com", "https://preview.configured.example.com"}
-	if !reflect.DeepEqual(cfg.Agent.CorsAllowedOrigins, wantOrigins) {
-		t.Fatalf("Agent.CorsAllowedOrigins = %#v, want %#v", cfg.Agent.CorsAllowedOrigins, wantOrigins)
+	if !reflect.DeepEqual(cfg.Local.CorsAllowedOrigins, wantOrigins) {
+		t.Fatalf("Local.CorsAllowedOrigins = %#v, want %#v", cfg.Local.CorsAllowedOrigins, wantOrigins)
 	}
 	if cfg.History.MaxLines != 42 || cfg.History.MaxBytes != 2048 || cfg.History.MaxLineBytes != 128 {
 		t.Fatalf("History = %#v", cfg.History)
 	}
-	if cfg.Agent.ListenUrl != "http://0.0.0.0:9090" {
-		t.Fatalf("Agent.ListenUrl = %q", cfg.Agent.ListenUrl)
+	if cfg.Local.ListenUrl != "http://0.0.0.0:9090" {
+		t.Fatalf("Local.ListenUrl = %q", cfg.Local.ListenUrl)
 	}
-	if !cfg.Agent.ExposeErrors {
-		t.Fatal("Agent.ExposeErrors = false, want true")
+	if !cfg.Local.ExposeErrors {
+		t.Fatal("Local.ExposeErrors = false, want true")
 	}
-	if cfg.Base == nil || cfg.Base.Agent.PublicUrl != cfg.Agent.PublicUrl {
-		t.Fatalf("Base.Agent = %#v, want YAML-only env config value", cfg.Base)
+	if cfg.Base == nil || cfg.Base.Local.PublicUrl != cfg.Local.PublicUrl {
+		t.Fatalf("Base.Local = %#v, want YAML-only env config value", cfg.Base)
 	}
 }
 
@@ -169,7 +169,7 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "dotenv-logs")
 	stateDir := filepath.Join(cwd, "dotenv-state")
-	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_AGENT__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_AGENT__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_AGENT__API_BASE_URL=https://api.dotenv.example.com\nTERMBRIDGE_AGENT__CORS_ALLOWED_ORIGINS=https://dotenv.example.com,https://preview.dotenv.example.com\nTERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_AGENT__EXPOSE_ERRORS=true\n")
+	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_LOCAL__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_LOCAL__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_LOCAL__API_BASE_URL=https://api.dotenv.example.com\nTERMBRIDGE_LOCAL__CORS_ALLOWED_ORIGINS=https://dotenv.example.com,https://preview.dotenv.example.com\nTERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_LOCAL__EXPOSE_ERRORS=true\n")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
@@ -187,26 +187,26 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	if cfg.History.MaxLines != 20 || cfg.History.MaxBytes != 4096 || cfg.History.MaxLineBytes != 256 {
 		t.Fatalf("History = %#v", cfg.History)
 	}
-	if cfg.Agent.StaticDir != filepath.Clean("/opt/termbridge/web/dist") {
-		t.Fatalf("Agent.StaticDir = %q", cfg.Agent.StaticDir)
+	if cfg.Local.StaticDir != filepath.Clean("/opt/termbridge/web/dist") {
+		t.Fatalf("Local.StaticDir = %q", cfg.Local.StaticDir)
 	}
-	if cfg.Agent.PublicUrl != "https://dotenv.example.com" || cfg.Agent.ListenUrl != "http://127.0.0.1:9091" {
-		t.Fatalf("Agent = %#v", cfg.Agent)
+	if cfg.Local.PublicUrl != "https://dotenv.example.com" || cfg.Local.ListenUrl != "http://127.0.0.1:9091" {
+		t.Fatalf("Local = %#v", cfg.Local)
 	}
-	if cfg.Agent.ApiBaseUrl != "https://api.dotenv.example.com" {
-		t.Fatalf("Agent.ApiBaseUrl = %q", cfg.Agent.ApiBaseUrl)
+	if cfg.Local.ApiBaseUrl != "https://api.dotenv.example.com" {
+		t.Fatalf("Local.ApiBaseUrl = %q", cfg.Local.ApiBaseUrl)
 	}
 	wantOrigins := []string{"https://dotenv.example.com", "https://preview.dotenv.example.com"}
-	if !reflect.DeepEqual(cfg.Agent.CorsAllowedOrigins, wantOrigins) {
-		t.Fatalf("Agent.CorsAllowedOrigins = %#v, want %#v", cfg.Agent.CorsAllowedOrigins, wantOrigins)
+	if !reflect.DeepEqual(cfg.Local.CorsAllowedOrigins, wantOrigins) {
+		t.Fatalf("Local.CorsAllowedOrigins = %#v, want %#v", cfg.Local.CorsAllowedOrigins, wantOrigins)
 	}
-	if !cfg.Agent.ExposeErrors {
-		t.Fatal("Agent.ExposeErrors = false, want true")
+	if !cfg.Local.ExposeErrors {
+		t.Fatal("Local.ExposeErrors = false, want true")
 	}
 	if cfg.Base == nil {
 		t.Fatal("Base = nil, want YAML-only baseline config")
 	}
-	if cfg.Base.LogLevel != "info" || cfg.Base.Agent.PublicUrl != "http://localhost:9030" {
+	if cfg.Base.LogLevel != "info" || cfg.Base.Local.PublicUrl != "http://localhost:9030" {
 		t.Fatalf("Base = %#v, want default YAML values", cfg.Base)
 	}
 }
@@ -216,19 +216,19 @@ func TestLoadOSEnvOverridesDotEnv(t *testing.T) {
 	configureRemoteAuth(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeDotEnv(t, cwd, "TERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:8080\nTERMBRIDGE_AGENT__EXPOSE_ERRORS=false\n")
-	t.Setenv("TERMBRIDGE_AGENT__LISTEN_URL", "http://127.0.0.1:9092")
-	t.Setenv("TERMBRIDGE_AGENT__EXPOSE_ERRORS", "true")
+	writeDotEnv(t, cwd, "TERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:8080\nTERMBRIDGE_LOCAL__EXPOSE_ERRORS=false\n")
+	t.Setenv("TERMBRIDGE_LOCAL__LISTEN_URL", "http://127.0.0.1:9092")
+	t.Setenv("TERMBRIDGE_LOCAL__EXPOSE_ERRORS", "true")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9092" {
-		t.Fatalf("Agent.ListenUrl = %q", cfg.Agent.ListenUrl)
+	if cfg.Local.ListenUrl != "http://127.0.0.1:9092" {
+		t.Fatalf("Local.ListenUrl = %q", cfg.Local.ListenUrl)
 	}
-	if !cfg.Agent.ExposeErrors {
-		t.Fatal("Agent.ExposeErrors = false, want true")
+	if !cfg.Local.ExposeErrors {
+		t.Fatal("Local.ExposeErrors = false, want true")
 	}
 }
 
@@ -236,9 +236,9 @@ func TestLoadEnvironmentDotEnvOverridesYAMLAndSkipsDefaultDotEnv(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "log:\n  level: warn\nagent:\n  listen_url: http://127.0.0.1:9040\n")
-	writeDotEnvFile(t, cwd, EnvFileName, "TERMBRIDGE_LOG__LEVEL=error\nTERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:8080\n")
-	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:9093\n")
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: warn\nlocal:\n  listen_url: http://127.0.0.1:9040\n")
+	writeDotEnvFile(t, cwd, EnvFileName, "TERMBRIDGE_LOG__LEVEL=error\nTERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:8080\n")
+	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:9093\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -251,10 +251,10 @@ func TestLoadEnvironmentDotEnvOverridesYAMLAndSkipsDefaultDotEnv(t *testing.T) {
 	if cfg.LogLevel != "debug" {
 		t.Fatalf("LogLevel = %q, want .env.develop override", cfg.LogLevel)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9093" {
-		t.Fatalf("Agent.ListenUrl = %q, want .env.develop override", cfg.Agent.ListenUrl)
+	if cfg.Local.ListenUrl != "http://127.0.0.1:9093" {
+		t.Fatalf("Local.ListenUrl = %q, want .env.develop override", cfg.Local.ListenUrl)
 	}
-	if cfg.Base == nil || cfg.Base.LogLevel != "warn" || cfg.Base.Agent.ListenUrl != "http://127.0.0.1:9040" {
+	if cfg.Base == nil || cfg.Base.LogLevel != "warn" || cfg.Base.Local.ListenUrl != "http://127.0.0.1:9040" {
 		t.Fatalf("Base = %#v, want YAML-only env config value", cfg.Base)
 	}
 }
@@ -288,16 +288,16 @@ func TestLoadOSEnvOverridesEnvironmentDotEnv(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_AGENT__LISTEN_URL=http://127.0.0.1:8080\n")
+	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:8080\n")
 	t.Setenv(EnvNameVariable, "develop")
-	t.Setenv("TERMBRIDGE_AGENT__LISTEN_URL", "http://127.0.0.1:9094")
+	t.Setenv("TERMBRIDGE_LOCAL__LISTEN_URL", "http://127.0.0.1:9094")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9094" {
-		t.Fatalf("Agent.ListenUrl = %q, want OS env override", cfg.Agent.ListenUrl)
+	if cfg.Local.ListenUrl != "http://127.0.0.1:9094" {
+		t.Fatalf("Local.ListenUrl = %q, want OS env override", cfg.Local.ListenUrl)
 	}
 }
 
@@ -412,7 +412,7 @@ func TestLoadRejectsInvalidAgentListenURL(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "agent:\n  listen_url: not-a-url\n")
+	writeEnvConfig(t, cwd, "develop", "local:\n  listen_url: not-a-url\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	_, err := Load(Options{Cwd: cwd})
@@ -428,7 +428,7 @@ func TestLoadRejectsInvalidAgentPublicURL(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "agent:\n  public_url: ftp://example.com\n")
+	writeEnvConfig(t, cwd, "develop", "local:\n  public_url: ftp://example.com\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	_, err := Load(Options{Cwd: cwd})
@@ -444,7 +444,7 @@ func TestLoadRejectsInvalidAgentAPIBaseURL(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "agent:\n  api_base_url: ftp://api.example.com\n")
+	writeEnvConfig(t, cwd, "develop", "local:\n  api_base_url: ftp://api.example.com\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	_, err := Load(Options{Cwd: cwd})
@@ -460,15 +460,15 @@ func TestLoadAllowsPathAPIBaseURLForDevProxy(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "agent:\n  listen_url: http://127.0.0.1:9031\n  public_url: http://localhost:9030\n  api_base_url: /agent-api/\ncloud:\n  listen_url: http://127.0.0.1:9032\n  public_url: http://localhost:9030\n  api_base_url: /cloud-api/\n")
+	writeEnvConfig(t, cwd, "develop", "local:\n  listen_url: http://127.0.0.1:9031\n  public_url: http://localhost:9030\n  api_base_url: /local-api/\ncloud:\n  listen_url: http://127.0.0.1:9032\n  public_url: http://localhost:9030\n  api_base_url: /cloud-api/\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9031" || cfg.Agent.ApiBaseUrl != "/agent-api" {
-		t.Fatalf("Agent dev proxy config = %#v", cfg.Agent)
+	if cfg.Local.ListenUrl != "http://127.0.0.1:9031" || cfg.Local.ApiBaseUrl != "/local-api" {
+		t.Fatalf("Local dev proxy config = %#v", cfg.Local)
 	}
 	if cfg.Cloud.ListenUrl != "http://127.0.0.1:9032" || cfg.Cloud.ApiBaseUrl != "/cloud-api" {
 		t.Fatalf("Cloud dev proxy config = %#v", cfg.Cloud)
@@ -479,7 +479,7 @@ func TestLoadRejectsInvalidAgentCORSAllowedOrigin(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "agent:\n  cors_allowed_origins:\n    - chrome-extension://example\n")
+	writeEnvConfig(t, cwd, "develop", "local:\n  cors_allowed_origins:\n    - chrome-extension://example\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	_, err := Load(Options{Cwd: cwd})
@@ -567,7 +567,7 @@ func TestLoadUpsertsGeneratedValuesIntoExistingEnvironmentConfig(t *testing.T) {
 	}
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\nagent:\n  listen_url: http://127.0.0.1:9040\n")
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\nlocal:\n  listen_url: http://127.0.0.1:9040\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	loadedFiles := []string{}
@@ -631,48 +631,48 @@ func TestLoadRejectsIncompleteIntegrationConfig(t *testing.T) {
 	}
 }
 
-func TestLoadAgentOAuthConfig(t *testing.T) {
+func TestLoadLocalOAuthConfig(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "agent:\n  oauth:\n    client_id: termbridge-agent\n    client_secret: agent-secret\n    redirect_url: http://localhost:9030/agent/oauth/callback/\n    scopes: openid,email,profile\n")
+	writeEnvConfig(t, cwd, "develop", "local:\n  oauth:\n    client_id: termbridge-agent\n    client_secret: agent-secret\n    redirect_url: http://localhost:9030/oauth/callback/\n    scopes: openid,email,profile\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Agent.OAuth.ClientId != "termbridge-agent" {
-		t.Fatalf("Agent.OAuth.ClientId = %q", cfg.Agent.OAuth.ClientId)
+	if cfg.Local.OAuth.ClientId != "termbridge-agent" {
+		t.Fatalf("Local.OAuth.ClientId = %q", cfg.Local.OAuth.ClientId)
 	}
-	if cfg.Agent.OAuth.ClientSecret != "agent-secret" {
-		t.Fatalf("Agent.OAuth.ClientSecret = %q", cfg.Agent.OAuth.ClientSecret)
+	if cfg.Local.OAuth.ClientSecret != "agent-secret" {
+		t.Fatalf("Local.OAuth.ClientSecret = %q", cfg.Local.OAuth.ClientSecret)
 	}
-	if cfg.Agent.OAuth.RedirectUrl != "http://localhost:9030/agent/oauth/callback" {
-		t.Fatalf("Agent.OAuth.RedirectUrl = %q", cfg.Agent.OAuth.RedirectUrl)
+	if cfg.Local.OAuth.RedirectUrl != "http://localhost:9030/oauth/callback" {
+		t.Fatalf("Local.OAuth.RedirectUrl = %q", cfg.Local.OAuth.RedirectUrl)
 	}
 	wantScopes := []string{"openid", "email", "profile"}
-	if !reflect.DeepEqual(cfg.Agent.OAuth.Scopes, wantScopes) {
-		t.Fatalf("Agent.OAuth.Scopes = %#v, want %#v", cfg.Agent.OAuth.Scopes, wantScopes)
+	if !reflect.DeepEqual(cfg.Local.OAuth.Scopes, wantScopes) {
+		t.Fatalf("Local.OAuth.Scopes = %#v, want %#v", cfg.Local.OAuth.Scopes, wantScopes)
 	}
 }
 
-func TestLoadRejectsIncompleteAgentOAuthConfig(t *testing.T) {
+func TestLoadRejectsIncompleteLocalOAuthConfig(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "agent:\n  oauth:\n    client_id: termbridge-agent\n    client_secret: \"\"\n    redirect_url: \"\"\n")
+	writeEnvConfig(t, cwd, "develop", "local:\n  oauth:\n    client_id: termbridge-agent\n    client_secret: \"\"\n    redirect_url: \"\"\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	_, err := Load(Options{Cwd: cwd})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
-	if !strings.Contains(err.Error(), "incomplete agent OAuth configuration") {
-		t.Fatalf("Load() error = %v, want incomplete agent OAuth configuration", err)
+	if !strings.Contains(err.Error(), "incomplete local OAuth configuration") {
+		t.Fatalf("Load() error = %v, want incomplete local OAuth configuration", err)
 	}
-	if !strings.Contains(err.Error(), "TERMBRIDGE_AGENT__OAUTH__CLIENT_SECRET") || !strings.Contains(err.Error(), "TERMBRIDGE_AGENT__OAUTH__REDIRECT_URL") {
-		t.Fatalf("Load() error = %v, want missing agent OAuth env names", err)
+	if !strings.Contains(err.Error(), "TERMBRIDGE_LOCAL__OAUTH__CLIENT_SECRET") || !strings.Contains(err.Error(), "TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL") {
+		t.Fatalf("Load() error = %v, want missing local OAuth env names", err)
 	}
 }
 
@@ -685,8 +685,8 @@ func TestLoadIgnoresMissingDotEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9030" {
-		t.Fatalf("Agent.ListenUrl = %q, want http://127.0.0.1:9030", cfg.Agent.ListenUrl)
+	if cfg.Local.ListenUrl != "http://127.0.0.1:9030" {
+		t.Fatalf("Local.ListenUrl = %q, want http://127.0.0.1:9030", cfg.Local.ListenUrl)
 	}
 }
 
@@ -712,7 +712,7 @@ func TestLoadIgnoresUnknownConfigAndEnvironmentKeys(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "unknown_root:\n  value: ignored\nagent:\n  listen_url: http://127.0.0.1:9045\n  unknown_field: ignored\n")
+	writeEnvConfig(t, cwd, "develop", "unknown_root:\n  value: ignored\nlocal:\n  listen_url: http://127.0.0.1:9045\n  unknown_field: ignored\n")
 	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_UNKNOWN__FIELD=ignored\nTERMBRIDGE_LOG__LEVEL=debug\n")
 	t.Setenv(EnvNameVariable, "develop")
 
@@ -720,8 +720,8 @@ func TestLoadIgnoresUnknownConfigAndEnvironmentKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Agent.ListenUrl != "http://127.0.0.1:9045" {
-		t.Fatalf("Agent.ListenUrl = %q", cfg.Agent.ListenUrl)
+	if cfg.Local.ListenUrl != "http://127.0.0.1:9045" {
+		t.Fatalf("Local.ListenUrl = %q", cfg.Local.ListenUrl)
 	}
 	if cfg.LogLevel != "debug" {
 		t.Fatalf("LogLevel = %q, want known .env override", cfg.LogLevel)

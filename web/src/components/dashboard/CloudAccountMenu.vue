@@ -6,7 +6,7 @@
     @click="emit('login')"
   >
     <LogIn class="size-4 text-[var(--color-text-subtle)]" />
-    {{ t('gateway.signIn') }}
+    {{ t('cloud.signIn') }}
   </button>
 
   <DropdownMenuRoot v-else>
@@ -30,14 +30,14 @@
           @select="emit('changePassword')"
         >
           <KeyRound class="size-4 text-[var(--color-text-subtle)]" />
-          {{ t('gateway.changePassword') }}
+          {{ t('cloud.changePassword') }}
         </DropdownMenuItem>
         <DropdownMenuItem
           class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
           @select="emit('logout')"
         >
           <LogOut class="size-4 text-[var(--color-text-subtle)]" />
-          {{ t('gateway.logout') }}
+          {{ t('cloud.logout') }}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenuPortal>

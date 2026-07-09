@@ -61,7 +61,7 @@ export function terminalWsUrl(
   const pathWithQuery = query ? `${path}?${query}` : path
   const runtimeConfig = useRuntimeConfigStore().config
   const apiBaseUrl =
-    target.mode === 'cloud' ? runtimeConfig.cloud.apiBaseUrl : runtimeConfig.agent.apiBaseUrl
+    target.mode === 'cloud' ? runtimeConfig.cloud.apiBaseUrl : runtimeConfig.local.apiBaseUrl
   return buildApiWebSocketUrl(apiBaseUrl, pathWithQuery)
 }
 

@@ -64,7 +64,7 @@ describe('useTerminalSocket', () => {
     const terminal = useTerminalSocket(vi.fn(), vi.fn(), vi.fn())
 
     terminal.sendControl({ type: 'resize', cols: 120, rows: 32, nonce: '' })
-    terminal.connect('/agent-api/sessions/session-1/ws')
+    terminal.connect('/local-api/sessions/session-1/ws')
 
     const socket = FakeWebSocket.instances[0]
     expect(socket).toBeDefined()
@@ -82,7 +82,7 @@ describe('useTerminalSocket', () => {
 
     terminal.sendControl({ type: 'resize', cols: 100, rows: 24, nonce: '' })
     terminal.sendControl({ type: 'resize', cols: 140, rows: 40, nonce: '' })
-    terminal.connect('/agent-api/sessions/session-1/ws')
+    terminal.connect('/local-api/sessions/session-1/ws')
 
     const socket = FakeWebSocket.instances[0]
     socket.open()
@@ -96,7 +96,7 @@ describe('useTerminalSocket', () => {
   it('defers resize messages sent while the socket is connecting', () => {
     const terminal = useTerminalSocket(vi.fn(), vi.fn(), vi.fn())
 
-    terminal.connect('/agent-api/sessions/session-1/ws')
+    terminal.connect('/local-api/sessions/session-1/ws')
     const socket = FakeWebSocket.instances[0]
 
     terminal.sendControl({ type: 'resize', cols: 132, rows: 35, nonce: '' })
@@ -113,7 +113,7 @@ describe('useTerminalSocket', () => {
   it('does not replay a resize that was already sent on a later reconnect', () => {
     const terminal = useTerminalSocket(vi.fn(), vi.fn(), vi.fn())
 
-    terminal.connect('/agent-api/sessions/session-1/ws')
+    terminal.connect('/local-api/sessions/session-1/ws')
     const firstSocket = FakeWebSocket.instances[0]
     firstSocket.open()
 
@@ -123,7 +123,7 @@ describe('useTerminalSocket', () => {
       { type: 'resize', cols: 150, rows: 45, nonce: '' },
     ])
 
-    terminal.connect('/agent-api/sessions/session-1/ws')
+    terminal.connect('/local-api/sessions/session-1/ws')
     const secondSocket = FakeWebSocket.instances[1]
     secondSocket.open()
 

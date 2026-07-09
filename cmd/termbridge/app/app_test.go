@@ -128,7 +128,7 @@ func TestRunAgentStartsBackendAndConnectorFromConfig(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  public_url: http://termbridge.lvh.me\n"
+	configContent := "local:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  public_url: http://termbridge.lvh.me\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
 	oldRunBackendServer := runBackendServer
@@ -172,7 +172,7 @@ func TestRunAgentStartsBackendAndConnectorFromConfig(t *testing.T) {
 		t.Fatal("runBackendServer was not called")
 	}
 	healthResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(healthResponse, httptest.NewRequest(http.MethodGet, "/agent-api/health", nil))
+	gotServer.ServeHTTP(healthResponse, httptest.NewRequest(http.MethodGet, "/local-api/health", nil))
 	if healthResponse.Code != http.StatusOK || !strings.Contains(healthResponse.Body.String(), `"status":"ok"`) {
 		t.Fatalf("health response = %d %s", healthResponse.Code, healthResponse.Body.String())
 	}
@@ -212,7 +212,7 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 		_, _ = w.Write([]byte(`{"accepted":true}`))
 	}))
 	defer cloudPublic.Close()
-	configContent := "agent:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  public_url: " + cloudPublic.URL + "\n"
+	configContent := "local:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  public_url: " + cloudPublic.URL + "\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
 	oldRunBackendServer := runBackendServer
@@ -250,7 +250,7 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 	})
 
 	loginResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/agent-api/auth/login", nil))
+	gotServer.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/local-api/auth/login", nil))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("agent login status = %d; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
@@ -264,7 +264,7 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 		t.Fatalf("agent login token is empty: %s", loginResponse.Body.String())
 	}
 
-	connectRequest := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
+	connectRequest := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
 	connectRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	connectResponse := httptest.NewRecorder()
 	gotServer.ServeHTTP(connectResponse, connectRequest)
@@ -374,17 +374,17 @@ func TestRunWorkspaceAndSessionList(t *testing.T) {
 }
 
 func TestFrontendStaticEntryConfigUsesModeSpecificBuildInputs(t *testing.T) {
-	agentEnv := readRepoFile(t, "web", ".env.agent")
+	localEnv := readRepoFile(t, "web", ".env.local")
 	cloudEnv := readRepoFile(t, "web", ".env.cloud")
 	developmentEnv := readRepoFile(t, "web", ".env.development")
 
-	if !strings.Contains(developmentEnv, "TERMBRIDGE_AGENT__MODE=hybrid") {
+	if !strings.Contains(developmentEnv, "TERMBRIDGE_LOCAL__MODE=hybrid") {
 		t.Fatalf("development frontend entry must use hybrid mode")
 	}
-	if !strings.Contains(agentEnv, "TERMBRIDGE_AGENT__MODE=agent") {
-		t.Fatalf("agent frontend entry must use agent mode")
+	if !strings.Contains(localEnv, "TERMBRIDGE_LOCAL__MODE=local") {
+		t.Fatalf("local frontend entry must use local mode")
 	}
-	if !strings.Contains(cloudEnv, "TERMBRIDGE_AGENT__MODE=cloud") {
+	if !strings.Contains(cloudEnv, "TERMBRIDGE_LOCAL__MODE=cloud") {
 		t.Fatalf("cloud frontend entry must use cloud mode")
 	}
 	if !strings.Contains(readRepoFile(t, "Dockerfile"), "RUN yarn build:cloud") {
@@ -392,6 +392,48 @@ func TestFrontendStaticEntryConfigUsesModeSpecificBuildInputs(t *testing.T) {
 	}
 	if !strings.Contains(readRepoFile(t, "Dockerfile.cn"), "RUN yarn build:cloud") {
 		t.Fatalf("Dockerfile.cn must build the cloud frontend entry")
+	}
+}
+
+func TestPortablePackageBuildsLocalFrontendAndRuntimeEntry(t *testing.T) {
+	taskfile := readRepoFile(t, "Taskfile.yml")
+	startCmd := readRepoFile(t, "scripts", "package", "start.cmd")
+	startSh := readRepoFile(t, "scripts", "package", "start.sh")
+	packageEnv := readRepoFile(t, "scripts", "package", ".env.local")
+
+	assertContains(t, taskfile, "cd web && yarn build:local", "portable package must build the local frontend entry")
+	assertNotContains(t, taskfile, "configs/config.production.yaml", "portable package must not copy the removed production config")
+	assertContains(t, taskfile, "cp scripts/package/.env.local {{.PACKAGE_ROOT}}/.env.local", "portable package must include runtime .env.local")
+
+	for scriptName, script := range map[string]string{"start.cmd": startCmd, "start.sh": startSh} {
+		assertContains(t, script, "TERMBRIDGE_ENV=local", scriptName+" must select the local runtime environment")
+		assertNotContains(t, script, "TERMBRIDGE_ENV=production", scriptName+" must not select the removed production environment")
+		assertContains(t, script, "TERMBRIDGE_LOCAL__PUBLIC_URL", scriptName+" must open the configured local public URL")
+	}
+
+	for _, want := range []string{
+		"TERMBRIDGE_LOCAL__STATIC_DIR=web",
+		"TERMBRIDGE_LOCAL__PUBLIC_URL=http://localhost:9030",
+		"TERMBRIDGE_CLOUD__PUBLIC_URL=",
+		"TERMBRIDGE_CLOUD__API_BASE_URL=",
+		"TERMBRIDGE_LOCAL__OAUTH__CLIENT_SECRET=",
+		"TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL=http://localhost:9030/oauth/callback",
+	} {
+		assertContains(t, packageEnv, want, "portable runtime env must carry local/cloud connection config")
+	}
+}
+
+func assertContains(t *testing.T, content string, want string, message string) {
+	t.Helper()
+	if !strings.Contains(content, want) {
+		t.Fatalf("%s: missing %q", message, want)
+	}
+}
+
+func assertNotContains(t *testing.T, content string, unwanted string, message string) {
+	t.Helper()
+	if strings.Contains(content, unwanted) {
+		t.Fatalf("%s: unexpected %q", message, unwanted)
 	}
 }
 

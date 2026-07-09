@@ -367,7 +367,7 @@
               @select="emit('logout')"
             >
               <LogOut class="size-4 text-[var(--color-text-subtle)]" />
-              {{ t('gateway.logout') }}
+              {{ t('cloud.logout') }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenuPortal>

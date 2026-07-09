@@ -15,8 +15,8 @@ import (
 func backendHandler(cfg Config, logger *slog.Logger, apiHandler http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	agentAPIHandler := transportmiddleware.CorsForPaths(cfg.Server.CorsAllowedOrigins, apiPath)(apiHandler)
-	mux.Handle("/agent-api", agentAPIHandler)
-	mux.Handle("/agent-api/", agentAPIHandler)
+	mux.Handle("/local-api", agentAPIHandler)
+	mux.Handle("/local-api/", agentAPIHandler)
 	if cfg.Server.StaticDir != "" {
 		mux.Handle("/", staticHandler(cfg.Server.StaticDir))
 	}
@@ -85,5 +85,5 @@ func serveIndexHTML(w http.ResponseWriter, r *http.Request, indexPath string) {
 }
 
 func apiPath(path string) bool {
-	return path == "/agent-api" || strings.HasPrefix(path, "/agent-api/")
+	return path == "/local-api" || strings.HasPrefix(path, "/local-api/")
 }

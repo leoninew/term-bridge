@@ -1,14 +1,14 @@
 <template>
   <ToastProvider>
     <section
-      v-if="!gateway.authInitialized"
+      v-if="!authInitialized"
       class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
     >
-      {{ t('gateway.checkingAuth') }}
+      {{ t('cloud.checkingAuth') }}
     </section>
 
     <SplitterGroup
-      v-else-if="isAgentMode || gateway.authenticated"
+      v-else-if="isLocalMode || authenticated"
       direction="horizontal"
       class="flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
     >
@@ -119,6 +119,10 @@
   import { useCreateSessionDraft } from '../../composable/useCreateSessionDraft'
   import { useSessionDialogs } from '../../composable/useSessionDialogs'
   import { useTerminalSize } from '../../composable/useTerminalSize'
+  import { useAuthTokensStore } from '../../store/authTokens'
+  import { useCloudAuthStore } from '../../store/cloudAuth'
+  import { useCloudDevicesStore } from '../../store/cloudDevices'
+  import { useLocalAuthStore } from '../../store/localAuth'
   import { useRuntimeConfigStore } from '../../store/runtimeConfig'
   import { terminalWsUrl, type SessionRuntimeApi } from '../../features/sessions/runtime'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
@@ -129,7 +133,6 @@
     Workspace as WorkspaceSummary,
   } from '../../gen/proto/termbridge/agent/v1/workspace'
   import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
-  import { useGatewayStore } from '../../store/gateway'
   import { useNotificationsStore } from '../../store/notifications'
   import { useWorkbenchStore } from '../../store/workbench'
   import { useWorkspaceSessionsStore } from '../../store/workspaceSessions'
@@ -145,7 +148,10 @@
 
   const { t } = useI18n()
   const router = useRouter()
-  const gateway = useGatewayStore()
+  const tokens = useAuthTokensStore()
+  const cloudAuth = useCloudAuthStore()
+  const cloudDevices = useCloudDevicesStore()
+  const localAuth = useLocalAuthStore()
   const runtimeConfig = useRuntimeConfigStore()
   const workspaceSessions = useWorkspaceSessionsStore()
   const workbench = useWorkbenchStore()
@@ -163,10 +169,14 @@
   const deletingSessionId = ref<string | null>(null)
   const removingWorkspaceId = ref<string | null>(null)
 
-  const isAgentMode = computed(() => props.runtimeTarget.mode === 'agent')
-  const workbenchDevice = computed(() => props.currentDevice ?? gateway.cloudSession)
+  const isLocalMode = computed(() => props.runtimeTarget.mode === 'local')
+  const authInitialized = computed(() =>
+    isLocalMode.value ? localAuth.authInitialized : cloudAuth.authInitialized,
+  )
+  const authenticated = computed(() => cloudAuth.authenticated)
+  const workbenchDevice = computed(() => props.currentDevice ?? localAuth.cloudSession)
   const helpHref = computed(() =>
-    isAgentMode.value ? new URL('/help', runtimeConfig.config.cloud.publicUrl).toString() : '',
+    isLocalMode.value ? new URL('/help', runtimeConfig.config.cloud.publicUrl).toString() : '',
   )
 
   const activeSession = computed(() => {
@@ -183,7 +193,7 @@
       props.runtimeTarget,
       session.workspace_id,
       session.id,
-      gateway.tokenForTarget(props.runtimeTarget.mode) ?? undefined,
+      tokens.tokenForTarget(props.runtimeTarget.mode) ?? undefined,
     )
   })
 
@@ -212,12 +222,18 @@
     } catch {
       // ignore logout API errors — clear local state anyway
     }
-    gateway.clearTokenForTarget(props.runtimeTarget.mode)
-    gateway.passwordInput = ''
+    tokens.clearTokenForTarget(props.runtimeTarget.mode)
+    if (isLocalMode.value) {
+      localAuth.reset()
+    } else {
+      cloudAuth.passwordInput = ''
+      cloudAuth.reset()
+      cloudDevices.reset()
+    }
     workspaceSessions.reset()
     workbench.resetForSourceChange()
     await router.replace(
-      isAgentMode.value ? { name: props.homeRouteName } : { name: 'cloud-login' },
+      isLocalMode.value ? { name: props.homeRouteName } : { name: 'cloud-login' },
     )
   }
 
@@ -560,7 +576,7 @@
   onMounted(async () => {
     try {
       if (props.runtimeTarget.mode === 'cloud') {
-        await gateway.loadDevices()
+        await cloudDevices.loadDevices()
       }
       await refresh()
     } catch (err) {

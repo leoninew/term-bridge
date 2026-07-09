@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import type { AgentMode } from '../config'
-import { useGatewayStore } from '../store/gateway'
+import type { LocalMode } from '../config'
+import { useCloudAuthStore } from '../store/cloudAuth'
+import { useLocalAuthStore } from '../store/localAuth'
 import { useRuntimeConfigStore } from '../store/runtimeConfig'
 
 const cloudAccountAuthRoutes = [
@@ -15,7 +16,7 @@ const cloudAccountAuthRoutes = [
 
 const homeRoute = 'home'
 
-const agentAuthWhitelistRoutes = [homeRoute, 'agent-oauth-callback']
+const agentAuthWhitelistRoutes = [homeRoute, 'local-oauth-callback']
 
 const cloudAuthWhitelistRoutes = [homeRoute, ...cloudAccountAuthRoutes]
 
@@ -71,22 +72,22 @@ export const router = createRouter({
       meta: { mode: 'cloud' },
     },
     {
-      path: '/agent/connect',
-      name: 'agent-connect',
-      component: () => import('../views/agent/ConnectView.vue'),
-      meta: { mode: 'agent' },
+      path: '/local/connect',
+      name: 'local-connect',
+      component: () => import('../views/local/ConnectView.vue'),
+      meta: { mode: 'local' },
     },
     {
-      path: '/agent/oauth/callback',
-      name: 'agent-oauth-callback',
-      component: () => import('../views/agent/OAuthCallbackView.vue'),
-      meta: { mode: 'agent' },
+      path: '/oauth/callback',
+      name: 'local-oauth-callback',
+      component: () => import('../views/local/OAuthCallbackView.vue'),
+      meta: { mode: 'local' },
     },
     {
       path: '/sessions',
-      name: 'agent-sessions',
-      component: () => import('../views/agent/SessionsView.vue'),
-      meta: { mode: 'agent' },
+      name: 'local-sessions',
+      component: () => import('../views/local/SessionsView.vue'),
+      meta: { mode: 'local' },
     },
     {
       path: '/dashboard',
@@ -116,30 +117,33 @@ export const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  const gateway = useGatewayStore()
+  const cloudAuth = useCloudAuthStore()
+  const localAuth = useLocalAuthStore()
   const runtimeConfig = useRuntimeConfigStore()
   const routeName = to.name as string
-  const routeMode = (to.meta.mode as AgentMode | undefined) ?? 'hybrid'
-  const configuredMode = runtimeConfig.config.agent.mode
+  const routeMode = (to.meta.mode as LocalMode | undefined) ?? 'hybrid'
+  const configuredMode = runtimeConfig.config.local.mode
 
   if (routeMode !== 'hybrid' && configuredMode !== 'hybrid' && configuredMode !== routeMode) {
     return { name: homeRoute }
   }
-  if (routeMode === 'agent' || routeMode === 'cloud') {
+  if (routeMode === 'local' || routeMode === 'cloud') {
     runtimeConfig.switchMode(routeMode)
   }
 
   const authWhitelistRoutes =
-    runtimeConfig.view.mode === 'agent' ? agentAuthWhitelistRoutes : cloudAuthWhitelistRoutes
+    runtimeConfig.view.mode === 'local' ? agentAuthWhitelistRoutes : cloudAuthWhitelistRoutes
   if (authWhitelistRoutes.includes(routeName)) {
     return
   }
 
-  await gateway.initializeAuth()
-  if (!gateway.authenticated) {
-    if (runtimeConfig.view.mode === 'agent') {
-      return { name: homeRoute }
-    }
+  if (runtimeConfig.view.mode === 'local') {
+    await localAuth.initializeAuth()
+    return
+  }
+
+  await cloudAuth.initializeAuth()
+  if (!cloudAuth.authenticated) {
     return {
       name: 'cloud-login',
       query: { redirect: to.fullPath },

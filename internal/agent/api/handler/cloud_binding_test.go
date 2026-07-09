@@ -31,7 +31,7 @@ func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	handler.setLocalCloudSession(&cloudv1.CloudSessionSummary{PublicUrl: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: prototime.FromTime(connectedAt)})
 
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/local-api/auth/me", nil))
 	if response.Code != http.StatusOK {
 		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
 	}
@@ -56,7 +56,7 @@ func TestAuthMeReturnsLocalDeviceSummary(t *testing.T) {
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, LocalDevice: device})
 
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/local-api/auth/me", nil))
 	if response.Code != http.StatusOK {
 		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
 	}
@@ -74,13 +74,13 @@ func TestAgentLoginIssuesLocalTokenAndProtectsBusinessRoutes(t *testing.T) {
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService})
 
 	unauthorized := httptest.NewRecorder()
-	handler.ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/agent-api/workspaces", nil))
+	handler.ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/local-api/workspaces", nil))
 	if unauthorized.Code != http.StatusUnauthorized {
 		t.Fatalf("unauthenticated workspaces status = %d, want 401; body=%s", unauthorized.Code, unauthorized.Body.String())
 	}
 
 	loginResponse := httptest.NewRecorder()
-	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/agent-api/auth/login", nil))
+	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/local-api/auth/login", nil))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d, want 200; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
@@ -92,7 +92,7 @@ func TestAgentLoginIssuesLocalTokenAndProtectsBusinessRoutes(t *testing.T) {
 		t.Fatalf("token response access_token=%q token_type=%q", tokenResp.GetAccessToken(), tokenResp.GetTokenType())
 	}
 
-	meRequest := httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil)
+	meRequest := httptest.NewRequest(http.MethodGet, "/local-api/auth/me", nil)
 	meRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	meResponse := httptest.NewRecorder()
 	handler.ServeHTTP(meResponse, meRequest)
@@ -130,9 +130,9 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 	}))
 	defer cloud.Close()
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir})
-	agentToken := agentToken(t, handler)
-	request := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
-	request.Header.Set("Authorization", "Bearer "+agentToken)
+	localToken := localToken(t, handler)
+	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
+	request.Header.Set("Authorization", "Bearer "+localToken)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
@@ -176,9 +176,9 @@ func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T)
 	defer cloud.Close()
 
 	first := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir})
-	agentToken := agentToken(t, first)
-	connectRequest := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
-	connectRequest.Header.Set("Authorization", "Bearer "+agentToken)
+	localToken := localToken(t, first)
+	connectRequest := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
+	connectRequest.Header.Set("Authorization", "Bearer "+localToken)
 	connectResponse := httptest.NewRecorder()
 	first.ServeHTTP(connectResponse, connectRequest)
 	if connectResponse.Code != http.StatusOK {
@@ -190,7 +190,7 @@ func TestCloudConnectPersistsLocalCloudSessionSummaryWithoutTokens(t *testing.T)
 
 	second := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: agentapp.Device{Id: device.Id, Name: device.Name, PublicKey: device.PublicKey}, LocalDeviceStateDir: stateDir})
 	response := httptest.NewRecorder()
-	second.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil))
+	second.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/local-api/auth/me", nil))
 	if response.Code != http.StatusOK {
 		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
 	}
@@ -235,25 +235,25 @@ func TestCloudDisconnectClearsLocalCloudSessionWithoutUnbindingCloudDevice(t *te
 		}
 		sessionEvents = append(sessionEvents, proto.Clone(summary).(*cloudv1.CloudSessionSummary))
 	}})
-	agentToken := agentToken(t, handler)
-	connectRequest := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
-	connectRequest.Header.Set("Authorization", "Bearer "+agentToken)
+	localToken := localToken(t, handler)
+	connectRequest := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
+	connectRequest.Header.Set("Authorization", "Bearer "+localToken)
 	connectResponse := httptest.NewRecorder()
 	handler.ServeHTTP(connectResponse, connectRequest)
 	if connectResponse.Code != http.StatusOK {
 		t.Fatalf("cloud connect status = %d; body=%s", connectResponse.Code, connectResponse.Body.String())
 	}
 
-	disconnectRequest := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/disconnect", nil)
-	disconnectRequest.Header.Set("Authorization", "Bearer "+agentToken)
+	disconnectRequest := httptest.NewRequest(http.MethodPost, "/local-api/cloud/disconnect", nil)
+	disconnectRequest.Header.Set("Authorization", "Bearer "+localToken)
 	disconnectResponse := httptest.NewRecorder()
 	handler.ServeHTTP(disconnectResponse, disconnectRequest)
 	if disconnectResponse.Code != http.StatusNoContent {
 		t.Fatalf("cloud disconnect status = %d; body=%s", disconnectResponse.Code, disconnectResponse.Body.String())
 	}
 
-	meRequest := httptest.NewRequest(http.MethodGet, "/agent-api/auth/me", nil)
-	meRequest.Header.Set("Authorization", "Bearer "+agentToken)
+	meRequest := httptest.NewRequest(http.MethodGet, "/local-api/auth/me", nil)
+	meRequest.Header.Set("Authorization", "Bearer "+localToken)
 	meResponse := httptest.NewRecorder()
 	handler.ServeHTTP(meResponse, meRequest)
 	if meResponse.Code != http.StatusOK {
@@ -291,10 +291,10 @@ func TestCloudConnectRequiresCloudTokenBeforeDeviceReport(t *testing.T) {
 	}))
 	defer cloud.Close()
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: testLocalDevice()})
-	agentToken := agentToken(t, handler)
+	localToken := localToken(t, handler)
 
-	request := httptest.NewRequest(http.MethodPost, "/agent-api/cloud/connect", strings.NewReader(`{"cloud_token":" "}`))
-	request.Header.Set("Authorization", "Bearer "+agentToken)
+	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"cloud_token":" "}`))
+	request.Header.Set("Authorization", "Bearer "+localToken)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest {
@@ -310,10 +310,10 @@ func decodeProtoJSONBody(r *http.Request, message proto.Message) error {
 	return codec.UnmarshalProtoJSON(data, message)
 }
 
-func agentToken(t *testing.T, handler *Handler) string {
+func localToken(t *testing.T, handler *Handler) string {
 	t.Helper()
 	loginResponse := httptest.NewRecorder()
-	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/agent-api/auth/login", nil))
+	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/local-api/auth/login", nil))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}

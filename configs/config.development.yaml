@@ -1,15 +1,15 @@
-agent:
+local:
   static_dir: 
   listen_url: http://127.0.0.1:9031
   public_url: http://localhost:9030
-  api_base_url: /agent-api
+  api_base_url: /local-api
   expose_errors: true
   cors_allowed_origins:
     - http://localhost:9030
   oauth:
     client_id: termbridge-agent
     client_secret: agent-secret
-    redirect_url: http://localhost:9030/agent/oauth/callback
+    redirect_url: http://localhost:9030/oauth/callback
     scopes: [openid, email, profile]
 
 cloud:
@@ -23,5 +23,5 @@ cloud:
     clients:
       - client_id: termbridge-agent
         client_secret: agent-secret
-        redirect_url: http://localhost:9030/agent/oauth/callback
+        redirect_url: http://localhost:9030/oauth/callback
         scopes: [openid, email, profile]

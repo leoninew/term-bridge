@@ -1,6 +1,6 @@
 <template>
   <section
-    class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
+    class="flex min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
   >
     {{ t('cloud.checkingAuth') }}
   </section>

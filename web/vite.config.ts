@@ -9,7 +9,7 @@ export default defineConfig({
     host: 'localhost',
     port: 9030,
     proxy: {
-      '/agent-api': {
+      '/local-api': {
         target: 'http://127.0.0.1:9031',
         changeOrigin: true,
         ws: true,

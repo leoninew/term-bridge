@@ -7,11 +7,11 @@
       @submit.prevent="emit('submit')"
     >
       <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
-        {{ t('gateway.loginTitle') }}
+        {{ t('cloud.loginTitle') }}
       </h1>
-      <p class="mt-1 text-[var(--color-text-muted)]">{{ t('gateway.loginDescription') }}</p>
+      <p class="mt-1 text-[var(--color-text-muted)]">{{ t('cloud.loginDescription') }}</p>
       <label class="mt-4 block">
-        <span class="text-[var(--color-text)]">{{ t('gateway.username') }}</span>
+        <span class="text-[var(--color-text)]">{{ t('cloud.username') }}</span>
         <input
           :value="username"
           class="mt-1 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-[var(--color-text)] outline-none"
@@ -21,7 +21,7 @@
         />
       </label>
       <label class="mt-3 block">
-        <span class="text-[var(--color-text)]">{{ t('gateway.password') }}</span>
+        <span class="text-[var(--color-text)]">{{ t('cloud.password') }}</span>
         <input
           :value="password"
           type="password"
@@ -35,7 +35,7 @@
         class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50 hover:bg-blue-500 disabled:opacity-60"
         :disabled="loggingIn || googleLoggingIn"
       >
-        {{ loggingIn ? t('gateway.signingIn') : t('gateway.signIn') }}
+        {{ loggingIn ? t('cloud.signingIn') : t('cloud.signIn') }}
       </button>
       <button
         type="button"
@@ -43,14 +43,14 @@
         :disabled="loggingIn || googleLoggingIn"
         @click="emit('google')"
       >
-        {{ googleLoggingIn ? t('gateway.signingIn') : t('gateway.continueWithGoogle') }}
+        {{ googleLoggingIn ? t('cloud.signingIn') : t('cloud.continueWithGoogle') }}
       </button>
       <div class="mt-3 flex justify-between text-xs text-[var(--color-text-muted)]">
         <RouterLink class="hover:text-[var(--color-text)]" :to="{ name: 'cloud-register' }">
-          {{ t('gateway.register') }}
+          {{ t('cloud.register') }}
         </RouterLink>
         <RouterLink class="hover:text-[var(--color-text)]" :to="{ name: 'cloud-forgot-password' }">
-          {{ t('gateway.forgotPassword') }}
+          {{ t('cloud.forgotPassword') }}
         </RouterLink>
       </div>
     </form>

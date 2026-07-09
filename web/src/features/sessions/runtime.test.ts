@@ -4,7 +4,7 @@ import type { BrowserRuntimeConfig } from '../../config'
 
 vi.mock('../../router', () => ({
   router: {
-    currentRoute: { value: { name: 'agent-sessions', fullPath: '/sessions' } },
+    currentRoute: { value: { name: 'local-sessions', fullPath: '/sessions' } },
     push: vi.fn(),
   },
 }))
@@ -27,16 +27,16 @@ function storageMock(): Storage {
 
 function runtimeConfig(overrides: BrowserRuntimeConfig = {}): BrowserRuntimeConfig {
   return {
-    agent: {
+    local: {
       mode: 'hybrid',
       publicUrl: 'http://localhost:9030',
-      apiBaseUrl: '/agent-api',
+      apiBaseUrl: '/local-api',
       cloudOAuth: {
         clientId: 'termbridge-agent',
-        redirectUrl: 'http://localhost:9030/agent/oauth/callback',
+        redirectUrl: 'http://localhost:9030/oauth/callback',
         scopes: ['openid', 'email', 'profile'],
       },
-      ...overrides.agent,
+      ...overrides.local,
     },
     cloud: {
       publicUrl: 'http://localhost:9030',
@@ -64,9 +64,9 @@ describe('sessions runtime helpers', () => {
     vi.unstubAllGlobals()
   })
 
-  it('builds same-origin terminal websocket path from agent API config', () => {
-    expect(terminalWsUrl({ mode: 'agent' }, 'workspace 1', 'session 1')).toBe(
-      '/agent-api/workspaces/workspace%201/sessions/session%201/ws',
+  it('builds same-origin terminal websocket path from local API config', () => {
+    expect(terminalWsUrl({ mode: 'local' }, 'workspace 1', 'session 1')).toBe(
+      '/local-api/workspaces/workspace%201/sessions/session%201/ws',
     )
   })
 

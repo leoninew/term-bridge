@@ -1,4 +1,4 @@
-export type AgentMode = 'agent' | 'cloud' | 'hybrid'
+export type LocalMode = 'local' | 'cloud' | 'hybrid'
 
 export interface CloudOAuthConfig {
   clientId: string
@@ -6,8 +6,8 @@ export interface CloudOAuthConfig {
   scopes: string[]
 }
 
-export interface RuntimeAgentConfig {
-  mode: AgentMode
+export interface RuntimeLocalConfig {
+  mode: LocalMode
   publicUrl: string
   apiBaseUrl: string
   cloudOAuth: CloudOAuthConfig
@@ -19,12 +19,12 @@ export interface RuntimeCloudConfig {
 }
 
 export interface RuntimeConfig {
-  agent: RuntimeAgentConfig
+  local: RuntimeLocalConfig
   cloud: RuntimeCloudConfig
 }
 
-export type BrowserRuntimeAgentConfig = Partial<{
-  mode: AgentMode
+export type BrowserRuntimeLocalConfig = Partial<{
+  mode: LocalMode
   publicUrl: string
   apiBaseUrl: string
   cloudOAuth: Partial<CloudOAuthConfig>
@@ -33,6 +33,6 @@ export type BrowserRuntimeAgentConfig = Partial<{
 export type BrowserRuntimeCloudConfig = Partial<RuntimeCloudConfig>
 
 export type BrowserRuntimeConfig = Partial<{
-  agent: BrowserRuntimeAgentConfig
+  local: BrowserRuntimeLocalConfig
   cloud: BrowserRuntimeCloudConfig
 }>

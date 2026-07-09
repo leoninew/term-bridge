@@ -46,7 +46,7 @@ type Config struct {
 	History           HistoryConfig
 	Terminal          TerminalConfig
 	Runtime           RuntimeConfig
-	Agent             AgentConfig
+	Local             LocalConfig
 	Cloud             CloudConfig
 	Auth              AuthConfig
 	Jwt               JwtConfig
@@ -147,18 +147,18 @@ type RuntimeConfig struct {
 	StateDir string
 }
 
-type AgentConfig struct {
+type LocalConfig struct {
 	ListenUrl          string
 	StaticDir          string
 	PublicUrl          string
 	ApiBaseUrl         string
 	CorsAllowedOrigins []string
 	ExposeErrors       bool
-	OAuth              AgentOAuthConfig
+	OAuth              LocalOAuthConfig
 	Database           DatabaseConfig
 }
 
-type AgentOAuthConfig struct {
+type LocalOAuthConfig struct {
 	ClientId     string
 	ClientSecret string
 	RedirectUrl  string
@@ -244,15 +244,15 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	if err != nil {
 		return Config{}, err
 	}
-	agentStaticDir, err := resolveOptionalDir(cwd, v.GetString("agent.static_dir"))
+	agentStaticDir, err := resolveOptionalDir(cwd, v.GetString("local.static_dir"))
 	if err != nil {
-		return Config{}, apperrors.Config("invalid agent.static_dir", err)
+		return Config{}, apperrors.Config("invalid local.static_dir", err)
 	}
 	cloudStaticDir, err := resolveOptionalDir(cwd, v.GetString("cloud.static_dir"))
 	if err != nil {
 		return Config{}, apperrors.Config("invalid cloud.static_dir", err)
 	}
-	agentDatabase, err := loadDatabaseConfig(cwd, v, "agent.database")
+	agentDatabase, err := loadDatabaseConfig(cwd, v, "local.database")
 	if err != nil {
 		return Config{}, err
 	}
@@ -288,18 +288,18 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			}},
 		},
 		Runtime: RuntimeConfig{StateDir: stateDir},
-		Agent: AgentConfig{
-			ListenUrl:          strings.TrimSpace(v.GetString("agent.listen_url")),
+		Local: LocalConfig{
+			ListenUrl:          strings.TrimSpace(v.GetString("local.listen_url")),
 			StaticDir:          agentStaticDir,
-			PublicUrl:          strings.TrimSpace(v.GetString("agent.public_url")),
-			ApiBaseUrl:         strings.TrimSpace(v.GetString("agent.api_base_url")),
-			CorsAllowedOrigins: getStringSlice(v, "agent.cors_allowed_origins"),
-			ExposeErrors:       v.GetBool("agent.expose_errors"),
-			OAuth: AgentOAuthConfig{
-				ClientId:     strings.TrimSpace(v.GetString("agent.oauth.client_id")),
-				ClientSecret: strings.TrimSpace(v.GetString("agent.oauth.client_secret")),
-				RedirectUrl:  strings.TrimSpace(v.GetString("agent.oauth.redirect_url")),
-				Scopes:       getStringSlice(v, "agent.oauth.scopes"),
+			PublicUrl:          strings.TrimSpace(v.GetString("local.public_url")),
+			ApiBaseUrl:         strings.TrimSpace(v.GetString("local.api_base_url")),
+			CorsAllowedOrigins: getStringSlice(v, "local.cors_allowed_origins"),
+			ExposeErrors:       v.GetBool("local.expose_errors"),
+			OAuth: LocalOAuthConfig{
+				ClientId:     strings.TrimSpace(v.GetString("local.oauth.client_id")),
+				ClientSecret: strings.TrimSpace(v.GetString("local.oauth.client_secret")),
+				RedirectUrl:  strings.TrimSpace(v.GetString("local.oauth.redirect_url")),
+				Scopes:       getStringSlice(v, "local.oauth.scopes"),
 			},
 			Database: agentDatabase,
 		},
@@ -351,7 +351,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 
 	normalizeLogBodyLimits(&cfg)
 	normalizeTerminalConfig(&cfg)
-	normalizeAgentConfig(&cfg)
+	normalizeLocalConfig(&cfg)
 	normalizeCloudConfig(&cfg)
 	if ensureDirs {
 		var err error
@@ -376,7 +376,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	if err := validateTerminal(cfg.Terminal); err != nil {
 		return Config{}, err
 	}
-	if err := validateAgent(cfg.Agent); err != nil {
+	if err := validateLocal(cfg.Local); err != nil {
 		return Config{}, err
 	}
 	if err := validateCloud(cfg); err != nil {
@@ -809,19 +809,19 @@ func configKeys() []string {
 		"terminal.client.queue.max_messages",
 		"terminal.client.queue.max_bytes",
 		"runtime.state_dir",
-		"agent.listen_url",
-		"agent.static_dir",
-		"agent.public_url",
-		"agent.api_base_url",
-		"agent.cors_allowed_origins",
-		"agent.expose_errors",
-		"agent.oauth.client_id",
-		"agent.oauth.client_secret",
-		"agent.oauth.redirect_url",
-		"agent.oauth.scopes",
-		"agent.database.driver",
-		"agent.database.sqlite.path",
-		"agent.database.mysql.dsn",
+		"local.listen_url",
+		"local.static_dir",
+		"local.public_url",
+		"local.api_base_url",
+		"local.cors_allowed_origins",
+		"local.expose_errors",
+		"local.oauth.client_id",
+		"local.oauth.client_secret",
+		"local.oauth.redirect_url",
+		"local.oauth.scopes",
+		"local.database.driver",
+		"local.database.sqlite.path",
+		"local.database.mysql.dsn",
 		"cloud.listen_url",
 		"cloud.static_dir",
 		"cloud.public_url",
@@ -979,17 +979,17 @@ func validateTerminal(cfg TerminalConfig) error {
 	return nil
 }
 
-func normalizeAgentConfig(cfg *Config) {
-	cfg.Agent.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.ListenUrl), "/")
-	cfg.Agent.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.PublicUrl), "/")
-	cfg.Agent.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.ApiBaseUrl), "/")
-	cfg.Agent.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Agent.CorsAllowedOrigins)
-	cfg.Agent.OAuth.ClientId = strings.TrimSpace(cfg.Agent.OAuth.ClientId)
-	cfg.Agent.OAuth.ClientSecret = strings.TrimSpace(cfg.Agent.OAuth.ClientSecret)
-	cfg.Agent.OAuth.RedirectUrl = strings.TrimRight(strings.TrimSpace(cfg.Agent.OAuth.RedirectUrl), "/")
-	cfg.Agent.OAuth.Scopes = cleanStringSlice(cfg.Agent.OAuth.Scopes)
-	if cfg.Agent.OAuth.ClientId != "" && len(cfg.Agent.OAuth.Scopes) == 0 {
-		cfg.Agent.OAuth.Scopes = []string{"openid", "email", "profile"}
+func normalizeLocalConfig(cfg *Config) {
+	cfg.Local.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Local.ListenUrl), "/")
+	cfg.Local.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Local.PublicUrl), "/")
+	cfg.Local.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Local.ApiBaseUrl), "/")
+	cfg.Local.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Local.CorsAllowedOrigins)
+	cfg.Local.OAuth.ClientId = strings.TrimSpace(cfg.Local.OAuth.ClientId)
+	cfg.Local.OAuth.ClientSecret = strings.TrimSpace(cfg.Local.OAuth.ClientSecret)
+	cfg.Local.OAuth.RedirectUrl = strings.TrimRight(strings.TrimSpace(cfg.Local.OAuth.RedirectUrl), "/")
+	cfg.Local.OAuth.Scopes = cleanStringSlice(cfg.Local.OAuth.Scopes)
+	if cfg.Local.OAuth.ClientId != "" && len(cfg.Local.OAuth.Scopes) == 0 {
+		cfg.Local.OAuth.Scopes = []string{"openid", "email", "profile"}
 	}
 }
 
@@ -1027,11 +1027,11 @@ func normalizeCloudConfig(cfg *Config) {
 	}
 }
 
-func validateAgent(cfg AgentConfig) error {
-	if err := validateHTTPServerConfig("agent", cfg.ListenUrl, cfg.PublicUrl, cfg.ApiBaseUrl, cfg.CorsAllowedOrigins); err != nil {
+func validateLocal(cfg LocalConfig) error {
+	if err := validateHTTPServerConfig("local", cfg.ListenUrl, cfg.PublicUrl, cfg.ApiBaseUrl, cfg.CorsAllowedOrigins); err != nil {
 		return err
 	}
-	return validateAgentOAuth(cfg.OAuth)
+	return validateLocalOAuth(cfg.OAuth)
 }
 
 func validateCloud(cfg Config) error {
@@ -1046,24 +1046,24 @@ func validateCloud(cfg Config) error {
 	return nil
 }
 
-func validateAgentOAuth(cfg AgentOAuthConfig) error {
+func validateLocalOAuth(cfg LocalOAuthConfig) error {
 	if cfg.ClientId == "" && cfg.ClientSecret == "" && cfg.RedirectUrl == "" {
 		return nil
 	}
 	missing := []string{}
 	if cfg.ClientId == "" {
-		missing = append(missing, envNameForKey("agent.oauth.client_id"))
+		missing = append(missing, envNameForKey("local.oauth.client_id"))
 	}
 	if cfg.ClientSecret == "" {
-		missing = append(missing, envNameForKey("agent.oauth.client_secret"))
+		missing = append(missing, envNameForKey("local.oauth.client_secret"))
 	}
 	if cfg.RedirectUrl == "" {
-		missing = append(missing, envNameForKey("agent.oauth.redirect_url"))
+		missing = append(missing, envNameForKey("local.oauth.redirect_url"))
 	}
 	if len(missing) > 0 {
-		return apperrors.Config("incomplete agent OAuth configuration", errors.New(strings.Join(missing, ", ")))
+		return apperrors.Config("incomplete local OAuth configuration", errors.New(strings.Join(missing, ", ")))
 	}
-	return validateHTTPURL("agent.oauth.redirect_url", cfg.RedirectUrl)
+	return validateHTTPURL("local.oauth.redirect_url", cfg.RedirectUrl)
 }
 
 func validateCloudOAuthClient(index int, client CloudOAuthClientConfig) error {

@@ -5,7 +5,7 @@ import type { BrowserRuntimeConfig } from '../../config'
 import {
   ApiClientError,
   ApiContractMismatchError,
-  agentApiClient,
+  localApiClient,
   apiClient,
   cloudApiClient,
   ensureRequestId,
@@ -15,7 +15,7 @@ import {
 
 vi.mock('../../router', () => ({
   router: {
-    currentRoute: { value: { name: 'agent-sessions' } },
+    currentRoute: { value: { name: 'local-sessions' } },
     push: vi.fn(),
   },
 }))
@@ -36,16 +36,16 @@ function storageMock(): Storage {
 
 function runtimeConfig(overrides: BrowserRuntimeConfig = {}): BrowserRuntimeConfig {
   return {
-    agent: {
+    local: {
       mode: 'hybrid',
       publicUrl: 'http://localhost:9030',
-      apiBaseUrl: '/agent-api',
+      apiBaseUrl: '/local-api',
       cloudOAuth: {
         clientId: 'termbridge-agent',
-        redirectUrl: 'http://localhost:9030/agent/oauth/callback',
+        redirectUrl: 'http://localhost:9030/oauth/callback',
         scopes: ['openid', 'email', 'profile'],
       },
-      ...overrides.agent,
+      ...overrides.local,
     },
     cloud: {
       publicUrl: 'http://localhost:9030',
@@ -131,8 +131,8 @@ describe('api client', () => {
     expect(err).toBeInstanceOf(ApiContractMismatchError)
   })
 
-  it('uses agent API base URL for agent requests', async () => {
-    stubBrowser(runtimeConfig({ agent: { apiBaseUrl: 'https://agent.example.com/' } }))
+  it('uses local API base URL for local requests', async () => {
+    stubBrowser(runtimeConfig({ local: { apiBaseUrl: 'https://local.example.com/' } }))
     setActivePinia(createPinia())
 
     const result = await apiClient.get<string>('/history', {
@@ -145,7 +145,7 @@ describe('api client', () => {
       }),
     })
 
-    expect(result.data).toBe('https://agent.example.com')
+    expect(result.data).toBe('https://local.example.com')
   })
 
   it('uses cloud API base URL for cloud requests', async () => {
@@ -167,12 +167,12 @@ describe('api client', () => {
 
   it('sends only the token for the requested API target', async () => {
     const localStorage = storageMock()
-    localStorage.setItem('termbridge_agent_token', 'agent-token')
+    localStorage.setItem('termbridge_local_token', 'local-token')
     localStorage.setItem('termbridge_cloud_token', 'cloud-token')
     stubBrowser(runtimeConfig(), localStorage)
     setActivePinia(createPinia())
 
-    const agentResult = await agentApiClient.get<string>('/auth/me', {
+    const localResult = await localApiClient.get<string>('/auth/me', {
       adapter: async (config) => ({
         data: String(AxiosHeaders.from(config.headers).get('Authorization')),
         status: 200,
@@ -191,7 +191,7 @@ describe('api client', () => {
       }),
     })
 
-    expect(agentResult.data).toBe('Bearer agent-token')
+    expect(localResult.data).toBe('Bearer local-token')
     expect(cloudResult.data).toBe('Bearer cloud-token')
   })
 

@@ -24,7 +24,8 @@ COPY --from=web-build /src/web/dist ./web/dist
 COPY configs/ ./configs/
 ENV TERMBRIDGE_CLOUD__LISTEN_URL=http://0.0.0.0:80 \
     TERMBRIDGE_CLOUD__STATIC_DIR=/opt/termbridge/web/dist \
-    TERMBRIDGE_CLOUD__PUBLIC_URL=http://localhost \
+    TERMBRIDGE_CLOUD__PUBLIC_URL=http://termbridge.lvh.me \
+    TERMBRIDGE_CLOUD__API_BASE_URL=/cloud-api \
     TERMBRIDGE_RUNTIME__STATE_DIR=/var/lib/termbridge
 EXPOSE 80
 VOLUME ["/var/lib/termbridge"]

@@ -9,12 +9,12 @@ const cloudOAuthStateKey = 'termbridge.cloud.oauth2.state'
 const cloudOAuthRedirectKey = 'termbridge.cloud.oauth2.redirect'
 
 export function cloudOAuthConfigured(): boolean {
-  const config = useRuntimeConfigStore().config.agent.cloudOAuth
+  const config = useRuntimeConfigStore().config.local.cloudOAuth
   return !!config
 }
 
 export function startCloudOAuth(postAuthRedirect: string) {
-  const config = useRuntimeConfigStore().config.agent.cloudOAuth
+  const config = useRuntimeConfigStore().config.local.cloudOAuth
   const state = randomState()
   writeLocalStorageValue(cloudOAuthStateKey, state)
   writeLocalStorageValue(cloudOAuthRedirectKey, safeLocalRedirect(postAuthRedirect) || '/')

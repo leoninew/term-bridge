@@ -1,10 +1,10 @@
 <template>
   <ToastProvider>
     <section
-      v-if="!gateway.authInitialized"
+      v-if="!cloudAuth.authInitialized"
       class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
     >
-      {{ t('gateway.checkingAuth') }}
+      {{ t('cloudAuth.checkingAuth') }}
     </section>
     <section
       v-else
@@ -23,25 +23,25 @@
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../../components/session/ToastHost.vue'
   import { cloudOAuthAuthorize } from '../../features/cloud/api'
-  import { useGatewayStore } from '../../store/gateway'
+  import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useNotificationsStore } from '../../store/notifications'
 
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
-  const gateway = useGatewayStore()
+  const cloudAuth = useCloudAuthStore()
   const notifications = useNotificationsStore()
 
   onMounted(async () => {
-    await gateway.initializeAuth()
-    if (!gateway.authenticated) {
+    await cloudAuth.initializeAuth()
+    if (!cloudAuth.authenticated) {
       await router.replace({ name: 'cloud-login', query: { redirect: route.fullPath } })
       return
     }
     try {
       window.location.href = await cloudOAuthAuthorize(route.fullPath)
     } catch (err) {
-      notifications.notifyError(t('gateway.loginFailed'), err)
+      notifications.notifyError(t('cloudAuth.loginFailed'), err)
       await router.replace({ name: 'home' })
     }
   })

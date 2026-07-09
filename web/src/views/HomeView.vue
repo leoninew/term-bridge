@@ -1,6 +1,6 @@
 <template>
   <ToastProvider>
-    <AgentHome v-if="runtimeConfig.view.mode === 'agent'" />
+    <LocalHome v-if="runtimeConfig.view.mode === 'local'" />
     <CloudHome v-else />
     <ToastHost />
   </ToastProvider>
@@ -8,7 +8,7 @@
 
 <script setup lang="ts">
   import { ToastProvider } from 'reka-ui'
-  import AgentHome from '../components/dashboard/AgentHome.vue'
+  import LocalHome from '../components/dashboard/LocalHome.vue'
   import CloudHome from '../components/dashboard/CloudHome.vue'
   import ToastHost from '../components/session/ToastHost.vue'
   import { useRuntimeConfigStore } from '../store/runtimeConfig'

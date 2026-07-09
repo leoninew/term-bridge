@@ -19,16 +19,16 @@ function storageMock(): Storage {
 
 function runtimeConfig(overrides: BrowserRuntimeConfig = {}): BrowserRuntimeConfig {
   return {
-    agent: {
+    local: {
       mode: 'hybrid',
       publicUrl: 'http://localhost:9030',
-      apiBaseUrl: '/agent-api',
+      apiBaseUrl: '/local-api',
       cloudOAuth: {
         clientId: 'termbridge-agent',
-        redirectUrl: 'http://localhost:9030/agent/oauth/callback',
+        redirectUrl: 'http://localhost:9030/oauth/callback',
         scopes: ['openid', 'email', 'profile'],
       },
-      ...overrides.agent,
+      ...overrides.local,
     },
     cloud: {
       publicUrl: 'http://termbridge.lvh.me',
@@ -58,13 +58,13 @@ describe('runtime config store', () => {
 
   it('parses nested runtime config injected by the server', () => {
     stubWindowConfig(
-      runtimeConfig({ agent: { mode: 'cloud', apiBaseUrl: 'https://agent.example.com/' } }),
+      runtimeConfig({ local: { mode: 'cloud', apiBaseUrl: 'https://local.example.com/' } }),
     )
 
     const store = useRuntimeConfigStore()
 
-    expect(store.config.agent.mode).toBe('cloud')
-    expect(store.config.agent.apiBaseUrl).toBe('https://agent.example.com')
+    expect(store.config.local.mode).toBe('cloud')
+    expect(store.config.local.apiBaseUrl).toBe('https://local.example.com')
     expect(store.config.cloud.publicUrl).toBe('http://termbridge.lvh.me')
     expect(store.config.cloud.apiBaseUrl).toBe('http://termbridge.lvh.me/cloud-api')
     expect(store.view.mode).toBe('cloud')
@@ -75,28 +75,28 @@ describe('runtime config store', () => {
       localStorage: storageMock(),
       sessionStorage: storageMock(),
     })
-    vi.stubEnv('TERMBRIDGE_AGENT__MODE', 'hybrid')
-    vi.stubEnv('TERMBRIDGE_AGENT__PUBLIC_URL', 'http://localhost:9030')
-    vi.stubEnv('TERMBRIDGE_AGENT__API_BASE_URL', '/agent-api')
-    vi.stubEnv('TERMBRIDGE_AGENT__OAUTH__CLIENT_ID', 'termbridge-agent')
+    vi.stubEnv('TERMBRIDGE_LOCAL__MODE', 'hybrid')
+    vi.stubEnv('TERMBRIDGE_LOCAL__PUBLIC_URL', 'http://localhost:9030')
+    vi.stubEnv('TERMBRIDGE_LOCAL__API_BASE_URL', '/local-api')
+    vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__CLIENT_ID', 'termbridge-agent')
     vi.stubEnv(
-      'TERMBRIDGE_AGENT__OAUTH__REDIRECT_URL',
-      'http://localhost:9030/agent/oauth/callback',
+      'TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL',
+      'http://localhost:9030/oauth/callback',
     )
-    vi.stubEnv('TERMBRIDGE_AGENT__OAUTH__SCOPES', 'openid,email,profile')
+    vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__SCOPES', 'openid,email,profile')
     vi.stubEnv('TERMBRIDGE_CLOUD__PUBLIC_URL', 'https://cloud.example.com/')
     vi.stubEnv('TERMBRIDGE_CLOUD__API_BASE_URL', 'https://cloud.example.com/cloud-api/')
 
     const store = useRuntimeConfigStore()
 
     expect(store.config).toEqual({
-      agent: {
+      local: {
         mode: 'hybrid',
         publicUrl: 'http://localhost:9030',
-        apiBaseUrl: '/agent-api',
+        apiBaseUrl: '/local-api',
         cloudOAuth: {
           clientId: 'termbridge-agent',
-          redirectUrl: 'http://localhost:9030/agent/oauth/callback',
+          redirectUrl: 'http://localhost:9030/oauth/callback',
           scopes: ['openid', 'email', 'profile'],
         },
       },
@@ -113,65 +113,65 @@ describe('runtime config store', () => {
       localStorage: storageMock(),
       sessionStorage: storageMock(),
     })
-    vi.stubEnv('TERMBRIDGE_AGENT__MODE', 'cloud')
-    vi.stubEnv('TERMBRIDGE_AGENT__PUBLIC_URL', 'http://localhost:9030')
-    vi.stubEnv('TERMBRIDGE_AGENT__API_BASE_URL', '/agent-api')
-    vi.stubEnv('TERMBRIDGE_AGENT__OAUTH__CLIENT_ID', 'termbridge-agent')
+    vi.stubEnv('TERMBRIDGE_LOCAL__MODE', 'cloud')
+    vi.stubEnv('TERMBRIDGE_LOCAL__PUBLIC_URL', 'http://localhost:9030')
+    vi.stubEnv('TERMBRIDGE_LOCAL__API_BASE_URL', '/local-api')
+    vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__CLIENT_ID', 'termbridge-agent')
     vi.stubEnv(
-      'TERMBRIDGE_AGENT__OAUTH__REDIRECT_URL',
-      'http://localhost:9030/agent/oauth/callback',
+      'TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL',
+      'http://localhost:9030/oauth/callback',
     )
-    vi.stubEnv('TERMBRIDGE_AGENT__OAUTH__SCOPES', 'openid,email,profile')
+    vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__SCOPES', 'openid,email,profile')
     vi.stubEnv('TERMBRIDGE_CLOUD__PUBLIC_URL', 'http://localhost:9030')
     vi.stubEnv('TERMBRIDGE_CLOUD__API_BASE_URL', '/cloud-api')
 
     const store = useRuntimeConfigStore()
 
-    expect(store.config.agent.mode).toBe('cloud')
+    expect(store.config.local.mode).toBe('cloud')
     expect(store.view.mode).toBe('cloud')
   })
 
   it('initializes view mode from session storage only in hybrid mode', () => {
     const sessionStorage = storageMock()
     sessionStorage.setItem('termbridge.active_mode', 'cloud')
-    stubWindowConfig(runtimeConfig({ agent: { mode: 'hybrid' } }), sessionStorage)
+    stubWindowConfig(runtimeConfig({ local: { mode: 'hybrid' } }), sessionStorage)
 
     const store = useRuntimeConfigStore()
 
     expect(store.view.mode).toBe('cloud')
   })
 
-  it('keeps agent mode read-only and switches only the view mode in hybrid mode', () => {
+  it('keeps local mode read-only and switches only the view mode in hybrid mode', () => {
     const sessionStorage = storageMock()
-    stubWindowConfig(runtimeConfig({ agent: { mode: 'hybrid' } }), sessionStorage)
+    stubWindowConfig(runtimeConfig({ local: { mode: 'hybrid' } }), sessionStorage)
     const store = useRuntimeConfigStore()
 
     expect(store.switchMode('cloud')).toBe(true)
 
-    expect(store.config.agent.mode).toBe('hybrid')
+    expect(store.config.local.mode).toBe('hybrid')
     expect(store.view.mode).toBe('cloud')
     expect(sessionStorage.getItem('termbridge.active_mode')).toBe('cloud')
   })
 
   it('rejects view mode changes outside hybrid mode', () => {
-    stubWindowConfig(runtimeConfig({ agent: { mode: 'agent' } }))
+    stubWindowConfig(runtimeConfig({ local: { mode: 'local' } }))
     const store = useRuntimeConfigStore()
 
     expect(store.switchMode('cloud')).toBe(false)
 
-    expect(store.config.agent.mode).toBe('agent')
-    expect(store.view.mode).toBe('agent')
+    expect(store.config.local.mode).toBe('local')
+    expect(store.view.mode).toBe('local')
   })
 
   it('fails fast when required config is missing', () => {
-    stubWindowConfig({ agent: { mode: 'hybrid' }, cloud: {} })
+    stubWindowConfig({ local: { mode: 'hybrid' }, cloud: {} })
 
     expect(() => useRuntimeConfigStore()).toThrow(/Invalid runtime config from window\.__CONFIG__/)
   })
 
-  it('fails fast when agent mode uses an unsupported value', () => {
-    stubWindowConfig(runtimeConfig({ agent: { mode: 'both' as never } }))
+  it('fails fast when local mode uses an unsupported value', () => {
+    stubWindowConfig(runtimeConfig({ local: { mode: 'both' as never } }))
 
-    expect(() => useRuntimeConfigStore()).toThrow(/agent\.mode must be agent, cloud, or hybrid/)
+    expect(() => useRuntimeConfigStore()).toThrow(/local\.mode must be local, cloud, or hybrid/)
   })
 })
