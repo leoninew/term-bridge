@@ -54,8 +54,11 @@ func TestLoadDefaults(t *testing.T) {
 	if filepath.Clean(cfg.LogDir) != filepath.Clean(wantLogDir) {
 		t.Fatalf("LogDir = %q, want %q", cfg.LogDir, wantLogDir)
 	}
-	if cfg.LogHTTP.RequestBodyLimit != 4096 || cfg.LogHTTP.ResponseBodyLimit != 4096 {
+	if cfg.LogHTTP.RequestBodyLimit != 4096 || cfg.LogHTTP.ResponseBodyLimit != 4096 || !cfg.LogHTTP.SkipAssetEnabled {
 		t.Fatalf("LogHTTP = %#v", cfg.LogHTTP)
+	}
+	if !reflect.DeepEqual(cfg.LogHTTP.SkipAssetExtensions, wantDefaultSkipAssetExtensions()) {
+		t.Fatalf("LogHTTP.SkipAssetExtensions = %#v", cfg.LogHTTP.SkipAssetExtensions)
 	}
 	wantStateDir := filepath.Join(cwd, "data")
 	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(wantStateDir) {
@@ -169,7 +172,7 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "dotenv-logs")
 	stateDir := filepath.Join(cwd, "dotenv-state")
-	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_LOCAL__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_LOCAL__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_LOCAL__API_BASE_URL=https://api.dotenv.example.com\nTERMBRIDGE_LOCAL__CORS_ALLOWED_ORIGINS=https://dotenv.example.com,https://preview.dotenv.example.com\nTERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_LOCAL__EXPOSE_ERRORS=true\n")
+	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_ENABLED=false\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_EXTENSIONS=js,CSS,,.webp\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_LOCAL__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_LOCAL__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_LOCAL__API_BASE_URL=https://api.dotenv.example.com\nTERMBRIDGE_LOCAL__CORS_ALLOWED_ORIGINS=https://dotenv.example.com,https://preview.dotenv.example.com\nTERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_LOCAL__EXPOSE_ERRORS=true\n")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
@@ -181,8 +184,12 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	if filepath.Clean(cfg.LogDir) != filepath.Clean(logDir) || filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(stateDir) {
 		t.Fatalf("paths = %q/%q", cfg.LogDir, cfg.Runtime.StateDir)
 	}
-	if cfg.LogHTTP.RequestBodyLimit != 512 || cfg.LogHTTP.ResponseBodyLimit != 1024 {
+	if cfg.LogHTTP.RequestBodyLimit != 512 || cfg.LogHTTP.ResponseBodyLimit != 1024 || cfg.LogHTTP.SkipAssetEnabled {
 		t.Fatalf("LogHTTP = %#v", cfg.LogHTTP)
+	}
+	wantAssetExtensions := []string{".js", ".css", ".webp"}
+	if !reflect.DeepEqual(cfg.LogHTTP.SkipAssetExtensions, wantAssetExtensions) {
+		t.Fatalf("LogHTTP.SkipAssetExtensions = %#v, want %#v", cfg.LogHTTP.SkipAssetExtensions, wantAssetExtensions)
 	}
 	if cfg.History.MaxLines != 20 || cfg.History.MaxBytes != 4096 || cfg.History.MaxLineBytes != 256 {
 		t.Fatalf("History = %#v", cfg.History)
@@ -732,6 +739,10 @@ func TestDefaultConfigFileExists(t *testing.T) {
 	if _, err := os.ReadFile(repoDefaultConfigPath(t)); err != nil {
 		t.Fatalf("ReadFile(default config) error = %v", err)
 	}
+}
+
+func wantDefaultSkipAssetExtensions() []string {
+	return []string{".js", ".mjs", ".css", ".map", ".jpg", ".jpeg", ".png", ".gif", ".svg", ".ico", ".webp", ".avif", ".woff", ".woff2", ".ttf", ".otf", ".eot", ".wasm"}
 }
 
 func isolateHome(t *testing.T) string {

@@ -1,9 +1,13 @@
 package app
 
-import "time"
+import (
+	"time"
+
+	sharedconfig "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/config"
+)
 
 type Config struct {
-	LogHTTP  LogHTTPConfig
+	LogHTTP  sharedconfig.LogHTTPConfig
 	Server   ServerConfig
 	Gate     GateConfig
 	Database DatabaseConfig
@@ -11,11 +15,6 @@ type Config struct {
 	Jwt      JwtConfig
 	Resend   ResendConfig
 	Cloud    CloudConfig
-}
-
-type LogHTTPConfig struct {
-	RequestBodyLimit  int
-	ResponseBodyLimit int
 }
 
 type ServerConfig struct {

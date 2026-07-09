@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	sharedconfig "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/config"
 )
 
 const testBodyMaxBytes = 32
@@ -77,6 +79,60 @@ func TestMiddlewareRecordsWriteHeaderWithoutBody(t *testing.T) {
 	assertLogNumber(t, completed, "status", http.StatusNoContent)
 	assertLogNumber(t, completed, "bytes", 0)
 	assertLogMissing(t, completed, "response_body")
+}
+
+func TestMiddlewareSkipsConfiguredAssetSuccessLogs(t *testing.T) {
+	config := sharedconfig.LogHTTPConfig{RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: true, SkipAssetExtensions: []string{".js", ".css", ".jpg"}}
+	for _, target := range []string{"/assets/app.js", "/assets/theme.css?v=1", "/assets/logo.jpg"} {
+		entries, recorder := runLoggedRequestWithConfig(t, config, http.MethodGet, target, "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("asset"))
+		}))
+		if len(entries) != 0 {
+			t.Fatalf("%s produced %d log entries, want static asset success log skipped: %+v", target, len(entries), entries)
+		}
+		if recorder.Code != http.StatusOK || recorder.Body.String() != "asset" {
+			t.Fatalf("%s response = %d %q, want unchanged asset response", target, recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
+func TestMiddlewareKeepsAssetLogsWhenSkipDisabled(t *testing.T) {
+	config := sharedconfig.LogHTTPConfig{RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: false, SkipAssetExtensions: []string{".js"}}
+	entries, _ := runLoggedRequestWithConfig(t, config, http.MethodGet, "/assets/app.js", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("asset"))
+	}))
+
+	assertStartedAndCompleted(t, entries)
+}
+
+func TestMiddlewareKeepsFailedAssetAndAPILogs(t *testing.T) {
+	config := sharedconfig.LogHTTPConfig{RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: true, SkipAssetExtensions: []string{".js"}}
+	entries, _ := runLoggedRequestWithConfig(t, config, http.MethodGet, "/assets/missing.js", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	_, completed := assertStartedAndCompleted(t, entries)
+	assertLogNumber(t, completed, "status", http.StatusNotFound)
+
+	entries, _ = runLoggedRequestWithConfig(t, config, http.MethodGet, "/local-api/health.js", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("api"))
+	}))
+	_, completed = assertStartedAndCompleted(t, entries)
+	assertLogNumber(t, completed, "status", http.StatusOK)
+}
+
+func TestMiddlewareUsesConfiguredAssetExtensions(t *testing.T) {
+	config := sharedconfig.LogHTTPConfig{RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: true, SkipAssetExtensions: []string{".css"}}
+	entries, _ := runLoggedRequestWithConfig(t, config, http.MethodGet, "/assets/app.js", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("script"))
+	}))
+	assertStartedAndCompleted(t, entries)
+
+	entries, _ = runLoggedRequestWithConfig(t, config, http.MethodGet, "/assets/app.css", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("style"))
+	}))
+	if len(entries) != 0 {
+		t.Fatalf("configured css asset produced logs: %+v", entries)
+	}
 }
 
 func TestMiddlewareRecordsJSONRequestBodyAndRestoresIt(t *testing.T) {
@@ -162,6 +218,12 @@ func TestLoggingResponseWriterExposesOptionalInterfaces(t *testing.T) {
 
 func runLoggedRequest(t *testing.T, method string, target string, contentType string, body string, handler http.Handler) ([]map[string]any, *httptest.ResponseRecorder) {
 	t.Helper()
+	config := sharedconfig.LogHTTPConfig{RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes}
+	return runLoggedRequestWithConfig(t, config, method, target, contentType, body, handler)
+}
+
+func runLoggedRequestWithConfig(t *testing.T, config sharedconfig.LogHTTPConfig, method string, target string, contentType string, body string, handler http.Handler) ([]map[string]any, *httptest.ResponseRecorder) {
+	t.Helper()
 	var logBuffer bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logBuffer, nil))
 	request := httptest.NewRequest(method, target, strings.NewReader(body))
@@ -170,16 +232,17 @@ func runLoggedRequest(t *testing.T, method string, target string, contentType st
 		request.Header.Set("Content-Type", contentType)
 	}
 	recorder := httptest.NewRecorder()
-	Middleware(logger, Config{RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes})(handler).ServeHTTP(recorder, request)
+	Middleware(logger, config)(handler).ServeHTTP(recorder, request)
 	return decodeLogEntries(t, logBuffer.String()), recorder
 }
 
 func decodeLogEntries(t *testing.T, content string) []map[string]any {
 	t.Helper()
-	lines := strings.Split(strings.TrimSpace(content), "\n")
-	if len(lines) == 0 || lines[0] == "" {
-		t.Fatal("expected log entry")
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return nil
 	}
+	lines := strings.Split(content, "\n")
 	entries := make([]map[string]any, 0, len(lines))
 	for _, line := range lines {
 		var entry map[string]any

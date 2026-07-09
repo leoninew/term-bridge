@@ -20,7 +20,7 @@ func backendHandler(cfg Config, logger *slog.Logger, apiHandler http.Handler) ht
 	if cfg.Server.StaticDir != "" {
 		mux.Handle("/", staticHandler(cfg.Server.StaticDir))
 	}
-	return requestlog.Middleware(logger, requestlog.Config{RequestBodyLimit: cfg.LogHTTP.RequestBodyLimit, ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit})(mux)
+	return requestlog.Middleware(logger, cfg.LogHTTP)(mux)
 }
 
 func validateStaticDir(staticDir string) error {

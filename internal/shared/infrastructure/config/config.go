@@ -114,8 +114,10 @@ type ResendConfig struct {
 }
 
 type LogHTTPConfig struct {
-	RequestBodyLimit  int
-	ResponseBodyLimit int
+	RequestBodyLimit    int
+	ResponseBodyLimit   int
+	SkipAssetEnabled    bool
+	SkipAssetExtensions []string
 }
 
 type HistoryConfig struct {
@@ -269,8 +271,10 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 		LogFormat:   strings.ToLower(v.GetString("log.format")),
 		LogDir:      logDir,
 		LogHTTP: LogHTTPConfig{
-			RequestBodyLimit:  v.GetInt("log.http.request_body_limit"),
-			ResponseBodyLimit: v.GetInt("log.http.response_body_limit"),
+			RequestBodyLimit:    v.GetInt("log.http.request_body_limit"),
+			ResponseBodyLimit:   v.GetInt("log.http.response_body_limit"),
+			SkipAssetEnabled:    v.GetBool("log.http.skip_asset_enabled"),
+			SkipAssetExtensions: getStringSlice(v, "log.http.skip_asset_extensions"),
 		},
 		History: HistoryConfig{
 			MaxLines:     v.GetInt("history.max_lines"),
@@ -349,7 +353,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 		EnvFile:           loadedEnvFile,
 	}
 
-	normalizeLogBodyLimits(&cfg)
+	normalizeLogHTTPConfig(&cfg)
 	normalizeTerminalConfig(&cfg)
 	normalizeLocalConfig(&cfg)
 	normalizeCloudConfig(&cfg)
@@ -801,6 +805,8 @@ func configKeys() []string {
 		"log.dir",
 		"log.http.request_body_limit",
 		"log.http.response_body_limit",
+		"log.http.skip_asset_enabled",
+		"log.http.skip_asset_extensions",
 		"history.max_lines",
 		"history.max_bytes",
 		"history.max_line_bytes",
@@ -920,13 +926,37 @@ func validateLogFormat(format string) error {
 	}
 }
 
-func normalizeLogBodyLimits(cfg *Config) {
+func normalizeLogHTTPConfig(cfg *Config) {
 	if cfg.LogHTTP.RequestBodyLimit <= 0 {
 		cfg.LogHTTP.RequestBodyLimit = 0
 	}
 	if cfg.LogHTTP.ResponseBodyLimit <= 0 {
 		cfg.LogHTTP.ResponseBodyLimit = 0
 	}
+	cfg.LogHTTP.SkipAssetExtensions = normalizeLogHTTPAssetExtensions(cfg.LogHTTP.SkipAssetExtensions)
+}
+
+func normalizeLogHTTPAssetExtensions(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "" {
+			continue
+		}
+		if !strings.HasPrefix(value, ".") {
+			value = "." + value
+		}
+		if value == "." {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }
 
 func validateHistory(cfg HistoryConfig) error {

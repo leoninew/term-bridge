@@ -4,13 +4,14 @@ import (
 	"time"
 
 	"gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/storage/history"
+	sharedconfig "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/config"
 )
 
 type Config struct {
 	Cwd      string
 	Command  []string
 	LogDir   string
-	LogHTTP  LogHTTPConfig
+	LogHTTP  sharedconfig.LogHTTPConfig
 	History  history.Config
 	Terminal TerminalConfig
 	Runtime  RuntimeConfig
@@ -20,11 +21,6 @@ type Config struct {
 	Auth     AuthConfig
 	Jwt      JwtConfig
 	Cloud    CloudConnectorConfig
-}
-
-type LogHTTPConfig struct {
-	RequestBodyLimit  int
-	ResponseBodyLimit int
 }
 
 type TerminalConfig struct {

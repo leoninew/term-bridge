@@ -19,6 +19,26 @@ log:
   http:
     request_body_limit: 4096
     response_body_limit: 4096
+    skip_asset_enabled: true
+    skip_asset_extensions:
+      - .js
+      - .mjs
+      - .css
+      - .map
+      - .jpg
+      - .jpeg
+      - .png
+      - .gif
+      - .svg
+      - .ico
+      - .webp
+      - .avif
+      - .woff
+      - .woff2
+      - .ttf
+      - .otf
+      - .eot
+      - .wasm
 
 # 历史记录
 history:

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	sharedconfig "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/config"
 )
 
 func TestBackendHandlerServesStaticFilesWithSPAFallbackAndKeepsAPIRoutes(t *testing.T) {
@@ -96,7 +98,7 @@ func TestBackendHandlerLogsUnifiedRequests(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"agent"}`))
 	})
-	handler := backendHandler(Config{LogHTTP: LogHTTPConfig{RequestBodyLimit: 4096, ResponseBodyLimit: 4096}}, logger, apiHandler)
+	handler := backendHandler(Config{LogHTTP: sharedconfig.LogHTTPConfig{RequestBodyLimit: 4096, ResponseBodyLimit: 4096}}, logger, apiHandler)
 
 	request := httptest.NewRequest(http.MethodGet, "/local-api/health?x=1", nil)
 	request.Header.Set("User-Agent", "test-agent")

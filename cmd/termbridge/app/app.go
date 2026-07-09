@@ -210,10 +210,7 @@ func agentConfig(cfg config.Config) agentserver.Config {
 		Cwd:     cfg.Cwd,
 		Command: append([]string(nil), cfg.Command...),
 		LogDir:  cfg.LogDir,
-		LogHTTP: agentserver.LogHTTPConfig{
-			RequestBodyLimit:  cfg.LogHTTP.RequestBodyLimit,
-			ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit,
-		},
+		LogHTTP: cfg.LogHTTP,
 		History: history.Config{
 			MaxLines:     cfg.History.MaxLines,
 			MaxBytes:     cfg.History.MaxBytes,
@@ -258,10 +255,7 @@ func agentConfig(cfg config.Config) agentserver.Config {
 
 func cloudConfig(cfg config.Config) cloudserver.Config {
 	return cloudserver.Config{
-		LogHTTP: cloudserver.LogHTTPConfig{
-			RequestBodyLimit:  cfg.LogHTTP.RequestBodyLimit,
-			ResponseBodyLimit: cfg.LogHTTP.ResponseBodyLimit,
-		},
+		LogHTTP: cfg.LogHTTP,
 		Server: cloudserver.ServerConfig{
 			ListenURL:          cfg.Cloud.ListenUrl,
 			StaticDir:          cfg.Cloud.StaticDir,

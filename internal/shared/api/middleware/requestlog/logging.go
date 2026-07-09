@@ -8,28 +8,29 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 	"unicode/utf8"
+
+	sharedconfig "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/config"
 )
 
 const TruncatedBodySuffix = "..."
 
 const requestIdHeader = "X-Request-ID"
 
+const assetsPathPrefix = "/assets/"
+
 var requestIdCounter atomic.Uint64
 
-type Config struct {
-	RequestBodyLimit  int
-	ResponseBodyLimit int
-}
-
-func Middleware(logger *slog.Logger, config Config) func(http.Handler) http.Handler {
+func Middleware(logger *slog.Logger, config sharedconfig.LogHTTPConfig) func(http.Handler) http.Handler {
 	if logger == nil {
 		panic("request logger is required")
 	}
+	assetExtensions := assetExtensionSet(config.SkipAssetExtensions)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			startedAt := time.Now()
@@ -47,14 +48,25 @@ func Middleware(logger *slog.Logger, config Config) func(http.Handler) http.Hand
 			if bodyErr != nil {
 				startedAttrs = append(startedAttrs, "body_read_error", bodyErr.Error())
 			}
-			logger.Info("request started", startedAttrs...)
+			deferStartedLog := config.SkipAssetEnabled && isSkippableAssetPath(r.URL.Path, assetExtensions)
+			if !deferStartedLog {
+				logger.Info("request started", startedAttrs...)
+			}
 
 			responseWriter := NewLoggingResponseWriter(w, config.ResponseBodyLimit)
 			next.ServeHTTP(responseWriter, r)
 
+			status := responseWriter.Status()
+			if deferStartedLog && status == http.StatusOK {
+				return
+			}
+			if deferStartedLog {
+				logger.Info("request started", startedAttrs...)
+			}
+
 			completedAttrs := append([]any{}, requestAttrs...)
 			completedAttrs = append(completedAttrs,
-				"status", responseWriter.Status(),
+				"status", status,
 				"bytes", responseWriter.BytesWritten(),
 				"duration_ms", time.Since(startedAt).Milliseconds(),
 			)
@@ -64,6 +76,32 @@ func Middleware(logger *slog.Logger, config Config) func(http.Handler) http.Hand
 			logger.Info("request completed", completedAttrs...)
 		})
 	}
+}
+
+func isSkippableAssetPath(requestPath string, assetExtensions map[string]struct{}) bool {
+	if len(assetExtensions) == 0 {
+		return false
+	}
+	requestPath = path.Clean("/" + requestPath)
+	if !strings.HasPrefix(requestPath, assetsPathPrefix) {
+		return false
+	}
+	_, ok := assetExtensions[strings.ToLower(path.Ext(requestPath))]
+	return ok
+}
+
+func assetExtensionSet(values []string) map[string]struct{} {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if value == "" {
+			continue
+		}
+		out[value] = struct{}{}
+	}
+	return out
 }
 
 func requestLogAttrs(r *http.Request, requestId string) []any {
