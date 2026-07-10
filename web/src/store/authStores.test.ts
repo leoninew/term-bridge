@@ -97,6 +97,17 @@ describe('local auth store', () => {
     expect(mocks.authMeViaCloud).not.toHaveBeenCalled()
   })
 
+  it('reuses an existing local token without issuing another local login', async () => {
+    const tokens = useAuthTokensStore()
+    tokens.setLocalToken('existing-local-token')
+    const localAuth = useLocalAuthStore()
+
+    await localAuth.ensureToken()
+
+    expect(tokens.localToken).toBe('existing-local-token')
+    expect(mocks.authLoginViaLocal).not.toHaveBeenCalled()
+  })
+
   it('keeps local cloud session separate from browser authentication', async () => {
     mocks.authMe.mockResolvedValueOnce({
       authenticated: false,
@@ -135,7 +146,23 @@ describe('cloud auth store', () => {
     vi.unstubAllGlobals()
   })
 
-  it('loads browser account state from cloud auth endpoint', async () => {
+  it('clears an unverified stored cloud token', async () => {
+    window.localStorage.setItem('termbridge_cloud_token', 'stale-cloud-token')
+    mocks.authMeViaCloud.mockResolvedValueOnce({ authenticated: false })
+    const tokens = useAuthTokensStore()
+    const cloudAuth = useCloudAuthStore()
+
+    await cloudAuth.initializeAuth()
+
+    expect(cloudAuth.authInitialized).toBe(true)
+    expect(cloudAuth.authenticated).toBe(false)
+    expect(tokens.cloudToken).toBeNull()
+    expect(window.localStorage.getItem('termbridge_cloud_token')).toBeNull()
+    expect(mocks.authMeViaCloud).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a server-verified cloud token and loads browser account state', async () => {
+    window.localStorage.setItem('termbridge_cloud_token', 'verified-cloud-token')
     mocks.authMeViaCloud.mockResolvedValueOnce({
       authenticated: true,
       user: {
@@ -146,12 +173,15 @@ describe('cloud auth store', () => {
         email_verified: true,
       },
     })
+    const tokens = useAuthTokensStore()
     const cloudAuth = useCloudAuthStore()
 
     await cloudAuth.initializeAuth()
 
     expect(cloudAuth.authenticated).toBe(true)
     expect(cloudAuth.user?.email).toBe('user@example.test')
+    expect(tokens.cloudToken).toBe('verified-cloud-token')
+    expect(window.localStorage.getItem('termbridge_cloud_token')).toBe('verified-cloud-token')
     expect(mocks.authLoginViaLocal).not.toHaveBeenCalled()
     expect(mocks.authMeViaCloud).toHaveBeenCalledTimes(1)
     expect(mocks.authMe).not.toHaveBeenCalled()

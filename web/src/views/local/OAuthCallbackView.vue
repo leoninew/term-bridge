@@ -15,15 +15,17 @@
   import { useRoute, useRouter } from 'vue-router'
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../../components/session/ToastHost.vue'
-  import { exchangeOAuthCode } from '../../features/local/api'
   import { assertCloudOAuthState, consumeCloudOAuthRedirect } from '../../features/cloud/oauth'
+  import { exchangeOAuthCode } from '../../features/local/api'
   import { useAuthTokensStore } from '../../store/authTokens'
+  import { useLocalAuthStore } from '../../store/localAuth'
   import { useNotificationsStore } from '../../store/notifications'
 
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
   const authTokens = useAuthTokensStore()
+  const localAuth = useLocalAuthStore()
   const notifications = useNotificationsStore()
 
   onMounted(async () => {
@@ -39,6 +41,7 @@
     }
     try {
       assertCloudOAuthState(state)
+      await localAuth.ensureToken()
       const accessToken = await exchangeOAuthCode(code)
       authTokens.setCloudToken(accessToken)
       await router.replace(consumeCloudOAuthRedirect())

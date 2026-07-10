@@ -28,6 +28,9 @@ export const useCloudAuthStore = defineStore('cloudAuth', () => {
       authenticated.value = me.authenticated
       user.value = me.user ?? null
       usernameInput.value = me.user?.email || usernameInput.value
+      if (!me.authenticated) {
+        tokens.clearCloudToken()
+      }
       initializedToken = tokens.cloudToken
     } catch (err) {
       authenticated.value = false

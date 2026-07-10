@@ -16,25 +16,18 @@
   import { ToastProvider } from 'reka-ui'
   import ToastHost from '../../components/session/ToastHost.vue'
   import { authGoogleCallback } from '../../features/cloud/api'
+  import { consumeCloudLoginRedirect } from '../../features/cloud/loginRedirect'
   import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useNotificationsStore } from '../../store/notifications'
-  import { readLocalStorageValue, removeLocalStorageValue } from '../../store/storage'
 
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
   const cloudAuth = useCloudAuthStore()
   const notifications = useNotificationsStore()
-  const cloudLoginRedirectKey = 'termbridge.cloud.login_redirect'
 
   function redirectAfterLogin() {
-    const redirect = readLocalStorageValue(cloudLoginRedirectKey)
-    removeLocalStorageValue(cloudLoginRedirectKey)
-    return safeRedirect(redirect) || { name: 'cloud-dashboard' }
-  }
-
-  function safeRedirect(value: string | null) {
-    return value && value.startsWith('/') && !value.startsWith('//') ? value : ''
+    return consumeCloudLoginRedirect() || { name: 'cloud-dashboard' }
   }
 
   onMounted(async () => {
@@ -48,7 +41,12 @@
     try {
       const response = await authGoogleCallback(code, state)
       cloudAuth.setToken(response.access_token)
-      await router.replace(redirectAfterLogin())
+      await cloudAuth.initializeAuth({ force: true })
+      if (cloudAuth.authenticated) {
+        await router.replace(redirectAfterLogin())
+      } else {
+        await router.replace({ name: 'cloud-login' })
+      }
     } catch (err) {
       notifications.notifyError(t('cloud.googleLoginFailed'), err)
       await router.replace({ name: 'cloud-login' })

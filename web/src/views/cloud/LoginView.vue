@@ -31,23 +31,23 @@
   import LoginPanel from '../../components/session/LoginPanel.vue'
   import ToastHost from '../../components/session/ToastHost.vue'
   import { authGoogleUrl } from '../../features/cloud/api'
-  import { useAuthTokensStore } from '../../store/authTokens'
+  import {
+    authenticatedCloudLoginRedirect,
+    storeCloudLoginRedirect,
+  } from '../../features/cloud/loginRedirect'
   import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useNotificationsStore } from '../../store/notifications'
-  import { removeLocalStorageValue, writeLocalStorageValue } from '../../store/storage'
 
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
   const cloudAuth = useCloudAuthStore()
-  const tokens = useAuthTokensStore()
   const notifications = useNotificationsStore()
   const googleLoggingIn = ref(false)
-  const cloudLoginRedirectKey = 'termbridge.cloudAuth.login_redirect'
 
   onMounted(async () => {
     await cloudAuth.initializeAuth()
-    if (tokens.cloudToken) {
+    if (cloudAuth.authenticated) {
       await router.replace(redirectAfterLogin())
     }
   })
@@ -55,19 +55,21 @@
   async function login() {
     try {
       await cloudAuth.login()
-      await router.replace(redirectAfterLogin())
+      await cloudAuth.initializeAuth({ force: true })
+      if (cloudAuth.authenticated) {
+        await router.replace(redirectAfterLogin())
+      }
     } catch (err) {
       notifications.notifyError(t('cloudAuth.loginFailed'), err)
     }
   }
 
   function redirectAfterLogin() {
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-    return safeRedirect(redirect) || { name: 'cloud-dashboard' }
-  }
-
-  function safeRedirect(value: string | null) {
-    return value && value.startsWith('/') && !value.startsWith('//') ? value : ''
+    const redirect = authenticatedCloudLoginRedirect(
+      cloudAuth.authenticated,
+      typeof route.query.redirect === 'string' ? route.query.redirect : '',
+    )
+    return redirect || { name: 'cloud-dashboard' }
   }
 
   async function loginWithGoogle() {
@@ -76,14 +78,7 @@
     }
     googleLoggingIn.value = true
     try {
-      const redirect = safeRedirect(
-        typeof route.query.redirect === 'string' ? route.query.redirect : '',
-      )
-      if (redirect) {
-        writeLocalStorageValue(cloudLoginRedirectKey, redirect)
-      } else {
-        removeLocalStorageValue(cloudLoginRedirectKey)
-      }
+      storeCloudLoginRedirect(typeof route.query.redirect === 'string' ? route.query.redirect : '')
       window.location.href = await authGoogleUrl()
     } catch (err) {
       googleLoggingIn.value = false

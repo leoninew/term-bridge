@@ -347,6 +347,33 @@ func TestExchangeOAuthCodeReturnsAccessToken(t *testing.T) {
 	}
 }
 
+func TestExchangeOAuthCodeRequiresLocalAuthentication(t *testing.T) {
+	cloudCalled := false
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cloudCalled = true
+		t.Fatal("cloud token endpoint must not be called without local authentication")
+	}))
+	defer cloud.Close()
+	handler := New(Config{
+		JWTSecret:      testJWTKey,
+		Logger:         slog.Default(),
+		AuthService:    NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
+		CloudPublicURL: cloud.URL,
+		OAuthClient:    testOAuthClientConfig(),
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("exchange status = %d, want 401; body=%s", response.Code, response.Body.String())
+	}
+	if cloudCalled {
+		t.Fatal("cloud token endpoint was called")
+	}
+}
+
 func TestExchangeOAuthCodeRequiresCode(t *testing.T) {
 	handler := New(Config{
 		JWTSecret:      testJWTKey,
