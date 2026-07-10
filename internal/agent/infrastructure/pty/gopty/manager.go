@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +28,10 @@ func (m Manager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.S
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
+	command, err := parseCommandText(spec.CommandText)
+	if err != nil {
+		return nil, err
+	}
 
 	newPTY := m.newPTY
 	if newPTY == nil {
@@ -45,10 +48,16 @@ func (m Manager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.S
 		}
 	}
 
+	executable, err := exec.LookPath(command.executable)
+	if err != nil {
+		_ = pt.Close()
+		return nil, fmt.Errorf("resolve executable: %w", err)
+	}
+
 	// Use context.Background() to prevent the process from being killed
 	// when the HTTP request context is cancelled.
 	// The process lifecycle is managed by the session runtime, not the HTTP request.
-	cmd := pt.CommandContext(context.Background(), spec.EffectiveCommand(), spec.Args...)
+	cmd := pt.CommandContext(context.Background(), executable, command.args...)
 	cmd.Dir = spec.Cwd
 	cmd.Env = spec.Env
 	startedAt := time.Now().UTC()
@@ -72,8 +81,8 @@ func (m Manager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.S
 			SchemaVersion: 1,
 			Pid:           cmd.Process.Pid,
 			OwnerPid:      os.Getpid(),
-			Executable:    spec.EffectiveCommand(),
-			CommandLine:   strings.Join(append([]string{spec.Command}, spec.Args...), " "),
+			Executable:    executable,
+			CommandLine:   spec.CommandText,
 			Cwd:           spec.Cwd,
 			StartedAt:     startedAt,
 		},

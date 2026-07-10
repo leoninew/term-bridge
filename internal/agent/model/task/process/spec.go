@@ -27,23 +27,22 @@ func (s TerminalSize) OrDefault() TerminalSize {
 	return DefaultTerminalSize()
 }
 
-// ProcessSpec is the stable boundary between CLI/app parsing and runtime launch.
+// ProcessSpec is the stable boundary between application code and PTY launch.
+// CommandText is the exact command text supplied by the caller. The PTY
+// infrastructure is the only layer permitted to parse it for process launch.
 type ProcessSpec struct {
-	Command         string
-	Args            []string
-	Cwd             string
-	Env             []string
-	InitialSize     TerminalSize
-	ResolvedCommand string
+	CommandText string
+	Cwd         string
+	Env         []string
+	InitialSize TerminalSize
 }
 
-func NewSpec(cwd string, command []string, size TerminalSize) (ProcessSpec, error) {
-	if len(command) == 0 {
+func NewSpec(cwd string, commandText string, size TerminalSize) (ProcessSpec, error) {
+	if strings.TrimSpace(commandText) == "" {
 		return ProcessSpec{}, fmt.Errorf("missing command")
 	}
 	return ProcessSpec{
-		Command:     command[0],
-		Args:        append([]string(nil), command[1:]...),
+		CommandText: commandText,
 		Cwd:         cwd,
 		Env:         append([]string(nil), os.Environ()...),
 		InitialSize: size.OrDefault(),
@@ -51,23 +50,11 @@ func NewSpec(cwd string, command []string, size TerminalSize) (ProcessSpec, erro
 }
 
 func (s ProcessSpec) Validate() error {
-	if strings.TrimSpace(s.Command) == "" {
+	if strings.TrimSpace(s.CommandText) == "" {
 		return fmt.Errorf("missing command")
 	}
 	if strings.TrimSpace(s.Cwd) == "" {
 		return fmt.Errorf("missing cwd")
 	}
 	return nil
-}
-
-func (s ProcessSpec) WithResolvedCommand(path string) ProcessSpec {
-	s.ResolvedCommand = path
-	return s
-}
-
-func (s ProcessSpec) EffectiveCommand() string {
-	if s.ResolvedCommand != "" {
-		return s.ResolvedCommand
-	}
-	return s.Command
 }

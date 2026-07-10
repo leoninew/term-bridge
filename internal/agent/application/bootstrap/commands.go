@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"sort"
-	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -62,34 +61,41 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("resolve workspace", err)
 	}
 
+	commandText, err := gopty.CommandTextFromArguments(cfg.Command)
+	if err != nil {
+		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Usage(err.Error())
+	}
 	commandRecord := session.CommandRecord{
-		Command:     cfg.Command[0],
-		Args:        append([]string(nil), cfg.Command[1:]...),
+		Command:     commandText,
 		EnvStrategy: "inherit",
 		EnvCount:    len(processEnv()),
 	}
 	manager := sessionapp.Manager{Store: store}
 	sess, err := manager.Create(sessionapp.CreateOptions{
 		Workspace: ws,
-		Name:      strings.Join(cfg.Command, " "),
+		Name:      commandText,
 		LaunchCwd: cfg.Cwd,
 		Command:   commandRecord,
 		History:   session.HistoryRecord{Path: "history.log", MaxLines: cfg.History.MaxLines, MaxBytes: cfg.History.MaxBytes, MaxLineBytes: cfg.History.MaxLineBytes},
 	})
 	if err != nil {
+		logger.Error("exec session create failed", "source", "cli", "cwd", cfg.Cwd, "stage", "create_session", "error_kind", apperrors.KindOf(err))
 		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("create session", err)
 	}
+	logger.Info("exec session created", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "command_length", len(commandText))
 
 	historyWriter, err := history.NewWriter(store.HistoryPath(sess.WorkspaceId, sess.Id), history.Config{MaxLines: cfg.History.MaxLines, MaxBytes: cfg.History.MaxBytes, MaxLineBytes: cfg.History.MaxLineBytes})
 	if err != nil {
 		_ = store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "history_create_failed", UpdatedAt: time.Now().UTC()})
+		logger.Error("exec history writer create failed", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "stage", "create_history", "error_kind", apperrors.KindOf(err))
 		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("create history writer", err)
 	}
 	defer func() { _ = historyWriter.Close() }()
 
-	spec, err := process.NewSpec(cfg.Cwd, cfg.Command, process.DefaultTerminalSize())
+	spec, err := process.NewSpec(cfg.Cwd, commandText, process.DefaultTerminalSize())
 	if err != nil {
 		_ = store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "build_process_spec_failed", UpdatedAt: time.Now().UTC()})
+		logger.Error("exec process spec build failed", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "stage", "build_process_spec", "error_kind", apperrors.KindOf(err))
 		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("build process spec", err)
 	}
 
@@ -102,8 +108,10 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 			}
 			if err := store.SaveProcessState(sess.WorkspaceId, sess.Id, record, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: updatedAt}); err != nil {
 				hookErr = err
-				logger.Error("save process state", "error", err)
+				logger.Error("exec process state save failed", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "stage", "save_process_state", "error_kind", apperrors.KindOf(err))
+				return
 			}
+			logger.Info("exec process started", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "pid", record.Pid)
 		},
 	}
 
@@ -115,18 +123,21 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 	if runnerFunc == nil {
 		runnerFunc = defaultRuntimeRunner
 	}
+	logger.Info("exec process start requested", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "command_length", len(commandText))
 	runtimeResult, err := runnerFunc(ctx, logger, spec, runner.IO{Stdin: options.Stdin, Stdout: io.MultiWriter(stdout, historyWriter), Stderr: options.Stderr, TerminalOutput: stdout}, hooks)
 	endedAt := time.Now().UTC()
 	if err != nil {
 		_ = store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "runtime_failed", UpdatedAt: endedAt})
+		logger.Error("exec process runtime failed", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "stage", "run_process", "error_kind", apperrors.KindOf(err))
 		return CommandResult{Command: append([]string(nil), cfg.Command...)}, err
 	}
 	if hookErr != nil {
 		_ = store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "persistence_failed", UpdatedAt: endedAt})
+		logger.Error("exec process lifecycle persistence failed", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "stage", "persist_lifecycle", "error_kind", apperrors.KindOf(hookErr))
 		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("persist session lifecycle", hookErr)
 	}
 	if err := historyWriter.Close(); err != nil {
-		logger.Warn("close history writer", "error", err)
+		logger.Warn("close history writer", "error_kind", apperrors.KindOf(err))
 	}
 	sessionUpdate := sess
 	truncatedHistory := historyWriter.Truncated()
@@ -151,13 +162,16 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 	if truncatedHistory {
 		if err := store.SaveSessionExitState(sessionUpdate, exitRecord, stateRecord); err != nil {
 			_ = store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_exit_failed", UpdatedAt: endedAt})
+			logger.Error("exec exit state save failed", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "stage", "save_exit_state", "error_kind", apperrors.KindOf(err))
 			return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("save session exit state", err)
 		}
 	} else if err := store.SaveExitState(sess.WorkspaceId, sess.Id, exitRecord, stateRecord); err != nil {
 		_ = store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "save_exit_failed", UpdatedAt: endedAt})
+		logger.Error("exec exit state save failed", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "stage", "save_exit_state", "error_kind", apperrors.KindOf(err))
 		return CommandResult{Command: append([]string(nil), cfg.Command...)}, apperrors.Runtime("save exit state", err)
 	}
 
+	logger.Info("exec process exited", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "exit_code", runtimeResult.ExitCode, "state", finalState, "forced", runtimeResult.Exit.Forced, "closed", runtimeResult.Exit.Closed)
 	return CommandResult{Command: append([]string(nil), cfg.Command...), ExitCode: runtimeResult.ExitCode}, nil
 }
 

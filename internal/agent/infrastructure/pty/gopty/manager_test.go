@@ -167,8 +167,7 @@ func TestManagerRunsCmdExe(t *testing.T) {
 		t.Skip("cmd.exe not found")
 	}
 	spec := process.ProcessSpec{
-		Command:     cmdPath,
-		Args:        []string{"/c", "echo TERM_BRIDGE_CMD_OK"},
+		CommandText: `"` + cmdPath + `" /c "echo TERM_BRIDGE_CMD_OK"`,
 		Cwd:         t.TempDir(),
 		Env:         os.Environ(),
 		InitialSize: process.TerminalSize{Cols: 80, Rows: 25},
@@ -213,8 +212,7 @@ func runPowerShell(t *testing.T, script string) (string, termpty.Result) {
 func powerShellSpec(t *testing.T, script string) process.ProcessSpec {
 	t.Helper()
 	return process.ProcessSpec{
-		Command:     resolvePowerShell(t),
-		Args:        []string{"-NoLogo", "-NoProfile", "-Command", script},
+		CommandText: `"` + resolvePowerShell(t) + `" -NoLogo -NoProfile -Command "` + strings.ReplaceAll(script, `"`, `\"`) + `"`,
 		Cwd:         t.TempDir(),
 		Env:         append(os.Environ(), "TERMBRIDGE_GOPTY_TEST=ok"),
 		InitialSize: process.TerminalSize{Cols: 80, Rows: 25},

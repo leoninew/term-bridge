@@ -5,11 +5,9 @@ import "time"
 const SchemaVersion = 2
 
 type CommandRecord struct {
-	Executable  string   `json:"executable"`
-	Command     string   `json:"command"`
-	Args        []string `json:"args"`
-	EnvStrategy string   `json:"env_strategy"`
-	EnvCount    int      `json:"env_count"`
+	Command     string `json:"command"`
+	EnvStrategy string `json:"env_strategy"`
+	EnvCount    int    `json:"env_count"`
 }
 
 type HistoryRecord struct {

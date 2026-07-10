@@ -252,8 +252,7 @@
       logTerminalDiagnostic('session.create.request', {
         name: draft.value.name,
         cwd: draft.value.cwd,
-        command: draft.value.command[0],
-        args: draft.value.command.length - 1,
+        commandLength: draft.value.commandText.length,
         cols: size.cols,
         rows: size.rows,
       })
@@ -261,7 +260,7 @@
         workspace_id: draft.value.workspaceId ?? '',
         name: draft.value.name,
         cwd: draft.value.cwd,
-        command: draft.value.command,
+        command: [draft.value.commandText],
         cols: size.cols,
         rows: size.rows,
       })

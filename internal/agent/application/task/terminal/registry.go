@@ -186,9 +186,13 @@ func (r *Registry) CreateSession(ctx context.Context, request *agent.CreateSessi
 		return nil, apperrors.Usage("missing session name")
 	}
 	command := request.GetCommand()
-	if len(command) == 0 {
+	if len(command) != 1 {
+		return nil, apperrors.Usage("session command must contain one raw command text")
+	}
+	if strings.TrimSpace(command[0]) == "" {
 		return nil, apperrors.Usage("missing session command")
 	}
+	commandText := command[0]
 	cwd := request.GetCwd()
 	if strings.TrimSpace(cwd) == "" {
 		cwd = r.cwd
@@ -206,17 +210,17 @@ func (r *Registry) CreateSession(ctx context.Context, request *agent.CreateSessi
 	if err := terminalproto.ValidateSize(size.Cols, size.Rows); err != nil {
 		return nil, apperrors.Usage(err.Error())
 	}
-	r.logger.Info("terminal session create request", "name", name, "cwd", absCwd, "command", strings.Join(command, " "), "cols", size.Cols, "rows", size.Rows)
+	r.logger.Info("terminal session create request", "name", name, "cwd", absCwd, "command_length", len(commandText), "cols", size.Cols, "rows", size.Rows)
 
 	ws, err := r.workspaceForCreateSession(request.GetWorkspaceId(), absCwd)
 	if err != nil {
+		r.logger.Error("terminal session workspace resolve failed", "source", "web", "cwd", absCwd, "stage", "resolve_workspace", "error_kind", apperrors.KindOf(err))
 		return nil, err
 	}
 
 	env := os.Environ()
 	commandRecord := session.CommandRecord{
-		Command:     command[0],
-		Args:        append([]string(nil), command[1:]...),
+		Command:     commandText,
 		EnvStrategy: "inherit",
 		EnvCount:    len(env),
 	}
@@ -234,11 +238,15 @@ func (r *Registry) CreateSession(ctx context.Context, request *agent.CreateSessi
 		},
 	})
 	if err != nil {
+		r.logger.Error("terminal session create failed", "source", "web", "workspace_id", ws.Id, "cwd", absCwd, "stage", "create_session", "error_kind", apperrors.KindOf(err))
 		return nil, apperrors.Runtime("create session", err)
 	}
+	r.logger.Info("terminal session created", "source", "web", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", absCwd, "command_length", len(commandText))
 
-	if err := r.startSessionRuntime(ctx, sess, command, size); err != nil {
-		r.saveSessionFailed(sess, startFailureReason(err))
+	if err := r.startSessionRuntime(ctx, sess, commandText, size); err != nil {
+		reason := startFailureReason(err)
+		r.saveSessionFailed(sess, reason)
+		r.logger.Error("terminal session start failed", "source", "web", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", sess.LaunchCwd, "stage", "start_process", "reason", reason, "error_kind", apperrors.KindOf(err))
 		return nil, err
 	}
 	return &agent.CreateSessionResp{SessionId: sess.Id, WorkspaceId: sess.WorkspaceId, State: string(session.StateRunning)}, nil
@@ -252,8 +260,8 @@ func (r *Registry) RerunSession(ctx context.Context, workspaceId string, session
 	if !session.Terminal(view.State.State) {
 		return nil, apperrors.Usage("cannot rerun running session")
 	}
-	command := commandFromSession(view.Session)
-	if len(command) == 0 {
+	commandText := commandTextFromSession(view.Session)
+	if strings.TrimSpace(commandText) == "" {
 		r.saveSessionFailed(view.Session, "missing_rerun_command")
 		return nil, apperrors.Usage("missing session command")
 	}
@@ -282,52 +290,49 @@ func (r *Registry) RerunSession(ctx context.Context, workspaceId string, session
 			return nil, apperrors.Runtime("begin session run", err)
 		}
 	}
-	if err := r.startClaimedSessionRuntime(ctx, view.Session, command, size); err != nil {
-		r.saveSessionFailed(view.Session, startFailureReason(err))
+	if err := r.startClaimedSessionRuntime(ctx, view.Session, commandText, size); err != nil {
+		reason := startFailureReason(err)
+		r.saveSessionFailed(view.Session, reason)
+		r.logger.Error("terminal session rerun failed", "source", "web", "session_id", view.Session.Id, "workspace_id", view.Session.WorkspaceId, "cwd", view.Session.LaunchCwd, "stage", "rerun_process", "reason", reason, "error_kind", apperrors.KindOf(err))
 		return nil, err
 	}
 	return &agent.CreateSessionResp{SessionId: view.Session.Id, WorkspaceId: view.Session.WorkspaceId, State: string(session.StateRunning)}, nil
 }
 
-func (r *Registry) startSessionRuntime(ctx context.Context, sess session.Session, command []string, size process.TerminalSize) error {
+func (r *Registry) startSessionRuntime(ctx context.Context, sess session.Session, commandText string, size process.TerminalSize) error {
 	if err := r.claimSessionStart(sess.Id); err != nil {
 		return err
 	}
 	defer r.releaseSessionStart(sess.Id)
-	return r.startClaimedSessionRuntime(ctx, sess, command, size)
+	return r.startClaimedSessionRuntime(ctx, sess, commandText, size)
 }
 
-func (r *Registry) startClaimedSessionRuntime(ctx context.Context, sess session.Session, command []string, size process.TerminalSize) error {
+func (r *Registry) startClaimedSessionRuntime(ctx context.Context, sess session.Session, commandText string, size process.TerminalSize) error {
 	historyWriter, err := history.NewWriter(r.store.HistoryPath(sess.WorkspaceId, sess.Id), history.Config{MaxLines: r.historyConfig.MaxLines, MaxBytes: r.historyConfig.MaxBytes, MaxLineBytes: r.historyConfig.MaxLineBytes})
 	if err != nil {
 		return apperrors.Runtime("create history writer", err)
 	}
-	spec, err := process.NewSpec(sess.LaunchCwd, command, size)
+	spec, err := process.NewSpec(sess.LaunchCwd, commandText, size)
 	if err != nil {
 		_ = historyWriter.Close()
 		return apperrors.Runtime("build process spec", err)
 	}
 	spec.Env = os.Environ()
-	resolved, err := process.ResolveExecutable(spec.Command)
-	if err != nil {
-		_ = historyWriter.Close()
-		return apperrors.Runtime("resolve executable", err)
-	}
-	spec = spec.WithResolvedCommand(resolved)
 
-	r.logger.Debug("terminal pty start", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cols", spec.InitialSize.Cols, "rows", spec.InitialSize.Rows, "command", spec.EffectiveCommand())
+	r.logger.Info("terminal process start requested", "source", "web", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", spec.Cwd, "cols", spec.InitialSize.Cols, "rows", spec.InitialSize.Rows, "command_length", len(spec.CommandText))
 	ptySession, err := r.manager.Start(ctx, spec)
 	if err != nil {
 		_ = historyWriter.Close()
+		r.logger.Error("terminal process start failed", "source", "web", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", spec.Cwd, "stage", "start_pty", "error_kind", apperrors.KindOf(err))
+		if apperrors.IsUsage(err) {
+			return err
+		}
 		return apperrors.Runtime("start pty", err)
 	}
 	if reporter, ok := ptySession.(termpty.ProcessReporter); ok {
 		record := reporter.ProcessInfo()
-		if record.Executable == "" {
-			record.Executable = spec.EffectiveCommand()
-		}
 		if record.CommandLine == "" {
-			record.CommandLine = formatProcessCommand(spec.Command, spec.Args)
+			record.CommandLine = spec.CommandText
 		}
 		if record.Cwd == "" {
 			record.Cwd = spec.Cwd
@@ -347,7 +352,7 @@ func (r *Registry) startClaimedSessionRuntime(ctx context.Context, sess session.
 		return apperrors.Runtime("save running state", err)
 	}
 
-	r.logger.Debug("terminal pty started", "session_id", sess.Id, "workspace_id", sess.WorkspaceId)
+	r.logger.Info("terminal process started", "source", "web", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", spec.Cwd)
 	runtime := newSessionRuntime(r, sess, ptySession, historyWriter, size)
 	r.mu.Lock()
 	r.runtimes[sess.Id] = runtime
@@ -374,7 +379,7 @@ func (r *Registry) releaseSessionStart(sessionId string) {
 
 func (r *Registry) saveSessionFailed(sess session.Session, reason string) {
 	if err := r.store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: reason, UpdatedAt: time.Now().UTC()}); err != nil {
-		r.logger.Warn("save failed session state", "session_id", sess.Id, "reason", reason, "error", err)
+		r.logger.Warn("save failed session state", "session_id", sess.Id, "reason", reason, "error_kind", apperrors.KindOf(err))
 	}
 }
 
@@ -385,8 +390,6 @@ func startFailureReason(err error) string {
 		return "history_create_failed"
 	case strings.Contains(message, "build process spec"):
 		return "build_process_spec_failed"
-	case strings.Contains(message, "resolve executable"):
-		return "resolve_executable_failed"
 	case strings.Contains(message, "start pty"):
 		return "pty_start_failed"
 	case strings.Contains(message, "save process"):
@@ -398,22 +401,8 @@ func startFailureReason(err error) string {
 	}
 }
 
-func formatProcessCommand(command string, args []string) string {
-	if len(args) == 0 {
-		return command
-	}
-	return command + " " + strings.Join(args, " ")
-}
-
-func commandFromSession(sess session.Session) []string {
-	command := strings.TrimSpace(sess.Command.Command)
-	if command == "" {
-		command = strings.TrimSpace(sess.Command.Executable)
-	}
-	if command == "" {
-		return nil
-	}
-	return append([]string{command}, sess.Command.Args...)
+func commandTextFromSession(sess session.Session) string {
+	return sess.Command.Command
 }
 
 func validateSessionCwd(cwd string) error {

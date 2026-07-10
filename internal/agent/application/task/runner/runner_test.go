@@ -12,18 +12,29 @@ import (
 
 	termpty "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/pty"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 )
 
 func TestRunReturnsUserExitCode(t *testing.T) {
 	manager := &fakeManager{session: newFakePTYSession("hello", termpty.Result{ExitCode: 7})}
 	r := CommandRunner{Manager: manager, Logger: slog.Default()}
 
-	result, err := r.Run(context.Background(), process.ProcessSpec{Command: "go", Cwd: t.TempDir(), InitialSize: process.DefaultTerminalSize()}, IO{Stdin: bytes.NewReader(nil), Stdout: io.Discard, Stderr: io.Discard})
+	result, err := r.Run(context.Background(), process.ProcessSpec{CommandText: "go", Cwd: t.TempDir(), InitialSize: process.DefaultTerminalSize()}, IO{Stdin: bytes.NewReader(nil), Stdout: io.Discard, Stderr: io.Discard})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if result.ExitCode != 7 {
 		t.Fatalf("ExitCode = %d, want 7", result.ExitCode)
+	}
+}
+
+func TestRunPreservesUsageErrorFromPTYManager(t *testing.T) {
+	manager := &failingManager{err: apperrors.Usage("shell control operators are not supported")}
+	r := CommandRunner{Manager: manager, Logger: slog.Default()}
+
+	_, err := r.Run(context.Background(), process.ProcessSpec{CommandText: "ccs list | findstr active", Cwd: t.TempDir(), InitialSize: process.DefaultTerminalSize()}, IO{Stdin: bytes.NewReader(nil), Stdout: io.Discard, Stderr: io.Discard})
+	if !apperrors.IsUsage(err) {
+		t.Fatalf("Run() error kind = %s, want usage; err=%v", apperrors.KindOf(err), err)
 	}
 }
 
@@ -93,6 +104,14 @@ type fakeManager struct {
 
 func (m *fakeManager) Start(context.Context, process.ProcessSpec) (termpty.Session, error) {
 	return m.session, nil
+}
+
+type failingManager struct {
+	err error
+}
+
+func (m *failingManager) Start(context.Context, process.ProcessSpec) (termpty.Session, error) {
+	return nil, m.err
 }
 
 type fakePTYSession struct {

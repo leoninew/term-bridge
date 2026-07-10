@@ -76,10 +76,3 @@ export function decodeControl(data: string): ServerControlMessage {
   }
   return parsed
 }
-
-export function commandFromText(value: string): string[] {
-  return value
-    .trim()
-    .split(/\s+/)
-    .filter((part) => part.length > 0)
-}

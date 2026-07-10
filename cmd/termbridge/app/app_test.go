@@ -51,8 +51,8 @@ func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
 	if result.ExitCode != 7 {
 		t.Fatalf("ExitCode = %d, want 7", result.ExitCode)
 	}
-	if gotSpec.Command != "pwsh" || len(gotSpec.Args) != 1 || gotSpec.Args[0] != "-NoLogo" {
-		t.Fatalf("ProcessSpec = %#v", gotSpec)
+	if gotSpec.CommandText != "pwsh -NoLogo" {
+		t.Fatalf("ProcessSpec.CommandText = %q, want %q", gotSpec.CommandText, "pwsh -NoLogo")
 	}
 	if filepath.Clean(gotSpec.Cwd) != filepath.Clean(cwd) {
 		t.Fatalf("ProcessSpec.Cwd = %q, want %q", gotSpec.Cwd, cwd)

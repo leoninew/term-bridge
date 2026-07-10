@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,12 +18,9 @@ import (
 )
 
 func TestKillTreeStopsUnixChildProcess(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("unix process group test")
-	}
 	marker := filepath.Join(t.TempDir(), "child.pid")
 	script := "sleep 30 & echo $! > " + shellQuote(marker) + "; echo TERM_BRIDGE_CHILD_READY; wait"
-	spec := process.ProcessSpec{Command: "/bin/sh", Args: []string{"-c", script}, Cwd: t.TempDir(), Env: os.Environ(), InitialSize: process.DefaultTerminalSize()}
+	spec := process.ProcessSpec{CommandText: "/bin/sh -c " + strconv.Quote(script), Cwd: t.TempDir(), Env: os.Environ(), InitialSize: process.DefaultTerminalSize()}
 	session, err := NewManager().Start(context.Background(), spec)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)

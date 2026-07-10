@@ -115,7 +115,7 @@ func Run(ctx context.Context, options Options) (Result, error) {
 
 	switch options.Command.Kind {
 	case CommandExec:
-		logger.Info("termbridge exec command parsed", "cwd", cfg.Cwd, "command", strings.Join(cfg.Command, " "), "config", cfg.DefaultConfigFile)
+		logger.Info("termbridge exec command requested", "cwd", cfg.Cwd, "command_arg_count", len(cfg.Command), "config", cfg.DefaultConfigFile)
 		return runExec(ctx, cfg, logger.Slog, options)
 	case CommandWorkspace:
 		return runWorkspaceList(ctx, cfg, options.Stdout)

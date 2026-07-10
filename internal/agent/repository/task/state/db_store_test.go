@@ -23,7 +23,7 @@ func TestDBStoreSavesListsAndSoftDeletesRuntimeState(t *testing.T) {
 	if err := store.SaveWorkspace(ws); err != nil {
 		t.Fatalf("SaveWorkspace() error = %v", err)
 	}
-	sess := session.Session{SchemaVersion: session.SchemaVersion, Id: "session-1", WorkspaceId: ws.Id, Name: "shell", LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "pwsh", Args: []string{"-NoLogo"}, EnvStrategy: "inherit", EnvCount: 3}, History: session.HistoryRecord{Path: "history.log", MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, CreatedAt: now, UpdatedAt: now}
+	sess := session.Session{SchemaVersion: session.SchemaVersion, Id: "session-1", WorkspaceId: ws.Id, Name: "shell", LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "pwsh -NoLogo", EnvStrategy: "inherit", EnvCount: 3}, History: session.HistoryRecord{Path: "history.log", MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, CreatedAt: now, UpdatedAt: now}
 	if err := store.SaveSession(sess); err != nil {
 		t.Fatalf("SaveSession() error = %v", err)
 	}

@@ -19,7 +19,7 @@ func TestStoreSavesAndListsRecordsFromWorkspaceAggregate(t *testing.T) {
 	if err := store.SaveWorkspace(ws); err != nil {
 		t.Fatalf("SaveWorkspace() error = %v", err)
 	}
-	sess := session.Session{SchemaVersion: session.SchemaVersion, Id: "02", WorkspaceId: ws.Id, Name: "shell", LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "pwsh", Args: []string{"-NoLogo"}}, History: session.HistoryRecord{Path: "history.log", MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, CreatedAt: now, UpdatedAt: now}
+	sess := session.Session{SchemaVersion: session.SchemaVersion, Id: "02", WorkspaceId: ws.Id, Name: "shell", LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "pwsh -NoLogo"}, History: session.HistoryRecord{Path: "history.log", MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, CreatedAt: now, UpdatedAt: now}
 	if err := store.SaveSession(sess); err != nil {
 		t.Fatalf("SaveSession() error = %v", err)
 	}

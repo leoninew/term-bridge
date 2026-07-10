@@ -9,6 +9,7 @@ import (
 
 	termpty "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/pty"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 )
 
 type terminalSession struct {
@@ -80,7 +81,7 @@ func resizeIfChanged(next process.TerminalSize, last process.TerminalSize, sessi
 		return last
 	}
 	if err := session.Resize(next); err != nil {
-		logger.Warn("resize PTY", "cols", next.Cols, "rows", next.Rows, "error", err)
+		logger.Warn("resize PTY", "cols", next.Cols, "rows", next.Rows, "error_kind", apperrors.KindOf(err))
 		return last
 	}
 	return next

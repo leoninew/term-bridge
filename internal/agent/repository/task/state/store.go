@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
@@ -246,7 +245,7 @@ func (s Store) SaveSessionExitState(value session.Session, exit process.ExitReco
 		record := workspaceExitFromProcess(exit)
 		node.Name = value.Name
 		node.LaunchCwd = value.LaunchCwd
-		node.Command = workspace.CommandRecord{Executable: value.Command.Executable, Command: value.Command.Command, Args: append([]string(nil), value.Command.Args...), EnvStrategy: value.Command.EnvStrategy, EnvCount: value.Command.EnvCount}
+		node.Command = workspace.CommandRecord{Command: value.Command.Command, EnvStrategy: value.Command.EnvStrategy, EnvCount: value.Command.EnvCount}
 		node.History = workspace.HistoryRecord{Path: value.History.Path, MaxLines: value.History.MaxLines, MaxBytes: value.History.MaxBytes, MaxLineBytes: value.History.MaxLineBytes, Truncated: value.History.Truncated}
 		node.CurrentRun.Exit = &record
 		node.State = workspaceStateFromSession(stateRecord)
@@ -424,9 +423,7 @@ func sessionNodeFromSession(value session.Session) workspace.SessionNode {
 		Name:      value.Name,
 		LaunchCwd: value.LaunchCwd,
 		Command: workspace.CommandRecord{
-			Executable:  value.Command.Executable,
 			Command:     value.Command.Command,
-			Args:        append([]string(nil), value.Command.Args...),
 			EnvStrategy: value.Command.EnvStrategy,
 			EnvCount:    value.Command.EnvCount,
 		},
@@ -450,9 +447,7 @@ func sessionFromWorkspaceNode(ws workspace.Workspace, child workspace.SessionNod
 		WorkspaceId:   ws.Id,
 		LaunchCwd:     child.LaunchCwd,
 		Command: session.CommandRecord{
-			Executable:  child.Command.Executable,
 			Command:     child.Command.Command,
-			Args:        append([]string(nil), child.Command.Args...),
 			EnvStrategy: child.Command.EnvStrategy,
 			EnvCount:    child.Command.EnvCount,
 		},
@@ -742,8 +737,5 @@ func readJSON(path string, value any) error {
 }
 
 func formatCommand(command session.CommandRecord) string {
-	if len(command.Args) == 0 {
-		return command.Command
-	}
-	return command.Command + " " + strings.Join(command.Args, " ")
+	return command.Command
 }

@@ -13,6 +13,7 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/session"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/idgen"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 )
@@ -201,7 +202,7 @@ func (r *SessionRuntime) resize(cols int, rows int) error {
 	r.mu.Unlock()
 	r.registry.logger.Debug("terminal pty resize", "session_id", r.session.Id, "previous_cols", previous.Cols, "previous_rows", previous.Rows, "cols", size.Cols, "rows", size.Rows)
 	if err := r.pty.Resize(size); err != nil {
-		r.registry.logger.Warn("terminal pty resize failed", "session_id", r.session.Id, "previous_cols", previous.Cols, "previous_rows", previous.Rows, "cols", size.Cols, "rows", size.Rows, "error", err)
+		r.registry.logger.Warn("terminal pty resize failed", "session_id", r.session.Id, "previous_cols", previous.Cols, "previous_rows", previous.Rows, "cols", size.Cols, "rows", size.Rows, "error_kind", apperrors.KindOf(err))
 		return err
 	}
 	r.mu.Lock()
@@ -257,13 +258,13 @@ func (r *SessionRuntime) readLoop() {
 		if n > 0 {
 			chunk := copyBytes(buf[:n])
 			if _, writeErr := r.history.Write(chunk); writeErr != nil {
-				r.registry.logger.Warn("write web terminal history", "session_id", r.session.Id, "error", writeErr)
+				r.registry.logger.Warn("write web terminal history", "session_id", r.session.Id, "error_kind", apperrors.KindOf(writeErr))
 			}
 			r.publishBinary(chunk)
 		}
 		if err != nil {
 			if !isClosedReadError(err) {
-				r.registry.logger.Warn("read web terminal pty", "session_id", r.session.Id, "error", err)
+				r.registry.logger.Warn("read web terminal pty", "session_id", r.session.Id, "error_kind", apperrors.KindOf(err))
 			}
 			return
 		}
@@ -310,7 +311,9 @@ func (r *SessionRuntime) waitLoop() {
 		saveErr = r.registry.store.SaveExitState(r.session.WorkspaceId, r.session.Id, exitRecord, stateRecord)
 	}
 	if saveErr != nil {
-		r.registry.logger.Warn("save web terminal exit state", "session_id", r.session.Id, "state", finalState, "error", saveErr)
+		r.registry.logger.Warn("save web terminal exit state", "source", "web", "session_id", r.session.Id, "workspace_id", r.session.WorkspaceId, "cwd", r.session.LaunchCwd, "stage", "save_exit_state", "state", finalState, "error_kind", apperrors.KindOf(saveErr))
+	} else {
+		r.registry.logger.Info("terminal process exited", "source", "web", "session_id", r.session.Id, "workspace_id", r.session.WorkspaceId, "cwd", r.session.LaunchCwd, "exit_code", exit.Code, "state", finalState, "forced", exit.Forced, "closed", exit.Closed)
 	}
 	exitCode := int32(exit.Code)
 	r.broadcastText(&agent.ServerControlMessage{Type: terminalproto.TypeExited, ExitCode: &exitCode, State: string(finalState), LifecycleState: string(finalState), AttachmentState: string(AttachmentDetached)})

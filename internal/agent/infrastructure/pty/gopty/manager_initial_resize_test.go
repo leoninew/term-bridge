@@ -16,7 +16,7 @@ func TestManagerStartReturnsErrorWhenInitialResizeFails(t *testing.T) {
 	resizeErr := errors.New("initial resize failed")
 	pt := &initialResizeFakePTY{resizeErr: resizeErr}
 	manager := Manager{newPTY: func() (gopty.Pty, error) { return pt, nil }}
-	spec := process.ProcessSpec{Command: "fake-command", Cwd: t.TempDir(), InitialSize: process.TerminalSize{Cols: 123, Rows: 45}}
+	spec := process.ProcessSpec{CommandText: "fake-command", Cwd: t.TempDir(), InitialSize: process.TerminalSize{Cols: 123, Rows: 45}}
 
 	session, err := manager.Start(context.Background(), spec)
 	if err == nil {
