@@ -134,6 +134,17 @@ func (s Store) UpdateSession(workspaceId string, sessionId string, update func(*
 	return value, nil
 }
 
+func (s Store) UpdateStoppedSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error) {
+	stateRecord, err := s.LoadState(workspaceId, sessionId)
+	if err != nil {
+		return session.Session{}, err
+	}
+	if stateRecord.State != session.StateStopped {
+		return session.Session{}, errors.New("session is no longer stopped")
+	}
+	return s.UpdateSession(workspaceId, sessionId, update)
+}
+
 func (s Store) DeleteSession(workspaceId string, sessionId string) error {
 	ws, err := s.LoadWorkspace(workspaceId)
 	if err != nil {

@@ -128,6 +128,26 @@ func runtimeRequestFrame(method string, params any, requestId string) (*shared.T
 			return nil, fmt.Errorf("close_session params have type %T", params)
 		}
 		frame.Payload = &shared.TunnelFrame_CloseSessionReq{CloseSessionReq: req}
+	case "list_shortcuts":
+		frame.Payload = &shared.TunnelFrame_ListShortcutsReq{ListShortcutsReq: &agent.ListShortcutsReq{}}
+	case "create_shortcut":
+		req, ok := params.(*agent.CreateShortcutReq)
+		if !ok {
+			return nil, fmt.Errorf("create_shortcut params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_CreateShortcutReq{CreateShortcutReq: req}
+	case "update_shortcut":
+		req, ok := params.(*agent.UpdateShortcutRequest)
+		if !ok {
+			return nil, fmt.Errorf("update_shortcut params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_UpdateShortcutReq{UpdateShortcutReq: req}
+	case "delete_shortcut":
+		req, ok := params.(*agent.DeleteShortcutReq)
+		if !ok {
+			return nil, fmt.Errorf("delete_shortcut params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_DeleteShortcutReq{DeleteShortcutReq: req}
 	default:
 		return nil, fmt.Errorf("unknown runtime method %q", method)
 	}

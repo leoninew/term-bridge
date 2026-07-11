@@ -11,11 +11,23 @@ import type {
   RerunSessionReq,
   UpdateSessionReq,
 } from '../../gen/proto/termbridge/agent/v1/session'
+import type {
+  CreateShortcutReq,
+  Shortcut,
+  UpdateShortcutReq,
+} from '../../gen/proto/termbridge/agent/v1/shortcut'
 import { runtimePath, type RuntimeTarget } from '../runtimeTarget'
 
 export type ApiResult<T> = {
   data: T
   offline: boolean
+}
+
+export type ShortcutRuntimeApi = {
+  listShortcuts(): Promise<Shortcut[]>
+  createShortcut(request: CreateShortcutReq): Promise<Shortcut>
+  updateShortcut(shortcutId: string, request: UpdateShortcutReq): Promise<Shortcut>
+  deleteShortcut(shortcutId: string): Promise<void>
 }
 
 export type SessionRuntimeApi = {

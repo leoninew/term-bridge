@@ -5,6 +5,7 @@ package termbridge.shared;
 import "termbridge/agent/v1/workspace.proto";
 import "termbridge/agent/v1/session.proto";
 import "termbridge/agent/v1/history.proto";
+import "termbridge/agent/v1/shortcut.proto";
 import "termbridge/shared/v1/common.proto";
 
 option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1/tunnel";
@@ -32,6 +33,10 @@ message TunnelFrame {
     termbridge.agent.UpdateWorkspaceOrderReq update_workspace_order_req = 110;
     termbridge.agent.WorkspaceSessionOrderReq update_session_order_req = 111;
     termbridge.agent.DeleteWorkspaceReq delete_workspace_req = 112;
+    termbridge.agent.ListShortcutsReq list_shortcuts_req = 113;
+    termbridge.agent.CreateShortcutReq create_shortcut_req = 114;
+    termbridge.agent.UpdateShortcutRequest update_shortcut_req = 115;
+    termbridge.agent.DeleteShortcutReq delete_shortcut_req = 116;
 
     termbridge.agent.ListWorkspacesResp list_workspaces_resp = 200;
     termbridge.agent.WorkspaceTreeResp workspace_tree_resp = 201;
@@ -46,6 +51,10 @@ message TunnelFrame {
     termbridge.agent.UpdateWorkspaceOrderResp update_workspace_order_resp = 210;
     termbridge.agent.UpdateSessionOrderResp update_session_order_resp = 211;
     termbridge.agent.DeleteWorkspaceResp delete_workspace_resp = 212;
+    termbridge.agent.ListShortcutsResp list_shortcuts_resp = 213;
+    termbridge.agent.CreateShortcutResp create_shortcut_resp = 214;
+    termbridge.agent.UpdateShortcutResp update_shortcut_resp = 215;
+    termbridge.agent.DeleteShortcutResp delete_shortcut_resp = 216;
 
     TerminalAttachReq terminal_attach = 300;
     TerminalInput terminal_input = 301;

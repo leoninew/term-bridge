@@ -11,6 +11,7 @@ import (
 
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/session"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/shortcut"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/workspace"
 
 	_ "modernc.org/sqlite"
@@ -242,6 +243,106 @@ func TestDBStoreOrdersWorkspacesAndSessions(t *testing.T) {
 	}
 }
 
+func TestDBStorePersistsDeviceScopedShortcuts(t *testing.T) {
+	store, db := newTestDBStore(t)
+	commandText := `codex --dangerously-bypass-approvals-and-sandbox -c "review changes"`
+	description := "  review workflow  "
+	created, err := store.CreateShortcut(shortcut.Shortcut{Id: "shortcut-1", Name: "  Review  ", Command: commandText, Description: &description})
+	if err != nil {
+		t.Fatalf("CreateShortcut() error = %v", err)
+	}
+	if created.Name != "Review" || created.Command != commandText || created.Description == nil || *created.Description != "review workflow" {
+		t.Fatalf("CreateShortcut() = %#v, want normalized metadata with raw command", created)
+	}
+	listed, err := store.ListShortcuts()
+	if err != nil {
+		t.Fatalf("ListShortcuts() error = %v", err)
+	}
+	if len(listed) != 1 || listed[0].Id != created.Id || listed[0].Command != commandText {
+		t.Fatalf("ListShortcuts() = %#v, want saved shortcut", listed)
+	}
+	previousUpdatedAt := created.UpdatedAt
+	updated, err := store.UpdateShortcut(created.Id, func(value *shortcut.Shortcut) error {
+		value.Command = "cmd"
+		value.Description = nil
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("UpdateShortcut() error = %v", err)
+	}
+	if updated.Command != "cmd" || updated.Description != nil || !updated.UpdatedAt.After(previousUpdatedAt) {
+		t.Fatalf("UpdateShortcut() = %#v, want updated command, cleared description, and newer timestamp", updated)
+	}
+	otherDeviceStore := NewDbStore(db, "sqlite", t.TempDir(), "device-2")
+	otherDeviceShortcuts, err := otherDeviceStore.ListShortcuts()
+	if err != nil {
+		t.Fatalf("ListShortcuts(other device) error = %v", err)
+	}
+	if len(otherDeviceShortcuts) != 0 {
+		t.Fatalf("ListShortcuts(other device) = %#v, want no shortcuts", otherDeviceShortcuts)
+	}
+	if _, err := otherDeviceStore.UpdateShortcut(created.Id, func(*shortcut.Shortcut) error { return nil }); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("UpdateShortcut(other device) error = %v, want os.ErrNotExist", err)
+	}
+	if err := otherDeviceStore.DeleteShortcut(created.Id); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("DeleteShortcut(other device) error = %v, want os.ErrNotExist", err)
+	}
+	if err := store.DeleteShortcut(created.Id); err != nil {
+		t.Fatalf("DeleteShortcut() error = %v", err)
+	}
+	listed, err = store.ListShortcuts()
+	if err != nil {
+		t.Fatalf("ListShortcuts(after delete) error = %v", err)
+	}
+	if len(listed) != 0 {
+		t.Fatalf("ListShortcuts(after delete) = %#v, want no selectable shortcut", listed)
+	}
+}
+
+func TestDBStoreRejectsBlankShortcutRequiredFields(t *testing.T) {
+	store, _ := newTestDBStore(t)
+	for _, value := range []shortcut.Shortcut{{Name: "", Command: "cmd"}, {Name: "shell", Command: " \t "}} {
+		if _, err := store.CreateShortcut(value); err == nil {
+			t.Fatalf("CreateShortcut(%#v) error = nil, want required-field error", value)
+		}
+	}
+}
+
+func TestDBStoreUpdatesOnlyStoppedSessions(t *testing.T) {
+	store, _ := newTestDBStore(t)
+	now := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+	ws := workspace.Workspace{SchemaVersion: workspace.SchemaVersion, Id: "workspace-1", Name: "project", Path: t.TempDir(), CreatedAt: now, UpdatedAt: now}
+	if err := store.SaveWorkspace(ws); err != nil {
+		t.Fatalf("SaveWorkspace() error = %v", err)
+	}
+	sess := session.Session{SchemaVersion: session.SchemaVersion, Id: "session-1", WorkspaceId: ws.Id, Name: "shell", LaunchCwd: ws.Path, Command: session.CommandRecord{Command: "cmd"}, CreatedAt: now, UpdatedAt: now}
+	if err := store.SaveSession(sess); err != nil {
+		t.Fatalf("SaveSession() error = %v", err)
+	}
+	if _, err := store.UpdateStoppedSession(ws.Id, sess.Id, func(value *session.Session) error {
+		value.Name = "should not apply"
+		value.UpdatedAt = now.Add(time.Second)
+		return nil
+	}); err == nil {
+		t.Fatal("UpdateStoppedSession() error = nil while session is running")
+	}
+	if err := store.SaveState(ws.Id, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, UpdatedAt: now.Add(time.Second)}); err != nil {
+		t.Fatalf("SaveState(stopped) error = %v", err)
+	}
+	updated, err := store.UpdateStoppedSession(ws.Id, sess.Id, func(value *session.Session) error {
+		value.Name = "edited shell"
+		value.Command.Command = `cmd /c "echo updated"`
+		value.UpdatedAt = now.Add(2 * time.Second)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("UpdateStoppedSession() error = %v", err)
+	}
+	if updated.Name != "edited shell" || updated.Command.Command != `cmd /c "echo updated"` || updated.LaunchCwd != ws.Path {
+		t.Fatalf("UpdateStoppedSession() = %#v, want updated name/command and unchanged cwd", updated)
+	}
+}
+
 func TestDBStoreHistoryPathRemainsFileBackedTerminalOutput(t *testing.T) {
 	store, _ := newTestDBStore(t)
 	want := filepath.Join(store.root, "history", "session-1.log")
@@ -270,6 +371,8 @@ func newTestDBStore(t *testing.T) (DbStore, *sql.DB) {
 		`CREATE INDEX idx_sessions_device_deleted ON sessions(device_id, deleted_at)`,
 		`CREATE TABLE session_runs (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, workspace_id TEXT NOT NULL, device_id TEXT NOT NULL, sequence INTEGER NOT NULL, command_json TEXT NOT NULL, terminal_size_json TEXT NOT NULL DEFAULT '{}', process_json TEXT NOT NULL DEFAULT '{}', exit_json TEXT NOT NULL DEFAULT '{}', state TEXT NOT NULL, state_reason TEXT NOT NULL DEFAULT '', started_at TEXT NULL, ended_at TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT NULL, FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`,
 		`CREATE INDEX idx_session_runs_session_sequence ON session_runs(session_id, sequence)`,
+		`CREATE TABLE shortcuts (id TEXT PRIMARY KEY, device_id TEXT NOT NULL, name TEXT NOT NULL, command TEXT NOT NULL, description TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
+		`CREATE INDEX idx_shortcuts_device_updated ON shortcuts(device_id, updated_at)`,
 	}
 	for _, statement := range statements {
 		if _, err := db.ExecContext(context.Background(), statement); err != nil {

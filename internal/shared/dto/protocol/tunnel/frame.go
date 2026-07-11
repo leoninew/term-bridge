@@ -116,6 +116,14 @@ func responseMessage(frame *shared.TunnelFrame) proto.Message {
 		return payload.UpdateSessionOrderResp
 	case *shared.TunnelFrame_DeleteWorkspaceResp:
 		return payload.DeleteWorkspaceResp
+	case *shared.TunnelFrame_ListShortcutsResp:
+		return payload.ListShortcutsResp
+	case *shared.TunnelFrame_CreateShortcutResp:
+		return payload.CreateShortcutResp.GetShortcut()
+	case *shared.TunnelFrame_UpdateShortcutResp:
+		return payload.UpdateShortcutResp.GetShortcut()
+	case *shared.TunnelFrame_DeleteShortcutResp:
+		return payload.DeleteShortcutResp
 	default:
 		return nil
 	}

@@ -118,12 +118,22 @@ p {
 
 .button,
 .toast-close {
-  border: 1px solid var(--color-border-strong);
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: var(--color-surface);
+  background: var(--color-control-bg);
   color: var(--color-text);
   font-size: 14px;
-  padding: 4px 8px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 0 12px;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease;
 }
 
 .button:hover:not(:disabled),
@@ -138,10 +148,24 @@ p {
   color: var(--color-primary-text);
 }
 
+.button-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
 .button-danger {
   border-color: var(--color-danger-border);
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
+}
+
+.button-danger:hover:not(:disabled) {
+  background: var(--color-danger-hover);
+}
+
+.button-secondary {
+  border-color: var(--color-border);
+  background: var(--color-control-bg);
+  color: var(--color-text);
 }
 
 .dialog-overlay {
@@ -149,6 +173,7 @@ p {
   inset: 0;
   z-index: 40;
   background: rgb(0 0 0 / 0.55);
+  backdrop-filter: blur(2px);
 }
 
 .dialog-content {
@@ -156,21 +181,28 @@ p {
   left: 50%;
   top: 50%;
   z-index: 50;
-  width: min(440px, calc(100vw - 32px));
+  width: min(480px, calc(100vw - 32px));
   transform: translate(-50%, -50%);
-  border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
   background: var(--color-surface);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.28);
   color: var(--color-text);
   font-size: 14px;
-  padding: 24px;
+  padding: 20px;
+}
+
+.dialog-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .dialog-title {
-  margin-bottom: 12px;
   color: var(--color-text-strong);
   font-size: 18px;
   font-weight: 600;
+  line-height: 1.35;
 }
 
 .dialog-description,
@@ -182,33 +214,52 @@ p {
 .dialog-note {
   margin-top: 8px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-surface-muted);
-  padding: 6px;
+  padding: 8px;
 }
 
 .dialog-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
 .dialog-form label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   color: var(--color-text);
+  font-weight: 500;
 }
 
-.dialog-form input {
+.dialog-form input,
+.dialog-form textarea {
   width: 100%;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   background: var(--color-control-bg);
   color: var(--color-text);
+  font: inherit;
+  font-weight: 400;
   outline: none;
-  padding: 5px 8px;
+  padding: 8px 10px;
+}
+
+.dialog-form input {
+  min-height: 36px;
+}
+
+.dialog-form textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.dialog-form input:focus,
+.dialog-form textarea:focus {
+  border-color: var(--color-border-strong);
+  box-shadow: 0 0 0 3px var(--color-surface-muted);
 }
 
 .dialog-actions {
@@ -216,7 +267,7 @@ p {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .terminal-shell {

@@ -99,6 +99,8 @@ func (h *Handler) registerAgentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/local-api/workspaces", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
 	mux.HandleFunc("/local-api/workspaces/", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
 	mux.HandleFunc("/local-api/sessions", h.authMiddleware(http.HandlerFunc(h.handleLocalSessions)).ServeHTTP)
+	mux.HandleFunc("/local-api/shortcuts", h.authMiddleware(http.HandlerFunc(h.handleLocalShortcuts)).ServeHTTP)
+	mux.HandleFunc("/local-api/shortcuts/", h.authMiddleware(http.HandlerFunc(h.handleLocalShortcuts)).ServeHTTP)
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { h.Handler().ServeHTTP(w, r) }
@@ -287,6 +289,54 @@ func (s *Handler) handleLocalSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.handleJSONRuntimeWithStatus(w, r, s.localRuntime, "", "create_session", request, "", http.StatusCreated)
+}
+
+func (s *Handler) handleLocalShortcuts(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/local-api/shortcuts")
+	if path == "" {
+		s.handleShortcutRoute(w, r, s.localRuntime, "", nil)
+		return
+	}
+	if !strings.HasPrefix(path, "/") {
+		s.writeNotFound(w, r)
+		return
+	}
+	shortcutId := strings.TrimPrefix(path, "/")
+	if shortcutId == "" || strings.Contains(shortcutId, "/") {
+		s.writeNotFound(w, r)
+		return
+	}
+	s.handleShortcutRoute(w, r, s.localRuntime, "", &shortcutId)
+}
+
+func (s *Handler) handleShortcutRoute(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, shortcutId *string) {
+	if shortcutId == nil {
+		switch r.Method {
+		case http.MethodGet:
+			s.handleJSONRuntime(w, r, endpoint, deviceId, "list_shortcuts", nil, "")
+		case http.MethodPost:
+			request := &agent.CreateShortcutReq{}
+			if !s.decodeJSONRequest(w, r, request) {
+				return
+			}
+			s.handleJSONRuntimeWithStatus(w, r, endpoint, deviceId, "create_shortcut", request, "", http.StatusCreated)
+		default:
+			s.methodNotAllowed(w, r, http.MethodGet, http.MethodPost)
+		}
+		return
+	}
+	switch r.Method {
+	case http.MethodPatch:
+		request := &agent.UpdateShortcutReq{}
+		if !s.decodeJSONRequest(w, r, request) {
+			return
+		}
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "update_shortcut", &agent.UpdateShortcutRequest{ShortcutId: *shortcutId, Request: request}, "")
+	case http.MethodDelete:
+		s.handleNoContentRuntime(w, r, endpoint, "delete_shortcut", &agent.DeleteShortcutReq{ShortcutId: *shortcutId})
+	default:
+		s.methodNotAllowed(w, r, http.MethodPatch, http.MethodDelete)
+	}
 }
 
 func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, parts []string) {

@@ -13,6 +13,7 @@ import (
 
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/session"
+	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/shortcut"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/workspace"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/idgen"
 )
@@ -216,6 +217,14 @@ func (s DbStore) LoadSession(workspaceId string, sessionId string) (session.Sess
 }
 
 func (s DbStore) UpdateSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error) {
+	return s.updateSession(workspaceId, sessionId, "", update)
+}
+
+func (s DbStore) UpdateStoppedSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error) {
+	return s.updateSession(workspaceId, sessionId, session.StateStopped, update)
+}
+
+func (s DbStore) updateSession(workspaceId string, sessionId string, requiredState session.State, update func(*session.Session) error) (session.Session, error) {
 	if err := s.validate(); err != nil {
 		return session.Session{}, err
 	}
@@ -279,14 +288,156 @@ func (s DbStore) UpdateSession(workspaceId string, sessionId string, update func
 	if err != nil {
 		return session.Session{}, fmt.Errorf("marshal session history: %w", err)
 	}
-	result, err := tx.ExecContext(ctx, `UPDATE sessions SET name=?, launch_cwd=?, command_json=?, history_json=?, updated_at=? WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL AND updated_at=?`, value.Name, value.LaunchCwd, commandJSON, historyJSON, s.storeTime(value.UpdatedAt), value.Id, value.WorkspaceId, s.deviceId, s.storeTime(originalUpdatedAt))
+	query := `UPDATE sessions SET name=?, launch_cwd=?, command_json=?, history_json=?, updated_at=? WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL AND updated_at=?`
+	args := []any{value.Name, value.LaunchCwd, commandJSON, historyJSON, s.storeTime(value.UpdatedAt), value.Id, value.WorkspaceId, s.deviceId, s.storeTime(originalUpdatedAt)}
+	if requiredState != "" {
+		query += ` AND current_state=?`
+		args = append(args, string(requiredState))
+	}
+	result, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		return session.Session{}, err
 	}
 	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		if requiredState != "" {
+			return session.Session{}, errors.New("session is no longer stopped")
+		}
 		return session.Session{}, errors.New("session was updated concurrently")
 	}
 	return value, tx.Commit()
+}
+
+func (s DbStore) CreateShortcut(value shortcut.Shortcut) (shortcut.Shortcut, error) {
+	if err := s.validate(); err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	if err := value.Normalize(); err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	if value.Id == "" {
+		id, err := idgen.New()
+		if err != nil {
+			return shortcut.Shortcut{}, err
+		}
+		value.Id = id
+	}
+	now := time.Now().UTC()
+	if value.CreatedAt.IsZero() {
+		value.CreatedAt = now
+	}
+	if value.UpdatedAt.IsZero() {
+		value.UpdatedAt = value.CreatedAt
+	}
+	_, err := s.db.ExecContext(context.Background(), `INSERT INTO shortcuts (id,device_id,name,command,description,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`, value.Id, s.deviceId, value.Name, value.Command, value.Description, s.storeTime(value.CreatedAt), s.storeTime(value.UpdatedAt))
+	if err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	value.SchemaVersion = shortcut.SchemaVersion
+	return value, nil
+}
+
+func (s DbStore) ListShortcuts() ([]shortcut.Shortcut, error) {
+	if err := s.validate(); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(context.Background(), `SELECT id,name,command,description,created_at,updated_at FROM shortcuts WHERE device_id=? ORDER BY updated_at DESC, id ASC`, s.deviceId)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	values := make([]shortcut.Shortcut, 0)
+	for rows.Next() {
+		value, err := scanShortcut(rows)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return values, nil
+}
+
+func (s DbStore) UpdateShortcut(shortcutId string, update func(*shortcut.Shortcut) error) (shortcut.Shortcut, error) {
+	if err := s.validate(); err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	shortcutId = strings.TrimSpace(shortcutId)
+	ctx := context.Background()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	value, err := scanShortcut(tx.QueryRowContext(ctx, `SELECT id,name,command,description,created_at,updated_at FROM shortcuts WHERE id=? AND device_id=?`, shortcutId, s.deviceId))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return shortcut.Shortcut{}, os.ErrNotExist
+		}
+		return shortcut.Shortcut{}, err
+	}
+	originalUpdatedAt := value.UpdatedAt
+	if err := update(&value); err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	if value.Id != shortcutId {
+		return shortcut.Shortcut{}, errors.New("shortcut update cannot change id")
+	}
+	if err := value.Normalize(); err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	if value.UpdatedAt.IsZero() || value.UpdatedAt.Equal(originalUpdatedAt) {
+		value.UpdatedAt = time.Now().UTC()
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE shortcuts SET name=?, command=?, description=?, updated_at=? WHERE id=? AND device_id=? AND updated_at=?`, value.Name, value.Command, value.Description, s.storeTime(value.UpdatedAt), value.Id, s.deviceId, s.storeTime(originalUpdatedAt))
+	if err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return shortcut.Shortcut{}, errors.New("shortcut was updated concurrently")
+	}
+	if err := tx.Commit(); err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	return value, nil
+}
+
+func (s DbStore) DeleteShortcut(shortcutId string) error {
+	if err := s.validate(); err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(context.Background(), `DELETE FROM shortcuts WHERE id=? AND device_id=?`, strings.TrimSpace(shortcutId), s.deviceId)
+	if err != nil {
+		return err
+	}
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return os.ErrNotExist
+	}
+	return nil
+}
+
+func scanShortcut(scanner interface{ Scan(dest ...any) error }) (shortcut.Shortcut, error) {
+	var value shortcut.Shortcut
+	var description sql.NullString
+	var createdAt, updatedAt any
+	if err := scanner.Scan(&value.Id, &value.Name, &value.Command, &description, &createdAt, &updatedAt); err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	if description.Valid {
+		value.Description = &description.String
+	}
+	var err error
+	value.CreatedAt, err = dbScanTime(createdAt)
+	if err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	value.UpdatedAt, err = dbScanTime(updatedAt)
+	if err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	value.SchemaVersion = shortcut.SchemaVersion
+	return value, nil
 }
 
 func (s DbStore) DeleteSession(workspaceId string, sessionId string) error {

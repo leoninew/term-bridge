@@ -16,6 +16,12 @@ import type {
   UpdateSessionOrderResp,
 } from '../../gen/proto/termbridge/agent/v1/session'
 import type {
+  CreateShortcutReq,
+  ListShortcutsResp,
+  Shortcut,
+  UpdateShortcutReq,
+} from '../../gen/proto/termbridge/agent/v1/shortcut'
+import type {
   AuthMeResp,
   CloudOAuthExchangeReq,
   CloudOAuthExchangeResp,
@@ -99,6 +105,31 @@ export async function updateSession(
     request,
   )
   return response.data
+}
+
+export async function listShortcuts(): Promise<Shortcut[]> {
+  const response = await localApiClient.get<ListShortcutsResp>(localRuntimePath('/shortcuts'))
+  return response.data.items
+}
+
+export async function createShortcut(request: CreateShortcutReq): Promise<Shortcut> {
+  const response = await localApiClient.post<Shortcut>(localRuntimePath('/shortcuts'), request)
+  return response.data
+}
+
+export async function updateShortcut(
+  shortcutId: string,
+  request: UpdateShortcutReq,
+): Promise<Shortcut> {
+  const response = await localApiClient.patch<Shortcut>(
+    localRuntimePath(`/shortcuts/${encodeURIComponent(shortcutId)}`),
+    request,
+  )
+  return response.data
+}
+
+export async function deleteShortcut(shortcutId: string): Promise<void> {
+  await localApiClient.delete(localRuntimePath(`/shortcuts/${encodeURIComponent(shortcutId)}`))
 }
 
 export async function deleteSession(workspaceId: string, sessionId: string): Promise<void> {

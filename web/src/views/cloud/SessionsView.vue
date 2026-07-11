@@ -18,17 +18,21 @@
     authLogout,
     closeSession,
     createSession,
+    createShortcut,
     deleteSession,
+    deleteShortcut,
     deleteWorkspace,
     getSession,
+    listShortcuts,
     listWorkspaceTree,
     readHistory,
     rerunSession,
     updateSession,
     updateSessionOrder,
+    updateShortcut,
     updateWorkspaceOrder,
   } from '../../features/cloud/api'
-  import type { SessionRuntimeApi } from '../../features/sessions/runtime'
+  import type { SessionRuntimeApi, ShortcutRuntimeApi } from '../../features/sessions/runtime'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
   import type {
     CreateSessionReq,
@@ -44,7 +48,7 @@
   const currentDevice = computed(
     () => cloudDevices.devices.find((device) => device.id === deviceId.value) ?? null,
   )
-  const runtimeApi = computed<SessionRuntimeApi>(() => ({
+  const runtimeApi = computed<SessionRuntimeApi & ShortcutRuntimeApi>(() => ({
     createSession(workspaceId: string | null, request: CreateSessionReq) {
       return createSession(runtimeTarget.value, workspaceId, request)
     },
@@ -56,6 +60,18 @@
     },
     deleteSession(workspaceId: string, sessionId: string) {
       return deleteSession(runtimeTarget.value, workspaceId, sessionId)
+    },
+    listShortcuts() {
+      return listShortcuts(runtimeTarget.value)
+    },
+    createShortcut(request: Parameters<typeof createShortcut>[1]) {
+      return createShortcut(runtimeTarget.value, request)
+    },
+    updateShortcut(shortcutId: string, request: Parameters<typeof updateShortcut>[2]) {
+      return updateShortcut(runtimeTarget.value, shortcutId, request)
+    },
+    deleteShortcut(shortcutId: string) {
+      return deleteShortcut(runtimeTarget.value, shortcutId)
     },
     readHistory(workspaceId: string, sessionId: string) {
       return readHistory(runtimeTarget.value, workspaceId, sessionId)

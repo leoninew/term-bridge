@@ -14,29 +14,37 @@
     authLogout,
     closeSession,
     createSession,
+    createShortcut,
     deleteSession,
+    deleteShortcut,
     deleteWorkspace,
     getSession,
+    listShortcuts,
     listWorkspaceTree,
     readHistory,
     rerunSession,
     updateSession,
     updateSessionOrder,
+    updateShortcut,
     updateWorkspaceOrder,
   } from '../../features/local/api'
-  import type { SessionRuntimeApi } from '../../features/sessions/runtime'
+  import type { SessionRuntimeApi, ShortcutRuntimeApi } from '../../features/sessions/runtime'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
 
   const runtimeTarget: RuntimeTarget = { mode: 'local' }
-  const runtimeApi: SessionRuntimeApi = {
+  const runtimeApi: SessionRuntimeApi & ShortcutRuntimeApi = {
     createSession,
+    createShortcut,
     getSession,
     updateSession,
     deleteSession,
+    deleteShortcut,
     readHistory,
     closeSession,
     rerunSession,
     updateSessionOrder,
+    updateShortcut,
+    listShortcuts,
     listWorkspaceTree,
     updateWorkspaceOrder,
     deleteWorkspace,

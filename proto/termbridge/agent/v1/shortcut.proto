@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package termbridge.agent;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1/shortcut";
+
+message Shortcut {
+  string id = 1;
+  string name = 2;
+  string command = 3;
+  optional string description = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message ListShortcutsReq {}
+
+message ListShortcutsResp {
+  repeated Shortcut items = 1;
+}
+
+message CreateShortcutReq {
+  string name = 1;
+  string command = 2;
+  optional string description = 3;
+}
+
+message CreateShortcutResp {
+  Shortcut shortcut = 1;
+}
+
+message UpdateShortcutReq {
+  optional string name = 1;
+  optional string command = 2;
+  optional string description = 3;
+}
+
+message UpdateShortcutRequest {
+  string shortcut_id = 1;
+  UpdateShortcutReq request = 2;
+}
+
+message UpdateShortcutResp {
+  Shortcut shortcut = 1;
+}
+
+message DeleteShortcutReq {
+  string shortcut_id = 1;
+}
+
+message DeleteShortcutResp {}

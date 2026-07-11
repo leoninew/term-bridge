@@ -22,6 +22,16 @@ import type {
   WorkspaceSessionsResp,
 } from "../../agent/v1/session";
 import type {
+  CreateShortcutReq,
+  CreateShortcutResp,
+  DeleteShortcutReq,
+  DeleteShortcutResp,
+  ListShortcutsReq,
+  ListShortcutsResp,
+  UpdateShortcutRequest,
+  UpdateShortcutResp,
+} from "../../agent/v1/shortcut";
+import type {
   DeleteWorkspaceReq,
   DeleteWorkspaceResp,
   ListWorkspacesReq,
@@ -55,6 +65,10 @@ export interface TunnelFrame {
   update_workspace_order_req?: UpdateWorkspaceOrderReq | undefined;
   update_session_order_req?: WorkspaceSessionOrderReq | undefined;
   delete_workspace_req?: DeleteWorkspaceReq | undefined;
+  list_shortcuts_req?: ListShortcutsReq | undefined;
+  create_shortcut_req?: CreateShortcutReq | undefined;
+  update_shortcut_req?: UpdateShortcutRequest | undefined;
+  delete_shortcut_req?: DeleteShortcutReq | undefined;
   list_workspaces_resp?: ListWorkspacesResp | undefined;
   workspace_tree_resp?: WorkspaceTreeResp | undefined;
   workspace_sessions_resp?: WorkspaceSessionsResp | undefined;
@@ -68,6 +82,10 @@ export interface TunnelFrame {
   update_workspace_order_resp?: UpdateWorkspaceOrderResp | undefined;
   update_session_order_resp?: UpdateSessionOrderResp | undefined;
   delete_workspace_resp?: DeleteWorkspaceResp | undefined;
+  list_shortcuts_resp?: ListShortcutsResp | undefined;
+  create_shortcut_resp?: CreateShortcutResp | undefined;
+  update_shortcut_resp?: UpdateShortcutResp | undefined;
+  delete_shortcut_resp?: DeleteShortcutResp | undefined;
   terminal_attach?: TerminalAttachReq | undefined;
   terminal_input?: TerminalInput | undefined;
   terminal_output?: TerminalOutput | undefined;

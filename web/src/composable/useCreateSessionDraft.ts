@@ -1,5 +1,8 @@
 import { proxyRefs, ref } from 'vue'
+import type { Shortcut } from '../gen/proto/termbridge/agent/v1/shortcut'
 import type { Workspace as WorkspaceSummary } from '../gen/proto/termbridge/agent/v1/workspace'
+
+export type CommandSource = 'shortcut' | 'command'
 
 export type ValidCreateSessionDraft = {
   workspaceId: string | null
@@ -15,12 +18,21 @@ export function useCreateSessionDraft() {
   const sessionName = ref('')
   const cwd = ref('')
   const commandText = ref('')
+  const commandSource = ref<CommandSource>('shortcut')
+  const selectedShortcutId = ref<string | null>(null)
 
   function reset(nextWorkspace: WorkspaceSummary | undefined, defaultName: string) {
     workspace.value = nextWorkspace ?? null
     sessionName.value = defaultName
     cwd.value = nextWorkspace?.path ?? '~'
     commandText.value = ''
+    commandSource.value = 'shortcut'
+    selectedShortcutId.value = null
+  }
+
+  function selectShortcut(value: Shortcut | undefined) {
+    selectedShortcutId.value = value?.id ?? null
+    commandText.value = value?.command ?? ''
   }
 
   function validate():
@@ -53,7 +65,10 @@ export function useCreateSessionDraft() {
     sessionName,
     cwd,
     commandText,
+    commandSource,
+    selectedShortcutId,
     reset,
+    selectShortcut,
     validate,
   })
 }

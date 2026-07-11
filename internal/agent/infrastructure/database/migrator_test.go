@@ -16,7 +16,7 @@ func TestMigrateCreatesAgentRuntimeSchemaOnly(t *testing.T) {
 	if err := Migrate(context.Background(), db, "sqlite"); err != nil {
 		t.Fatalf("Migrate() error = %v", err)
 	}
-	for _, table := range []string{"workspaces", "sessions", "session_runs", "goose_agent_db_version"} {
+	for _, table := range []string{"workspaces", "sessions", "session_runs", "shortcuts", "goose_agent_db_version"} {
 		if !testTableExists(t, db, table) {
 			t.Fatalf("table %s does not exist", table)
 		}
@@ -25,6 +25,27 @@ func TestMigrateCreatesAgentRuntimeSchemaOnly(t *testing.T) {
 		if testTableExists(t, db, table) {
 			t.Fatalf("cloud table %s exists in agent schema", table)
 		}
+	}
+}
+
+func TestMigrateUpgradesCompleteRuntimeSchema(t *testing.T) {
+	db := openTestDB(t)
+	defer func() { _ = db.Close() }()
+	if err := Migrate(context.Background(), db, "sqlite"); err != nil {
+		t.Fatalf("initial Migrate() error = %v", err)
+	}
+	if _, err := db.Exec(`DROP TABLE shortcuts`); err != nil {
+		t.Fatalf("drop shortcuts for upgrade simulation: %v", err)
+	}
+	if _, err := db.Exec(`DELETE FROM goose_agent_db_version WHERE version_id=202607100001`); err != nil {
+		t.Fatalf("reset shortcut migration version: %v", err)
+	}
+
+	if err := Migrate(context.Background(), db, "sqlite"); err != nil {
+		t.Fatalf("upgrade Migrate() error = %v", err)
+	}
+	if !testTableExists(t, db, "shortcuts") {
+		t.Fatal("Migrate() did not add shortcuts to a complete pre-existing runtime schema")
 	}
 }
 

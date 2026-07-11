@@ -51,6 +51,7 @@ message RerunWorkspaceSessionReq {
 
 message UpdateSessionReq {
   optional string name = 1;
+  optional string command = 2;
 }
 
 message UpdateWorkspaceSessionReq {

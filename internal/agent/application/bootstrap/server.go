@@ -12,6 +12,7 @@ import (
 	"time"
 
 	agentapi "gitee.com/leoninew/TermBridge-go/internal/agent/api/handler"
+	shortcutapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/shortcut"
 	terminalapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/terminal"
 	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
 	agentdb "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/database"
@@ -57,7 +58,8 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 	if err != nil {
 		return err
 	}
-	runtimeAccess := agentapp.WebTerminalAccess{Registry: newWebTerminalRegistry(cfg, logger, state.NewDbStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id))}
+	runtimeStore := state.NewDbStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id)
+	runtimeAccess := agentapp.WebTerminalAccess{Registry: newWebTerminalRegistry(cfg, logger, runtimeStore), Shortcuts: shortcutapp.NewService(runtimeStore)}
 
 	serveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()

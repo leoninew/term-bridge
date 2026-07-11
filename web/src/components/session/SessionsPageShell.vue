@@ -25,7 +25,7 @@
           @select="openSessionTab"
           @refresh="refresh"
           @new-session="openCreateSessionForm"
-          @edit-session="dialogs.openEditDialog"
+          @edit-session="openEditSessionDialog"
           @stop-session="stopSessionFromSidebar"
           @rerun-session="rerunSessionFromSidebar"
           @delete-session="openDeleteSessionDialog"
@@ -35,6 +35,7 @@
           @reorder-sessions="reorderSessions"
           @logout="handleLogout"
           @open-dashboard="openDashboard"
+          @open-shortcuts="openShortcuts"
         />
       </SplitterPanel>
 
@@ -57,6 +58,9 @@
           :create-cwd="createDraft.cwd"
           :create-name="createDraft.sessionName"
           :create-command="createDraft.commandText"
+          :create-command-source="createDraft.commandSource"
+          :create-selected-shortcut-id="createDraft.selectedShortcutId"
+          :shortcuts="shortcuts"
           :creating-session="creatingSession"
           :terminal-ws-url="activeTerminalWsUrl"
           :session-title="sessionTitle"
@@ -69,6 +73,8 @@
           @update:create-cwd="createDraft.cwd = $event"
           @update:create-name="createDraft.sessionName = $event"
           @update:create-command="createDraft.commandText = $event"
+          @update:create-command-source="createDraft.commandSource = $event"
+          @update:create-selected-shortcut-id="selectCreateShortcut"
           @create-workbench="createSessionWorkbench = $event"
           @terminal-state="handleTerminalState"
           @terminal-error="handleTerminalError"
@@ -79,6 +85,7 @@
     <EditSessionDialog
       :open="dialogs.editDialogOpen"
       :session="dialogs.selectedSession"
+      :shortcuts="shortcuts"
       :editing="editingSession"
       @update:open="dialogs.editDialogOpen = $event"
       @submit="editSelectedSession"
@@ -124,10 +131,15 @@
   import { useCloudDevicesStore } from '../../store/cloudDevices'
   import { useLocalAuthStore } from '../../store/localAuth'
   import { useRuntimeConfigStore } from '../../store/runtimeConfig'
-  import { terminalWsUrl, type SessionRuntimeApi } from '../../features/sessions/runtime'
+  import {
+    terminalWsUrl,
+    type SessionRuntimeApi,
+    type ShortcutRuntimeApi,
+  } from '../../features/sessions/runtime'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
+  import type { Shortcut } from '../../gen/proto/termbridge/agent/v1/shortcut'
   import type {
     SessionSummary,
     Workspace as WorkspaceSummary,
@@ -139,7 +151,7 @@
 
   const props = defineProps<{
     runtimeTarget: RuntimeTarget
-    runtimeApi: SessionRuntimeApi
+    runtimeApi: SessionRuntimeApi & ShortcutRuntimeApi
     homeRouteName: string
     loginRedirect: string
     currentDevice?: DeviceSummary | CloudSessionSummary | null
@@ -164,6 +176,7 @@
 
   const creatingSession = ref(false)
   const editingSession = ref(false)
+  const shortcuts = ref<Shortcut[]>([])
   const stoppingSessionId = ref<string | null>(null)
   const rerunningSessionId = ref<string | null>(null)
   const deletingSessionId = ref<string | null>(null)
@@ -214,6 +227,29 @@
 
   async function openDashboard() {
     await router.push({ name: props.homeRouteName })
+  }
+
+  async function openShortcuts() {
+    await router.push(
+      props.runtimeTarget.mode === 'local'
+        ? { name: 'local-shortcuts' }
+        : { name: 'cloud-shortcuts', params: { deviceId: props.runtimeTarget.deviceId } },
+    )
+  }
+
+  function selectCreateShortcut(shortcutId: string | null) {
+    createDraft.selectShortcut(shortcuts.value.find((value) => value.id === shortcutId))
+  }
+
+  function openEditSessionDialog(session: SessionSummary) {
+    if (session.lifecycle_state !== 'stopped') {
+      return
+    }
+    dialogs.openEditDialog(session)
+  }
+
+  async function refreshShortcuts() {
+    shortcuts.value = await props.runtimeApi.listShortcuts()
   }
 
   async function handleLogout() {
@@ -291,25 +327,26 @@
     }
   }
 
-  async function editSelectedSession(name: string) {
-    if (!dialogs.selectedSession || editingSession.value) {
+  async function editSelectedSession(payload: { name: string; command: string }) {
+    const session = dialogs.selectedSession
+    if (!session || session.lifecycle_state !== 'stopped' || editingSession.value) {
       return
     }
-    if (!name) {
+    if (!payload.name) {
       notifications.pushToast('error', t('toast.editSessionFailed'), t('message.nameRequired'))
+      return
+    }
+    if (!payload.command.trim()) {
+      notifications.pushToast('error', t('toast.editSessionFailed'), t('message.commandRequired'))
       return
     }
     editingSession.value = true
     try {
-      const updated = await props.runtimeApi.updateSession(
-        dialogs.selectedSession.workspace_id,
-        dialogs.selectedSession.id,
-        { name },
-      )
+      const updated = await props.runtimeApi.updateSession(session.workspace_id, session.id, payload)
       workspaceSessions.updateSession(updated)
       dialogs.selectedSession = updated
       dialogs.editDialogOpen = false
-      notifications.pushToast('success', t('toast.sessionEdited'), name)
+      notifications.pushToast('success', t('toast.sessionEdited'), payload.name)
     } catch (err) {
       notifications.notifyError(t('toast.editSessionFailed'), err)
     } finally {
@@ -577,7 +614,7 @@
       if (props.runtimeTarget.mode === 'cloud') {
         await cloudDevices.loadDevices()
       }
-      await refresh()
+      await Promise.all([refresh(), refreshShortcuts()])
     } catch (err) {
       notifications.notifyError(t('toast.refreshFailed'), err)
     }

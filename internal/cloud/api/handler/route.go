@@ -160,7 +160,11 @@ func isRuntimeResponse(frame *shared.TunnelFrame) bool {
 		*shared.TunnelFrame_ReadHistoryResp,
 		*shared.TunnelFrame_UpdateWorkspaceOrderResp,
 		*shared.TunnelFrame_UpdateSessionOrderResp,
-		*shared.TunnelFrame_DeleteWorkspaceResp:
+		*shared.TunnelFrame_DeleteWorkspaceResp,
+		*shared.TunnelFrame_ListShortcutsResp,
+		*shared.TunnelFrame_CreateShortcutResp,
+		*shared.TunnelFrame_UpdateShortcutResp,
+		*shared.TunnelFrame_DeleteShortcutResp:
 		return true
 	default:
 		return false

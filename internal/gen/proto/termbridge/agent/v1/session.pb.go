@@ -464,6 +464,7 @@ func (x *RerunWorkspaceSessionReq) GetRequest() *RerunSessionReq {
 type UpdateSessionReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          *string                `protobuf:"bytes,1,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Command       *string                `protobuf:"bytes,2,opt,name=command,proto3,oneof" json:"command,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -501,6 +502,13 @@ func (*UpdateSessionReq) Descriptor() ([]byte, []int) {
 func (x *UpdateSessionReq) GetName() string {
 	if x != nil && x.Name != nil {
 		return *x.Name
+	}
+	return ""
+}
+
+func (x *UpdateSessionReq) GetCommand() string {
+	if x != nil && x.Command != nil {
+		return *x.Command
 	}
 	return ""
 }
@@ -863,10 +871,13 @@ const file_termbridge_agent_v1_session_proto_rawDesc = "" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x12;\n" +
-	"\arequest\x18\x03 \x01(\v2!.termbridge.agent.RerunSessionReqR\arequest\"4\n" +
+	"\arequest\x18\x03 \x01(\v2!.termbridge.agent.RerunSessionReqR\arequest\"_\n" +
 	"\x10UpdateSessionReq\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01B\a\n" +
-	"\x05_name\"\x9b\x01\n" +
+	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1d\n" +
+	"\acommand\x18\x02 \x01(\tH\x01R\acommand\x88\x01\x01B\a\n" +
+	"\x05_nameB\n" +
+	"\n" +
+	"\b_command\"\x9b\x01\n" +
 	"\x19UpdateWorkspaceSessionReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1d\n" +
 	"\n" +

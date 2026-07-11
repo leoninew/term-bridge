@@ -157,7 +157,7 @@
               <span class="min-w-0 flex-1 truncate text-sm">{{
                 session.session.name || session.session.command
               }}</span>
-              <span class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+              <span v-if="session.session.lifecycle_state === 'stopped'" class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
                 <button
                   type="button"
                   class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
@@ -277,6 +277,13 @@
               <LayoutDashboard class="size-4 text-[var(--color-text-subtle)]" />
               {{ t('dashboard.home') }}
             </DropdownMenuItem>
+            <DropdownMenuItem
+              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
+              @select="emit('openShortcuts')"
+            >
+              <Command class="size-4 text-[var(--color-text-subtle)]" />
+              {{ t('shortcut.title') }}
+            </DropdownMenuItem>
             <DropdownMenuItem v-if="props.helpHref" as-child>
               <a
                 :href="props.helpHref"
@@ -384,6 +391,7 @@
     Check,
     ChevronRight,
     CircleHelp,
+    Command,
     CircleStop,
     Folder,
     FolderOpen,
@@ -459,6 +467,7 @@
     reorderSessions: [workspaceId: string, sessionIds: string[]]
     logout: []
     openDashboard: []
+    openShortcuts: []
   }>()
 
   const { t, locale } = useI18n()

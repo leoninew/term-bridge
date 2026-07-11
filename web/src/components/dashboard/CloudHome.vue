@@ -1,15 +1,7 @@
 <template>
   <section class="min-h-screen bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]">
-    <header
-      class="flex h-16 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-6"
-    >
-      <RouterLink to="/" class="flex items-center gap-3">
-        <img :src="logoDataUrl" alt="TermBridge" class="size-10 rounded-xl shadow-lg" />
-        <p class="text-lg font-semibold text-[var(--color-text-strong)]">TermBridge</p>
-      </RouterLink>
-
-      <div class="flex items-center gap-3">
-        <DisplayControls />
+    <AppHeader>
+      <template #actions>
         <CloudAccountMenu
           :authenticated="cloudAuth.authenticated"
           :user-display-name="cloudUserDisplayName"
@@ -18,8 +10,8 @@
           @logout="logoutCloud"
           @change-password="changePasswordDialogOpen = true"
         />
-      </div>
-    </header>
+      </template>
+    </AppHeader>
 
     <main class="min-h-[calc(100vh-4rem)] p-6 pt-10">
       <div class="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
@@ -126,6 +118,7 @@
   import { useI18n } from 'vue-i18n'
   import { ArrowRight } from '@lucide/vue'
   import { RouterLink, useRouter } from 'vue-router'
+  import AppHeader from '../layout/AppHeader.vue'
   import cloudHomeHeroUrl from '../../assets/cloud-home-hero-candidate.png'
   import {
     DialogClose,
@@ -136,14 +129,10 @@
     DialogTitle,
   } from 'reka-ui'
   import CloudAccountMenu from './CloudAccountMenu.vue'
-  import DisplayControls from './DisplayControls.vue'
   import { authChangePassword, authLogout } from '../../features/cloud/api'
   import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useRuntimeConfigStore } from '../../store/runtimeConfig'
   import { useNotificationsStore } from '../../store/notifications'
-
-  const logoDataUrl =
-    'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHJ4PSIxMCIgZmlsbD0iIzI1NjNlYiIvPjx0ZXh0IHg9IjIwIiB5PSIyNSIgZm9udC1zaXplPSIxNCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmaWxsPSJ3aGl0ZSIgZm9udC13ZWlnaHQ9IjcwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+VEI8L3RleHQ+PC9zdmc+'
 
   const { t } = useI18n()
   const router = useRouter()

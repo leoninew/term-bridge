@@ -67,10 +67,15 @@
         :cwd="createCwd"
         :name="createName"
         :command="createCommand"
+        :command-source="createCommandSource"
+        :selected-shortcut-id="createSelectedShortcutId"
+        :shortcuts="shortcuts"
         :creating="creatingSession"
         @update:cwd="emit('update:createCwd', $event)"
         @update:name="emit('update:createName', $event)"
         @update:command="emit('update:createCommand', $event)"
+        @update:command-source="emit('update:createCommandSource', $event)"
+        @update:selected-shortcut-id="emit('update:createSelectedShortcutId', $event)"
         @workbench="emit('createWorkbench', $event)"
         @submit="emit('submitCreate')"
         @cancel="emit('cancelCreate')"
@@ -117,7 +122,9 @@
   import TerminalPane from './TerminalPane.vue'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
+  import type { Shortcut } from '../../gen/proto/termbridge/agent/v1/shortcut'
   import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
+  import type { CommandSource } from '../../composable/useCreateSessionDraft'
   import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
   import type { OpenSessionTab } from '../../store/workbench'
 
@@ -131,6 +138,9 @@
     createCwd: string
     createName: string
     createCommand: string
+    createCommandSource: CommandSource
+    createSelectedShortcutId: string | null
+    shortcuts: Shortcut[]
     creatingSession: boolean
     terminalWsUrl: string | null
     sessionTitle: (workspaceId: string, sessionId: string) => string
@@ -146,6 +156,8 @@
     'update:createCwd': [value: string]
     'update:createName': [value: string]
     'update:createCommand': [value: string]
+    'update:createCommandSource': [value: CommandSource]
+    'update:createSelectedShortcutId': [value: string | null]
     createWorkbench: [element: HTMLElement | null]
     terminalState: [message: ServerControlMessage]
     terminalError: [message: string]

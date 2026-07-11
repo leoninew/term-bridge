@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 
+	shortcutapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/shortcut"
 	terminalapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/terminal"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 )
@@ -18,6 +19,10 @@ type RuntimeAccess interface {
 	RerunSession(ctx context.Context, workspaceId string, sessionId string, request *agent.RerunSessionReq) (*agent.CreateSessionResp, error)
 	GetSession(ctx context.Context, workspaceId string, sessionId string) (*agent.SessionSummary, error)
 	UpdateSession(ctx context.Context, workspaceId string, sessionId string, request *agent.UpdateSessionReq) (*agent.SessionSummary, error)
+	ListShortcuts(ctx context.Context) ([]*agent.Shortcut, error)
+	CreateShortcut(ctx context.Context, request *agent.CreateShortcutReq) (*agent.Shortcut, error)
+	UpdateShortcut(ctx context.Context, shortcutId string, request *agent.UpdateShortcutReq) (*agent.Shortcut, error)
+	DeleteShortcut(ctx context.Context, shortcutId string) error
 	DeleteSession(ctx context.Context, workspaceId string, sessionId string) error
 	CloseSession(ctx context.Context, workspaceId string, sessionId string) (*agent.SessionSummary, error)
 	ReadHistory(ctx context.Context, workspaceId string, sessionId string) ([]byte, error)
@@ -33,7 +38,8 @@ type TerminalStream interface {
 }
 
 type WebTerminalAccess struct {
-	Registry *terminalapp.Registry
+	Registry  *terminalapp.Registry
+	Shortcuts shortcutapp.Service
 }
 
 func (a WebTerminalAccess) ListWorkspaces(ctx context.Context) ([]*agent.Workspace, error) {
@@ -104,6 +110,34 @@ func (a WebTerminalAccess) UpdateSession(ctx context.Context, workspaceId string
 		return nil, err
 	}
 	return a.Registry.UpdateSession(workspaceId, sessionId, request)
+}
+
+func (a WebTerminalAccess) ListShortcuts(ctx context.Context) ([]*agent.Shortcut, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return a.Shortcuts.List()
+}
+
+func (a WebTerminalAccess) CreateShortcut(ctx context.Context, request *agent.CreateShortcutReq) (*agent.Shortcut, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return a.Shortcuts.Create(request)
+}
+
+func (a WebTerminalAccess) UpdateShortcut(ctx context.Context, shortcutId string, request *agent.UpdateShortcutReq) (*agent.Shortcut, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return a.Shortcuts.Update(shortcutId, request)
+}
+
+func (a WebTerminalAccess) DeleteShortcut(ctx context.Context, shortcutId string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return a.Shortcuts.Delete(shortcutId)
 }
 
 func (a WebTerminalAccess) DeleteSession(ctx context.Context, workspaceId string, sessionId string) error {

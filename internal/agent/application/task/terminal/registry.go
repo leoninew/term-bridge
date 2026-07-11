@@ -51,6 +51,7 @@ type RuntimeStore interface {
 	SaveSession(session.Session) error
 	LoadSession(workspaceId string, sessionId string) (session.Session, error)
 	UpdateSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error)
+	UpdateStoppedSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error)
 	DeleteSession(workspaceId string, sessionId string) error
 	DeleteWorkspace(workspaceId string) error
 	SaveState(workspaceId string, sessionId string, value session.StateRecord) error
@@ -569,23 +570,48 @@ func (r *Registry) UpdateSessionOrder(workspaceId string, sessionIds []string) (
 }
 
 func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *agent.UpdateSessionReq) (*agent.SessionSummary, error) {
-	name := strings.TrimSpace(request.GetName())
-	if name == "" {
-		return nil, apperrors.Usage("missing session name")
+	if request == nil || (request.Name == nil && request.Command == nil) {
+		return nil, apperrors.Usage("session update requires name or command")
+	}
+	var name string
+	if request.Name != nil {
+		name = strings.TrimSpace(request.GetName())
+		if name == "" {
+			return nil, apperrors.Usage("missing session name")
+		}
+	}
+	var commandText string
+	if request.Command != nil {
+		commandText = request.GetCommand()
+		if strings.TrimSpace(commandText) == "" {
+			return nil, apperrors.Usage("missing session command")
+		}
 	}
 	view, err := r.sessionView(workspaceId, sessionId)
 	if err != nil {
 		return nil, err
 	}
-	updated, err := r.store.UpdateSession(workspaceId, sessionId, func(value *session.Session) error {
-		value.Name = name
+	if view.State.State != session.StateStopped {
+		return nil, apperrors.Usage("only stopped sessions can be edited")
+	}
+	updated, err := r.store.UpdateStoppedSession(workspaceId, sessionId, func(value *session.Session) error {
+		if request.Name != nil {
+			value.Name = name
+		}
+		if request.Command != nil {
+			value.Command.Command = commandText
+		}
 		value.UpdatedAt = time.Now().UTC()
 		return nil
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "no longer stopped") {
+			return nil, apperrors.Usage("only stopped sessions can be edited")
+		}
 		return nil, apperrors.Runtime("update session", err)
 	}
 	view.Session = updated
+	view.CommandText = commandTextFromSession(updated)
 	return r.summaryFromView(view), nil
 }
 

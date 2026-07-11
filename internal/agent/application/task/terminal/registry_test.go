@@ -415,7 +415,7 @@ func TestCreateSessionRequiresName(t *testing.T) {
 	}
 }
 
-func TestUpdateSessionChangesName(t *testing.T) {
+func TestUpdateStoppedSessionChangesNameAndPreservesRawCommand(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()
 	fake := newFakeSession()
@@ -424,24 +424,57 @@ func TestUpdateSessionChangesName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
+	if _, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{Name: stringPointer("New name")}); err == nil {
+		t.Fatal("UpdateSession() error = nil, want running session rejection")
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
+	waitRuntimeRemoved(t, registry, response.SessionId)
 
 	newName := "New name"
-	summary, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{Name: &newName})
+	commandText := `ccs run c1 --prompt "review changes"`
+	summary, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{Name: &newName, Command: &commandText})
 	if err != nil {
 		t.Fatalf("UpdateSession() error = %v", err)
 	}
-	if summary.Name != "New name" {
-		t.Fatalf("Name = %q, want New name", summary.Name)
+	if summary.Name != newName || summary.Command != commandText || summary.Cwd != cwd {
+		t.Fatalf("UpdateSession() summary = %#v, want updated name/raw command and unchanged cwd", summary)
 	}
 	stored, err := state.NewStore(root).LoadSession(response.WorkspaceId, response.SessionId)
 	if err != nil {
 		t.Fatalf("LoadSession() error = %v", err)
 	}
-	if stored.Name != "New name" {
-		t.Fatalf("stored name = %q", stored.Name)
+	if stored.Name != newName || stored.Command.Command != commandText || stored.LaunchCwd != cwd {
+		t.Fatalf("stored session = %#v, want updated name/raw command and unchanged cwd", stored)
+	}
+}
+
+func TestUpdateSessionRejectsFailedSessionAndEmptyPatch(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	store := state.NewStore(root)
+	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: store, LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	response, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{Name: "Old name", Command: []string{"go version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	if _, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{}); err == nil {
+		t.Fatal("UpdateSession(empty patch) error = nil, want rejection")
+	}
+	if err := store.SaveState(response.WorkspaceId, response.SessionId, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "launch_failed", UpdatedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("SaveState(failed) error = %v", err)
+	}
+	newName := "New name"
+	if _, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{Name: &newName}); err == nil {
+		t.Fatal("UpdateSession(failed) error = nil, want failed session rejection")
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
-	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
+	waitExit(t, store, response.WorkspaceId, response.SessionId)
+}
+
+func stringPointer(value string) *string {
+	return &value
 }
 
 func TestDeleteSessionRejectsRunningAndAllowsStopped(t *testing.T) {

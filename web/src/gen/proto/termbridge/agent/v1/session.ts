@@ -54,6 +54,7 @@ export interface RerunWorkspaceSessionReq {
 
 export interface UpdateSessionReq {
   name?: string | undefined;
+  command?: string | undefined;
 }
 
 export interface UpdateWorkspaceSessionReq {

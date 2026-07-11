@@ -90,6 +90,12 @@ export const router = createRouter({
       meta: { mode: 'local' },
     },
     {
+      path: '/shortcuts',
+      name: 'local-shortcuts',
+      component: () => import('../views/local/ShortcutsView.vue'),
+      meta: { mode: 'local' },
+    },
+    {
       path: '/dashboard',
       name: 'cloud-dashboard',
       component: () => import('../views/cloud/DashboardView.vue'),
@@ -99,6 +105,12 @@ export const router = createRouter({
       path: '/devices/:deviceId/sessions',
       name: 'cloud-sessions',
       component: () => import('../views/cloud/SessionsView.vue'),
+      meta: { mode: 'cloud' },
+    },
+    {
+      path: '/devices/:deviceId/shortcuts',
+      name: 'cloud-shortcuts',
+      component: () => import('../views/cloud/ShortcutsView.vue'),
       meta: { mode: 'cloud' },
     },
     {

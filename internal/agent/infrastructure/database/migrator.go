@@ -33,6 +33,9 @@ func Migrate(ctx context.Context, db *sql.DB, driver string) error {
 	if err := goose.UpContext(ctx, db, "."); err != nil {
 		return apperrors.Config("run agent database migrations", err)
 	}
+	if err := validateShortcutSchemaState(ctx, db, driver); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -71,6 +74,17 @@ func validateRuntimeSchemaState(ctx context.Context, db *sql.DB, driver string) 
 	}
 	if (workspaces || sessions || sessionRuns) && (!workspaces || !sessions || !sessionRuns) {
 		return apperrors.Config("invalid agent schema state", fmt.Errorf("runtime tables are partially present"))
+	}
+	return nil
+}
+
+func validateShortcutSchemaState(ctx context.Context, db *sql.DB, driver string) error {
+	shortcuts, err := tableExists(ctx, db, driver, "shortcuts")
+	if err != nil {
+		return apperrors.Config("inspect agent schema state", err)
+	}
+	if !shortcuts {
+		return apperrors.Config("invalid agent schema state", fmt.Errorf("shortcuts table is missing after migrations"))
 	}
 	return nil
 }

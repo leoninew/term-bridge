@@ -231,6 +231,29 @@ func HandleRuntimeRequest(ctx context.Context, runtimeAccess RuntimeAccess, fram
 			return nil, err
 		}
 		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ReadHistoryResp{ReadHistoryResp: &agent.ReadHistoryResp{Text: string(data)}}), nil
+	case *shared.TunnelFrame_ListShortcutsReq:
+		items, err := runtimeAccess.ListShortcuts(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ListShortcutsResp{ListShortcutsResp: &agent.ListShortcutsResp{Items: items}}), nil
+	case *shared.TunnelFrame_CreateShortcutReq:
+		value, err := runtimeAccess.CreateShortcut(ctx, payload.CreateShortcutReq)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_CreateShortcutResp{CreateShortcutResp: &agent.CreateShortcutResp{Shortcut: value}}), nil
+	case *shared.TunnelFrame_UpdateShortcutReq:
+		value, err := runtimeAccess.UpdateShortcut(ctx, payload.UpdateShortcutReq.GetShortcutId(), payload.UpdateShortcutReq.GetRequest())
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_UpdateShortcutResp{UpdateShortcutResp: &agent.UpdateShortcutResp{Shortcut: value}}), nil
+	case *shared.TunnelFrame_DeleteShortcutReq:
+		if err := runtimeAccess.DeleteShortcut(ctx, payload.DeleteShortcutReq.GetShortcutId()); err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_DeleteShortcutResp{DeleteShortcutResp: &agent.DeleteShortcutResp{}}), nil
 	default:
 		return nil, fmt.Errorf("unsupported runtime payload %T", frame.GetPayload())
 	}
@@ -265,6 +288,14 @@ func runtimeResponse(streamId string, requestId string, payload any) *shared.Tun
 		frame.Payload = value
 	case *shared.TunnelFrame_DeleteWorkspaceResp:
 		frame.Payload = value
+	case *shared.TunnelFrame_ListShortcutsResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_CreateShortcutResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_UpdateShortcutResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_DeleteShortcutResp:
+		frame.Payload = value
 	}
 	return frame
 }
@@ -283,7 +314,11 @@ func isRuntimeRequest(frame *shared.TunnelFrame) bool {
 		*shared.TunnelFrame_ReadHistoryReq,
 		*shared.TunnelFrame_UpdateWorkspaceOrderReq,
 		*shared.TunnelFrame_UpdateSessionOrderReq,
-		*shared.TunnelFrame_DeleteWorkspaceReq:
+		*shared.TunnelFrame_DeleteWorkspaceReq,
+		*shared.TunnelFrame_ListShortcutsReq,
+		*shared.TunnelFrame_CreateShortcutReq,
+		*shared.TunnelFrame_UpdateShortcutReq,
+		*shared.TunnelFrame_DeleteShortcutReq:
 		return true
 	default:
 		return false
