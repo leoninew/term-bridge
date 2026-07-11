@@ -13,11 +13,20 @@
       :password="cloudAuth.passwordInput"
       :logging-in="cloudAuth.loggingIn"
       :google-logging-in="googleLoggingIn"
+      :turnstile-ready="!!turnstileToken"
       @update:username="cloudAuth.usernameInput = $event"
       @update:password="cloudAuth.passwordInput = $event"
       @submit="login"
       @google="loginWithGoogle"
-    />
+    >
+      <TurnstileChallenge
+        v-if="turnstileSiteKey"
+        ref="turnstile"
+        :site-key="turnstileSiteKey"
+        @token="turnstileToken = $event"
+        @reset="turnstileToken = ''"
+      />
+    </LoginPanel>
 
     <ToastHost />
   </ToastProvider>
@@ -30,7 +39,8 @@
   import { ToastProvider } from 'reka-ui'
   import LoginPanel from '../../components/session/LoginPanel.vue'
   import ToastHost from '../../components/session/ToastHost.vue'
-  import { authGoogleUrl } from '../../features/cloud/api'
+  import TurnstileChallenge from '../../components/cloud/TurnstileChallenge.vue'
+  import { authGoogleUrl, authLoginCSRFToken, authTurnstileSiteKey } from '../../features/cloud/api'
   import {
     authenticatedCloudLoginRedirect,
     storeCloudLoginRedirect,
@@ -44,23 +54,44 @@
   const cloudAuth = useCloudAuthStore()
   const notifications = useNotificationsStore()
   const googleLoggingIn = ref(false)
+  const turnstileSiteKey = ref('')
+  const turnstileToken = ref('')
+  const turnstile = ref<InstanceType<typeof TurnstileChallenge> | null>(null)
 
   onMounted(async () => {
-    await cloudAuth.initializeAuth()
-    if (cloudAuth.authenticated) {
-      await router.replace(redirectAfterLogin())
+    try {
+      ;[turnstileSiteKey.value] = await Promise.all([
+        authTurnstileSiteKey(),
+        cloudAuth.initializeAuth(),
+      ])
+      if (cloudAuth.authenticated) {
+        await router.replace(redirectAfterLogin())
+      }
+    } catch (err) {
+      notifications.notifyError(t('cloudAuth.loginFailed'), err)
     }
   })
 
   async function login() {
+    if (!turnstileToken.value) {
+      notifications.notifyError(
+        t('cloudAuth.loginFailed'),
+        new Error(t('cloud.humanVerificationRequired')),
+      )
+      return
+    }
     try {
-      await cloudAuth.login()
+      const csrfToken = await authLoginCSRFToken()
+      await cloudAuth.login(turnstileToken.value, csrfToken)
       await cloudAuth.initializeAuth({ force: true })
       if (cloudAuth.authenticated) {
         await router.replace(redirectAfterLogin())
       }
     } catch (err) {
       notifications.notifyError(t('cloudAuth.loginFailed'), err)
+    } finally {
+      turnstileToken.value = ''
+      turnstile.value?.reset()
     }
   }
 

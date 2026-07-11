@@ -174,8 +174,14 @@ type CloudConfig struct {
 	ApiBaseUrl         string
 	CorsAllowedOrigins []string
 	ExposeErrors       bool
+	Turnstile          TurnstileConfig
 	OAuth              CloudOAuthConfig
 	Database           DatabaseConfig
+}
+
+type TurnstileConfig struct {
+	SiteKey   string
+	SecretKey string
 }
 
 type CloudOAuthConfig struct {
@@ -314,8 +320,12 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			ApiBaseUrl:         strings.TrimSpace(v.GetString("cloud.api_base_url")),
 			CorsAllowedOrigins: getStringSlice(v, "cloud.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("cloud.expose_errors"),
-			OAuth:              loadCloudOAuthConfig(v),
-			Database:           cloudDatabase,
+			Turnstile: TurnstileConfig{
+				SiteKey:   strings.TrimSpace(v.GetString("cloud.turnstile.site_key")),
+				SecretKey: strings.TrimSpace(v.GetString("cloud.turnstile.secret_key")),
+			},
+			OAuth:    loadCloudOAuthConfig(v),
+			Database: cloudDatabase,
 		},
 		Auth: AuthConfig{
 			Username: strings.TrimSpace(v.GetString("auth.local_admin.username")),
@@ -834,6 +844,8 @@ func configKeys() []string {
 		"cloud.api_base_url",
 		"cloud.cors_allowed_origins",
 		"cloud.expose_errors",
+		"cloud.turnstile.site_key",
+		"cloud.turnstile.secret_key",
 		"cloud.database.driver",
 		"cloud.database.sqlite.path",
 		"cloud.database.mysql.dsn",
@@ -1045,6 +1057,8 @@ func normalizeCloudConfig(cfg *Config) {
 	cfg.Cloud.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.PublicUrl), "/")
 	cfg.Cloud.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.ApiBaseUrl), "/")
 	cfg.Cloud.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Cloud.CorsAllowedOrigins)
+	cfg.Cloud.Turnstile.SiteKey = strings.TrimSpace(cfg.Cloud.Turnstile.SiteKey)
+	cfg.Cloud.Turnstile.SecretKey = strings.TrimSpace(cfg.Cloud.Turnstile.SecretKey)
 	for index := range cfg.Cloud.OAuth.Clients {
 		client := &cfg.Cloud.OAuth.Clients[index]
 		client.ClientId = strings.TrimSpace(client.ClientId)
@@ -1068,10 +1082,30 @@ func validateCloud(cfg Config) error {
 	if err := validateHTTPServerConfig("cloud", cfg.Cloud.ListenUrl, cfg.Cloud.PublicUrl, cfg.Cloud.ApiBaseUrl, cfg.Cloud.CorsAllowedOrigins); err != nil {
 		return err
 	}
+	if err := validateTurnstile(cfg.Environment, cfg.Cloud); err != nil {
+		return err
+	}
 	for index, client := range cfg.Cloud.OAuth.Clients {
 		if err := validateCloudOAuthClient(index, client); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func validateTurnstile(environment string, cloud CloudConfig) error {
+	if environment != "production" {
+		return nil
+	}
+	if cloud.Turnstile.SiteKey == "" {
+		return apperrors.Config("invalid cloud.turnstile.site_key", fmt.Errorf("required in production"))
+	}
+	if cloud.Turnstile.SecretKey == "" {
+		return apperrors.Config("invalid cloud.turnstile.secret_key", fmt.Errorf("required in production"))
+	}
+	parsed, err := url.Parse(cloud.PublicUrl)
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" {
+		return apperrors.Config("invalid cloud.public_url", fmt.Errorf("must be an absolute HTTPS URL for Turnstile hostname validation in production"))
 	}
 	return nil
 }

@@ -42,13 +42,18 @@ export const useCloudAuthStore = defineStore('cloudAuth', () => {
     }
   }
 
-  async function login() {
+  async function login(turnstileToken: string, csrfToken: string) {
     if (loggingIn.value) {
       return
     }
     loggingIn.value = true
     try {
-      const response: AuthLoginResp = await authLogin(usernameInput.value, passwordInput.value)
+      const response: AuthLoginResp = await authLogin(
+        usernameInput.value,
+        passwordInput.value,
+        turnstileToken,
+        csrfToken,
+      )
       setToken(response.access_token)
       passwordInput.value = ''
     } finally {

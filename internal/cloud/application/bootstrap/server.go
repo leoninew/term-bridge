@@ -7,7 +7,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
 	cloudapi "gitee.com/leoninew/TermBridge-go/internal/cloud/api/handler"
 	cloudauth "gitee.com/leoninew/TermBridge-go/internal/cloud/application/user/auth"
@@ -46,9 +48,27 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 	if err != nil {
 		return apperrors.Config("invalid jwt.secret_key", err)
 	}
+	expectedHostname, err := validateTurnstileConfig(cfg.Environment, cfg.Cloud)
+	if err != nil {
+		return apperrors.Config("invalid cloud.turnstile", err)
+	}
 	authService := cloudauth.New(repo, tokens, cloudauth.Config{PasswordPolicy: cloudauth.PasswordPolicy{MinLength: cfg.Auth.PasswordPolicy.MinLength, MaxLength: cfg.Auth.PasswordPolicy.MaxLength}, Code: cloudauth.CodePolicy{Length: cfg.Auth.Code.Length, Ttl: cfg.Auth.Code.Ttl, ResendCooldown: cfg.Auth.Code.ResendCooldown, MaxAttempts: cfg.Auth.Code.MaxAttempts}}, cloudemail.NewResendSender(cloudemail.Config{ApiKey: cfg.Resend.ApiKey, FromEmail: cfg.Resend.FromEmail}), cloudauth.NewOAuthGoogleClient(cloudauth.GoogleConfig{ClientID: cfg.Auth.Google.ClientID, ClientSecret: cfg.Auth.Google.ClientSecret, RedirectUrl: cfg.Auth.Google.RedirectUrl}))
-	cloudHandler := cloudapi.New(cloudapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, AgentTunnelAudience: tunnelAudience(cfg), DeviceRepository: cloudapi.NewDeviceRepository(deviceRepository), CloudPublicURL: cfg.Cloud.PublicURL, CloudOAuth: cloudapi.CloudOAuthConfig{Clients: cloudOAuthClients(cfg.Cloud.OAuth.Clients)}, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey()})
+	cloudHandler := cloudapi.New(cloudapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, AgentTunnelAudience: tunnelAudience(cfg), DeviceRepository: cloudapi.NewDeviceRepository(deviceRepository), CloudPublicURL: cfg.Cloud.PublicURL, CloudOAuth: cloudapi.CloudOAuthConfig{Clients: cloudOAuthClients(cfg.Cloud.OAuth.Clients)}, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), Turnstile: cloudapi.TurnstileConfig{SiteKey: cfg.Cloud.Turnstile.SiteKey, SecretKey: cfg.Cloud.Turnstile.SecretKey, ExpectedHostname: expectedHostname, Verify: cloudapi.NewTurnstileVerifier(cfg.Cloud.Turnstile.SecretKey, expectedHostname, nil)}, CSRF: cloudapi.CSRFConfig{Tokens: cloudapi.NewCSRFTokens(10*time.Minute, 1024)}})
 	return serveHTTP(ctx, cfg, logger, options, cloudHandler, stdout)
+}
+
+func validateTurnstileConfig(environment string, cfg CloudConfig) (string, error) {
+	if environment != "production" {
+		return "", nil
+	}
+	if strings.TrimSpace(cfg.Turnstile.SiteKey) == "" || strings.TrimSpace(cfg.Turnstile.SecretKey) == "" {
+		return "", fmt.Errorf("site key and secret key are required")
+	}
+	parsed, err := url.Parse(cfg.PublicURL)
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" {
+		return "", fmt.Errorf("public URL must be an absolute HTTPS URL with a hostname")
+	}
+	return parsed.Hostname(), nil
 }
 
 func cloudOAuthClients(clients []CloudOAuthClientConfig) []cloudapi.CloudOAuthClientConfig {

@@ -2,7 +2,9 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -21,8 +23,28 @@ type testErrorResponse struct {
 	RequestId string `json:"request_id"`
 }
 
+type acceptingTurnstileVerifier struct{}
+
+func (acceptingTurnstileVerifier) Verify(context.Context, string, string) error {
+	return nil
+}
+
+func testAuthSecurityConfig() (TurnstileConfig, CSRFConfig) {
+	return TurnstileConfig{Verify: acceptingTurnstileVerifier{}}, CSRFConfig{Tokens: NewCSRFTokens(0, 0)}
+}
+
+func testLoginRequestBody(t *testing.T, handler *Handler, username string, password string) string {
+	t.Helper()
+	csrfToken, err := handler.config.CSRF.Tokens.Issue()
+	if err != nil {
+		t.Fatalf("issue CSRF token: %v", err)
+	}
+	return fmt.Sprintf(`{"username":%q,"password":%q,"turnstile_token":"turnstile-test-token","csrf_token":%q}`, username, password, csrfToken)
+}
+
 func testCloudConfig() Config {
-	return Config{Username: "admin", Password: "admin", JWTSecret: testJWTKey, Logger: slog.Default()}
+	turnstile, csrf := testAuthSecurityConfig()
+	return Config{Username: "admin", Password: "admin", JWTSecret: testJWTKey, Logger: slog.Default(), Turnstile: turnstile, CSRF: csrf}
 }
 
 func TestHealth(t *testing.T) {
@@ -47,7 +69,7 @@ func TestAuthEndpoints(t *testing.T) {
 	assertAPIError(t, devicesResponse, http.StatusUnauthorized, errorCodeUnauthorized)
 
 	loginResponse := httptest.NewRecorder()
-	server.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
+	server.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(testLoginRequestBody(t, server, "admin", "admin"))))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d, want 200; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
@@ -176,7 +198,7 @@ func TestOAuthAuthorizationCodeCanBeExchangedOnce(t *testing.T) {
 func TestLoginRejectsBadPassword(t *testing.T) {
 	server := New(testCloudConfig())
 	response := httptest.NewRecorder()
-	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"bad"}`)))
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(testLoginRequestBody(t, server, "admin", "bad"))))
 	assertAPIError(t, response, http.StatusUnauthorized, errorCodeUnauthorized)
 }
 

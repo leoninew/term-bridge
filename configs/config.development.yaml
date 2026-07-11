@@ -19,6 +19,10 @@ cloud:
   expose_errors: true
   cors_allowed_origins:
     - http://localhost:9030
+  # Cloudflare's official test credentials; never use these outside development.
+  turnstile:
+    site_key: 1x00000000000000000000AA
+    secret_key: 1x0000000000000000000000000000000AA
   oauth:
     clients:
       - client_id: termbridge-agent

@@ -7,14 +7,15 @@ import (
 )
 
 type Config struct {
-	LogHTTP  sharedconfig.LogHTTPConfig
-	Server   ServerConfig
-	Gate     GateConfig
-	Database DatabaseConfig
-	Auth     AuthConfig
-	Jwt      JwtConfig
-	Resend   ResendConfig
-	Cloud    CloudConfig
+	Environment string
+	LogHTTP     sharedconfig.LogHTTPConfig
+	Server      ServerConfig
+	Gate        GateConfig
+	Database    DatabaseConfig
+	Auth        AuthConfig
+	Jwt         JwtConfig
+	Resend      ResendConfig
+	Cloud       CloudConfig
 }
 
 type ServerConfig struct {
@@ -82,7 +83,13 @@ type ResendConfig struct {
 
 type CloudConfig struct {
 	PublicURL string
+	Turnstile TurnstileConfig
 	OAuth     CloudOAuthConfig
+}
+
+type TurnstileConfig struct {
+	SiteKey   string
+	SecretKey string
 }
 
 type CloudOAuthConfig struct {

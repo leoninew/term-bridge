@@ -37,6 +37,15 @@ func TestBrowserAPIRelay(t *testing.T) {
 				return responseFrame(frame, &shared.TunnelFrame_WorkspaceSessionsResp{WorkspaceSessionsResp: &agent.WorkspaceSessionsResp{Items: []*agent.SessionSummary{{Id: "sess-1", WorkspaceId: payload.WorkspaceSessionsReq.GetWorkspaceId(), Name: "Session"}}}})
 			case *shared.TunnelFrame_ReadHistoryReq:
 				return responseFrame(frame, &shared.TunnelFrame_ReadHistoryResp{ReadHistoryResp: &agent.ReadHistoryResp{Text: strings.Repeat("h", 64*1024)}})
+			case *shared.TunnelFrame_ListShortcutsReq:
+				description := "launch shell"
+				return responseFrame(frame, &shared.TunnelFrame_ListShortcutsResp{ListShortcutsResp: &agent.ListShortcutsResp{Items: []*agent.Shortcut{{Id: "shortcut-1", Name: "Shell", Command: `cmd /c "echo hello" && dir`, Description: &description}}}})
+			case *shared.TunnelFrame_CreateShortcutReq:
+				return responseFrame(frame, &shared.TunnelFrame_CreateShortcutResp{CreateShortcutResp: &agent.CreateShortcutResp{Shortcut: &agent.Shortcut{Id: "shortcut-created", Name: payload.CreateShortcutReq.GetName(), Command: payload.CreateShortcutReq.GetCommand(), Description: payload.CreateShortcutReq.Description}}})
+			case *shared.TunnelFrame_UpdateShortcutReq:
+				return responseFrame(frame, &shared.TunnelFrame_UpdateShortcutResp{UpdateShortcutResp: &agent.UpdateShortcutResp{Shortcut: &agent.Shortcut{Id: payload.UpdateShortcutReq.GetShortcutId(), Name: payload.UpdateShortcutReq.GetRequest().GetName(), Command: payload.UpdateShortcutReq.GetRequest().GetCommand(), Description: payload.UpdateShortcutReq.GetRequest().Description}}})
+			case *shared.TunnelFrame_DeleteShortcutReq:
+				return responseFrame(frame, &shared.TunnelFrame_DeleteShortcutResp{DeleteShortcutResp: &agent.DeleteShortcutResp{}})
 			default:
 				return tunnel.ErrorFrame(frame.GetStreamId(), frame.GetRequestId(), "bad_request", "unknown payload")
 			}
@@ -51,6 +60,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 		{"/cloud-api/devices/dev-1/workspaces/tree", "Workspace"},
 		{"/cloud-api/devices/dev-1/workspaces/ws-1/sessions", "sess-1"},
 		{"/cloud-api/devices/dev-1/workspaces/ws-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
+		{"/cloud-api/devices/dev-1/shortcuts", "shortcut-1"},
 	} {
 		request := httptest.NewRequest(http.MethodGet, tc.path, nil)
 		request.Header.Set(requestIdHeader, "req_test_relay")
@@ -64,6 +74,29 @@ func TestBrowserAPIRelay(t *testing.T) {
 			t.Fatalf("%s body = %s, want %q", tc.path, response.Body.String(), tc.want)
 		}
 	}
+	for _, tc := range []struct {
+		method string
+		path   string
+		body   string
+		status int
+		want   string
+	}{
+		{http.MethodPost, "/cloud-api/devices/dev-1/shortcuts", `{"name":"Created shell","command":"cmd /c \"echo created\""}`, http.StatusCreated, "Created shell"},
+		{http.MethodPatch, "/cloud-api/devices/dev-1/shortcuts/shortcut-1", `{"name":"Updated shell"}`, http.StatusOK, "Updated shell"},
+		{http.MethodDelete, "/cloud-api/devices/dev-1/shortcuts/shortcut-1", "", http.StatusNoContent, ""},
+	} {
+		request := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+		request.Header.Set(requestIdHeader, "req_test_relay")
+		request.Header.Set("Authorization", "Bearer "+token)
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != tc.status {
+			t.Fatalf("%s %s status = %d, want %d; body=%s", tc.method, tc.path, response.Code, tc.status, response.Body.String())
+		}
+		if tc.want != "" && !strings.Contains(response.Body.String(), tc.want) {
+			t.Fatalf("%s %s body = %s, want %q", tc.method, tc.path, response.Body.String(), tc.want)
+		}
+	}
 	cancel()
 	<-agentDone
 }
@@ -71,7 +104,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 func loginToken(t *testing.T, handler *Handler) string {
 	t.Helper()
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`)))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(testLoginRequestBody(t, handler, "admin", "admin"))))
 	if response.Code != http.StatusOK {
 		t.Fatalf("login status = %d; body=%s", response.Code, response.Body.String())
 	}
@@ -141,13 +174,27 @@ func responseFrame(request *shared.TunnelFrame, payload any) *shared.TunnelFrame
 		frame.Payload = value
 	case *shared.TunnelFrame_ReadHistoryResp:
 		frame.Payload = value
+	case *shared.TunnelFrame_ListShortcutsResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_CreateShortcutResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_UpdateShortcutResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_DeleteShortcutResp:
+		frame.Payload = value
 	}
 	return frame
 }
 
 func isRuntimeRequestFrame(frame *shared.TunnelFrame) bool {
 	switch frame.GetPayload().(type) {
-	case *shared.TunnelFrame_WorkspaceTreeReq, *shared.TunnelFrame_WorkspaceSessionsReq, *shared.TunnelFrame_ReadHistoryReq:
+	case *shared.TunnelFrame_WorkspaceTreeReq,
+		*shared.TunnelFrame_WorkspaceSessionsReq,
+		*shared.TunnelFrame_ReadHistoryReq,
+		*shared.TunnelFrame_ListShortcutsReq,
+		*shared.TunnelFrame_CreateShortcutReq,
+		*shared.TunnelFrame_UpdateShortcutReq,
+		*shared.TunnelFrame_DeleteShortcutReq:
 		return true
 	default:
 		return false

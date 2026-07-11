@@ -19,11 +19,22 @@ message AuthLoginReq {
   string email = 1;
   string username = 2;
   string password = 3;
+  string turnstile_token = 4;
+  string csrf_token = 5;
 }
 
 message AuthRegisterReq {
   string email = 1;
   string password = 2;
+  string turnstile_token = 3;
+}
+
+message AuthSecurityConfigResp {
+  string turnstile_site_key = 1;
+}
+
+message AuthCsrfTokenResp {
+  string token = 1;
 }
 
 message AuthVerifyEmailReq {

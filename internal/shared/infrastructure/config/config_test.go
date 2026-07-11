@@ -638,6 +638,35 @@ func TestLoadRejectsIncompleteIntegrationConfig(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsProductionTurnstileConfiguration(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	t.Setenv(EnvNameVariable, "production")
+	writeEnvConfig(t, cwd, "production", "cloud:\n  public_url: https://cloud.example.test\n")
+
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil || !strings.Contains(err.Error(), "cloud.turnstile.site_key") {
+		t.Fatalf("Load() error = %v, want missing production Turnstile site key", err)
+	}
+}
+
+func TestLoadProductionTurnstileConfiguration(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	t.Setenv(EnvNameVariable, "production")
+	writeEnvConfig(t, cwd, "production", "cloud:\n  public_url: https://cloud.example.test\n  turnstile:\n    site_key: production-site-key\n    secret_key: production-secret-key\n")
+
+	cfg, err := Load(Options{Cwd: cwd})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Cloud.Turnstile.SiteKey != "production-site-key" || cfg.Cloud.Turnstile.SecretKey != "production-secret-key" {
+		t.Fatalf("Turnstile config = %#v", cfg.Cloud.Turnstile)
+	}
+}
+
 func TestLoadLocalOAuthConfig(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()

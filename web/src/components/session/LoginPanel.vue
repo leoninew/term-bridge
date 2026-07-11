@@ -1,7 +1,7 @@
 <template>
-  <section
-    class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text)]"
-  >
+  <section class="min-h-screen bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]">
+    <AppHeader />
+    <div class="flex min-h-[calc(100vh-4rem)] items-center justify-center p-6">
     <form
       class="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl"
       @submit.prevent="emit('submit')"
@@ -30,10 +30,11 @@
           @input="emit('update:password', ($event.target as HTMLInputElement).value)"
         />
       </label>
+      <slot />
       <button
         type="submit"
         class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50 hover:bg-blue-500 disabled:opacity-60"
-        :disabled="loggingIn || googleLoggingIn"
+        :disabled="loggingIn || googleLoggingIn || !turnstileReady"
       >
         {{ loggingIn ? t('cloud.signingIn') : t('cloud.signIn') }}
       </button>
@@ -53,19 +54,22 @@
           {{ t('cloud.forgotPassword') }}
         </RouterLink>
       </div>
-    </form>
+      </form>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n'
   import { RouterLink } from 'vue-router'
+  import AppHeader from '../layout/AppHeader.vue'
 
   defineProps<{
     username: string
     password: string
     loggingIn: boolean
     googleLoggingIn: boolean
+    turnstileReady: boolean
   }>()
 
   const emit = defineEmits<{

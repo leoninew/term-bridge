@@ -3,6 +3,7 @@ package requestlog
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -151,6 +152,31 @@ func TestMiddlewareRecordsJSONRequestBodyAndRestoresIt(t *testing.T) {
 	if handlerBody != body {
 		t.Fatalf("expected handler body %q, got %q", body, handlerBody)
 	}
+}
+
+func TestMiddlewareRedactsCloudCredentialBodiesWithoutBreakingHandlerInput(t *testing.T) {
+	body := `{"password":"secret","turnstile_token":"challenge","csrf_token":"csrf"}`
+	var handlerBody string
+	entries, _ := runLoggedRequest(t, http.MethodPost, "/cloud-api/auth/login", "application/json", body, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, _ := io.ReadAll(r.Body)
+		handlerBody = string(data)
+		writeTestJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+	}))
+	started, _ := assertStartedAndCompleted(t, entries)
+
+	assertLogMissing(t, started, "request_body")
+	if handlerBody != body {
+		t.Fatalf("handler body = %q, want %q", handlerBody, body)
+	}
+}
+
+func TestMiddlewareRedactsCSRFTokenResponse(t *testing.T) {
+	entries, _ := runLoggedRequest(t, http.MethodGet, "/cloud-api/auth/login/csrf", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeTestJSON(w, http.StatusOK, map[string]string{"token": "csrf-secret"})
+	}))
+	_, completed := assertStartedAndCompleted(t, entries)
+
+	assertLogMissing(t, completed, "response_body")
 }
 
 func TestMiddlewareSkipsNonJSONBodies(t *testing.T) {

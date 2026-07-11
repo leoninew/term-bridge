@@ -6,6 +6,8 @@ import type {
   AuthLoginReq,
   AuthLoginResp,
   AuthMeResp,
+  AuthCsrfTokenResp,
+  AuthSecurityConfigResp,
   AuthPasswordResetConfirmReq,
   AuthPasswordResetRequestReq,
   AuthRegisterReq,
@@ -30,6 +32,12 @@ import type {
   UpdateSessionReq,
   UpdateSessionOrderResp,
 } from '../../gen/proto/termbridge/agent/v1/session'
+import type {
+  CreateShortcutReq,
+  ListShortcutsResp,
+  Shortcut,
+  UpdateShortcutReq,
+} from '../../gen/proto/termbridge/agent/v1/shortcut'
 import { cloudApiClient } from '../api/client'
 import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
 import type { RuntimeTarget } from '../runtimeTarget'
@@ -52,8 +60,29 @@ export async function authMeViaCloud(): Promise<AuthMeResp> {
   }
 }
 
-export async function authLogin(email: string, password: string): Promise<AuthLoginResp> {
-  const request: AuthLoginReq = { email, username: '', password }
+export async function authTurnstileSiteKey(): Promise<string> {
+  const response = await cloudApiClient.get<AuthSecurityConfigResp>('/auth/turnstile/config')
+  return response.data.turnstile_site_key
+}
+
+export async function authLoginCSRFToken(): Promise<string> {
+  const response = await cloudApiClient.get<AuthCsrfTokenResp>('/auth/login/csrf')
+  return response.data.token
+}
+
+export async function authLogin(
+  email: string,
+  password: string,
+  turnstileToken: string,
+  csrfToken: string,
+): Promise<AuthLoginResp> {
+  const request: AuthLoginReq = {
+    email,
+    username: '',
+    password,
+    turnstile_token: turnstileToken,
+    csrf_token: csrfToken,
+  }
   const response = await cloudApiClient.post<AuthLoginResp>('/auth/login', request)
   return response.data
 }
@@ -62,8 +91,12 @@ export async function authLogout(): Promise<void> {
   await cloudApiClient.post('/auth/logout')
 }
 
-export async function authRegister(email: string, password: string): Promise<void> {
-  const request: AuthRegisterReq = { email, password }
+export async function authRegister(
+  email: string,
+  password: string,
+  turnstileToken: string,
+): Promise<void> {
+  const request: AuthRegisterReq = { email, password, turnstile_token: turnstileToken }
   await cloudApiClient.post('/auth/register', request)
 }
 
@@ -169,6 +202,42 @@ export async function updateSession(
     request,
   )
   return response.data
+}
+
+export async function listShortcuts(target: RuntimeTarget): Promise<Shortcut[]> {
+  const response = await cloudApiClient.get<ListShortcutsResp>(
+    cloudRuntimePath(target, '/shortcuts'),
+  )
+  return response.data.items
+}
+
+export async function createShortcut(
+  target: RuntimeTarget,
+  request: CreateShortcutReq,
+): Promise<Shortcut> {
+  const response = await cloudApiClient.post<Shortcut>(
+    cloudRuntimePath(target, '/shortcuts'),
+    request,
+  )
+  return response.data
+}
+
+export async function updateShortcut(
+  target: RuntimeTarget,
+  shortcutId: string,
+  request: UpdateShortcutReq,
+): Promise<Shortcut> {
+  const response = await cloudApiClient.patch<Shortcut>(
+    cloudRuntimePath(target, `/shortcuts/${encodeURIComponent(shortcutId)}`),
+    request,
+  )
+  return response.data
+}
+
+export async function deleteShortcut(target: RuntimeTarget, shortcutId: string): Promise<void> {
+  await cloudApiClient.delete(
+    cloudRuntimePath(target, `/shortcuts/${encodeURIComponent(shortcutId)}`),
+  )
 }
 
 export async function deleteSession(

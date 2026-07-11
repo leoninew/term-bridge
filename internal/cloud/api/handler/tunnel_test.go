@@ -64,7 +64,7 @@ func TestDevicesEndpointReturnsRegisteredDevices(t *testing.T) {
 	handler := New(testCloudConfig())
 	handler.registry.Register("dev-1", "local", time.Now().UTC())
 	loginResponse := httptest.NewRecorder()
-	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", stringsReader(`{"username":"admin","password":"admin"}`)))
+	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", stringsReader(testLoginRequestBody(t, handler, "admin", "admin"))))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d", loginResponse.Code)
 	}

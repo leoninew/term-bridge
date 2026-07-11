@@ -42,6 +42,28 @@ type Config struct {
 	CloudPublicURL      string
 	CloudOAuth          CloudOAuthConfig
 	CORSAllowedOrigins  []string
+	Turnstile           TurnstileConfig
+	CSRF                CSRFConfig
+}
+
+type TurnstileConfig struct {
+	SiteKey          string
+	SecretKey        string
+	ExpectedHostname string
+	Verify           TurnstileVerifier
+}
+
+type CSRFConfig struct {
+	Tokens CSRFTokenService
+}
+
+type TurnstileVerifier interface {
+	Verify(ctx context.Context, token string, remoteIP string) error
+}
+
+type CSRFTokenService interface {
+	Issue() (string, error)
+	Consume(token string) bool
 }
 
 type CloudOAuthConfig struct {
@@ -197,6 +219,8 @@ func (h *Handler) registerCommonRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/cloud-api/health", h.handleHealth)
 	mux.HandleFunc("/cloud-api/auth/logout", h.authMiddleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
 	mux.HandleFunc("/cloud-api/auth/me", h.handleAuthMe)
+	mux.HandleFunc("/cloud-api/auth/turnstile/config", h.handleTurnstileConfig)
+	mux.HandleFunc("/cloud-api/auth/login/csrf", h.handleLoginCSRF)
 }
 
 func (h *Handler) registerCloudRoutes(mux *http.ServeMux) {
@@ -227,6 +251,44 @@ func (s *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, &shared.HealthResp{Status: "ok"})
 }
 
+func (s *Handler) handleTurnstileConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	writeJSON(w, http.StatusOK, &cloudproto.AuthSecurityConfigResp{TurnstileSiteKey: s.config.Turnstile.SiteKey})
+}
+
+func (s *Handler) handleLoginCSRF(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	if s.config.CSRF.Tokens == nil {
+		s.writeAuthSecurityError(w, r)
+		return
+	}
+	token, err := s.config.CSRF.Tokens.Issue()
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeInternal, "Authentication security is temporarily unavailable.", err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, &cloudproto.AuthCsrfTokenResp{Token: token})
+}
+
+func (s *Handler) consumeCSRFToken(token string) bool {
+	return s.config.CSRF.Tokens != nil && s.config.CSRF.Tokens.Consume(token)
+}
+
+func (s *Handler) verifyTurnstile(ctx context.Context, token string) bool {
+	return s.config.Turnstile.Verify != nil && s.config.Turnstile.Verify.Verify(ctx, token, "") == nil
+}
+
+func (s *Handler) writeAuthSecurityError(w http.ResponseWriter, r *http.Request) {
+	s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Authentication security verification failed.", errAuthSecurityValidation)
+}
+
 func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		s.methodNotAllowed(w, r, http.MethodPost)
@@ -237,6 +299,10 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	var req cloudproto.AuthLoginReq
 	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	if !s.consumeCSRFToken(req.CsrfToken) || !s.verifyTurnstile(r.Context(), req.TurnstileToken) {
+		s.writeAuthSecurityError(w, r)
 		return
 	}
 	login := req.Email
@@ -304,6 +370,10 @@ func (s *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	var req cloudproto.AuthRegisterReq
 	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	if !s.verifyTurnstile(r.Context(), req.TurnstileToken) {
+		s.writeAuthSecurityError(w, r)
 		return
 	}
 	if s.authService == nil {
@@ -462,8 +532,8 @@ func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Handler) handleOAuthAuthorize(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		s.methodNotAllowed(w, r, http.MethodPost)
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		s.methodNotAllowed(w, r, http.MethodGet, http.MethodPost)
 		return
 	}
 	if !s.requireCloudOAuth(w, r) {
@@ -712,10 +782,47 @@ func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.writeNotFound(w, r)
+	case "shortcuts":
+		s.handleShortcutRoute(w, r, endpoint, deviceId, parts[2:])
 	default:
 		s.writeNotFound(w, r)
 	}
 }
+func (s *Handler) handleShortcutRoute(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, parts []string) {
+	if len(parts) == 0 {
+		switch r.Method {
+		case http.MethodGet:
+			s.handleJSONRuntime(w, r, endpoint, deviceId, "list_shortcuts", nil, "")
+		case http.MethodPost:
+			request := &agent.CreateShortcutReq{}
+			if !s.decodeJSONRequest(w, r, request) {
+				return
+			}
+			s.handleJSONRuntimeWithStatus(w, r, endpoint, deviceId, "create_shortcut", request, "", http.StatusCreated)
+		default:
+			s.methodNotAllowed(w, r, http.MethodGet, http.MethodPost)
+		}
+		return
+	}
+	if len(parts) != 1 || parts[0] == "" {
+		s.writeNotFound(w, r)
+		return
+	}
+	shortcutId := parts[0]
+	switch r.Method {
+	case http.MethodPatch:
+		request := &agent.UpdateShortcutReq{}
+		if !s.decodeJSONRequest(w, r, request) {
+			return
+		}
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "update_shortcut", &agent.UpdateShortcutRequest{ShortcutId: shortcutId, Request: request}, "")
+	case http.MethodDelete:
+		s.handleNoContentRuntime(w, r, endpoint, "delete_shortcut", &agent.DeleteShortcutReq{ShortcutId: shortcutId})
+	default:
+		s.methodNotAllowed(w, r, http.MethodPatch, http.MethodDelete)
+	}
+}
+
 func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, parts []string) {
 	if len(parts) == 2 && r.Method == http.MethodGet {
 		s.handleJSONRuntime(w, r, endpoint, deviceId, "workspaces", nil, "")
@@ -1262,6 +1369,9 @@ func normalizeConfig(config Config) Config {
 		panic("cloud api logger is required")
 	}
 	config.CloudPublicURL = strings.TrimRight(strings.TrimSpace(config.CloudPublicURL), "/")
+	config.Turnstile.SiteKey = strings.TrimSpace(config.Turnstile.SiteKey)
+	config.Turnstile.SecretKey = strings.TrimSpace(config.Turnstile.SecretKey)
+	config.Turnstile.ExpectedHostname = normalizeHostname(config.Turnstile.ExpectedHostname)
 	for index := range config.CloudOAuth.Clients {
 		client := &config.CloudOAuth.Clients[index]
 		client.ClientId = strings.TrimSpace(client.ClientId)

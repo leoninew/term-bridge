@@ -22,11 +22,22 @@ export interface AuthLoginReq {
   email: string;
   username: string;
   password: string;
+  turnstile_token: string;
+  csrf_token: string;
 }
 
 export interface AuthRegisterReq {
   email: string;
   password: string;
+  turnstile_token: string;
+}
+
+export interface AuthSecurityConfigResp {
+  turnstile_site_key: string;
+}
+
+export interface AuthCsrfTokenResp {
+  token: string;
 }
 
 export interface AuthVerifyEmailReq {

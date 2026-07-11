@@ -113,6 +113,12 @@ cloud:
   # 仅建议本地调试打开；生产保持 false。
   expose_errors: false
 
+  # Cloudflare Turnstile protects public email/password login and registration.
+  # Production must supply non-empty credentials and a public HTTPS hostname via environment-specific configuration.
+  turnstile:
+    site_key: ""
+    secret_key: ""
+
   # Cloud 作为 OAuth2 Authorization Server 时接受的 client registry。
   # 默认值面向本地开发；其他环境通过 configs/config.<env>.yaml 或环境变量覆盖。
   oauth:

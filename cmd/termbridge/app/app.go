@@ -255,7 +255,8 @@ func agentConfig(cfg config.Config) agentserver.Config {
 
 func cloudConfig(cfg config.Config) cloudserver.Config {
 	return cloudserver.Config{
-		LogHTTP: cfg.LogHTTP,
+		Environment: cfg.Environment,
+		LogHTTP:     cfg.LogHTTP,
 		Server: cloudserver.ServerConfig{
 			ListenURL:          cfg.Cloud.ListenUrl,
 			StaticDir:          cfg.Cloud.StaticDir,
@@ -293,7 +294,11 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 		},
 		Cloud: cloudserver.CloudConfig{
 			PublicURL: cfg.Cloud.PublicUrl,
-			OAuth:     cloudserver.CloudOAuthConfig{Clients: cloudOAuthClients(cfg.Cloud.OAuth.Clients)},
+			Turnstile: cloudserver.TurnstileConfig{
+				SiteKey:   cfg.Cloud.Turnstile.SiteKey,
+				SecretKey: cfg.Cloud.Turnstile.SecretKey,
+			},
+			OAuth: cloudserver.CloudOAuthConfig{Clients: cloudOAuthClients(cfg.Cloud.OAuth.Clients)},
 		},
 	}
 }

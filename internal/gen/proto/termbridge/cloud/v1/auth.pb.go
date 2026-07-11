@@ -98,12 +98,14 @@ func (x *User) GetProvider() string {
 }
 
 type AuthLoginReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
-	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
-	Password      string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Email          string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	Username       string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	Password       string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`
+	TurnstileToken string                 `protobuf:"bytes,4,opt,name=turnstile_token,json=turnstileToken,proto3" json:"turnstile_token,omitempty"`
+	CsrfToken      string                 `protobuf:"bytes,5,opt,name=csrf_token,json=csrfToken,proto3" json:"csrf_token,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AuthLoginReq) Reset() {
@@ -157,12 +159,27 @@ func (x *AuthLoginReq) GetPassword() string {
 	return ""
 }
 
+func (x *AuthLoginReq) GetTurnstileToken() string {
+	if x != nil {
+		return x.TurnstileToken
+	}
+	return ""
+}
+
+func (x *AuthLoginReq) GetCsrfToken() string {
+	if x != nil {
+		return x.CsrfToken
+	}
+	return ""
+}
+
 type AuthRegisterReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
-	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Email          string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	Password       string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	TurnstileToken string                 `protobuf:"bytes,3,opt,name=turnstile_token,json=turnstileToken,proto3" json:"turnstile_token,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AuthRegisterReq) Reset() {
@@ -209,6 +226,101 @@ func (x *AuthRegisterReq) GetPassword() string {
 	return ""
 }
 
+func (x *AuthRegisterReq) GetTurnstileToken() string {
+	if x != nil {
+		return x.TurnstileToken
+	}
+	return ""
+}
+
+type AuthSecurityConfigResp struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	TurnstileSiteKey string                 `protobuf:"bytes,1,opt,name=turnstile_site_key,json=turnstileSiteKey,proto3" json:"turnstile_site_key,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *AuthSecurityConfigResp) Reset() {
+	*x = AuthSecurityConfigResp{}
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthSecurityConfigResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthSecurityConfigResp) ProtoMessage() {}
+
+func (x *AuthSecurityConfigResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthSecurityConfigResp.ProtoReflect.Descriptor instead.
+func (*AuthSecurityConfigResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AuthSecurityConfigResp) GetTurnstileSiteKey() string {
+	if x != nil {
+		return x.TurnstileSiteKey
+	}
+	return ""
+}
+
+type AuthCsrfTokenResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthCsrfTokenResp) Reset() {
+	*x = AuthCsrfTokenResp{}
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthCsrfTokenResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthCsrfTokenResp) ProtoMessage() {}
+
+func (x *AuthCsrfTokenResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthCsrfTokenResp.ProtoReflect.Descriptor instead.
+func (*AuthCsrfTokenResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AuthCsrfTokenResp) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
 type AuthVerifyEmailReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
@@ -219,7 +331,7 @@ type AuthVerifyEmailReq struct {
 
 func (x *AuthVerifyEmailReq) Reset() {
 	*x = AuthVerifyEmailReq{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[3]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -231,7 +343,7 @@ func (x *AuthVerifyEmailReq) String() string {
 func (*AuthVerifyEmailReq) ProtoMessage() {}
 
 func (x *AuthVerifyEmailReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[3]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -244,7 +356,7 @@ func (x *AuthVerifyEmailReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthVerifyEmailReq.ProtoReflect.Descriptor instead.
 func (*AuthVerifyEmailReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{3}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AuthVerifyEmailReq) GetEmail() string {
@@ -270,7 +382,7 @@ type AuthResendVerificationReq struct {
 
 func (x *AuthResendVerificationReq) Reset() {
 	*x = AuthResendVerificationReq{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[4]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -282,7 +394,7 @@ func (x *AuthResendVerificationReq) String() string {
 func (*AuthResendVerificationReq) ProtoMessage() {}
 
 func (x *AuthResendVerificationReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[4]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -295,7 +407,7 @@ func (x *AuthResendVerificationReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthResendVerificationReq.ProtoReflect.Descriptor instead.
 func (*AuthResendVerificationReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{4}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *AuthResendVerificationReq) GetEmail() string {
@@ -315,7 +427,7 @@ type AuthChangePasswordReq struct {
 
 func (x *AuthChangePasswordReq) Reset() {
 	*x = AuthChangePasswordReq{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[5]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -327,7 +439,7 @@ func (x *AuthChangePasswordReq) String() string {
 func (*AuthChangePasswordReq) ProtoMessage() {}
 
 func (x *AuthChangePasswordReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[5]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -340,7 +452,7 @@ func (x *AuthChangePasswordReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthChangePasswordReq.ProtoReflect.Descriptor instead.
 func (*AuthChangePasswordReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{5}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AuthChangePasswordReq) GetCurrentPassword() string {
@@ -366,7 +478,7 @@ type AuthPasswordResetRequestReq struct {
 
 func (x *AuthPasswordResetRequestReq) Reset() {
 	*x = AuthPasswordResetRequestReq{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[6]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -378,7 +490,7 @@ func (x *AuthPasswordResetRequestReq) String() string {
 func (*AuthPasswordResetRequestReq) ProtoMessage() {}
 
 func (x *AuthPasswordResetRequestReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[6]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -391,7 +503,7 @@ func (x *AuthPasswordResetRequestReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthPasswordResetRequestReq.ProtoReflect.Descriptor instead.
 func (*AuthPasswordResetRequestReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{6}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AuthPasswordResetRequestReq) GetEmail() string {
@@ -412,7 +524,7 @@ type AuthPasswordResetConfirmReq struct {
 
 func (x *AuthPasswordResetConfirmReq) Reset() {
 	*x = AuthPasswordResetConfirmReq{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[7]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -424,7 +536,7 @@ func (x *AuthPasswordResetConfirmReq) String() string {
 func (*AuthPasswordResetConfirmReq) ProtoMessage() {}
 
 func (x *AuthPasswordResetConfirmReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[7]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -437,7 +549,7 @@ func (x *AuthPasswordResetConfirmReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthPasswordResetConfirmReq.ProtoReflect.Descriptor instead.
 func (*AuthPasswordResetConfirmReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{7}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *AuthPasswordResetConfirmReq) GetEmail() string {
@@ -471,7 +583,7 @@ type AuthGoogleCallbackReq struct {
 
 func (x *AuthGoogleCallbackReq) Reset() {
 	*x = AuthGoogleCallbackReq{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[8]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -483,7 +595,7 @@ func (x *AuthGoogleCallbackReq) String() string {
 func (*AuthGoogleCallbackReq) ProtoMessage() {}
 
 func (x *AuthGoogleCallbackReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[8]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -496,7 +608,7 @@ func (x *AuthGoogleCallbackReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthGoogleCallbackReq.ProtoReflect.Descriptor instead.
 func (*AuthGoogleCallbackReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{8}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *AuthGoogleCallbackReq) GetCode() string {
@@ -522,7 +634,7 @@ type CloudOAuthExchangeReq struct {
 
 func (x *CloudOAuthExchangeReq) Reset() {
 	*x = CloudOAuthExchangeReq{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[9]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -534,7 +646,7 @@ func (x *CloudOAuthExchangeReq) String() string {
 func (*CloudOAuthExchangeReq) ProtoMessage() {}
 
 func (x *CloudOAuthExchangeReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[9]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -547,7 +659,7 @@ func (x *CloudOAuthExchangeReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudOAuthExchangeReq.ProtoReflect.Descriptor instead.
 func (*CloudOAuthExchangeReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{9}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CloudOAuthExchangeReq) GetCode() string {
@@ -567,7 +679,7 @@ type CloudOAuthExchangeResp struct {
 
 func (x *CloudOAuthExchangeResp) Reset() {
 	*x = CloudOAuthExchangeResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[10]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -579,7 +691,7 @@ func (x *CloudOAuthExchangeResp) String() string {
 func (*CloudOAuthExchangeResp) ProtoMessage() {}
 
 func (x *CloudOAuthExchangeResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[10]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -592,7 +704,7 @@ func (x *CloudOAuthExchangeResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudOAuthExchangeResp.ProtoReflect.Descriptor instead.
 func (*CloudOAuthExchangeResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{10}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CloudOAuthExchangeResp) GetAccessToken() string {
@@ -619,7 +731,7 @@ type AuthLoginResp struct {
 
 func (x *AuthLoginResp) Reset() {
 	*x = AuthLoginResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[11]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -631,7 +743,7 @@ func (x *AuthLoginResp) String() string {
 func (*AuthLoginResp) ProtoMessage() {}
 
 func (x *AuthLoginResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[11]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -644,7 +756,7 @@ func (x *AuthLoginResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthLoginResp.ProtoReflect.Descriptor instead.
 func (*AuthLoginResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{11}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AuthLoginResp) GetAccessToken() string {
@@ -671,7 +783,7 @@ type AuthGoogleCallbackResp struct {
 
 func (x *AuthGoogleCallbackResp) Reset() {
 	*x = AuthGoogleCallbackResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[12]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -683,7 +795,7 @@ func (x *AuthGoogleCallbackResp) String() string {
 func (*AuthGoogleCallbackResp) ProtoMessage() {}
 
 func (x *AuthGoogleCallbackResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[12]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -696,7 +808,7 @@ func (x *AuthGoogleCallbackResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthGoogleCallbackResp.ProtoReflect.Descriptor instead.
 func (*AuthGoogleCallbackResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{12}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AuthGoogleCallbackResp) GetAccessToken() string {
@@ -723,7 +835,7 @@ type LocalAuthLoginResp struct {
 
 func (x *LocalAuthLoginResp) Reset() {
 	*x = LocalAuthLoginResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[13]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -735,7 +847,7 @@ func (x *LocalAuthLoginResp) String() string {
 func (*LocalAuthLoginResp) ProtoMessage() {}
 
 func (x *LocalAuthLoginResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[13]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -748,7 +860,7 @@ func (x *LocalAuthLoginResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocalAuthLoginResp.ProtoReflect.Descriptor instead.
 func (*LocalAuthLoginResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{13}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *LocalAuthLoginResp) GetAccessToken() string {
@@ -775,7 +887,7 @@ type CloudOAuthTokenResp struct {
 
 func (x *CloudOAuthTokenResp) Reset() {
 	*x = CloudOAuthTokenResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[14]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -787,7 +899,7 @@ func (x *CloudOAuthTokenResp) String() string {
 func (*CloudOAuthTokenResp) ProtoMessage() {}
 
 func (x *CloudOAuthTokenResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[14]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -800,7 +912,7 @@ func (x *CloudOAuthTokenResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudOAuthTokenResp.ProtoReflect.Descriptor instead.
 func (*CloudOAuthTokenResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{14}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CloudOAuthTokenResp) GetAccessToken() string {
@@ -826,7 +938,7 @@ type GoogleAuthUrlResp struct {
 
 func (x *GoogleAuthUrlResp) Reset() {
 	*x = GoogleAuthUrlResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[15]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -838,7 +950,7 @@ func (x *GoogleAuthUrlResp) String() string {
 func (*GoogleAuthUrlResp) ProtoMessage() {}
 
 func (x *GoogleAuthUrlResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[15]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -851,7 +963,7 @@ func (x *GoogleAuthUrlResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GoogleAuthUrlResp.ProtoReflect.Descriptor instead.
 func (*GoogleAuthUrlResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{15}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GoogleAuthUrlResp) GetAuthUrl() string {
@@ -874,7 +986,7 @@ type AuthMeResp struct {
 
 func (x *AuthMeResp) Reset() {
 	*x = AuthMeResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[16]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -886,7 +998,7 @@ func (x *AuthMeResp) String() string {
 func (*AuthMeResp) ProtoMessage() {}
 
 func (x *AuthMeResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[16]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -899,7 +1011,7 @@ func (x *AuthMeResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthMeResp.ProtoReflect.Descriptor instead.
 func (*AuthMeResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{16}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *AuthMeResp) GetAuthenticated() bool {
@@ -947,14 +1059,22 @@ const file_termbridge_cloud_v1_auth_proto_rawDesc = "" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12!\n" +
 	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\x12%\n" +
 	"\x0eemail_verified\x18\x04 \x01(\bR\remailVerified\x12\x1a\n" +
-	"\bprovider\x18\x05 \x01(\tR\bprovider\"\\\n" +
+	"\bprovider\x18\x05 \x01(\tR\bprovider\"\xa4\x01\n" +
 	"\fAuthLoginReq\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x1a\n" +
-	"\bpassword\x18\x03 \x01(\tR\bpassword\"C\n" +
+	"\bpassword\x18\x03 \x01(\tR\bpassword\x12'\n" +
+	"\x0fturnstile_token\x18\x04 \x01(\tR\x0eturnstileToken\x12\x1d\n" +
+	"\n" +
+	"csrf_token\x18\x05 \x01(\tR\tcsrfToken\"l\n" +
 	"\x0fAuthRegisterReq\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\">\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\x12'\n" +
+	"\x0fturnstile_token\x18\x03 \x01(\tR\x0eturnstileToken\"F\n" +
+	"\x16AuthSecurityConfigResp\x12,\n" +
+	"\x12turnstile_site_key\x18\x01 \x01(\tR\x10turnstileSiteKey\")\n" +
+	"\x11AuthCsrfTokenResp\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\">\n" +
 	"\x12AuthVerifyEmailReq\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\"1\n" +
@@ -1017,32 +1137,34 @@ func file_termbridge_cloud_v1_auth_proto_rawDescGZIP() []byte {
 	return file_termbridge_cloud_v1_auth_proto_rawDescData
 }
 
-var file_termbridge_cloud_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_termbridge_cloud_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_termbridge_cloud_v1_auth_proto_goTypes = []any{
 	(*User)(nil),                        // 0: termbridge.cloud.User
 	(*AuthLoginReq)(nil),                // 1: termbridge.cloud.AuthLoginReq
 	(*AuthRegisterReq)(nil),             // 2: termbridge.cloud.AuthRegisterReq
-	(*AuthVerifyEmailReq)(nil),          // 3: termbridge.cloud.AuthVerifyEmailReq
-	(*AuthResendVerificationReq)(nil),   // 4: termbridge.cloud.AuthResendVerificationReq
-	(*AuthChangePasswordReq)(nil),       // 5: termbridge.cloud.AuthChangePasswordReq
-	(*AuthPasswordResetRequestReq)(nil), // 6: termbridge.cloud.AuthPasswordResetRequestReq
-	(*AuthPasswordResetConfirmReq)(nil), // 7: termbridge.cloud.AuthPasswordResetConfirmReq
-	(*AuthGoogleCallbackReq)(nil),       // 8: termbridge.cloud.AuthGoogleCallbackReq
-	(*CloudOAuthExchangeReq)(nil),       // 9: termbridge.cloud.CloudOAuthExchangeReq
-	(*CloudOAuthExchangeResp)(nil),      // 10: termbridge.cloud.CloudOAuthExchangeResp
-	(*AuthLoginResp)(nil),               // 11: termbridge.cloud.AuthLoginResp
-	(*AuthGoogleCallbackResp)(nil),      // 12: termbridge.cloud.AuthGoogleCallbackResp
-	(*LocalAuthLoginResp)(nil),          // 13: termbridge.cloud.LocalAuthLoginResp
-	(*CloudOAuthTokenResp)(nil),         // 14: termbridge.cloud.CloudOAuthTokenResp
-	(*GoogleAuthUrlResp)(nil),           // 15: termbridge.cloud.GoogleAuthUrlResp
-	(*AuthMeResp)(nil),                  // 16: termbridge.cloud.AuthMeResp
-	(*CloudSessionSummary)(nil),         // 17: termbridge.cloud.CloudSessionSummary
-	(*DeviceSummary)(nil),               // 18: termbridge.cloud.DeviceSummary
+	(*AuthSecurityConfigResp)(nil),      // 3: termbridge.cloud.AuthSecurityConfigResp
+	(*AuthCsrfTokenResp)(nil),           // 4: termbridge.cloud.AuthCsrfTokenResp
+	(*AuthVerifyEmailReq)(nil),          // 5: termbridge.cloud.AuthVerifyEmailReq
+	(*AuthResendVerificationReq)(nil),   // 6: termbridge.cloud.AuthResendVerificationReq
+	(*AuthChangePasswordReq)(nil),       // 7: termbridge.cloud.AuthChangePasswordReq
+	(*AuthPasswordResetRequestReq)(nil), // 8: termbridge.cloud.AuthPasswordResetRequestReq
+	(*AuthPasswordResetConfirmReq)(nil), // 9: termbridge.cloud.AuthPasswordResetConfirmReq
+	(*AuthGoogleCallbackReq)(nil),       // 10: termbridge.cloud.AuthGoogleCallbackReq
+	(*CloudOAuthExchangeReq)(nil),       // 11: termbridge.cloud.CloudOAuthExchangeReq
+	(*CloudOAuthExchangeResp)(nil),      // 12: termbridge.cloud.CloudOAuthExchangeResp
+	(*AuthLoginResp)(nil),               // 13: termbridge.cloud.AuthLoginResp
+	(*AuthGoogleCallbackResp)(nil),      // 14: termbridge.cloud.AuthGoogleCallbackResp
+	(*LocalAuthLoginResp)(nil),          // 15: termbridge.cloud.LocalAuthLoginResp
+	(*CloudOAuthTokenResp)(nil),         // 16: termbridge.cloud.CloudOAuthTokenResp
+	(*GoogleAuthUrlResp)(nil),           // 17: termbridge.cloud.GoogleAuthUrlResp
+	(*AuthMeResp)(nil),                  // 18: termbridge.cloud.AuthMeResp
+	(*CloudSessionSummary)(nil),         // 19: termbridge.cloud.CloudSessionSummary
+	(*DeviceSummary)(nil),               // 20: termbridge.cloud.DeviceSummary
 }
 var file_termbridge_cloud_v1_auth_proto_depIdxs = []int32{
 	0,  // 0: termbridge.cloud.AuthMeResp.user:type_name -> termbridge.cloud.User
-	17, // 1: termbridge.cloud.AuthMeResp.cloud_session:type_name -> termbridge.cloud.CloudSessionSummary
-	18, // 2: termbridge.cloud.AuthMeResp.device:type_name -> termbridge.cloud.DeviceSummary
+	19, // 1: termbridge.cloud.AuthMeResp.cloud_session:type_name -> termbridge.cloud.CloudSessionSummary
+	20, // 2: termbridge.cloud.AuthMeResp.device:type_name -> termbridge.cloud.DeviceSummary
 	3,  // [3:3] is the sub-list for method output_type
 	3,  // [3:3] is the sub-list for method input_type
 	3,  // [3:3] is the sub-list for extension type_name
@@ -1063,7 +1185,7 @@ func file_termbridge_cloud_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_termbridge_cloud_v1_auth_proto_rawDesc), len(file_termbridge_cloud_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
