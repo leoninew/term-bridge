@@ -30,7 +30,7 @@ func TestCurrentDeviceReportBindsDeviceToCloudUserAndTunnelUsesPublicKey(t *test
 	}
 	localDevice := Device{Id: "dev-1", Name: "local-device", PublicKey: base64.StdEncoding.EncodeToString(publicKey)}
 
-	reportRequest := httptest.NewRequest(http.MethodPost, "/cloud-api/devices/current", strings.NewReader(`{"id":"`+localDevice.Id+`","name":"`+localDevice.Name+`","public_key":"`+localDevice.PublicKey+`"}`))
+	reportRequest := httptest.NewRequest(http.MethodPost, "/api/devices/current", strings.NewReader(`{"id":"`+localDevice.Id+`","name":"`+localDevice.Name+`","public_key":"`+localDevice.PublicKey+`"}`))
 	reportRequest.Header.Set("Authorization", "Bearer "+token)
 	reportResponse := httptest.NewRecorder()
 	handler.ServeHTTP(reportResponse, reportRequest)
@@ -38,7 +38,7 @@ func TestCurrentDeviceReportBindsDeviceToCloudUserAndTunnelUsesPublicKey(t *test
 		t.Fatalf("current device report status = %d; body=%s", reportResponse.Code, reportResponse.Body.String())
 	}
 
-	devicesRequest := httptest.NewRequest(http.MethodGet, "/cloud-api/devices", nil)
+	devicesRequest := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
 	devicesRequest.Header.Set("Authorization", "Bearer "+token)
 	devicesResponse := httptest.NewRecorder()
 	handler.ServeHTTP(devicesResponse, devicesRequest)
@@ -60,11 +60,11 @@ func TestCurrentDeviceReportBindsDeviceToCloudUserAndTunnelUsesPublicKey(t *test
 		t.Fatalf("PublicKey(%s) = %q", localDevice.Id, storedPublicKey)
 	}
 	handler.config.AgentTunnelAudience = "test-audience"
-	tunnelHeader, err := tunnel.SignedTunnelHeader(http.MethodGet, "/cloud-api/agent/tunnel", "test-audience", localDevice.Id, privateKey, time.Now(), "test-nonce")
+	tunnelHeader, err := tunnel.SignedTunnelHeader(http.MethodGet, "/api/agent/tunnel", "test-audience", localDevice.Id, privateKey, time.Now(), "test-nonce")
 	if err != nil {
 		t.Fatalf("SignedTunnelHeader() error = %v", err)
 	}
-	tunnelRequest := httptest.NewRequest(http.MethodGet, "/cloud-api/agent/tunnel", nil)
+	tunnelRequest := httptest.NewRequest(http.MethodGet, "/api/agent/tunnel", nil)
 	tunnelRequest.Header = tunnelHeader
 	verifiedDeviceId, ok := handler.verifyAgentTunnelRequest(tunnelRequest)
 	if !ok || verifiedDeviceId != localDevice.Id {
@@ -74,7 +74,7 @@ func TestCurrentDeviceReportBindsDeviceToCloudUserAndTunnelUsesPublicKey(t *test
 
 func TestCurrentDeviceReportRejectsUnauthenticatedRequest(t *testing.T) {
 	handler := newCloudHandlerForTest(t)
-	request := httptest.NewRequest(http.MethodPost, "/cloud-api/devices/current", strings.NewReader(`{"id":"dev-1","name":"local-device","public_key":"public-key"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/devices/current", strings.NewReader(`{"id":"dev-1","name":"local-device","public_key":"public-key"}`))
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	assertAPIError(t, response, http.StatusUnauthorized, errorCodeUnauthorized)
@@ -94,7 +94,7 @@ func TestDevicesFiltersByCloudUserAndDeleteDisconnectsRoute(t *testing.T) {
 	handler.setRoute("dev-1", newAgentRoute("dev-1", nil))
 	token := cloudUserToken(t, handler.authService, "user-1", "user-1@example.test")
 
-	devicesRequest := httptest.NewRequest(http.MethodGet, "/cloud-api/devices", nil)
+	devicesRequest := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
 	devicesRequest.Header.Set("Authorization", "Bearer "+token)
 	devicesResponse := httptest.NewRecorder()
 	handler.ServeHTTP(devicesResponse, devicesRequest)
@@ -109,7 +109,7 @@ func TestDevicesFiltersByCloudUserAndDeleteDisconnectsRoute(t *testing.T) {
 		t.Fatalf("devices count=%d first_id=%q first_online=%v", len(devices.GetItems()), devices.GetItems()[0].GetId(), devices.GetItems()[0].GetOnline())
 	}
 
-	deleteRequest := httptest.NewRequest(http.MethodDelete, "/cloud-api/devices/dev-1", nil)
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/api/devices/dev-1", nil)
 	deleteRequest.Header.Set("Authorization", "Bearer "+token)
 	deleteResponse := httptest.NewRecorder()
 	handler.ServeHTTP(deleteResponse, deleteRequest)

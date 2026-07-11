@@ -11,12 +11,14 @@ import (
 	"strings"
 	"testing"
 
+	browserdto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/browser"
 	sharedconfig "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/config"
 )
 
 func TestBackendHandlerServesStaticFilesWithSPAFallbackAndKeepsAPIRoutes(t *testing.T) {
 	staticDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("<html>app</html>"), 0o644); err != nil {
+	index := "<html><!-- __RUNTIME_CONFIG__ -->app</html>"
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte(index), 0o644); err != nil {
 		t.Fatalf("WriteFile(index) error = %v", err)
 	}
 	assetsDir := filepath.Join(staticDir, "assets")
@@ -28,24 +30,24 @@ func TestBackendHandlerServesStaticFilesWithSPAFallbackAndKeepsAPIRoutes(t *test
 	}
 	apiHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/local-api/health":
+		case "/api/health":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"status":"agent"}`))
 		default:
 			http.NotFound(w, r)
 		}
 	})
-	handler := backendHandler(Config{Server: ServerConfig{StaticDir: staticDir}}, slog.Default(), apiHandler)
+	handler := backendHandler(staticTestConfig(staticDir), slog.Default(), apiHandler)
 
 	cases := []struct {
 		path string
 		want string
 	}{
-		{path: "/", want: "<html>app</html>"},
-		{path: "/sessions", want: "<html>app</html>"},
-		{path: "/settings", want: "<html>app</html>"},
+		{path: "/", want: "window.__CONFIG__"},
+		{path: "/sessions", want: "window.__CONFIG__"},
+		{path: "/settings", want: "window.__CONFIG__"},
 		{path: "/assets/app.js", want: "console.log('app')"},
-		{path: "/local-api/health", want: `{"status":"agent"}`},
+		{path: "/api/health", want: `{"status":"agent"}`},
 	}
 	for _, tc := range cases {
 		response := httptest.NewRecorder()
@@ -56,19 +58,20 @@ func TestBackendHandlerServesStaticFilesWithSPAFallbackAndKeepsAPIRoutes(t *test
 	}
 
 	apiResponse := httptest.NewRecorder()
-	handler.ServeHTTP(apiResponse, httptest.NewRequest(http.MethodGet, "/local-api/missing", nil))
-	if apiResponse.Code != http.StatusNotFound || strings.Contains(apiResponse.Body.String(), "<html>app</html>") {
-		t.Fatalf("/local-api/missing = %d %q, want API 404 without SPA fallback", apiResponse.Code, apiResponse.Body.String())
+	handler.ServeHTTP(apiResponse, httptest.NewRequest(http.MethodGet, "/api/missing", nil))
+	if apiResponse.Code != http.StatusNotFound || strings.Contains(apiResponse.Body.String(), "<html>") {
+		t.Fatalf("/api/missing = %d %q, want API 404 without SPA fallback", apiResponse.Code, apiResponse.Body.String())
 	}
+
 }
 
-func TestBackendHandlerServesIndexHTMLWithoutRuntimeConfigInjection(t *testing.T) {
+func TestBackendHandlerInjectsRuntimeConfig(t *testing.T) {
 	staticDir := t.TempDir()
 	index := "<!doctype html><html><head><!-- __RUNTIME_CONFIG__ --><title>app</title></head><body></body></html>"
 	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte(index), 0o644); err != nil {
 		t.Fatalf("WriteFile(index) error = %v", err)
 	}
-	handler := backendHandler(Config{Server: ServerConfig{StaticDir: staticDir}}, slog.Default(), http.NotFoundHandler())
+	handler := backendHandler(staticTestConfig(staticDir), slog.Default(), http.NotFoundHandler())
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -79,11 +82,11 @@ func TestBackendHandlerServesIndexHTMLWithoutRuntimeConfigInjection(t *testing.T
 	if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 		t.Fatalf("Content-Type = %q", got)
 	}
-	if response.Body.String() != index {
-		t.Fatalf("index body = %q, want original index html", response.Body.String())
+	if got := response.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q", got)
 	}
-	if strings.Contains(response.Body.String(), "window.__CONFIG__") {
-		t.Fatalf("agent static handler injected runtime config: %s", response.Body.String())
+	if strings.Contains(response.Body.String(), "<!-- __RUNTIME_CONFIG__ -->") || !strings.Contains(response.Body.String(), `"mode":"local"`) {
+		t.Fatalf("index body = %q, want injected local browser runtime config", response.Body.String())
 	}
 }
 
@@ -91,7 +94,7 @@ func TestBackendHandlerLogsUnifiedRequests(t *testing.T) {
 	var logBuffer bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logBuffer, nil))
 	apiHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/local-api/health" {
+		if r.URL.Path != "/api/health" {
 			http.NotFound(w, r)
 			return
 		}
@@ -100,7 +103,7 @@ func TestBackendHandlerLogsUnifiedRequests(t *testing.T) {
 	})
 	handler := backendHandler(Config{LogHTTP: sharedconfig.LogHTTPConfig{RequestBodyLimit: 4096, ResponseBodyLimit: 4096}}, logger, apiHandler)
 
-	request := httptest.NewRequest(http.MethodGet, "/local-api/health?x=1", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/health?x=1", nil)
 	request.Header.Set("User-Agent", "test-agent")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -114,7 +117,7 @@ func TestBackendHandlerLogsUnifiedRequests(t *testing.T) {
 	assertBackendLogValue(t, started, "msg", "request started")
 	assertBackendLogValue(t, completed, "msg", "request completed")
 	assertBackendLogValue(t, started, "method", http.MethodGet)
-	assertBackendLogValue(t, started, "path", "/local-api/health")
+	assertBackendLogValue(t, started, "path", "/api/health")
 	assertBackendLogValue(t, started, "query", "x=1")
 	assertBackendLogNumber(t, completed, "status", http.StatusOK)
 	assertBackendLogValue(t, completed, "response_body", response.Body.String())
@@ -129,7 +132,7 @@ func TestBackendHandlerAppliesCorsOnlyToAPIRoutes(t *testing.T) {
 	}))
 
 	apiResponse := httptest.NewRecorder()
-	apiRequest := httptest.NewRequest(http.MethodOptions, "/local-api/health", nil)
+	apiRequest := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
 	apiRequest.Header.Set("Origin", "https://app.example.com")
 	handler.ServeHTTP(apiResponse, apiRequest)
 	if apiResponse.Code != http.StatusNoContent || apiResponse.Header().Get("Access-Control-Allow-Origin") != "https://app.example.com" {
@@ -143,6 +146,16 @@ func TestBackendHandlerAppliesCorsOnlyToAPIRoutes(t *testing.T) {
 	if staticResponse.Header().Get("Access-Control-Allow-Origin") != "" {
 		t.Fatalf("static CORS origin = %q, want empty", staticResponse.Header().Get("Access-Control-Allow-Origin"))
 	}
+}
+
+func staticTestConfig(staticDir string) Config {
+	return Config{Server: ServerConfig{
+		StaticDir: staticDir,
+		BrowserRuntimeConfig: browserdto.RuntimeConfig{
+			Local: browserdto.RuntimeLocalConfig{Mode: "local", PublicUrl: "http://localhost:9030", ApiBaseUrl: "/api"},
+			Cloud: browserdto.RuntimeCloudConfig{PublicUrl: "https://cloud.example.com", ApiBaseUrl: "/api"},
+		},
+	}}
 }
 
 func decodeBackendLogEntries(t *testing.T, content string) []map[string]any {
@@ -164,8 +177,8 @@ func decodeBackendLogEntries(t *testing.T, content string) []map[string]any {
 
 func assertBackendLogValue(t *testing.T, entry map[string]any, key string, want string) {
 	t.Helper()
-	if got, ok := entry[key].(string); !ok || got != want {
-		t.Fatalf("expected %s=%q, got %#v", key, want, entry[key])
+	if entry[key] != want {
+		t.Fatalf("%s = %#v, want %q", key, entry[key], want)
 	}
 }
 
@@ -173,6 +186,6 @@ func assertBackendLogNumber(t *testing.T, entry map[string]any, key string, want
 	t.Helper()
 	got, ok := entry[key].(float64)
 	if !ok || int(got) != want {
-		t.Fatalf("expected %s=%d, got %#v", key, want, entry[key])
+		t.Fatalf("%s = %#v, want %d", key, entry[key], want)
 	}
 }

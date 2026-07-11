@@ -82,9 +82,6 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Local.PublicUrl != "http://localhost:9030" {
 		t.Fatalf("Local.PublicUrl = %q, want local frontend URL", cfg.Local.PublicUrl)
 	}
-	if cfg.Local.ApiBaseUrl != "" {
-		t.Fatalf("Local.ApiBaseUrl = %q, want empty", cfg.Local.ApiBaseUrl)
-	}
 	if len(cfg.Local.CorsAllowedOrigins) != 0 {
 		t.Fatalf("Local.CorsAllowedOrigins = %#v, want empty", cfg.Local.CorsAllowedOrigins)
 	}
@@ -115,7 +112,7 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "configured-logs")
 	stateDir := filepath.Join(cwd, "configured-state")
-	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\nlocal:\n  expose_errors: true\n  listen_url: http://0.0.0.0:9090\n  static_dir: web/dist\n  public_url: https://configured.example.com/app/\n  api_base_url: https://api.configured.example.com/\n  cors_allowed_origins:\n    - https://configured.example.com/\n    - https://preview.configured.example.com\n")
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\nlocal:\n  expose_errors: true\n  listen_url: http://0.0.0.0:9090\n  static_dir: web/dist\n  public_url: https://configured.example.com/app/\n  cors_allowed_origins:\n    - https://configured.example.com/\n    - https://preview.configured.example.com\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	cfg, err := Load(Options{Cwd: cwd})
@@ -144,9 +141,6 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	if cfg.Local.PublicUrl != "https://configured.example.com/app" {
 		t.Fatalf("Local.PublicUrl = %q", cfg.Local.PublicUrl)
 	}
-	if cfg.Local.ApiBaseUrl != "https://api.configured.example.com" {
-		t.Fatalf("Local.ApiBaseUrl = %q", cfg.Local.ApiBaseUrl)
-	}
 	wantOrigins := []string{"https://configured.example.com", "https://preview.configured.example.com"}
 	if !reflect.DeepEqual(cfg.Local.CorsAllowedOrigins, wantOrigins) {
 		t.Fatalf("Local.CorsAllowedOrigins = %#v, want %#v", cfg.Local.CorsAllowedOrigins, wantOrigins)
@@ -172,7 +166,7 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "dotenv-logs")
 	stateDir := filepath.Join(cwd, "dotenv-state")
-	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_ENABLED=false\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_EXTENSIONS=js,CSS,,.webp\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_LOCAL__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_LOCAL__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_LOCAL__API_BASE_URL=https://api.dotenv.example.com\nTERMBRIDGE_LOCAL__CORS_ALLOWED_ORIGINS=https://dotenv.example.com,https://preview.dotenv.example.com\nTERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_LOCAL__EXPOSE_ERRORS=true\n")
+	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_ENABLED=false\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_EXTENSIONS=js,CSS,,.webp\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_LOCAL__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_LOCAL__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_LOCAL__CORS_ALLOWED_ORIGINS=https://dotenv.example.com,https://preview.dotenv.example.com\nTERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_LOCAL__EXPOSE_ERRORS=true\n")
 
 	cfg, err := Load(Options{Cwd: cwd})
 	if err != nil {
@@ -199,9 +193,6 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	}
 	if cfg.Local.PublicUrl != "https://dotenv.example.com" || cfg.Local.ListenUrl != "http://127.0.0.1:9091" {
 		t.Fatalf("Local = %#v", cfg.Local)
-	}
-	if cfg.Local.ApiBaseUrl != "https://api.dotenv.example.com" {
-		t.Fatalf("Local.ApiBaseUrl = %q", cfg.Local.ApiBaseUrl)
 	}
 	wantOrigins := []string{"https://dotenv.example.com", "https://preview.dotenv.example.com"}
 	if !reflect.DeepEqual(cfg.Local.CorsAllowedOrigins, wantOrigins) {
@@ -444,41 +435,6 @@ func TestLoadRejectsInvalidAgentPublicURL(t *testing.T) {
 	}
 	if !apperrors.IsConfig(err) {
 		t.Fatalf("Load() error = %T, want config error", err)
-	}
-}
-
-func TestLoadRejectsInvalidAgentAPIBaseURL(t *testing.T) {
-	isolateHome(t)
-	cwd := t.TempDir()
-	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "local:\n  api_base_url: ftp://api.example.com\n")
-	t.Setenv(EnvNameVariable, "develop")
-
-	_, err := Load(Options{Cwd: cwd})
-	if err == nil {
-		t.Fatal("Load() error = nil, want error")
-	}
-	if !apperrors.IsConfig(err) {
-		t.Fatalf("Load() error = %T, want config error", err)
-	}
-}
-
-func TestLoadAllowsPathAPIBaseURLForDevProxy(t *testing.T) {
-	isolateHome(t)
-	cwd := t.TempDir()
-	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "local:\n  listen_url: http://127.0.0.1:9031\n  public_url: http://localhost:9030\n  api_base_url: /local-api/\ncloud:\n  listen_url: http://127.0.0.1:9032\n  public_url: http://localhost:9030\n  api_base_url: /cloud-api/\n")
-	t.Setenv(EnvNameVariable, "develop")
-
-	cfg, err := Load(Options{Cwd: cwd})
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if cfg.Local.ListenUrl != "http://127.0.0.1:9031" || cfg.Local.ApiBaseUrl != "/local-api" {
-		t.Fatalf("Local dev proxy config = %#v", cfg.Local)
-	}
-	if cfg.Cloud.ListenUrl != "http://127.0.0.1:9032" || cfg.Cloud.ApiBaseUrl != "/cloud-api" {
-		t.Fatalf("Cloud dev proxy config = %#v", cfg.Cloud)
 	}
 }
 

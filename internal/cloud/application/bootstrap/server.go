@@ -89,7 +89,7 @@ func serveHTTP(ctx context.Context, cfg Config, logger *slog.Logger, options Opt
 	defer cancel()
 	backendReady := make(chan struct{})
 	errCh := make(chan error, 1)
-	if err := validateStaticDir(cfg.Server.StaticDir); err != nil {
+	if err := validateStaticDir(cfg.Server); err != nil {
 		return apperrors.Runtime("validate static web directory", err)
 	}
 	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Server.ListenURL}, backendHandler(cfg, logger, cloudHandler))

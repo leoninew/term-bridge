@@ -182,12 +182,28 @@ func runExec(ctx context.Context, cfg config.Config, logger *slog.Logger, option
 }
 
 func runAgent(ctx context.Context, cfg config.Config, logger *slog.Logger, options Options) (Result, error) {
-	err := agentserver.Run(ctx, agentConfig(cfg), logger, agentserver.Options{Stdout: options.Stdout, RunBackendServer: runBackendServer, RunClient: runAgentClient})
+	agentCfg := agentConfig(cfg)
+	if cfg.Local.StaticDir != "" {
+		browserRuntimeConfig, err := config.BuildBrowserRuntimeConfig(cfg, "local")
+		if err != nil {
+			return Result{Cwd: cfg.Cwd}, err
+		}
+		agentCfg.Server.BrowserRuntimeConfig = browserRuntimeConfig
+	}
+	err := agentserver.Run(ctx, agentCfg, logger, agentserver.Options{Stdout: options.Stdout, RunBackendServer: runBackendServer, RunClient: runAgentClient})
 	return Result{Cwd: cfg.Cwd}, err
 }
 
 func runCloud(ctx context.Context, cfg config.Config, logger *slog.Logger, options Options) (Result, error) {
-	err := cloudserver.Run(ctx, cloudConfig(cfg), logger, cloudserver.Options{Stdout: options.Stdout, RunBackendServer: runBackendServer})
+	cloudCfg := cloudConfig(cfg)
+	if cfg.Cloud.StaticDir != "" {
+		browserRuntimeConfig, err := config.BuildBrowserRuntimeConfig(cfg, "cloud")
+		if err != nil {
+			return Result{Cwd: cfg.Cwd}, err
+		}
+		cloudCfg.Server.BrowserRuntimeConfig = browserRuntimeConfig
+	}
+	err := cloudserver.Run(ctx, cloudCfg, logger, cloudserver.Options{Stdout: options.Stdout, RunBackendServer: runBackendServer})
 	return Result{Cwd: cfg.Cwd}, err
 }
 
@@ -230,7 +246,6 @@ func agentConfig(cfg config.Config) agentserver.Config {
 		Server: agentserver.ServerConfig{
 			ListenURL:          cfg.Local.ListenUrl,
 			StaticDir:          cfg.Local.StaticDir,
-			ApiBaseUrl:         cfg.Local.ApiBaseUrl,
 			CorsAllowedOrigins: cfg.Local.CorsAllowedOrigins,
 		},
 		Gate: agentserver.GateConfig{API: agentserver.GateApiConfig{ExposeErrors: cfg.Local.ExposeErrors}},
@@ -260,7 +275,6 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 		Server: cloudserver.ServerConfig{
 			ListenURL:          cfg.Cloud.ListenUrl,
 			StaticDir:          cfg.Cloud.StaticDir,
-			ApiBaseUrl:         cfg.Cloud.ApiBaseUrl,
 			CorsAllowedOrigins: cfg.Cloud.CorsAllowedOrigins,
 		},
 		Gate: cloudserver.GateConfig{API: cloudserver.GateApiConfig{ExposeErrors: cfg.Cloud.ExposeErrors}},

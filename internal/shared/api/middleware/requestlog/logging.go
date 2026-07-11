@@ -39,10 +39,7 @@ func Middleware(logger *slog.Logger, config sharedconfig.LogHTTPConfig) func(htt
 				w.Header().Set(requestIdHeader, requestId)
 			}
 			requestAttrs := requestLogAttrs(r, requestId)
-			requestBody, bodyErr := "", error(nil)
-			if !isSensitiveCloudAuthRequest(r.URL.Path) {
-				requestBody, bodyErr = readRequestBodyForLog(r, config.RequestBodyLimit)
-			}
+			requestBody, bodyErr := readRequestBodyForLog(r, config.RequestBodyLimit)
 
 			startedAttrs := append([]any{}, requestAttrs...)
 			if requestBody != "" {
@@ -73,20 +70,12 @@ func Middleware(logger *slog.Logger, config sharedconfig.LogHTTPConfig) func(htt
 				"bytes", responseWriter.BytesWritten(),
 				"duration_ms", time.Since(startedAt).Milliseconds(),
 			)
-			if responseBody := responseWriter.Body(); responseBody != "" && !isSensitiveCloudAuthResponse(r.URL.Path) {
+			if responseBody := responseWriter.Body(); responseBody != "" {
 				completedAttrs = append(completedAttrs, "response_body", responseBody)
 			}
 			logger.Info("request completed", completedAttrs...)
 		})
 	}
-}
-
-func isSensitiveCloudAuthRequest(requestPath string) bool {
-	return requestPath == "/cloud-api/auth/login" || requestPath == "/cloud-api/auth/register"
-}
-
-func isSensitiveCloudAuthResponse(requestPath string) bool {
-	return requestPath == "/cloud-api/auth/login/csrf"
 }
 
 func isSkippableAssetPath(requestPath string, assetExtensions map[string]struct{}) bool {

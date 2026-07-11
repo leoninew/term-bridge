@@ -12,11 +12,13 @@ export default defineConfig({
       '/local-api': {
         target: 'http://127.0.0.1:9031',
         changeOrigin: true,
+        rewrite: (requestPath) => requestPath.replace(/^\/local-api/, '/api'),
         ws: true,
       },
       '/cloud-api': {
         target: 'http://127.0.0.1:9032',
         changeOrigin: true,
+        rewrite: (requestPath) => requestPath.replace(/^\/cloud-api/, '/api'),
         ws: true,
       },
     },

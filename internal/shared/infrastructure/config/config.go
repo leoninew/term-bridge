@@ -153,7 +153,6 @@ type LocalConfig struct {
 	ListenUrl          string
 	StaticDir          string
 	PublicUrl          string
-	ApiBaseUrl         string
 	CorsAllowedOrigins []string
 	ExposeErrors       bool
 	OAuth              LocalOAuthConfig
@@ -171,7 +170,6 @@ type CloudConfig struct {
 	ListenUrl          string
 	StaticDir          string
 	PublicUrl          string
-	ApiBaseUrl         string
 	CorsAllowedOrigins []string
 	ExposeErrors       bool
 	Turnstile          TurnstileConfig
@@ -302,7 +300,6 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			ListenUrl:          strings.TrimSpace(v.GetString("local.listen_url")),
 			StaticDir:          agentStaticDir,
 			PublicUrl:          strings.TrimSpace(v.GetString("local.public_url")),
-			ApiBaseUrl:         strings.TrimSpace(v.GetString("local.api_base_url")),
 			CorsAllowedOrigins: getStringSlice(v, "local.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("local.expose_errors"),
 			OAuth: LocalOAuthConfig{
@@ -317,7 +314,6 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			ListenUrl:          strings.TrimSpace(v.GetString("cloud.listen_url")),
 			StaticDir:          cloudStaticDir,
 			PublicUrl:          strings.TrimSpace(v.GetString("cloud.public_url")),
-			ApiBaseUrl:         strings.TrimSpace(v.GetString("cloud.api_base_url")),
 			CorsAllowedOrigins: getStringSlice(v, "cloud.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("cloud.expose_errors"),
 			Turnstile: TurnstileConfig{
@@ -828,7 +824,6 @@ func configKeys() []string {
 		"local.listen_url",
 		"local.static_dir",
 		"local.public_url",
-		"local.api_base_url",
 		"local.cors_allowed_origins",
 		"local.expose_errors",
 		"local.oauth.client_id",
@@ -841,7 +836,6 @@ func configKeys() []string {
 		"cloud.listen_url",
 		"cloud.static_dir",
 		"cloud.public_url",
-		"cloud.api_base_url",
 		"cloud.cors_allowed_origins",
 		"cloud.expose_errors",
 		"cloud.turnstile.site_key",
@@ -1024,7 +1018,6 @@ func validateTerminal(cfg TerminalConfig) error {
 func normalizeLocalConfig(cfg *Config) {
 	cfg.Local.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Local.ListenUrl), "/")
 	cfg.Local.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Local.PublicUrl), "/")
-	cfg.Local.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Local.ApiBaseUrl), "/")
 	cfg.Local.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Local.CorsAllowedOrigins)
 	cfg.Local.OAuth.ClientId = strings.TrimSpace(cfg.Local.OAuth.ClientId)
 	cfg.Local.OAuth.ClientSecret = strings.TrimSpace(cfg.Local.OAuth.ClientSecret)
@@ -1055,7 +1048,6 @@ func normalizeHttpOrigins(values []string) []string {
 func normalizeCloudConfig(cfg *Config) {
 	cfg.Cloud.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.ListenUrl), "/")
 	cfg.Cloud.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.PublicUrl), "/")
-	cfg.Cloud.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.ApiBaseUrl), "/")
 	cfg.Cloud.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Cloud.CorsAllowedOrigins)
 	cfg.Cloud.Turnstile.SiteKey = strings.TrimSpace(cfg.Cloud.Turnstile.SiteKey)
 	cfg.Cloud.Turnstile.SecretKey = strings.TrimSpace(cfg.Cloud.Turnstile.SecretKey)
@@ -1072,14 +1064,14 @@ func normalizeCloudConfig(cfg *Config) {
 }
 
 func validateLocal(cfg LocalConfig) error {
-	if err := validateHTTPServerConfig("local", cfg.ListenUrl, cfg.PublicUrl, cfg.ApiBaseUrl, cfg.CorsAllowedOrigins); err != nil {
+	if err := validateHTTPServerConfig("local", cfg.ListenUrl, cfg.PublicUrl, cfg.CorsAllowedOrigins); err != nil {
 		return err
 	}
 	return validateLocalOAuth(cfg.OAuth)
 }
 
 func validateCloud(cfg Config) error {
-	if err := validateHTTPServerConfig("cloud", cfg.Cloud.ListenUrl, cfg.Cloud.PublicUrl, cfg.Cloud.ApiBaseUrl, cfg.Cloud.CorsAllowedOrigins); err != nil {
+	if err := validateHTTPServerConfig("cloud", cfg.Cloud.ListenUrl, cfg.Cloud.PublicUrl, cfg.Cloud.CorsAllowedOrigins); err != nil {
 		return err
 	}
 	if err := validateTurnstile(cfg.Environment, cfg.Cloud); err != nil {
@@ -1144,17 +1136,12 @@ func validateCloudOAuthClient(index int, client CloudOAuthClientConfig) error {
 	return validateHTTPURL(prefix+".redirect_url", client.RedirectUrl)
 }
 
-func validateHTTPServerConfig(prefix string, listenURL string, publicURL string, apiBaseURL string, corsAllowedOrigins []string) error {
+func validateHTTPServerConfig(prefix string, listenURL string, publicURL string, corsAllowedOrigins []string) error {
 	if err := validateHTTPURL(prefix+".listen_url", listenURL); err != nil {
 		return err
 	}
 	if publicURL != "" {
 		if err := validateHTTPURL(prefix+".public_url", publicURL); err != nil {
-			return err
-		}
-	}
-	if apiBaseURL != "" {
-		if err := validateAPIBaseURL(prefix+".api_base_url", apiBaseURL); err != nil {
 			return err
 		}
 	}
@@ -1164,16 +1151,6 @@ func validateHTTPServerConfig(prefix string, listenURL string, publicURL string,
 		}
 	}
 	return nil
-}
-
-func validateAPIBaseURL(key string, value string) error {
-	if strings.HasPrefix(value, "/") {
-		if strings.HasPrefix(value, "//") {
-			return apperrors.Config("invalid "+key, fmt.Errorf("must not be a protocol-relative URL"))
-		}
-		return nil
-	}
-	return validateHTTPURL(key, value)
 }
 
 func validateHTTPURL(key string, value string) error {

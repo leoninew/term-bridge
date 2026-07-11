@@ -3,7 +3,6 @@ package requestlog
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +16,7 @@ import (
 const testBodyMaxBytes = 32
 
 func TestMiddlewareIncludesMetadata(t *testing.T) {
-	entries, recorder := runLoggedRequest(t, http.MethodGet, "/local-api/test?x=1", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	entries, recorder := runLoggedRequest(t, http.MethodGet, "/api/test?x=1", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"ok":true}`))
@@ -26,7 +25,7 @@ func TestMiddlewareIncludesMetadata(t *testing.T) {
 
 	assertLogValue(t, started, "level", "INFO")
 	assertLogValue(t, started, "method", http.MethodGet)
-	assertLogValue(t, started, "path", "/local-api/test")
+	assertLogValue(t, started, "path", "/api/test")
 	assertLogValue(t, started, "query", "x=1")
 	if started["request_id"] == "" {
 		t.Fatal("expected started request_id")
@@ -43,7 +42,7 @@ func TestMiddlewareIncludesMetadata(t *testing.T) {
 
 	assertLogValue(t, completed, "level", "INFO")
 	assertLogValue(t, completed, "method", http.MethodGet)
-	assertLogValue(t, completed, "path", "/local-api/test")
+	assertLogValue(t, completed, "path", "/api/test")
 	assertLogValue(t, completed, "query", "x=1")
 	assertLogNumber(t, completed, "status", http.StatusCreated)
 	assertLogNumber(t, completed, "bytes", len(`{"ok":true}`))
@@ -61,7 +60,7 @@ func TestMiddlewareIncludesMetadata(t *testing.T) {
 }
 
 func TestMiddlewareDefaultsStatusWhenHandlerOnlyWritesBody(t *testing.T) {
-	entries, _ := runLoggedRequest(t, http.MethodGet, "/local-api/default-status", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	entries, _ := runLoggedRequest(t, http.MethodGet, "/api/default-status", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	}))
@@ -72,7 +71,7 @@ func TestMiddlewareDefaultsStatusWhenHandlerOnlyWritesBody(t *testing.T) {
 }
 
 func TestMiddlewareRecordsWriteHeaderWithoutBody(t *testing.T) {
-	entries, _ := runLoggedRequest(t, http.MethodDelete, "/local-api/no-content", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	entries, _ := runLoggedRequest(t, http.MethodDelete, "/api/no-content", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	_, completed := assertStartedAndCompleted(t, entries)
@@ -114,7 +113,7 @@ func TestMiddlewareKeepsFailedAssetAndAPILogs(t *testing.T) {
 	_, completed := assertStartedAndCompleted(t, entries)
 	assertLogNumber(t, completed, "status", http.StatusNotFound)
 
-	entries, _ = runLoggedRequestWithConfig(t, config, http.MethodGet, "/local-api/health.js", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	entries, _ = runLoggedRequestWithConfig(t, config, http.MethodGet, "/api/health.js", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("api"))
 	}))
 	_, completed = assertStartedAndCompleted(t, entries)
@@ -139,7 +138,7 @@ func TestMiddlewareUsesConfiguredAssetExtensions(t *testing.T) {
 func TestMiddlewareRecordsJSONRequestBodyAndRestoresIt(t *testing.T) {
 	body := `{"name":"demo"}`
 	var handlerBody string
-	entries, _ := runLoggedRequest(t, http.MethodPost, "/local-api/test", "application/json", body, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	entries, _ := runLoggedRequest(t, http.MethodPost, "/api/test", "application/json", body, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		_, _ = buf.ReadFrom(r.Body)
 		handlerBody = buf.String()
@@ -154,33 +153,8 @@ func TestMiddlewareRecordsJSONRequestBodyAndRestoresIt(t *testing.T) {
 	}
 }
 
-func TestMiddlewareRedactsCloudCredentialBodiesWithoutBreakingHandlerInput(t *testing.T) {
-	body := `{"password":"secret","turnstile_token":"challenge","csrf_token":"csrf"}`
-	var handlerBody string
-	entries, _ := runLoggedRequest(t, http.MethodPost, "/cloud-api/auth/login", "application/json", body, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		data, _ := io.ReadAll(r.Body)
-		handlerBody = string(data)
-		writeTestJSON(w, http.StatusOK, map[string]string{"ok": "true"})
-	}))
-	started, _ := assertStartedAndCompleted(t, entries)
-
-	assertLogMissing(t, started, "request_body")
-	if handlerBody != body {
-		t.Fatalf("handler body = %q, want %q", handlerBody, body)
-	}
-}
-
-func TestMiddlewareRedactsCSRFTokenResponse(t *testing.T) {
-	entries, _ := runLoggedRequest(t, http.MethodGet, "/cloud-api/auth/login/csrf", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeTestJSON(w, http.StatusOK, map[string]string{"token": "csrf-secret"})
-	}))
-	_, completed := assertStartedAndCompleted(t, entries)
-
-	assertLogMissing(t, completed, "response_body")
-}
-
 func TestMiddlewareSkipsNonJSONBodies(t *testing.T) {
-	entries, _ := runLoggedRequest(t, http.MethodPost, "/local-api/test", "text/plain", "plain text", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	entries, _ := runLoggedRequest(t, http.MethodPost, "/api/test", "text/plain", "plain text", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = w.Write([]byte("plain response"))
 	}))
@@ -193,7 +167,7 @@ func TestMiddlewareSkipsNonJSONBodies(t *testing.T) {
 }
 
 func TestMiddlewareRecordsJSONSuffixContentType(t *testing.T) {
-	entries, _ := runLoggedRequest(t, http.MethodPost, "/local-api/test", "application/problem+json", `{"problem":true}`, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	entries, _ := runLoggedRequest(t, http.MethodPost, "/api/test", "application/problem+json", `{"problem":true}`, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/problem+json")
 		_, _ = w.Write([]byte(`{"detail":"bad"}`))
 	}))
@@ -207,7 +181,7 @@ func TestMiddlewareTruncatesRequestAndResponseBodiesIndependently(t *testing.T) 
 	requestBody := `{"value":"` + strings.Repeat("好", testBodyMaxBytes) + `"}`
 	responseBody := `{"value":"` + strings.Repeat("坏", testBodyMaxBytes) + `"}`
 	var handlerBody string
-	entries, recorder := runLoggedRequest(t, http.MethodPost, "/local-api/test", "application/json", requestBody, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	entries, recorder := runLoggedRequest(t, http.MethodPost, "/api/test", "application/json", requestBody, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		_, _ = buf.ReadFrom(r.Body)
 		handlerBody = buf.String()

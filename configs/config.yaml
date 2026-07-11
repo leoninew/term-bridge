@@ -62,7 +62,7 @@ runtime:
   state_dir: data
 
 # Agent HTTP/API server 配置。
-# baseline 面向最终本机运行：agent 自己提供 Web/API，对浏览器暴露 /local-api，不依赖 Vite dev proxy。
+# baseline 面向最终本机运行：agent 自己提供同源 Web/API，不依赖 Vite dev proxy。
 local:
   # termbridge agent 暴露的本机 Web/API 地址。
   listen_url: http://127.0.0.1:9030
@@ -70,8 +70,6 @@ local:
   static_dir: ""
   # 浏览器访问本地前端/setup 的地址，用于本地工作台与云端授权回跳。
   public_url: http://localhost:9030
-  # 前端运行时本地 API base URL；空值表示同源 /local-api。
-  api_base_url: ""
   # 跨域 API Origin allowlist；空列表表示不开放跨域。
   # 终端 WebSocket 也会使用该列表校验浏览器 Origin；同源访问不需要配置。
   cors_allowed_origins: []
@@ -96,7 +94,7 @@ local:
       dsn: ""
 
 # Cloud HTTP/API server 与 connection 配置。
-# baseline 面向云端同源部署：cloud 自己提供 Web/API，对浏览器暴露 /cloud-api，不使用本地 Vite proxy path。
+# baseline 面向云端同源部署：cloud 自己提供同源 Web/API，不使用本地 Vite proxy path。
 cloud:
   # termbridge cloud 暴露的云端 Web/API 地址。
   listen_url: http://127.0.0.1:9030
@@ -104,8 +102,6 @@ cloud:
   static_dir: ""
   # Cloud 对外访问地址。Agent 连接云端和云端 OAuth/API 入口使用该地址。
   public_url: ""
-  # 前端运行时 Cloud API base URL；空值表示同源 /cloud-api。
-  api_base_url: ""
   # 跨域 API Origin allowlist；空列表表示不开放跨域。
   # 终端 WebSocket 也会使用该列表校验浏览器 Origin；同源访问不需要配置。
   cors_allowed_origins: []

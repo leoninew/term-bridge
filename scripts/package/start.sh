@@ -1,19 +1,24 @@
 #!/usr/bin/env sh
 set -eu
 cd "$(dirname "$0")"
-export TERMBRIDGE_ENV=local
+: "${TERMBRIDGE_ENV:=prod}"
+export TERMBRIDGE_ENV
+profile=.env.prod
+if [ "$TERMBRIDGE_ENV" = test ]; then
+  profile=.env.test
+fi
 
-if [ ! -f .env.local ]; then
-  printf '%s\n' '.env.local is missing' >&2
+if [ ! -f "$profile" ]; then
+  printf '%s\n' "$profile is missing" >&2
   exit 1
 fi
 
 set -a
-. ./.env.local
+. "./$profile"
 set +a
 
 if [ -z "${TERMBRIDGE_LOCAL__PUBLIC_URL:-}" ]; then
-  printf '%s\n' 'TERMBRIDGE_LOCAL__PUBLIC_URL is not set in .env.local' >&2
+  printf '%s\n' "TERMBRIDGE_LOCAL__PUBLIC_URL is not set in $profile" >&2
   exit 1
 fi
 

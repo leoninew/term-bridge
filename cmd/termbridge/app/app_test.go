@@ -172,7 +172,7 @@ func TestRunAgentStartsBackendAndConnectorFromConfig(t *testing.T) {
 		t.Fatal("runBackendServer was not called")
 	}
 	healthResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(healthResponse, httptest.NewRequest(http.MethodGet, "/local-api/health", nil))
+	gotServer.ServeHTTP(healthResponse, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if healthResponse.Code != http.StatusOK || !strings.Contains(healthResponse.Body.String(), `"status":"ok"`) {
 		t.Fatalf("health response = %d %s", healthResponse.Code, healthResponse.Body.String())
 	}
@@ -197,7 +197,7 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 		PublicKey string `json:"public_key"`
 	}
 	cloudPublic := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/cloud-api/devices/current" {
+		if r.URL.Path != "/api/devices/current" {
 			http.NotFound(w, r)
 			return
 		}
@@ -250,7 +250,7 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 	})
 
 	loginResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/local-api/auth/login", nil))
+	gotServer.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", nil))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("agent login status = %d; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
@@ -264,7 +264,7 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 		t.Fatalf("agent login token is empty: %s", loginResponse.Body.String())
 	}
 
-	connectRequest := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
+	connectRequest := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
 	connectRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	connectResponse := httptest.NewRecorder()
 	gotServer.ServeHTTP(connectResponse, connectRequest)
@@ -373,53 +373,65 @@ func TestRunWorkspaceAndSessionList(t *testing.T) {
 	}
 }
 
-func TestFrontendStaticEntryConfigUsesModeSpecificBuildInputs(t *testing.T) {
-	localEnv := readRepoFile(t, "web", ".env.local")
-	cloudEnv := readRepoFile(t, "web", ".env.cloud")
+func TestDeploymentBuildsAreConfigurationNeutral(t *testing.T) {
 	developmentEnv := readRepoFile(t, "web", ".env.development")
-
 	if !strings.Contains(developmentEnv, "TERMBRIDGE_LOCAL__MODE=hybrid") {
 		t.Fatalf("development frontend entry must use hybrid mode")
 	}
-	if !strings.Contains(localEnv, "TERMBRIDGE_LOCAL__MODE=local") {
-		t.Fatalf("local frontend entry must use local mode")
+
+	for _, path := range []string{filepath.Join("..", "..", "..", "web", ".env.local"), filepath.Join("..", "..", "..", "web", ".env.cloud"), filepath.Join("..", "..", "..", "Dockerfile.preflite")} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("obsolete deployment configuration %s must be absent, err = %v", path, err)
+		}
 	}
-	if !strings.Contains(cloudEnv, "TERMBRIDGE_LOCAL__MODE=cloud") {
-		t.Fatalf("cloud frontend entry must use cloud mode")
-	}
-	if !strings.Contains(readRepoFile(t, "Dockerfile"), "RUN yarn build:cloud") {
-		t.Fatalf("Dockerfile must build the cloud frontend entry")
-	}
-	if !strings.Contains(readRepoFile(t, "Dockerfile.cn"), "RUN yarn build:cloud") {
-		t.Fatalf("Dockerfile.cn must build the cloud frontend entry")
+
+	packageJSON := readRepoFile(t, "web", "package.json")
+	assertContains(t, packageJSON, "\"build:local\": \"vue-tsc --noEmit && vite build\"", "local build script must use the neutral bundle build")
+	assertContains(t, packageJSON, "\"build:cloud\": \"vue-tsc --noEmit && vite build\"", "cloud build script must use the neutral bundle build")
+	for _, dockerfile := range []string{"Dockerfile", "Dockerfile.cn"} {
+		content := readRepoFile(t, dockerfile)
+		assertContains(t, content, "RUN yarn build:cloud", dockerfile+" must retain the cloud build script")
+		assertNotContains(t, content, "TERMBRIDGE_", dockerfile+" must not bake runtime configuration")
 	}
 }
 
-func TestPortablePackageBuildsLocalFrontendAndRuntimeEntry(t *testing.T) {
+func TestPortablePackageShipsSelectableRuntimeProfiles(t *testing.T) {
 	taskfile := readRepoFile(t, "Taskfile.yml")
 	startCmd := readRepoFile(t, "scripts", "package", "start.cmd")
 	startSh := readRepoFile(t, "scripts", "package", "start.sh")
-	packageEnv := readRepoFile(t, "scripts", "package", ".env.local")
+	prodEnv := readRepoFile(t, "scripts", "package", ".env.prod")
+	testEnv := readRepoFile(t, "scripts", "package", ".env.test")
 
-	assertContains(t, taskfile, "cd web && yarn build:local", "portable package must build the local frontend entry")
-	assertNotContains(t, taskfile, "configs/config.production.yaml", "portable package must not copy the removed production config")
-	assertContains(t, taskfile, "cp scripts/package/.env.local {{.PACKAGE_ROOT}}/.env.local", "portable package must include runtime .env.local")
+	assertContains(t, taskfile, "cd web && yarn build:local", "portable package must retain its local build script")
+	assertContains(t, taskfile, "cp scripts/package/.env.prod {{.PACKAGE_ROOT}}/.env.prod", "portable package must include the production runtime profile")
+	assertContains(t, taskfile, "cp scripts/package/.env.test {{.PACKAGE_ROOT}}/.env.test", "portable package must include the test runtime profile")
+	assertNotContains(t, taskfile, "scripts/package/.env.local", "portable package must not include the obsolete local runtime profile")
 
 	for scriptName, script := range map[string]string{"start.cmd": startCmd, "start.sh": startSh} {
-		assertContains(t, script, "TERMBRIDGE_ENV=local", scriptName+" must select the local runtime environment")
-		assertNotContains(t, script, "TERMBRIDGE_ENV=production", scriptName+" must not select the removed production environment")
+		assertContains(t, script, "TERMBRIDGE_ENV", scriptName+" must inspect the caller-selected environment")
+		assertContains(t, script, ".env.prod", scriptName+" must default to the production runtime profile")
+		assertContains(t, script, ".env.test", scriptName+" must select the test runtime profile")
 		assertContains(t, script, "TERMBRIDGE_LOCAL__PUBLIC_URL", scriptName+" must open the configured local public URL")
+		assertNotContains(t, script, ".env.local", scriptName+" must not load the obsolete local runtime profile")
 	}
 
-	for _, want := range []string{
-		"TERMBRIDGE_LOCAL__STATIC_DIR=web",
-		"TERMBRIDGE_LOCAL__PUBLIC_URL=http://localhost:9030",
-		"TERMBRIDGE_CLOUD__PUBLIC_URL=",
-		"TERMBRIDGE_CLOUD__API_BASE_URL=",
-		"TERMBRIDGE_LOCAL__OAUTH__CLIENT_SECRET=",
-		"TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL=http://localhost:9030/oauth/callback",
+	for profileName, profile := range map[string]struct {
+		content  string
+		cloudURL string
+	}{
+		"prod": {content: prodEnv, cloudURL: "TERMBRIDGE_CLOUD__PUBLIC_URL=https://termbridge.preflite.cn"},
+		"test": {content: testEnv, cloudURL: "TERMBRIDGE_CLOUD__PUBLIC_URL=http://termbridge.lvh.me"},
 	} {
-		assertContains(t, packageEnv, want, "portable runtime env must carry local/cloud connection config")
+		for _, want := range []string{
+			"TERMBRIDGE_LOCAL__STATIC_DIR=web",
+			"TERMBRIDGE_LOCAL__PUBLIC_URL=http://localhost:9030",
+			profile.cloudURL,
+			"TERMBRIDGE_LOCAL__OAUTH__CLIENT_SECRET=agent-secret",
+			"TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL=http://localhost:9030/oauth/callback",
+		} {
+			assertContains(t, profile.content, want, profileName+" runtime profile must carry local and OAuth configuration")
+		}
+		assertNotContains(t, profile.content, "API_BASE_URL", profileName+" runtime profile must not retain API base URL configuration")
 	}
 }
 

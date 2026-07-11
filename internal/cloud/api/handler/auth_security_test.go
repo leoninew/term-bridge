@@ -69,7 +69,7 @@ func TestLoginSecurityRejectsInvalidCSRFBeforeCredentialAuthentication(t *testin
 	handler := New(Config{JWTSecret: testJWTKey, Logger: testLogger(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
 
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(`{"email":"user@example.test","password":"password","turnstile_token":"challenge","csrf_token":"invalid"}`)))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"email":"user@example.test","password":"password","turnstile_token":"challenge","csrf_token":"invalid"}`)))
 
 	assertAPIError(t, response, http.StatusBadRequest, errorCodeBadRequest)
 	if service.loginCalls.Load() != 0 {
@@ -87,7 +87,7 @@ func TestLoginSecurityConsumesCSRFTokenAndRequiresTurnstile(t *testing.T) {
 	}
 
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(`{"email":"user@example.test","password":"password","turnstile_token":"","csrf_token":"`+csrfToken+`"}`)))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"email":"user@example.test","password":"password","turnstile_token":"","csrf_token":"`+csrfToken+`"}`)))
 
 	assertAPIError(t, response, http.StatusBadRequest, errorCodeBadRequest)
 	if service.loginCalls.Load() != 0 {
@@ -104,7 +104,7 @@ func TestRegistrationSecurityRejectsChallengeBeforeAccountCreation(t *testing.T)
 	handler := New(Config{JWTSecret: testJWTKey, Logger: testLogger(), AuthService: service, Turnstile: TurnstileConfig{Verify: rejectingTurnstileVerifier{}}, CSRF: csrf})
 
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/register", bytes.NewBufferString(`{"email":"user@example.test","password":"password","turnstile_token":"challenge"}`)))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"user@example.test","password":"password","turnstile_token":"challenge"}`)))
 
 	assertAPIError(t, response, http.StatusBadRequest, errorCodeBadRequest)
 	if service.registerCalls.Load() != 0 {
@@ -119,13 +119,13 @@ func TestAuthSecurityEndpointsExposeOnlyPublicValues(t *testing.T) {
 	handler := New(Config{JWTSecret: testJWTKey, Logger: testLogger(), Turnstile: turnstile, CSRF: csrf})
 
 	configResponse := httptest.NewRecorder()
-	handler.ServeHTTP(configResponse, httptest.NewRequest(http.MethodGet, "/cloud-api/auth/turnstile/config", nil))
+	handler.ServeHTTP(configResponse, httptest.NewRequest(http.MethodGet, "/api/auth/turnstile/config", nil))
 	if configResponse.Code != http.StatusOK || !bytes.Contains(configResponse.Body.Bytes(), []byte("public-site-key")) || bytes.Contains(configResponse.Body.Bytes(), []byte("private-secret")) {
 		t.Fatalf("Turnstile config response = %d %s", configResponse.Code, configResponse.Body.String())
 	}
 
 	csrfResponse := httptest.NewRecorder()
-	handler.ServeHTTP(csrfResponse, httptest.NewRequest(http.MethodGet, "/cloud-api/auth/login/csrf", nil))
+	handler.ServeHTTP(csrfResponse, httptest.NewRequest(http.MethodGet, "/api/auth/login/csrf", nil))
 	if csrfResponse.Code != http.StatusOK || csrfResponse.Header().Get("Cache-Control") != "no-store" || !bytes.Contains(csrfResponse.Body.Bytes(), []byte(`"token"`)) {
 		t.Fatalf("CSRF response = %d headers=%v body=%s", csrfResponse.Code, csrfResponse.Header(), csrfResponse.Body.String())
 	}

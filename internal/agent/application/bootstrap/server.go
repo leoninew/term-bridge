@@ -149,7 +149,7 @@ func (c *cloudConnectorLifecycle) run(ctx context.Context, generation uint64, co
 }
 
 func serveHTTP(ctx context.Context, cfg Config, logger *slog.Logger, options Options, agentHandler http.Handler, stdout io.Writer, backendReady chan struct{}, errCh chan error) error {
-	if err := validateStaticDir(cfg.Server.StaticDir); err != nil {
+	if err := validateStaticDir(cfg.Server); err != nil {
 		return apperrors.Runtime("validate static web directory", err)
 	}
 	server := httpserver.New(httpserver.Config{ServerUrl: cfg.Server.ListenURL}, backendHandler(cfg, logger, agentHandler))

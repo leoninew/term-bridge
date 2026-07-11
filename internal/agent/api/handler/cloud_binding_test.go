@@ -31,7 +31,7 @@ func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	handler.setLocalCloudSession(&cloudv1.CloudSessionSummary{PublicUrl: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: prototime.FromTime(connectedAt)})
 
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/local-api/auth/me", nil))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
 	if response.Code != http.StatusOK {
 		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
 	}
@@ -50,13 +50,23 @@ func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	}
 }
 
+func TestLegacyAgentApiPathIsRejected(t *testing.T) {
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: NewLocalAuthService(sharedauth.NewTokenService(testJWTKey))})
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/local-api/health", nil))
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("legacy agent health status = %d, want 404", response.Code)
+	}
+}
+
 func TestAuthMeReturnsLocalDeviceSummary(t *testing.T) {
 	authService := newTestAuthService(sharedauth.NewTokenService(testJWTKey))
 	device := testLocalDevice()
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, LocalDevice: device})
 
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/local-api/auth/me", nil))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
 	if response.Code != http.StatusOK {
 		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
 	}
@@ -74,13 +84,13 @@ func TestAgentLoginIssuesLocalTokenAndProtectsBusinessRoutes(t *testing.T) {
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService})
 
 	unauthorized := httptest.NewRecorder()
-	handler.ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/local-api/workspaces", nil))
+	handler.ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/api/workspaces", nil))
 	if unauthorized.Code != http.StatusUnauthorized {
 		t.Fatalf("unauthenticated workspaces status = %d, want 401; body=%s", unauthorized.Code, unauthorized.Body.String())
 	}
 
 	loginResponse := httptest.NewRecorder()
-	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/local-api/auth/login", nil))
+	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", nil))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d, want 200; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}
@@ -92,7 +102,7 @@ func TestAgentLoginIssuesLocalTokenAndProtectsBusinessRoutes(t *testing.T) {
 		t.Fatalf("token response access_token=%q token_type=%q", tokenResp.GetAccessToken(), tokenResp.GetTokenType())
 	}
 
-	meRequest := httptest.NewRequest(http.MethodGet, "/local-api/auth/me", nil)
+	meRequest := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
 	meRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 	meResponse := httptest.NewRecorder()
 	handler.ServeHTTP(meResponse, meRequest)
@@ -117,7 +127,7 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 	}
 	var deviceReport cloudv1.CurrentDeviceReq
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/cloud-api/devices/current" {
+		if r.URL.Path != "/api/devices/current" {
 			t.Fatalf("unexpected cloud request path = %s", r.URL.Path)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer cloud-token" {
@@ -131,7 +141,7 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 	defer cloud.Close()
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir})
 	localToken := localToken(t, handler)
-	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
 	request.Header.Set("Authorization", "Bearer "+localToken)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -159,7 +169,7 @@ func TestCloudConnectDoesNotPersistLocalCloudSession(t *testing.T) {
 	}
 	var deviceReport cloudv1.CurrentDeviceReq
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/cloud-api/devices/current" {
+		if r.URL.Path != "/api/devices/current" {
 			t.Fatalf("unexpected cloud request path = %s", r.URL.Path)
 		}
 		if r.Method != http.MethodPost {
@@ -177,7 +187,7 @@ func TestCloudConnectDoesNotPersistLocalCloudSession(t *testing.T) {
 
 	first := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir})
 	localToken := localToken(t, first)
-	connectRequest := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
+	connectRequest := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
 	connectRequest.Header.Set("Authorization", "Bearer "+localToken)
 	connectResponse := httptest.NewRecorder()
 	first.ServeHTTP(connectResponse, connectRequest)
@@ -190,7 +200,7 @@ func TestCloudConnectDoesNotPersistLocalCloudSession(t *testing.T) {
 
 	second := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: agentapp.Device{Id: device.Id, Name: device.Name, PublicKey: device.PublicKey}, LocalDeviceStateDir: stateDir})
 	response := httptest.NewRecorder()
-	second.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/local-api/auth/me", nil))
+	second.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
 	if response.Code != http.StatusOK {
 		t.Fatalf("auth me status = %d; body=%s", response.Code, response.Body.String())
 	}
@@ -221,7 +231,7 @@ func TestCloudDisconnectClearsLocalCloudSessionWithoutUnbindingCloudDevice(t *te
 	var cloudRequestPaths []string
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cloudRequestPaths = append(cloudRequestPaths, r.Method+" "+r.URL.Path)
-		if r.URL.Path != "/cloud-api/devices/current" || r.Method != http.MethodPost {
+		if r.URL.Path != "/api/devices/current" || r.Method != http.MethodPost {
 			t.Fatalf("unexpected cloud request = %s %s", r.Method, r.URL.Path)
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -236,7 +246,7 @@ func TestCloudDisconnectClearsLocalCloudSessionWithoutUnbindingCloudDevice(t *te
 		sessionEvents = append(sessionEvents, proto.Clone(summary).(*cloudv1.CloudSessionSummary))
 	}})
 	localToken := localToken(t, handler)
-	connectRequest := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
+	connectRequest := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
 	connectRequest.Header.Set("Authorization", "Bearer "+localToken)
 	connectResponse := httptest.NewRecorder()
 	handler.ServeHTTP(connectResponse, connectRequest)
@@ -244,7 +254,7 @@ func TestCloudDisconnectClearsLocalCloudSessionWithoutUnbindingCloudDevice(t *te
 		t.Fatalf("cloud connect status = %d; body=%s", connectResponse.Code, connectResponse.Body.String())
 	}
 
-	disconnectRequest := httptest.NewRequest(http.MethodPost, "/local-api/cloud/disconnect", nil)
+	disconnectRequest := httptest.NewRequest(http.MethodPost, "/api/cloud/disconnect", nil)
 	disconnectRequest.Header.Set("Authorization", "Bearer "+localToken)
 	disconnectResponse := httptest.NewRecorder()
 	handler.ServeHTTP(disconnectResponse, disconnectRequest)
@@ -252,7 +262,7 @@ func TestCloudDisconnectClearsLocalCloudSessionWithoutUnbindingCloudDevice(t *te
 		t.Fatalf("cloud disconnect status = %d; body=%s", disconnectResponse.Code, disconnectResponse.Body.String())
 	}
 
-	meRequest := httptest.NewRequest(http.MethodGet, "/local-api/auth/me", nil)
+	meRequest := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
 	meRequest.Header.Set("Authorization", "Bearer "+localToken)
 	meResponse := httptest.NewRecorder()
 	handler.ServeHTTP(meResponse, meRequest)
@@ -280,7 +290,7 @@ func TestCloudDisconnectClearsLocalCloudSessionWithoutUnbindingCloudDevice(t *te
 	if strings.Contains(string(data), "cloud_binding") {
 		t.Fatalf("device identity persisted cloud binding after disconnect: %s", string(data))
 	}
-	if len(cloudRequestPaths) != 1 || cloudRequestPaths[0] != "POST /cloud-api/devices/current" {
+	if len(cloudRequestPaths) != 1 || cloudRequestPaths[0] != "POST /api/devices/current" {
 		t.Fatalf("cloud requests = %#v, want only device report and no unbind/delete", cloudRequestPaths)
 	}
 	if len(sessionEvents) != 2 || sessionEvents[0] == nil || sessionEvents[1] != nil {
@@ -297,7 +307,7 @@ func TestCloudConnectRequiresCloudTokenBeforeDeviceReport(t *testing.T) {
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: testLocalDevice()})
 	localToken := localToken(t, handler)
 
-	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"cloud_token":" "}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", strings.NewReader(`{"cloud_token":" "}`))
 	request.Header.Set("Authorization", "Bearer "+localToken)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -309,7 +319,7 @@ func TestCloudConnectRequiresCloudTokenBeforeDeviceReport(t *testing.T) {
 func TestExchangeOAuthCodeReturnsAccessToken(t *testing.T) {
 	const expectedToken = "exchanged-cloud-token"
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/cloud-api/oauth2/token" {
+		if r.URL.Path != "/api/oauth2/token" {
 			t.Fatalf("unexpected cloud token path = %s", r.URL.Path)
 		}
 		if err := r.ParseForm(); err != nil {
@@ -330,7 +340,7 @@ func TestExchangeOAuthCodeReturnsAccessToken(t *testing.T) {
 		OAuthClient:    testOAuthClientConfig(),
 	})
 
-	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
 	request.Header.Set("Authorization", "Bearer "+localToken(t, handler))
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -362,7 +372,7 @@ func TestExchangeOAuthCodeRequiresLocalAuthentication(t *testing.T) {
 		OAuthClient:    testOAuthClientConfig(),
 	})
 
-	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
@@ -384,7 +394,7 @@ func TestExchangeOAuthCodeRequiresCode(t *testing.T) {
 	})
 	localToken := localToken(t, handler)
 
-	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/oauth/exchange", strings.NewReader(`{"code":"  "}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"  "}`))
 	request.Header.Set("Authorization", "Bearer "+localToken)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -403,7 +413,7 @@ func TestExchangeOAuthCodeReturnsServiceUnavailableWithoutOAuthConfig(t *testing
 	})
 	localToken := localToken(t, handler)
 
-	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
 	request.Header.Set("Authorization", "Bearer "+localToken)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -428,7 +438,7 @@ func TestExchangeOAuthCodeReturnsBadGatewayOnCloudError(t *testing.T) {
 	})
 	localToken := localToken(t, handler)
 
-	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/oauth/exchange", strings.NewReader(`{"code":"bad-code"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"bad-code"}`))
 	request.Header.Set("Authorization", "Bearer "+localToken)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -446,7 +456,7 @@ func TestCloudConnectRequiresCloudTokenWithoutCodeBranch(t *testing.T) {
 	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)), CloudPublicURL: cloud.URL, LocalDevice: testLocalDevice()})
 	localToken := localToken(t, handler)
 
-	request := httptest.NewRequest(http.MethodPost, "/local-api/cloud/connect", strings.NewReader(`{"code":"some-code"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", strings.NewReader(`{"code":"some-code"}`))
 	request.Header.Set("Authorization", "Bearer "+localToken)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -475,7 +485,7 @@ func decodeProtoJSONBody(r *http.Request, message proto.Message) error {
 func localToken(t *testing.T, handler *Handler) string {
 	t.Helper()
 	loginResponse := httptest.NewRecorder()
-	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/local-api/auth/login", nil))
+	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", nil))
 	if loginResponse.Code != http.StatusOK {
 		t.Fatalf("login status = %d; body=%s", loginResponse.Code, loginResponse.Body.String())
 	}

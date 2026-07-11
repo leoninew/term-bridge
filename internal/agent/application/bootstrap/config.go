@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/storage/history"
+	browserdto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/browser"
 	sharedconfig "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/config"
 )
 
@@ -47,10 +48,10 @@ type RuntimeConfig struct {
 }
 
 type ServerConfig struct {
-	ListenURL          string
-	StaticDir          string
-	ApiBaseUrl         string
-	CorsAllowedOrigins []string
+	ListenURL            string
+	StaticDir            string
+	BrowserRuntimeConfig browserdto.RuntimeConfig
+	CorsAllowedOrigins   []string
 }
 
 type GateConfig struct {

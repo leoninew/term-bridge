@@ -3,6 +3,7 @@ package app
 import (
 	"time"
 
+	browserdto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/browser"
 	sharedconfig "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/config"
 )
 
@@ -19,10 +20,10 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	ListenURL          string
-	StaticDir          string
-	ApiBaseUrl         string
-	CorsAllowedOrigins []string
+	ListenURL            string
+	StaticDir            string
+	BrowserRuntimeConfig browserdto.RuntimeConfig
+	CorsAllowedOrigins   []string
 }
 
 type GateConfig struct {

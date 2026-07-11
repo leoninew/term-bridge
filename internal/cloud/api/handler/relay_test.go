@@ -57,10 +57,10 @@ func TestBrowserAPIRelay(t *testing.T) {
 		path string
 		want string
 	}{
-		{"/cloud-api/devices/dev-1/workspaces/tree", "Workspace"},
-		{"/cloud-api/devices/dev-1/workspaces/ws-1/sessions", "sess-1"},
-		{"/cloud-api/devices/dev-1/workspaces/ws-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
-		{"/cloud-api/devices/dev-1/shortcuts", "shortcut-1"},
+		{"/api/devices/dev-1/workspaces/tree", "Workspace"},
+		{"/api/devices/dev-1/workspaces/ws-1/sessions", "sess-1"},
+		{"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
+		{"/api/devices/dev-1/shortcuts", "shortcut-1"},
 	} {
 		request := httptest.NewRequest(http.MethodGet, tc.path, nil)
 		request.Header.Set(requestIdHeader, "req_test_relay")
@@ -81,9 +81,9 @@ func TestBrowserAPIRelay(t *testing.T) {
 		status int
 		want   string
 	}{
-		{http.MethodPost, "/cloud-api/devices/dev-1/shortcuts", `{"name":"Created shell","command":"cmd /c \"echo created\""}`, http.StatusCreated, "Created shell"},
-		{http.MethodPatch, "/cloud-api/devices/dev-1/shortcuts/shortcut-1", `{"name":"Updated shell"}`, http.StatusOK, "Updated shell"},
-		{http.MethodDelete, "/cloud-api/devices/dev-1/shortcuts/shortcut-1", "", http.StatusNoContent, ""},
+		{http.MethodPost, "/api/devices/dev-1/shortcuts", `{"name":"Created shell","command":"cmd /c \"echo created\""}`, http.StatusCreated, "Created shell"},
+		{http.MethodPatch, "/api/devices/dev-1/shortcuts/shortcut-1", `{"name":"Updated shell"}`, http.StatusOK, "Updated shell"},
+		{http.MethodDelete, "/api/devices/dev-1/shortcuts/shortcut-1", "", http.StatusNoContent, ""},
 	} {
 		request := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 		request.Header.Set(requestIdHeader, "req_test_relay")
@@ -104,7 +104,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 func loginToken(t *testing.T, handler *Handler) string {
 	t.Helper()
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/cloud-api/auth/login", bytes.NewBufferString(testLoginRequestBody(t, handler, "admin", "admin"))))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(testLoginRequestBody(t, handler, "admin", "admin"))))
 	if response.Code != http.StatusOK {
 		t.Fatalf("login status = %d; body=%s", response.Code, response.Body.String())
 	}
@@ -135,7 +135,7 @@ func runFakeAgent(t *testing.T, ctx context.Context, serverUrl string, respond f
 	req, _ := http.NewRequest(http.MethodGet, serverUrl, nil)
 	req.SetBasicAuth("admin", "admin")
 	requestHeader.Set("Authorization", req.Header.Get("Authorization"))
-	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/cloud-api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
+	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
 	if err != nil {
 		t.Errorf("Dial() error = %v", err)
 		return
