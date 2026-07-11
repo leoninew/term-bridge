@@ -5,11 +5,16 @@ import type {
 } from '../gen/proto/termbridge/agent/v1/workspace'
 
 export function useSessionDialogs() {
+  const createSessionDialogOpen = ref(false)
   const editDialogOpen = ref(false)
   const deleteSessionDialogOpen = ref(false)
   const removeWorkspaceDialogOpen = ref(false)
   const selectedSession = ref<SessionSummary | null>(null)
   const selectedWorkspace = ref<WorkspaceSummary | null>(null)
+
+  function openCreateSessionDialog() {
+    createSessionDialogOpen.value = true
+  }
 
   function openEditDialog(session: SessionSummary) {
     selectedSession.value = session
@@ -35,11 +40,13 @@ export function useSessionDialogs() {
   }
 
   return proxyRefs({
+    createSessionDialogOpen,
     editDialogOpen,
     deleteSessionDialogOpen,
     removeWorkspaceDialogOpen,
     selectedSession,
     selectedWorkspace,
+    openCreateSessionDialog,
     openEditDialog,
     openDeleteSessionDialog,
     openRemoveWorkspaceDialog,

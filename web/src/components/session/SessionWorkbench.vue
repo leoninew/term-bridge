@@ -1,5 +1,6 @@
 <template>
   <section
+    ref="workbench"
     class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--color-panel-bg)]"
   >
     <TabsRoot
@@ -62,27 +63,8 @@
         </TabsList>
       </div>
 
-      <CreateSessionPanel
-        v-if="createSessionFormOpen"
-        :cwd="createCwd"
-        :name="createName"
-        :command="createCommand"
-        :command-source="createCommandSource"
-        :selected-shortcut-id="createSelectedShortcutId"
-        :shortcuts="shortcuts"
-        :creating="creatingSession"
-        @update:cwd="emit('update:createCwd', $event)"
-        @update:name="emit('update:createName', $event)"
-        @update:command="emit('update:createCommand', $event)"
-        @update:command-source="emit('update:createCommandSource', $event)"
-        @update:selected-shortcut-id="emit('update:createSelectedShortcutId', $event)"
-        @workbench="emit('createWorkbench', $event)"
-        @submit="emit('submitCreate')"
-        @cancel="emit('cancelCreate')"
-      />
-
       <TerminalPane
-        v-if="!createSessionFormOpen && activeSession && activeTab"
+        v-if="activeSession && activeTab"
         :session="activeSession"
         :tab="activeTab"
         :ws-url="terminalWsUrl"
@@ -91,7 +73,7 @@
       />
 
       <section
-        v-if="!createSessionFormOpen && openedTabs.length === 0"
+        v-else-if="openedTabs.length === 0"
         class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-[var(--color-text-muted)]"
       >
         <h3 class="text-lg font-semibold text-[var(--color-text)]">
@@ -113,18 +95,16 @@
 </template>
 
 <script setup lang="ts">
+  import { useTemplateRef, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { SquareTerminal, X } from '@lucide/vue'
   import { TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
-  import CreateSessionPanel from './CreateSessionPanel.vue'
   import SessionStatusBar from './SessionStatusBar.vue'
   import TerminalPane from './TerminalPane.vue'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
-  import type { Shortcut } from '../../gen/proto/termbridge/agent/v1/shortcut'
   import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
-  import type { CommandSource } from '../../composable/useCreateSessionDraft'
   import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
   import type { OpenSessionTab } from '../../store/workbench'
 
@@ -134,14 +114,6 @@
     activeTab: OpenSessionTab | null
     activeSession: SessionSummary | null
     currentDevice: DeviceSummary | CloudSessionSummary | null
-    createSessionFormOpen: boolean
-    createCwd: string
-    createName: string
-    createCommand: string
-    createCommandSource: CommandSource
-    createSelectedShortcutId: string | null
-    shortcuts: Shortcut[]
-    creatingSession: boolean
     terminalWsUrl: string | null
     sessionTitle: (workspaceId: string, sessionId: string) => string
   }>()
@@ -151,17 +123,12 @@
     closeTab: [workspaceId: string, sessionId: string]
     reorderTabs: [tabs: OpenSessionTab[]]
     openCreate: []
-    submitCreate: []
-    cancelCreate: []
-    'update:createCwd': [value: string]
-    'update:createName': [value: string]
-    'update:createCommand': [value: string]
-    'update:createCommandSource': [value: CommandSource]
-    'update:createSelectedShortcutId': [value: string | null]
-    createWorkbench: [element: HTMLElement | null]
+    workbench: [element: HTMLElement | null]
     terminalState: [message: ServerControlMessage]
     terminalError: [message: string]
   }>()
 
   const { t } = useI18n()
+  const workbench = useTemplateRef<HTMLElement>('workbench')
+  watch(workbench, (element) => emit('workbench', element), { immediate: true })
 </script>

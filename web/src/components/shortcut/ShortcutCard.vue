@@ -1,46 +1,48 @@
 <template>
-  <article
-    class="flex min-w-0 flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm"
-  >
-    <div class="flex min-w-0 items-start justify-between gap-3">
+  <article class="shortcut-card flex min-w-0 flex-col border border-[var(--color-border)] bg-[var(--color-surface)]">
+    <div class="shortcut-card-header flex min-w-0 items-start justify-between">
       <div class="min-w-0">
-        <h3 class="truncate font-semibold text-[var(--color-text-strong)]">
+        <h3 class="truncate text-sm font-semibold text-[var(--color-text-strong)]">
           {{ shortcut.name }}
         </h3>
-        <p v-if="shortcut.description" class="mt-1 max-h-10 overflow-hidden text-sm text-[var(--color-text-muted)]">
+        <p
+          v-if="shortcut.description"
+          class="shortcut-card-description max-h-10 overflow-hidden text-sm text-[var(--color-text-muted)]"
+        >
           {{ shortcut.description }}
         </p>
       </div>
 
-      <div class="flex shrink-0 items-center gap-1">
+      <div class="shortcut-card-actions flex shrink-0 items-center">
         <button
           type="button"
-          class="inline-flex size-8 items-center justify-center rounded-md text-sm text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus:bg-[var(--color-control-hover)] focus:text-[var(--color-text)]"
+          class="button button-secondary button-icon shortcut-card-action text-[var(--color-text-muted)]"
           :aria-label="t('common.edit')"
           :title="t('common.edit')"
           @click="emit('edit', shortcut)"
         >
-          {{ t('common.edit') }}
+          <Pencil class="size-4" aria-hidden="true" />
         </button>
         <button
           type="button"
-          class="inline-flex size-8 items-center justify-center rounded-md text-sm text-[var(--color-danger-text)] outline-none hover:bg-[var(--color-danger-bg)] focus:bg-[var(--color-danger-bg)]"
+          class="button button-danger button-icon shortcut-card-action"
           :aria-label="t('common.delete')"
           :title="t('common.delete')"
           @click="emit('delete', shortcut)"
         >
-          {{ t('common.delete') }}
+          <Trash2 class="size-4" aria-hidden="true" />
         </button>
       </div>
     </div>
 
-    <code
-      class="mt-4 block max-h-36 min-h-16 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 font-mono text-xs leading-5 text-[var(--color-text)]"
-    >{{ shortcut.command }}</code>
+    <p class="shortcut-command" :title="shortcut.command">
+      {{ shortcut.command }}
+    </p>
   </article>
 </template>
 
 <script setup lang="ts">
+  import { Pencil, Trash2 } from '@lucide/vue'
   import { useI18n } from 'vue-i18n'
   import type { Shortcut } from '../../gen/proto/termbridge/agent/v1/shortcut'
 

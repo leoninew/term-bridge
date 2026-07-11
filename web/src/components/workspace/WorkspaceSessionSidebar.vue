@@ -157,7 +157,10 @@
               <span class="min-w-0 flex-1 truncate text-sm">{{
                 session.session.name || session.session.command
               }}</span>
-              <span v-if="session.session.lifecycle_state === 'stopped'" class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+              <span
+                v-if="isEditableSession(session.session)"
+                class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
+              >
                 <button
                   type="button"
                   class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
@@ -587,6 +590,10 @@
 
   function isActiveSession(session: SessionSummary) {
     return session.lifecycle_state === 'running'
+  }
+
+  function isEditableSession(session: SessionSummary) {
+    return ['stopped', 'failed'].includes(session.lifecycle_state)
   }
 
   function canRemoveWorkspace(workspace: WorkspaceTreeItem) {

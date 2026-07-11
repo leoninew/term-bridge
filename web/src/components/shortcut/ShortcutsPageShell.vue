@@ -1,29 +1,24 @@
 <template>
   <ToastProvider>
-    <section class="min-h-screen bg-[var(--color-app-bg)] text-[var(--color-text)]">
+    <section class="shortcut-page min-h-screen bg-[var(--color-app-bg)] text-[var(--color-text)]">
       <AppHeader />
 
-      <main class="min-h-[calc(100vh-4rem)] p-6 pt-10">
-        <section class="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
-          <header class="flex items-start justify-between gap-6">
-            <div>
-              <h1 class="text-2xl font-semibold text-[var(--color-text-strong)]">
-                {{ t('shortcut.title') }}
-              </h1>
-              <p class="mt-2 max-w-2xl text-sm text-[var(--color-text-muted)]">
-                {{ t('shortcut.description') }}
-              </p>
-            </div>
-            <button type="button" class="button button-primary h-9 shrink-0 px-3" @click="openCreate">
+      <main class="shortcut-page-main min-h-[calc(100vh-4rem)]">
+        <section class="shortcut-page-content mx-auto flex w-full max-w-[1200px] flex-col">
+          <header class="shortcut-page-header flex items-center justify-between">
+            <h1 class="shortcut-page-title font-semibold text-[var(--color-text-strong)]">
+              {{ t('shortcut.title') }}
+            </h1>
+            <button type="button" class="button button-primary shortcut-create-button shrink-0" @click="openCreate">
               {{ t('shortcut.createTitle') }}
             </button>
           </header>
 
-          <p v-if="loading" class="py-8 text-center text-[var(--color-text-muted)]">
+          <p v-if="loading" class="shortcut-loading text-center text-[var(--color-text-muted)]">
             {{ t('shortcut.loading') }}
           </p>
 
-          <div v-else-if="shortcuts.length" class="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          <div v-else-if="shortcuts.length" class="shortcut-grid grid sm:grid-cols-2 lg:grid-cols-4">
             <ShortcutCard
               v-for="shortcut in shortcuts"
               :key="shortcut.id"
@@ -35,7 +30,7 @@
 
           <section
             v-else
-            class="rounded-xl border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] px-8 py-14 text-center text-[var(--color-text-muted)]"
+            class="shortcut-empty border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] text-center text-[var(--color-text-muted)]"
           >
             {{ t('shortcut.empty') }}
           </section>

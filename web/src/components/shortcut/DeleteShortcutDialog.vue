@@ -1,7 +1,7 @@
 <template>
   <AlertDialogRoot :open="open" @update:open="emit('update:open', $event)">
     <AlertDialogPortal>
-      <AlertDialogOverlay class="dialog-overlay" />
+      <AlertDialogOverlay class="dialog-overlay shortcut-dialog-overlay" />
       <AlertDialogContent class="dialog-content shortcut-delete-dialog">
         <div class="dialog-header">
           <AlertDialogTitle class="dialog-title">{{ t('shortcut.deleteTitle') }}</AlertDialogTitle>
@@ -14,7 +14,11 @@
           <AlertDialogCancel class="button button-secondary" :disabled="deleting">
             {{ t('common.cancel') }}
           </AlertDialogCancel>
-          <AlertDialogAction class="button button-danger" :disabled="deleting" @click="emit('confirm')">
+          <AlertDialogAction
+            class="button button-danger"
+            :disabled="deleting"
+            @click="emit('confirm')"
+          >
             {{ deleting ? t('common.deleting') : t('common.delete') }}
           </AlertDialogAction>
         </div>

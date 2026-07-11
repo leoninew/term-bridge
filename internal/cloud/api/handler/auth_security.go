@@ -57,7 +57,9 @@ func (v *siteverifyVerifier) Verify(ctx context.Context, token string, remoteIP 
 	if err != nil {
 		return errAuthSecurityValidation
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 	if response.StatusCode != http.StatusOK {
 		return errAuthSecurityValidation
 	}

@@ -32,6 +32,7 @@ export const messages = {
       theme: '主题',
       close: '关闭',
       retry: '重试',
+      more: '更多',
     },
     theme: {
       light: '浅色',
@@ -54,7 +55,6 @@ export const messages = {
     },
     shortcut: {
       title: '快捷方式',
-      description: '管理当前设备上的可复用命令。',
       createTitle: '新建快捷方式',
       editTitle: '编辑快捷方式',
       deleteTitle: '删除快捷方式',
@@ -217,7 +217,6 @@ export const messages = {
     },
     dialog: {
       newSessionTitle: '新建会话',
-      newSessionDescription: '启动一个由后端管理的终端会话。',
       defaultSessionName: '默认',
       name: '名称',
       cwd: '目录',
@@ -229,7 +228,9 @@ export const messages = {
       shortcut: '快捷方式',
       directCommand: '直接命令',
       selectShortcut: '选择快捷方式',
+      searchShortcuts: '搜索快捷方式',
       noShortcuts: '没有可用快捷方式',
+      noShortcutMatches: '没有匹配的快捷方式',
       editSessionTitle: '编辑会话',
       deleteSessionTitle: '删除会话',
       deleteActiveSessionDescription: '运行中的会话不能删除。请先关闭终端会话。',
@@ -296,6 +297,7 @@ export const messages = {
       theme: 'Theme',
       close: 'Close',
       retry: 'Retry',
+      more: 'More',
     },
     theme: {
       light: 'Light',
@@ -319,7 +321,6 @@ export const messages = {
     },
     shortcut: {
       title: 'Shortcuts',
-      description: 'Manage reusable commands for this device.',
       createTitle: 'New shortcut',
       editTitle: 'Edit shortcut',
       deleteTitle: 'Delete shortcut',
@@ -499,7 +500,6 @@ export const messages = {
     },
     dialog: {
       newSessionTitle: 'New session',
-      newSessionDescription: 'Start a backend-supported terminal session.',
       defaultSessionName: 'Default',
       name: 'name',
       cwd: 'cwd',
@@ -511,7 +511,9 @@ export const messages = {
       shortcut: 'Shortcut',
       directCommand: 'Direct command',
       selectShortcut: 'Select a shortcut',
+      searchShortcuts: 'Search shortcuts',
       noShortcuts: 'No shortcuts available',
+      noShortcutMatches: 'No shortcuts match your search',
       editSessionTitle: 'Edit session',
       deleteSessionTitle: 'Delete session',
       deleteActiveSessionDescription:

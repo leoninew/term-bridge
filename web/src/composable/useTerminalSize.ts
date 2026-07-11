@@ -5,7 +5,7 @@ import { fitSafeTerminalSize } from '../protocol/terminal'
 
 export function useTerminalSize(workbench: Ref<HTMLElement | null>) {
   function measureInitialTerminalSize(): { cols: number; rows: number } {
-    const measured = measureCreateSessionWorkbench()
+    const measured = measureTerminalWorkbench()
     if (measured) {
       return measured
     }
@@ -21,7 +21,7 @@ export function useTerminalSize(workbench: Ref<HTMLElement | null>) {
     return size
   }
 
-  function measureCreateSessionWorkbench(): { cols: number; rows: number } | null {
+  function measureTerminalWorkbench(): { cols: number; rows: number } | null {
     const element = workbench.value
     if (!element) {
       logTerminalDiagnostic('xterm.measure.missing-workbench')

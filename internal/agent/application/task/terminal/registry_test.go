@@ -415,7 +415,7 @@ func TestCreateSessionRequiresName(t *testing.T) {
 	}
 }
 
-func TestUpdateStoppedSessionChangesNameAndPreservesRawCommand(t *testing.T) {
+func TestUpdateTerminalSessionChangesNameAndPreservesRawCommand(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()
 	fake := newFakeSession()
@@ -449,7 +449,7 @@ func TestUpdateStoppedSessionChangesNameAndPreservesRawCommand(t *testing.T) {
 	}
 }
 
-func TestUpdateSessionRejectsFailedSessionAndEmptyPatch(t *testing.T) {
+func TestUpdateSessionAllowsFailedSessionAndRejectsEmptyPatch(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()
 	fake := newFakeSession()
@@ -466,8 +466,12 @@ func TestUpdateSessionRejectsFailedSessionAndEmptyPatch(t *testing.T) {
 		t.Fatalf("SaveState(failed) error = %v", err)
 	}
 	newName := "New name"
-	if _, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{Name: &newName}); err == nil {
-		t.Fatal("UpdateSession(failed) error = nil, want failed session rejection")
+	updated, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{Name: &newName})
+	if err != nil {
+		t.Fatalf("UpdateSession(failed) error = %v", err)
+	}
+	if updated.Name != newName || updated.Cwd != cwd {
+		t.Fatalf("UpdateSession(failed) = %#v, want updated name and unchanged cwd", updated)
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
 	waitExit(t, store, response.WorkspaceId, response.SessionId)

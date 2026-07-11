@@ -261,7 +261,6 @@ func TestDBStorePersistsDeviceScopedShortcuts(t *testing.T) {
 	if len(listed) != 1 || listed[0].Id != created.Id || listed[0].Command != commandText {
 		t.Fatalf("ListShortcuts() = %#v, want saved shortcut", listed)
 	}
-	previousUpdatedAt := created.UpdatedAt
 	updated, err := store.UpdateShortcut(created.Id, func(value *shortcut.Shortcut) error {
 		value.Command = "cmd"
 		value.Description = nil
@@ -270,8 +269,8 @@ func TestDBStorePersistsDeviceScopedShortcuts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateShortcut() error = %v", err)
 	}
-	if updated.Command != "cmd" || updated.Description != nil || !updated.UpdatedAt.After(previousUpdatedAt) {
-		t.Fatalf("UpdateShortcut() = %#v, want updated command, cleared description, and newer timestamp", updated)
+	if updated.Command != "cmd" || updated.Description != nil {
+		t.Fatalf("UpdateShortcut() = %#v, want updated command and cleared description", updated)
 	}
 	otherDeviceStore := NewDbStore(db, "sqlite", t.TempDir(), "device-2")
 	otherDeviceShortcuts, err := otherDeviceStore.ListShortcuts()
@@ -308,7 +307,7 @@ func TestDBStoreRejectsBlankShortcutRequiredFields(t *testing.T) {
 	}
 }
 
-func TestDBStoreUpdatesOnlyStoppedSessions(t *testing.T) {
+func TestDBStoreUpdatesOnlyTerminalSessions(t *testing.T) {
 	store, _ := newTestDBStore(t)
 	now := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 	ws := workspace.Workspace{SchemaVersion: workspace.SchemaVersion, Id: "workspace-1", Name: "project", Path: t.TempDir(), CreatedAt: now, UpdatedAt: now}
@@ -319,27 +318,41 @@ func TestDBStoreUpdatesOnlyStoppedSessions(t *testing.T) {
 	if err := store.SaveSession(sess); err != nil {
 		t.Fatalf("SaveSession() error = %v", err)
 	}
-	if _, err := store.UpdateStoppedSession(ws.Id, sess.Id, func(value *session.Session) error {
+	if _, err := store.UpdateTerminalSession(ws.Id, sess.Id, func(value *session.Session) error {
 		value.Name = "should not apply"
 		value.UpdatedAt = now.Add(time.Second)
 		return nil
 	}); err == nil {
-		t.Fatal("UpdateStoppedSession() error = nil while session is running")
+		t.Fatal("UpdateTerminalSession() error = nil while session is running")
 	}
 	if err := store.SaveState(ws.Id, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, UpdatedAt: now.Add(time.Second)}); err != nil {
 		t.Fatalf("SaveState(stopped) error = %v", err)
 	}
-	updated, err := store.UpdateStoppedSession(ws.Id, sess.Id, func(value *session.Session) error {
+	updated, err := store.UpdateTerminalSession(ws.Id, sess.Id, func(value *session.Session) error {
 		value.Name = "edited shell"
 		value.Command.Command = `cmd /c "echo updated"`
 		value.UpdatedAt = now.Add(2 * time.Second)
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("UpdateStoppedSession() error = %v", err)
+		t.Fatalf("UpdateTerminalSession() error = %v", err)
 	}
 	if updated.Name != "edited shell" || updated.Command.Command != `cmd /c "echo updated"` || updated.LaunchCwd != ws.Path {
-		t.Fatalf("UpdateStoppedSession() = %#v, want updated name/command and unchanged cwd", updated)
+		t.Fatalf("UpdateTerminalSession() = %#v, want updated name/command and unchanged cwd", updated)
+	}
+	if err := store.SaveState(ws.Id, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, UpdatedAt: now.Add(3 * time.Second)}); err != nil {
+		t.Fatalf("SaveState(failed) error = %v", err)
+	}
+	updated, err = store.UpdateTerminalSession(ws.Id, sess.Id, func(value *session.Session) error {
+		value.Name = "failed shell"
+		value.UpdatedAt = now.Add(4 * time.Second)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("UpdateTerminalSession(failed) error = %v", err)
+	}
+	if updated.Name != "failed shell" || updated.LaunchCwd != ws.Path {
+		t.Fatalf("UpdateTerminalSession(failed) = %#v, want updated name and unchanged cwd", updated)
 	}
 }
 

@@ -54,33 +54,36 @@
           :active-tab="workbench.activeTab"
           :active-session="activeSession"
           :current-device="workbenchDevice"
-          :create-session-form-open="workbench.createSessionFormOpen"
-          :create-cwd="createDraft.cwd"
-          :create-name="createDraft.sessionName"
-          :create-command="createDraft.commandText"
-          :create-command-source="createDraft.commandSource"
-          :create-selected-shortcut-id="createDraft.selectedShortcutId"
-          :shortcuts="shortcuts"
-          :creating-session="creatingSession"
           :terminal-ws-url="activeTerminalWsUrl"
           :session-title="sessionTitle"
           @activate-tab="activateOpenedTab"
           @close-tab="closeTab"
           @reorder-tabs="workbench.openedTabs = $event"
           @open-create="() => openCreateSessionForm()"
-          @submit-create="startSession"
-          @cancel-create="cancelCreateSession"
-          @update:create-cwd="createDraft.cwd = $event"
-          @update:create-name="createDraft.sessionName = $event"
-          @update:create-command="createDraft.commandText = $event"
-          @update:create-command-source="createDraft.commandSource = $event"
-          @update:create-selected-shortcut-id="selectCreateShortcut"
-          @create-workbench="createSessionWorkbench = $event"
+          @workbench="terminalWorkbench = $event"
           @terminal-state="handleTerminalState"
           @terminal-error="handleTerminalError"
         />
       </SplitterPanel>
     </SplitterGroup>
+
+    <CreateSessionDialog
+      :open="dialogs.createSessionDialogOpen"
+      :cwd="createDraft.cwd"
+      :name="createDraft.sessionName"
+      :command="createDraft.commandText"
+      :command-source="createDraft.commandSource"
+      :selected-shortcut-id="createDraft.selectedShortcutId"
+      :shortcuts="shortcuts"
+      :creating="creatingSession"
+      @update:open="dialogs.createSessionDialogOpen = $event"
+      @update:cwd="createDraft.cwd = $event"
+      @update:name="createDraft.sessionName = $event"
+      @update:command="createDraft.commandText = $event"
+      @update:command-source="createDraft.commandSource = $event"
+      @update:selected-shortcut-id="selectCreateShortcut"
+      @submit="startSession"
+    />
 
     <EditSessionDialog
       :open="dialogs.editDialogOpen"
@@ -116,6 +119,7 @@
   import { useI18n } from 'vue-i18n'
   import { useRouter } from 'vue-router'
   import { SplitterGroup, SplitterPanel, SplitterResizeHandle, ToastProvider } from 'reka-ui'
+  import CreateSessionDialog from './CreateSessionDialog.vue'
   import DeleteSessionDialog from './DeleteSessionDialog.vue'
   import EditSessionDialog from './EditSessionDialog.vue'
   import RemoveWorkspaceDialog from './RemoveWorkspaceDialog.vue'
@@ -171,8 +175,8 @@
   const dialogs = useSessionDialogs()
   const createDraft = useCreateSessionDraft()
 
-  const createSessionWorkbench = ref<HTMLElement | null>(null)
-  const { measureInitialTerminalSize } = useTerminalSize(createSessionWorkbench)
+  const terminalWorkbench = ref<HTMLElement | null>(null)
+  const { measureInitialTerminalSize } = useTerminalSize(terminalWorkbench)
 
   const creatingSession = ref(false)
   const editingSession = ref(false)
@@ -242,7 +246,7 @@
   }
 
   function openEditSessionDialog(session: SessionSummary) {
-    if (session.lifecycle_state !== 'stopped') {
+    if (!isEditableLifecycle(session)) {
       return
     }
     dialogs.openEditDialog(session)
@@ -267,6 +271,11 @@
       cloudDevices.reset()
     }
     workspaceSessions.reset()
+    dialogs.createSessionDialogOpen = false
+    dialogs.editDialogOpen = false
+    dialogs.clearSelectedSession()
+    dialogs.removeWorkspaceDialogOpen = false
+    dialogs.clearSelectedWorkspace()
     workbench.resetForSourceChange()
     await router.replace(
       isLocalMode.value ? { name: props.homeRouteName } : { name: 'cloud-login' },
@@ -316,7 +325,7 @@
         await refresh()
       }
       createDraft.reset(undefined, t('dialog.defaultSessionName'))
-      workbench.closeCreateSessionForm()
+      dialogs.createSessionDialogOpen = false
       await openSessionTab(session)
       notifications.pushToast('success', t('toast.sessionCreated'), session.name)
     } catch (err) {
@@ -329,7 +338,7 @@
 
   async function editSelectedSession(payload: { name: string; command: string }) {
     const session = dialogs.selectedSession
-    if (!session || session.lifecycle_state !== 'stopped' || editingSession.value) {
+    if (!session || !isEditableLifecycle(session) || editingSession.value) {
       return
     }
     if (!payload.name) {
@@ -342,7 +351,11 @@
     }
     editingSession.value = true
     try {
-      const updated = await props.runtimeApi.updateSession(session.workspace_id, session.id, payload)
+      const updated = await props.runtimeApi.updateSession(
+        session.workspace_id,
+        session.id,
+        payload,
+      )
       workspaceSessions.updateSession(updated)
       dialogs.selectedSession = updated
       dialogs.editDialogOpen = false
@@ -463,12 +476,7 @@
       activeSessionId: workbench.activeSessionId,
     })
     createDraft.reset(workspace, t('dialog.defaultSessionName'))
-    workbench.openCreateSessionForm()
-  }
-
-  function cancelCreateSession() {
-    logTerminalDiagnostic('session.form.cancel', { activeSessionId: workbench.activeSessionId })
-    workbench.closeCreateSessionForm()
+    dialogs.openCreateSessionDialog()
   }
 
   async function stopSessionFromSidebar(session: SessionSummary) {
@@ -557,6 +565,10 @@
   }
 
   function canRerunLifecycle(session: SessionSummary) {
+    return ['stopped', 'failed'].includes(session.lifecycle_state)
+  }
+
+  function isEditableLifecycle(session: SessionSummary) {
     return ['stopped', 'failed'].includes(session.lifecycle_state)
   }
 

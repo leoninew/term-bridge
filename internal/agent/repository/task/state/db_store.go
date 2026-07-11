@@ -217,14 +217,14 @@ func (s DbStore) LoadSession(workspaceId string, sessionId string) (session.Sess
 }
 
 func (s DbStore) UpdateSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error) {
-	return s.updateSession(workspaceId, sessionId, "", update)
+	return s.updateSession(workspaceId, sessionId, false, update)
 }
 
-func (s DbStore) UpdateStoppedSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error) {
-	return s.updateSession(workspaceId, sessionId, session.StateStopped, update)
+func (s DbStore) UpdateTerminalSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error) {
+	return s.updateSession(workspaceId, sessionId, true, update)
 }
 
-func (s DbStore) updateSession(workspaceId string, sessionId string, requiredState session.State, update func(*session.Session) error) (session.Session, error) {
+func (s DbStore) updateSession(workspaceId string, sessionId string, terminalOnly bool, update func(*session.Session) error) (session.Session, error) {
 	if err := s.validate(); err != nil {
 		return session.Session{}, err
 	}
@@ -290,17 +290,17 @@ func (s DbStore) updateSession(workspaceId string, sessionId string, requiredSta
 	}
 	query := `UPDATE sessions SET name=?, launch_cwd=?, command_json=?, history_json=?, updated_at=? WHERE id=? AND workspace_id=? AND device_id=? AND deleted_at IS NULL AND updated_at=?`
 	args := []any{value.Name, value.LaunchCwd, commandJSON, historyJSON, s.storeTime(value.UpdatedAt), value.Id, value.WorkspaceId, s.deviceId, s.storeTime(originalUpdatedAt)}
-	if requiredState != "" {
-		query += ` AND current_state=?`
-		args = append(args, string(requiredState))
+	if terminalOnly {
+		query += ` AND current_state IN (?,?)`
+		args = append(args, string(session.StateStopped), string(session.StateFailed))
 	}
 	result, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		return session.Session{}, err
 	}
 	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
-		if requiredState != "" {
-			return session.Session{}, errors.New("session is no longer stopped")
+		if terminalOnly {
+			return session.Session{}, errors.New("session is no longer terminal")
 		}
 		return session.Session{}, errors.New("session was updated concurrently")
 	}

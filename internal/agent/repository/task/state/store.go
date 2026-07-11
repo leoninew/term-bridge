@@ -134,13 +134,13 @@ func (s Store) UpdateSession(workspaceId string, sessionId string, update func(*
 	return value, nil
 }
 
-func (s Store) UpdateStoppedSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error) {
+func (s Store) UpdateTerminalSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error) {
 	stateRecord, err := s.LoadState(workspaceId, sessionId)
 	if err != nil {
 		return session.Session{}, err
 	}
-	if stateRecord.State != session.StateStopped {
-		return session.Session{}, errors.New("session is no longer stopped")
+	if !session.Terminal(stateRecord.State) {
+		return session.Session{}, errors.New("session is no longer terminal")
 	}
 	return s.UpdateSession(workspaceId, sessionId, update)
 }

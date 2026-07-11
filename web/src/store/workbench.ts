@@ -19,14 +19,12 @@ export type RemovedSession = Pick<SessionSummary, 'id' | 'workspace_id'>
 export const useWorkbenchStore = defineStore('workbench', () => {
   const openedTabs = ref<OpenSessionTab[]>([])
   const activeSessionId = ref<string | null>(null)
-  const createSessionFormOpen = ref(false)
 
   const activeTab = computed(
     () => openedTabs.value.find((tab) => tab.sessionId === activeSessionId.value) ?? null,
   )
 
   function resetForSourceChange() {
-    createSessionFormOpen.value = false
     openedTabs.value = []
     activeSessionId.value = null
   }
@@ -36,7 +34,6 @@ export const useWorkbenchStore = defineStore('workbench', () => {
     runtimeApi: SessionRuntimeApi,
     session: SessionSummary,
   ) {
-    createSessionFormOpen.value = false
     ensureTab(session)
     setActiveSession(session.id)
     return ensureHistoryLoaded(target, runtimeApi, session)
@@ -66,7 +63,6 @@ export const useWorkbenchStore = defineStore('workbench', () => {
     sessionId: string,
     sessionResolver: (workspaceId: string, sessionId: string) => SessionSummary | null,
   ) {
-    createSessionFormOpen.value = false
     setActiveSession(sessionId)
     const tab = tabFor(sessionId)
     const session = tab ? sessionResolver(tab.workspaceId, tab.sessionId) : null
@@ -157,14 +153,6 @@ export const useWorkbenchStore = defineStore('workbench', () => {
     }
   }
 
-  function openCreateSessionForm() {
-    createSessionFormOpen.value = true
-  }
-
-  function closeCreateSessionForm() {
-    createSessionFormOpen.value = false
-  }
-
   function tabFor(sessionId: string) {
     return openedTabs.value.find((tab) => tab.sessionId === sessionId) ?? null
   }
@@ -173,7 +161,6 @@ export const useWorkbenchStore = defineStore('workbench', () => {
     openedTabs,
     activeSessionId,
     activeTab,
-    createSessionFormOpen,
     resetForSourceChange,
     openSession,
     ensureTab,
@@ -184,8 +171,6 @@ export const useWorkbenchStore = defineStore('workbench', () => {
     ensureActiveHistoryLoaded,
     resetTabHistory,
     closeRemovedSessions,
-    openCreateSessionForm,
-    closeCreateSessionForm,
     tabFor,
   }
 })

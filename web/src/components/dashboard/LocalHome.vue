@@ -166,6 +166,52 @@
             </li>
           </ul>
         </section>
+
+        <section
+          class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+        >
+          <div
+            class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
+          >
+            <h2 class="text-lg font-semibold text-[var(--color-text-strong)]">
+              {{ t('shortcut.title') }}
+            </h2>
+            <RouterLink
+              :to="{ name: 'local-shortcuts' }"
+              class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
+            >
+              <Command class="size-3.5" />
+              {{ t('common.more') }}
+            </RouterLink>
+          </div>
+
+          <div v-if="shortcutsLoading" class="p-5 text-sm text-[var(--color-text-muted)]">
+            {{ t('shortcut.loading') }}
+          </div>
+          <div v-else-if="shortcutError" class="p-5 text-sm text-[var(--color-danger-text)]">
+            {{ shortcutError }}
+          </div>
+          <div
+            v-else-if="shortcuts.length === 0"
+            class="p-5 text-sm text-[var(--color-text-muted)]"
+          >
+            {{ t('shortcut.empty') }}
+          </div>
+          <ul v-else class="grid gap-px bg-[var(--color-border)] sm:grid-cols-2 lg:grid-cols-4">
+            <li
+              v-for="shortcut in shortcuts"
+              :key="shortcut.id"
+              class="min-w-0 bg-[var(--color-surface)] px-4 py-3 text-center"
+            >
+              <p class="truncate text-sm font-semibold text-[var(--color-text-strong)]">
+                {{ shortcut.name }}
+              </p>
+              <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
+                {{ shortcut.command }}
+              </p>
+            </li>
+          </ul>
+        </section>
       </div>
     </main>
   </section>
@@ -174,7 +220,17 @@
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { ArrowRight, Folder, FolderOpen, Monitor, Package, Plug, Unplug, User } from '@lucide/vue'
+  import {
+    ArrowRight,
+    Command,
+    Folder,
+    FolderOpen,
+    Monitor,
+    Package,
+    Plug,
+    Unplug,
+    User,
+  } from '@lucide/vue'
   import { RouterLink, useRouter } from 'vue-router'
   import AppHeader from '../layout/AppHeader.vue'
   import CloudAccountConnectionMenu from './CloudAccountConnectionMenu.vue'
@@ -182,6 +238,7 @@
     authMe,
     connectCloudWithToken,
     disconnectCloud,
+    listShortcuts,
     listWorkspaces,
   } from '../../features/local/api'
   import {
@@ -192,6 +249,7 @@
     markCloudConnected,
     startCloudOAuth,
   } from '../../features/cloud/oauth'
+  import type { Shortcut } from '../../gen/proto/termbridge/agent/v1/shortcut'
   import type { Workspace } from '../../gen/proto/termbridge/agent/v1/workspace'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
@@ -213,6 +271,9 @@
   const workspaces = ref<Workspace[]>([])
   const workspacesLoading = ref(false)
   const workspaceError = ref('')
+  const shortcuts = ref<Shortcut[]>([])
+  const shortcutsLoading = ref(false)
+  const shortcutError = ref('')
 
   const cloudConnectEnabled = computed(() => cloudOAuthConfigured())
   const cloudConnectionActionLabel = computed(() =>
@@ -230,7 +291,9 @@
 
   async function loadLocalHome() {
     workspacesLoading.value = true
+    shortcutsLoading.value = true
     workspaceError.value = ''
+    shortcutError.value = ''
     try {
       await localAuth.ensureToken()
       const me = await authMe()
@@ -241,13 +304,41 @@
       } catch (err) {
         notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
       }
+    } catch (err) {
+      workspaceError.value = t('dashboard.loadWorkspacesFailed')
+      notifications.notifyError(t('dashboard.loadWorkspacesFailed'), err)
+      workspacesLoading.value = false
+      shortcutsLoading.value = false
+      return
+    }
+
+    await Promise.all([loadWorkspaces(), loadShortcuts()])
+  }
+
+  async function loadWorkspaces() {
+    workspacesLoading.value = true
+    workspaceError.value = ''
+    try {
       const workspaceResponse = await listWorkspaces()
-      workspaces.value = workspaceResponse.data
+      workspaces.value = workspaceResponse.data.slice(0, 5)
     } catch (err) {
       workspaceError.value = t('dashboard.loadWorkspacesFailed')
       notifications.notifyError(t('dashboard.loadWorkspacesFailed'), err)
     } finally {
       workspacesLoading.value = false
+    }
+  }
+
+  async function loadShortcuts() {
+    shortcutsLoading.value = true
+    shortcutError.value = ''
+    try {
+      shortcuts.value = (await listShortcuts()).slice(0, 4)
+    } catch (err) {
+      shortcutError.value = t('toast.loadShortcutsFailed')
+      notifications.notifyError(t('toast.loadShortcutsFailed'), err)
+    } finally {
+      shortcutsLoading.value = false
     }
   }
 

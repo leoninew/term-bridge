@@ -51,7 +51,7 @@ type RuntimeStore interface {
 	SaveSession(session.Session) error
 	LoadSession(workspaceId string, sessionId string) (session.Session, error)
 	UpdateSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error)
-	UpdateStoppedSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error)
+	UpdateTerminalSession(workspaceId string, sessionId string, update func(*session.Session) error) (session.Session, error)
 	DeleteSession(workspaceId string, sessionId string) error
 	DeleteWorkspace(workspaceId string) error
 	SaveState(workspaceId string, sessionId string, value session.StateRecord) error
@@ -591,10 +591,10 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 	if err != nil {
 		return nil, err
 	}
-	if view.State.State != session.StateStopped {
-		return nil, apperrors.Usage("only stopped sessions can be edited")
+	if !session.Terminal(view.State.State) {
+		return nil, apperrors.Usage("only stopped or failed sessions can be edited")
 	}
-	updated, err := r.store.UpdateStoppedSession(workspaceId, sessionId, func(value *session.Session) error {
+	updated, err := r.store.UpdateTerminalSession(workspaceId, sessionId, func(value *session.Session) error {
 		if request.Name != nil {
 			value.Name = name
 		}
@@ -605,8 +605,8 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 		return nil
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "no longer stopped") {
-			return nil, apperrors.Usage("only stopped sessions can be edited")
+		if strings.Contains(err.Error(), "no longer terminal") {
+			return nil, apperrors.Usage("only stopped or failed sessions can be edited")
 		}
 		return nil, apperrors.Runtime("update session", err)
 	}

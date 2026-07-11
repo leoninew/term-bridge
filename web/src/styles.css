@@ -21,9 +21,11 @@
   --color-text-subtle: #64748b;
   --color-primary-bg: #0c4a6e;
   --color-primary-border: #0369a1;
+  --color-primary-hover: #075985;
   --color-primary-text: #e0f2fe;
   --color-danger-bg: #450a0a;
   --color-danger-border: #7f1d1d;
+  --color-danger-hover: #7f1d1d;
   --color-danger-text: #fecaca;
   --color-warning-bg: #451a03;
   --color-warning-border: #92400e;
@@ -54,9 +56,11 @@
   --color-text-subtle: #64748b;
   --color-primary-bg: #0284c7;
   --color-primary-border: #0369a1;
+  --color-primary-hover: #0369a1;
   --color-primary-text: #ffffff;
   --color-danger-bg: #fee2e2;
   --color-danger-border: #ef4444;
+  --color-danger-hover: #fecaca;
   --color-danger-text: #991b1b;
   --color-warning-bg: #fef3c7;
   --color-warning-border: #f59e0b;
@@ -119,27 +123,41 @@ p {
 .button,
 .toast-close {
   display: inline-flex;
-  min-height: 32px;
+  min-height: 36px;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-control-bg);
   color: var(--color-text);
   font-size: 14px;
   font-weight: 500;
   line-height: 1;
-  padding: 0 12px;
+  padding: 0 14px;
   transition:
     border-color 150ms ease,
     background 150ms ease,
-    color 150ms ease;
+    color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .button:hover:not(:disabled),
 .toast-close:hover {
   border-color: var(--color-border-strong);
   background: var(--color-control-hover);
+}
+
+.button:focus-visible,
+.toast-close:focus-visible {
+  outline: none;
+  border-color: var(--color-border-strong);
+  box-shadow: 0 0 0 3px var(--color-surface-muted);
+}
+
+.button-icon {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
 }
 
 .button-primary {
@@ -181,15 +199,16 @@ p {
   left: 50%;
   top: 50%;
   z-index: 50;
-  width: min(480px, calc(100vw - 32px));
+  width: min(520px, calc(100vw - 32px));
   transform: translate(-50%, -50%);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--color-surface);
-  box-shadow: 0 24px 64px rgb(0 0 0 / 0.28);
+  box-shadow: 0 28px 72px rgb(0 0 0 / 0.3);
   color: var(--color-text);
   font-size: 14px;
-  padding: 20px;
+  line-height: 1.5;
+  padding: 24px;
 }
 
 .dialog-header {
@@ -222,11 +241,11 @@ p {
 .dialog-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 20px;
+  gap: 16px;
+  margin-top: 24px;
 }
 
-.dialog-form label {
+.dialog-form > label {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -235,10 +254,11 @@ p {
 }
 
 .dialog-form input,
+.dialog-form select,
 .dialog-form textarea {
   width: 100%;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-control-bg);
   color: var(--color-text);
   font: inherit;
@@ -247,16 +267,18 @@ p {
   padding: 8px 10px;
 }
 
-.dialog-form input {
+.dialog-form input,
+.dialog-form select {
   min-height: 36px;
 }
 
 .dialog-form textarea {
-  min-height: 84px;
+  min-height: 96px;
   resize: vertical;
 }
 
 .dialog-form input:focus,
+.dialog-form select:focus,
 .dialog-form textarea:focus {
   border-color: var(--color-border-strong);
   box-shadow: 0 0 0 3px var(--color-surface-muted);
@@ -267,7 +289,7 @@ p {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
 .terminal-shell {
@@ -368,6 +390,143 @@ p {
   border: 0;
   background: transparent;
   padding: 2px 6px;
+}
+
+.shortcut-page-main {
+  padding: 16px;
+}
+
+.shortcut-page-content {
+  gap: 16px;
+}
+
+.shortcut-page-header {
+  min-height: 36px;
+}
+
+.shortcut-page-title {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.shortcut-create-button {
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.shortcut-loading {
+  padding: 32px 0;
+}
+
+.shortcut-grid {
+  gap: 10px;
+}
+
+.shortcut-empty {
+  border-radius: 8px;
+  padding: 44px 24px;
+}
+
+.shortcut-card {
+  min-height: 0;
+  border-radius: 8px;
+  padding: 10px;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.shortcut-card:hover,
+.shortcut-card:focus-within {
+  border-color: var(--color-primary-border);
+  background: var(--color-surface-raised);
+}
+
+.shortcut-card-header {
+  gap: 8px;
+}
+
+.shortcut-card-description {
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+.shortcut-card-actions {
+  gap: 4px;
+}
+
+.shortcut-card-action.button-icon {
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.shortcut-card-action.button-icon:hover:not(:disabled) {
+  border-color: var(--color-border);
+  background: var(--color-control-hover);
+}
+
+.shortcut-card-action.button-danger:hover:not(:disabled) {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-bg);
+}
+
+.shortcut-command {
+  overflow: hidden;
+  margin-top: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 18px;
+  padding: 5px 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shortcut-dialog-overlay {
+  background: rgb(2 6 23 / 0.4);
+  backdrop-filter: none;
+}
+
+.shortcut-dialog-content {
+  width: min(576px, calc(100vw - 32px));
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 20px 52px rgb(0 0 0 / 0.22);
+}
+
+.shortcut-delete-dialog {
+  width: min(448px, calc(100vw - 32px));
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 20px 52px rgb(0 0 0 / 0.22);
+}
+
+.shortcut-editor-form {
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.shortcut-editor-form .dialog-actions,
+.shortcut-delete-dialog .dialog-actions {
+  margin-top: 12px;
+}
+
+.shortcut-dialog-content .dialog-form input:focus,
+.shortcut-dialog-content .dialog-form textarea:focus {
+  border-color: var(--color-primary-border);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-border) 22%, transparent);
+}
+
+.shortcut-command-input {
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace !important;
+  font-size: 13px !important;
+  line-height: 1.5;
 }
 
 .sr-only {

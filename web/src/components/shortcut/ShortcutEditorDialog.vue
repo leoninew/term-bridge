@@ -1,14 +1,11 @@
 <template>
   <DialogRoot :open="open" @update:open="emit('update:open', $event)">
     <DialogPortal>
-      <DialogOverlay class="dialog-overlay" />
+      <DialogOverlay class="dialog-overlay shortcut-dialog-overlay" />
       <DialogContent class="dialog-content shortcut-dialog-content">
-        <div class="dialog-header">
-          <DialogTitle class="dialog-title">
-            {{ shortcut ? t('shortcut.editTitle') : t('shortcut.createTitle') }}
-          </DialogTitle>
-          <p class="dialog-description">{{ t('shortcut.description') }}</p>
-        </div>
+        <DialogTitle class="dialog-title">
+          {{ shortcut ? t('shortcut.editTitle') : t('shortcut.createTitle') }}
+        </DialogTitle>
 
         <form class="dialog-form shortcut-editor-form" @submit.prevent="submit">
           <label>
@@ -17,7 +14,13 @@
           </label>
           <label>
             <span>{{ t('dialog.command') }}</span>
-            <textarea v-model="command" :disabled="saving" rows="4" spellcheck="false" />
+            <textarea
+              v-model="command"
+              class="shortcut-command-input"
+              :disabled="saving"
+              rows="4"
+              spellcheck="false"
+            />
           </label>
           <label>
             <span>{{ t('shortcut.descriptionField') }}</span>
@@ -76,6 +79,10 @@
   )
 
   function submit() {
-    emit('submit', { name: name.value.trim(), command: command.value, description: description.value })
+    emit('submit', {
+      name: name.value.trim(),
+      command: command.value,
+      description: description.value,
+    })
   }
 </script>

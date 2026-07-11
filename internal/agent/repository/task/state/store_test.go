@@ -12,6 +12,47 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/workspace"
 )
 
+func TestStoreUpdatesOnlyTerminalSessions(t *testing.T) {
+	store := NewStore(filepath.Join(t.TempDir(), ".termbridge"))
+	now := time.Date(2026, 7, 11, 10, 0, 0, 0, time.UTC)
+	ws, sess := saveWorkspaceSession(t, store, now)
+	if _, err := store.UpdateTerminalSession(ws.Id, sess.Id, func(value *session.Session) error {
+		value.Name = "should not apply"
+		return nil
+	}); err == nil {
+		t.Fatal("UpdateTerminalSession() error = nil while session is running")
+	}
+	if err := store.SaveState(ws.Id, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, UpdatedAt: now.Add(time.Second)}); err != nil {
+		t.Fatalf("SaveState(stopped) error = %v", err)
+	}
+	updated, err := store.UpdateTerminalSession(ws.Id, sess.Id, func(value *session.Session) error {
+		value.Name = "stopped shell"
+		value.Command.Command = `cmd /c "echo updated"`
+		value.UpdatedAt = now.Add(2 * time.Second)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("UpdateTerminalSession(stopped) error = %v", err)
+	}
+	if updated.Name != "stopped shell" || updated.Command.Command != `cmd /c "echo updated"` || updated.LaunchCwd != ws.Path {
+		t.Fatalf("UpdateTerminalSession(stopped) = %#v, want updated name/command and unchanged cwd", updated)
+	}
+	if err := store.SaveState(ws.Id, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, UpdatedAt: now.Add(3 * time.Second)}); err != nil {
+		t.Fatalf("SaveState(failed) error = %v", err)
+	}
+	updated, err = store.UpdateTerminalSession(ws.Id, sess.Id, func(value *session.Session) error {
+		value.Name = "failed shell"
+		value.UpdatedAt = now.Add(4 * time.Second)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("UpdateTerminalSession(failed) error = %v", err)
+	}
+	if updated.Name != "failed shell" || updated.LaunchCwd != ws.Path {
+		t.Fatalf("UpdateTerminalSession(failed) = %#v, want updated name and unchanged cwd", updated)
+	}
+}
+
 func TestStoreSavesAndListsRecordsFromWorkspaceAggregate(t *testing.T) {
 	store := NewStore(filepath.Join(t.TempDir(), ".termbridge"))
 	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
@@ -32,7 +73,6 @@ func TestStoreSavesAndListsRecordsFromWorkspaceAggregate(t *testing.T) {
 	if err := store.SaveExit(ws.Id, sess.Id, process.ExitRecord{SchemaVersion: 1, ExitCode: 7, Reason: "user_process_exited", EndedAt: now}); err != nil {
 		t.Fatalf("SaveExit() error = %v", err)
 	}
-
 	workspaces, warnings, err := store.ListWorkspaces()
 	if err != nil {
 		t.Fatalf("ListWorkspaces() error = %v", err)
@@ -43,7 +83,6 @@ func TestStoreSavesAndListsRecordsFromWorkspaceAggregate(t *testing.T) {
 	if len(workspaces) != 1 || workspaces[0].Id != ws.Id {
 		t.Fatalf("workspaces = %#v", workspaces)
 	}
-
 	sessions, warnings, err := store.ListSessions()
 	if err != nil {
 		t.Fatalf("ListSessions() error = %v", err)
@@ -77,7 +116,6 @@ func TestStoreOverwritesExistingState(t *testing.T) {
 	ws, sess := saveWorkspaceSession(t, store, now)
 	first := session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateRunning, Reason: "process_started", UpdatedAt: now}
 	second := session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateStopped, Reason: "user_process_exited", UpdatedAt: now.Add(time.Second)}
-
 	if err := store.SaveState(ws.Id, sess.Id, first); err != nil {
 		t.Fatalf("SaveState(first) error = %v", err)
 	}
@@ -110,18 +148,12 @@ func TestStoreReadsWorkspaceAggregateFiles(t *testing.T) {
 	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
-	sessionFiles := map[string]string{
-		"session.json": `{"session_id":"file-local","name":"file-local"}`,
-		"state.json":   `{"state":"running","reason":"session_file_state"}`,
-		"process.json": `{"pid":999}`,
-		"exit.json":    `{"exit_code":99,"reason":"session_file_exit"}`,
-	}
+	sessionFiles := map[string]string{"session.json": `{"session_id":"file-local","name":"file-local"}`, "state.json": `{"state":"running","reason":"session_file_state"}`, "process.json": `{"pid":999}`, "exit.json": `{"exit_code":99,"reason":"session_file_exit"}`}
 	for name, body := range sessionFiles {
 		if err := os.WriteFile(filepath.Join(sessionDir, name), []byte(body), 0o644); err != nil {
 			t.Fatalf("WriteFile(%s) error = %v", name, err)
 		}
 	}
-
 	stateRecord, err := store.LoadState(ws.Id, sess.Id)
 	if err != nil {
 		t.Fatalf("LoadState() error = %v", err)
