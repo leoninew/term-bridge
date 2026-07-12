@@ -108,33 +108,23 @@
         <DialogOverlay class="dialog-overlay" />
         <DialogContent class="dialog-content">
           <DialogTitle class="dialog-title">{{ t('cloud.changePassword') }}</DialogTitle>
-          <form class="mt-4 space-y-3" @submit.prevent="submitChangePassword">
+          <form class="dialog-form" @submit.prevent="submitChangePassword">
             <input
               v-model="currentPassword"
               type="password"
-              class="h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-sm text-[var(--color-text)] outline-none"
               :placeholder="t('cloud.currentPassword')"
             />
-            <input
-              v-model="newPassword"
-              type="password"
-              class="h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-sm text-[var(--color-text)] outline-none"
-              :placeholder="t('cloud.newPassword')"
-            />
-            <div class="flex justify-end gap-2 pt-2">
+            <input v-model="newPassword" type="password" :placeholder="t('cloud.newPassword')" />
+            <div class="dialog-actions">
               <DialogClose as-child>
                 <button
                   type="button"
-                  class="h-8 rounded-md border border-[var(--color-border)] px-3 text-sm text-[var(--color-text)]"
+                  class="button button-secondary bg-[var(--color-surface-raised)]"
                 >
                   {{ t('common.cancel') }}
                 </button>
               </DialogClose>
-              <button
-                type="submit"
-                class="h-8 rounded-md border border-blue-700 bg-blue-600 px-3 text-sm text-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                :disabled="changingPassword"
-              >
+              <button type="submit" class="button button-primary" :disabled="changingPassword">
                 {{ changingPassword ? t('cloud.changingPassword') : t('cloud.changePassword') }}
               </button>
             </div>

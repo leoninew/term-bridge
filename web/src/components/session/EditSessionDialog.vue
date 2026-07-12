@@ -21,11 +21,14 @@
           />
           <div class="dialog-actions">
             <DialogClose as-child
-              ><button type="button" class="button button-secondary">
+              ><button
+                type="button"
+                class="button button-secondary bg-[var(--color-surface-raised)]"
+              >
                 {{ t('common.cancel') }}
               </button></DialogClose
             ><button type="submit" class="button button-primary" :disabled="editing">
-              {{ editing ? t('common.editing') : t('common.edit') }}
+              {{ t('common.confirm') }}
             </button>
           </div>
         </form></DialogContent

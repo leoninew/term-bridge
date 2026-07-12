@@ -241,8 +241,8 @@ p {
 .dialog-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-top: 24px;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .dialog-form > label {
@@ -289,7 +289,11 @@ p {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 24px;
+  margin-top: 16px;
+}
+
+.dialog-form > .dialog-actions {
+  margin-top: 4px;
 }
 
 .terminal-shell {
@@ -495,32 +499,20 @@ p {
 
 .shortcut-dialog-content {
   width: min(576px, calc(100vw - 32px));
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 20px 52px rgb(0 0 0 / 0.22);
 }
 
 .shortcut-delete-dialog {
   width: min(448px, calc(100vw - 32px));
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 20px 52px rgb(0 0 0 / 0.22);
-}
-
-.shortcut-editor-form {
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.shortcut-editor-form .dialog-actions,
-.shortcut-delete-dialog .dialog-actions {
-  margin-top: 12px;
 }
 
 .shortcut-dialog-content .dialog-form input:focus,
 .shortcut-dialog-content .dialog-form textarea:focus {
   border-color: var(--color-primary-border);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-border) 22%, transparent);
+}
+
+.shortcut-editor-form textarea {
+  min-height: 36px;
 }
 
 .shortcut-command-input {

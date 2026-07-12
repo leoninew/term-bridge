@@ -3,17 +3,19 @@
     <AlertDialogPortal>
       <AlertDialogOverlay class="dialog-overlay" />
       <AlertDialogContent class="dialog-content">
-        <AlertDialogTitle class="dialog-title">{{
-          t('dialog.removeWorkspaceTitle')
-        }}</AlertDialogTitle>
-        <AlertDialogDescription class="dialog-description">
-          <template v-if="workspace">
-            {{ t('dialog.removeWorkspaceDescription', { name: workspace.name }) }}
-          </template>
-          <template v-else>
-            {{ t('dialog.removeWorkspaceDescription', { name: t('dialog.fallbackSession') }) }}
-          </template>
-        </AlertDialogDescription>
+        <div class="dialog-header">
+          <AlertDialogTitle class="dialog-title">{{
+            t('dialog.removeWorkspaceTitle')
+          }}</AlertDialogTitle>
+          <AlertDialogDescription class="dialog-description">
+            <template v-if="workspace">
+              {{ t('dialog.removeWorkspaceDescription', { name: workspace.name }) }}
+            </template>
+            <template v-else>
+              {{ t('dialog.removeWorkspaceDescription', { name: t('dialog.fallbackSession') }) }}
+            </template>
+          </AlertDialogDescription>
+        </div>
         <div class="dialog-actions">
           <AlertDialogCancel as-child>
             <button type="button" class="button button-secondary">

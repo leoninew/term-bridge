@@ -3,21 +3,23 @@
     <AlertDialogPortal>
       <AlertDialogOverlay class="dialog-overlay" />
       <AlertDialogContent class="dialog-content">
-        <AlertDialogTitle class="dialog-title">{{
-          t('dialog.deleteSessionTitle')
-        }}</AlertDialogTitle>
-        <AlertDialogDescription class="dialog-description">
-          <template v-if="session && session.lifecycle_state === 'running'">
-            {{ t('dialog.deleteActiveSessionDescription') }}
-          </template>
-          <template v-else>
-            {{
-              t('dialog.deleteSessionDescription', {
-                name: session ? session.name : t('dialog.fallbackSession'),
-              })
-            }}
-          </template>
-        </AlertDialogDescription>
+        <div class="dialog-header">
+          <AlertDialogTitle class="dialog-title">{{
+            t('dialog.deleteSessionTitle')
+          }}</AlertDialogTitle>
+          <AlertDialogDescription class="dialog-description">
+            <template v-if="session && session.lifecycle_state === 'running'">
+              {{ t('dialog.deleteActiveSessionDescription') }}
+            </template>
+            <template v-else>
+              {{
+                t('dialog.deleteSessionDescription', {
+                  name: session ? session.name : t('dialog.fallbackSession'),
+                })
+              }}
+            </template>
+          </AlertDialogDescription>
+        </div>
         <div class="dialog-actions">
           <AlertDialogCancel as-child>
             <button type="button" class="button button-secondary">

@@ -18,6 +18,7 @@ export const messages = {
   'zh-CN': {
     common: {
       cancel: '取消',
+      confirm: '确定',
       create: '新建',
       creating: '新建中…',
       delete: '删除',
@@ -283,6 +284,7 @@ export const messages = {
   'en-US': {
     common: {
       cancel: 'Cancel',
+      confirm: 'Confirm',
       create: 'Create',
       creating: 'Creating…',
       delete: 'Delete',
