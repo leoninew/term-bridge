@@ -59,6 +59,17 @@ describe('useCreateSessionDraft', () => {
     expect(draft.selectedShortcutId).toBe('shortcut-1')
     expect(draft.commandText).toBe(command)
     expect(draft.commandSource).toBe('command')
+    draft.selectedShortcutId = null
+    expect(draft.commandText).toBe(command)
+    expect(draft.validate()).toEqual({
+      value: {
+        workspaceId: null,
+        name: 'New Session',
+        cwd: '~',
+        commandText: command,
+      },
+      error: null,
+    })
   })
 
   it('returns specific validation errors', () => {

@@ -242,6 +242,10 @@
   }
 
   function selectCreateShortcut(shortcutId: string | null) {
+    if (shortcutId === null) {
+      createDraft.selectedShortcutId = null
+      return
+    }
     createDraft.selectShortcut(shortcuts.value.find((value) => value.id === shortcutId))
   }
 
