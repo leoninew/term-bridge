@@ -12,6 +12,7 @@ import (
 	"time"
 
 	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
+	cloudapi "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/cloudapi"
 	cloudv1 "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
@@ -26,7 +27,7 @@ func testLocalDevice() agentapp.Device {
 
 func TestAuthMeReturnsRuntimeLocalCloudSessionSummary(t *testing.T) {
 	authService := newTestAuthService(sharedauth.NewTokenService(testJWTKey))
-	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: "https://cloud.example.test"})
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService})
 	connectedAt := time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
 	handler.setLocalCloudSession(&cloudv1.CloudSessionSummary{PublicUrl: "https://cloud.example.test", DeviceId: "dev-1", DeviceName: "local-device", ConnectedAt: prototime.FromTime(connectedAt)})
 
@@ -139,7 +140,7 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer cloud.Close()
-	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir})
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudService: testCloudService(cloud.URL), LocalDevice: device, LocalDeviceStateDir: stateDir})
 	localToken := localToken(t, handler)
 	request := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
 	request.Header.Set("Authorization", "Bearer "+localToken)
@@ -185,7 +186,7 @@ func TestCloudConnectDoesNotPersistLocalCloudSession(t *testing.T) {
 	}))
 	defer cloud.Close()
 
-	first := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir})
+	first := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudService: testCloudService(cloud.URL), LocalDevice: device, LocalDeviceStateDir: stateDir})
 	localToken := localToken(t, first)
 	connectRequest := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
 	connectRequest.Header.Set("Authorization", "Bearer "+localToken)
@@ -198,7 +199,7 @@ func TestCloudConnectDoesNotPersistLocalCloudSession(t *testing.T) {
 		t.Fatalf("device report id=%q name=%q public_key=%q", deviceReport.GetId(), deviceReport.GetName(), deviceReport.GetPublicKey())
 	}
 
-	second := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: agentapp.Device{Id: device.Id, Name: device.Name, PublicKey: device.PublicKey}, LocalDeviceStateDir: stateDir})
+	second := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudService: testCloudService(cloud.URL), LocalDevice: agentapp.Device{Id: device.Id, Name: device.Name, PublicKey: device.PublicKey}, LocalDeviceStateDir: stateDir})
 	response := httptest.NewRecorder()
 	second.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
 	if response.Code != http.StatusOK {
@@ -238,7 +239,7 @@ func TestCloudDisconnectClearsLocalCloudSessionWithoutUnbindingCloudDevice(t *te
 	}))
 	defer cloud.Close()
 	var sessionEvents []*cloudv1.CloudSessionSummary
-	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: device, LocalDeviceStateDir: stateDir, OnLocalCloudSession: func(summary *cloudv1.CloudSessionSummary) {
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudService: testCloudService(cloud.URL), LocalDevice: device, LocalDeviceStateDir: stateDir, OnLocalCloudSession: func(summary *cloudv1.CloudSessionSummary) {
 		if summary == nil {
 			sessionEvents = append(sessionEvents, nil)
 			return
@@ -304,7 +305,7 @@ func TestCloudConnectRequiresCloudTokenBeforeDeviceReport(t *testing.T) {
 		t.Fatalf("cloud endpoint should not be called without cloud token")
 	}))
 	defer cloud.Close()
-	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudPublicURL: cloud.URL, LocalDevice: testLocalDevice()})
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, CloudService: testCloudService(cloud.URL), LocalDevice: testLocalDevice()})
 	localToken := localToken(t, handler)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", strings.NewReader(`{"cloud_token":" "}`))
@@ -333,11 +334,10 @@ func TestExchangeOAuthCodeReturnsAccessToken(t *testing.T) {
 	}))
 	defer cloud.Close()
 	handler := New(Config{
-		JWTSecret:      testJWTKey,
-		Logger:         slog.Default(),
-		AuthService:    NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
-		CloudPublicURL: cloud.URL,
-		OAuthClient:    testOAuthClientConfig(),
+		JWTSecret:    testJWTKey,
+		Logger:       slog.Default(),
+		AuthService:  NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
+		CloudService: testCloudService(cloud.URL),
 	})
 
 	request := httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
@@ -365,11 +365,10 @@ func TestExchangeOAuthCodeRequiresLocalAuthentication(t *testing.T) {
 	}))
 	defer cloud.Close()
 	handler := New(Config{
-		JWTSecret:      testJWTKey,
-		Logger:         slog.Default(),
-		AuthService:    NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
-		CloudPublicURL: cloud.URL,
-		OAuthClient:    testOAuthClientConfig(),
+		JWTSecret:    testJWTKey,
+		Logger:       slog.Default(),
+		AuthService:  NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
+		CloudService: testCloudService(cloud.URL),
 	})
 
 	request := httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
@@ -386,11 +385,10 @@ func TestExchangeOAuthCodeRequiresLocalAuthentication(t *testing.T) {
 
 func TestExchangeOAuthCodeRequiresCode(t *testing.T) {
 	handler := New(Config{
-		JWTSecret:      testJWTKey,
-		Logger:         slog.Default(),
-		AuthService:    NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
-		CloudPublicURL: "https://cloud.example.test",
-		OAuthClient:    testOAuthClientConfig(),
+		JWTSecret:    testJWTKey,
+		Logger:       slog.Default(),
+		AuthService:  NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
+		CloudService: testCloudService("https://cloud.example.test"),
 	})
 	localToken := localToken(t, handler)
 
@@ -404,25 +402,6 @@ func TestExchangeOAuthCodeRequiresCode(t *testing.T) {
 	}
 }
 
-func TestExchangeOAuthCodeReturnsServiceUnavailableWithoutOAuthConfig(t *testing.T) {
-	handler := New(Config{
-		JWTSecret:      testJWTKey,
-		Logger:         slog.Default(),
-		AuthService:    NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
-		CloudPublicURL: "https://cloud.example.test",
-	})
-	localToken := localToken(t, handler)
-
-	request := httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"auth-code"}`))
-	request.Header.Set("Authorization", "Bearer "+localToken)
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, request)
-
-	if response.Code != http.StatusServiceUnavailable {
-		t.Fatalf("exchange status = %d, want 503; body=%s", response.Code, response.Body.String())
-	}
-}
-
 func TestExchangeOAuthCodeReturnsBadGatewayOnCloudError(t *testing.T) {
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -430,11 +409,10 @@ func TestExchangeOAuthCodeReturnsBadGatewayOnCloudError(t *testing.T) {
 	}))
 	defer cloud.Close()
 	handler := New(Config{
-		JWTSecret:      testJWTKey,
-		Logger:         slog.Default(),
-		AuthService:    NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
-		CloudPublicURL: cloud.URL,
-		OAuthClient:    testOAuthClientConfig(),
+		JWTSecret:    testJWTKey,
+		Logger:       slog.Default(),
+		AuthService:  NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)),
+		CloudService: testCloudService(cloud.URL),
 	})
 	localToken := localToken(t, handler)
 
@@ -453,7 +431,7 @@ func TestCloudConnectRequiresCloudTokenWithoutCodeBranch(t *testing.T) {
 		t.Fatalf("cloud endpoint should not be called without cloud token")
 	}))
 	defer cloud.Close()
-	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)), CloudPublicURL: cloud.URL, LocalDevice: testLocalDevice()})
+	handler := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: NewLocalAuthService(sharedauth.NewTokenService(testJWTKey)), CloudService: testCloudService(cloud.URL), LocalDevice: testLocalDevice()})
 	localToken := localToken(t, handler)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", strings.NewReader(`{"code":"some-code"}`))
@@ -465,13 +443,19 @@ func TestCloudConnectRequiresCloudTokenWithoutCodeBranch(t *testing.T) {
 	}
 }
 
-func testOAuthClientConfig() OAuthClientConfig {
-	return OAuthClientConfig{
-		ClientId:     "test-client-id",
-		ClientSecret: "test-client-secret",
-		RedirectUrl:  "https://local.example.test/oauth/callback",
-		Scopes:       []string{"read", "write"},
-	}
+func testCloudService(apiBaseUrl string) *agentapp.CloudService {
+	return agentapp.NewCloudService(
+		cloudapi.New(cloudapi.Config{ApiBaseUrl: apiBaseUrl, HttpClient: http.DefaultClient}),
+		agentapp.CloudServiceConfig{
+			PublicUrl: apiBaseUrl,
+			OAuthClient: agentapp.OAuthClientConfig{
+				ClientId:     "test-client-id",
+				ClientSecret: "test-client-secret",
+				RedirectUrl:  "https://local.example.test/oauth/callback",
+				Scopes:       []string{"read", "write"},
+			},
+		},
+	)
 }
 
 func decodeProtoJSONBody(r *http.Request, message proto.Message) error {

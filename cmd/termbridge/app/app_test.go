@@ -212,7 +212,7 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 		_, _ = w.Write([]byte(`{"accepted":true}`))
 	}))
 	defer cloudPublic.Close()
-	configContent := "local:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  public_url: " + cloudPublic.URL + "\n"
+	configContent := "local:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  public_url: " + cloudPublic.URL + "\n  api_base_url: " + cloudPublic.URL + "\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
 	oldRunBackendServer := runBackendServer
@@ -426,12 +426,12 @@ func TestPortablePackageShipsSelectableRuntimeProfiles(t *testing.T) {
 			"TERMBRIDGE_LOCAL__STATIC_DIR=web",
 			"TERMBRIDGE_LOCAL__PUBLIC_URL=http://localhost:9030",
 			profile.cloudURL,
+			"TERMBRIDGE_CLOUD__API_BASE_URL=",
 			"TERMBRIDGE_LOCAL__OAUTH__CLIENT_SECRET=agent-secret",
 			"TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL=http://localhost:9030/oauth/callback",
 		} {
 			assertContains(t, profile.content, want, profileName+" runtime profile must carry local and OAuth configuration")
 		}
-		assertNotContains(t, profile.content, "API_BASE_URL", profileName+" runtime profile must not retain API base URL configuration")
 	}
 }
 

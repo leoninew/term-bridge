@@ -9,7 +9,11 @@
             <h1 class="shortcut-page-title font-semibold text-[var(--color-text-strong)]">
               {{ t('shortcut.title') }}
             </h1>
-            <button type="button" class="button button-primary shortcut-create-button shrink-0" @click="openCreate">
+            <button
+              type="button"
+              class="button button-primary shortcut-create-button shrink-0"
+              @click="openCreate"
+            >
               {{ t('shortcut.createTitle') }}
             </button>
           </header>
@@ -18,7 +22,10 @@
             {{ t('shortcut.loading') }}
           </p>
 
-          <div v-else-if="shortcuts.length" class="shortcut-grid grid sm:grid-cols-2 lg:grid-cols-4">
+          <div
+            v-else-if="shortcuts.length"
+            class="shortcut-grid grid sm:grid-cols-2 lg:grid-cols-4"
+          >
             <ShortcutCard
               v-for="shortcut in shortcuts"
               :key="shortcut.id"

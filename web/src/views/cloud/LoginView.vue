@@ -4,7 +4,7 @@
       v-if="!cloudAuth.authInitialized"
       class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
     >
-      {{ t('cloudAuth.checkingAuth') }}
+      {{ t('cloud.checkingAuth') }}
     </section>
 
     <LoginPanel
@@ -68,14 +68,14 @@
         await router.replace(redirectAfterLogin())
       }
     } catch (err) {
-      notifications.notifyError(t('cloudAuth.loginFailed'), err)
+      notifications.notifyError(t('cloud.loginFailed'), err)
     }
   })
 
   async function login() {
     if (!turnstileToken.value) {
       notifications.notifyError(
-        t('cloudAuth.loginFailed'),
+        t('cloud.loginFailed'),
         new Error(t('cloud.humanVerificationRequired')),
       )
       return
@@ -88,7 +88,7 @@
         await router.replace(redirectAfterLogin())
       }
     } catch (err) {
-      notifications.notifyError(t('cloudAuth.loginFailed'), err)
+      notifications.notifyError(t('cloud.loginFailed'), err)
     } finally {
       turnstileToken.value = ''
       turnstile.value?.reset()
@@ -113,7 +113,7 @@
       window.location.href = await authGoogleUrl()
     } catch (err) {
       googleLoggingIn.value = false
-      notifications.notifyError(t('cloudAuth.googleLoginFailed'), err)
+      notifications.notifyError(t('cloud.googleLoginFailed'), err)
     }
   }
 </script>

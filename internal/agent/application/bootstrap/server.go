@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	shortcutapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/shortcut"
 	terminalapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/terminal"
 	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
+	cloudapi "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/cloudapi"
 	agentdb "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/database"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/pty/gopty"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/repository/task/state"
@@ -66,8 +66,15 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 	backendReady := make(chan struct{})
 	errCh := make(chan error, 3)
 	cloudConnector := newCloudConnectorLifecycle(serveCtx, cfg, runtimeAccess, device, logger, options, stdout)
+	cloudService := agentapp.NewCloudService(
+		cloudapi.New(cloudapi.Config{ApiBaseUrl: cfg.Cloud.ApiBaseUrl, HttpClient: http.DefaultClient}),
+		agentapp.CloudServiceConfig{
+			PublicUrl:   cfg.Cloud.PublicURL,
+			OAuthClient: agentapp.OAuthClientConfig{ClientId: cfg.Cloud.OAuthClient.ClientId, ClientSecret: cfg.Cloud.OAuthClient.ClientSecret, RedirectUrl: cfg.Cloud.OAuthClient.RedirectUrl, Scopes: append([]string(nil), cfg.Cloud.OAuthClient.Scopes...)},
+		},
+	)
 
-	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudPublicURL: cfg.Cloud.PublicURL, OAuthClient: agentapi.OAuthClientConfig{ClientId: cfg.Cloud.OAuthClient.ClientId, ClientSecret: cfg.Cloud.OAuthClient.ClientSecret, RedirectUrl: cfg.Cloud.OAuthClient.RedirectUrl, Scopes: append([]string(nil), cfg.Cloud.OAuthClient.Scopes...)}, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(summary *cloud.CloudSessionSummary) {
+	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudService: cloudService, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(summary *cloud.CloudSessionSummary) {
 		if summary == nil {
 			cloudConnector.Stop()
 			return
@@ -107,7 +114,7 @@ func (c *cloudConnectorLifecycle) Start() {
 	c.cancel = cancel
 	c.generation++
 	generation := c.generation
-	connector := newAgentConnector(c.cfg, c.cfg.Cloud.PublicURL, c.runtimeAccess, c.device, c.logger)
+	connector := newAgentConnector(c.cfg, c.cfg.Cloud.ApiBaseUrl, c.runtimeAccess, c.device, c.logger)
 	c.mu.Unlock()
 
 	_, _ = fmt.Fprintf(c.stdout, "TermBridge agent connector targeting %s\n", connector.Config().ConnectUrl)
@@ -219,7 +226,7 @@ func newAgentConnector(cfg Config, connectURL string, runtimeAccess agentapp.Run
 }
 
 func cloudConnectorConfigured(cfg Config) bool {
-	return strings.TrimSpace(cfg.Cloud.PublicURL) != ""
+	return cfg.Cloud.ApiBaseUrl != ""
 }
 
 func newWebTerminalRegistry(cfg Config, logger *slog.Logger, store terminalapp.RuntimeStore) *terminalapp.Registry {

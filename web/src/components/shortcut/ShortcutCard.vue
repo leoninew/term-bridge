@@ -1,5 +1,7 @@
 <template>
-  <article class="shortcut-card flex min-w-0 flex-col border border-[var(--color-border)] bg-[var(--color-surface)]">
+  <article
+    class="shortcut-card flex min-w-0 flex-col border border-[var(--color-border)] bg-[var(--color-surface)]"
+  >
     <div class="shortcut-card-header flex min-w-0 items-start justify-between">
       <div class="min-w-0">
         <h3 class="truncate text-sm font-semibold text-[var(--color-text-strong)]">

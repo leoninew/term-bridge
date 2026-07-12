@@ -83,9 +83,10 @@ type ResendConfig struct {
 }
 
 type CloudConfig struct {
-	PublicURL string
-	Turnstile TurnstileConfig
-	OAuth     CloudOAuthConfig
+	PublicURL  string
+	ApiBaseUrl string
+	Turnstile  TurnstileConfig
+	OAuth      CloudOAuthConfig
 }
 
 type TurnstileConfig struct {

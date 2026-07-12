@@ -53,7 +53,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		return apperrors.Config("invalid cloud.turnstile", err)
 	}
 	authService := cloudauth.New(repo, tokens, cloudauth.Config{PasswordPolicy: cloudauth.PasswordPolicy{MinLength: cfg.Auth.PasswordPolicy.MinLength, MaxLength: cfg.Auth.PasswordPolicy.MaxLength}, Code: cloudauth.CodePolicy{Length: cfg.Auth.Code.Length, Ttl: cfg.Auth.Code.Ttl, ResendCooldown: cfg.Auth.Code.ResendCooldown, MaxAttempts: cfg.Auth.Code.MaxAttempts}}, cloudemail.NewResendSender(cloudemail.Config{ApiKey: cfg.Resend.ApiKey, FromEmail: cfg.Resend.FromEmail}), cloudauth.NewOAuthGoogleClient(cloudauth.GoogleConfig{ClientID: cfg.Auth.Google.ClientID, ClientSecret: cfg.Auth.Google.ClientSecret, RedirectUrl: cfg.Auth.Google.RedirectUrl}))
-	cloudHandler := cloudapi.New(cloudapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, AgentTunnelAudience: tunnelAudience(cfg), DeviceRepository: cloudapi.NewDeviceRepository(deviceRepository), CloudPublicURL: cfg.Cloud.PublicURL, CloudOAuth: cloudapi.CloudOAuthConfig{Clients: cloudOAuthClients(cfg.Cloud.OAuth.Clients)}, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), Turnstile: cloudapi.TurnstileConfig{SiteKey: cfg.Cloud.Turnstile.SiteKey, SecretKey: cfg.Cloud.Turnstile.SecretKey, ExpectedHostname: expectedHostname, Verify: cloudapi.NewTurnstileVerifier(cfg.Cloud.Turnstile.SecretKey, expectedHostname, nil)}, CSRF: cloudapi.CSRFConfig{Tokens: cloudapi.NewCSRFTokens(10*time.Minute, 1024)}})
+	cloudHandler := cloudapi.New(cloudapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, AgentTunnelAudience: cfg.Cloud.ApiBaseUrl, DeviceRepository: cloudapi.NewDeviceRepository(deviceRepository), CloudPublicURL: cfg.Cloud.PublicURL, CloudOAuth: cloudapi.CloudOAuthConfig{Clients: cloudOAuthClients(cfg.Cloud.OAuth.Clients)}, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), Turnstile: cloudapi.TurnstileConfig{SiteKey: cfg.Cloud.Turnstile.SiteKey, SecretKey: cfg.Cloud.Turnstile.SecretKey, ExpectedHostname: expectedHostname, Verify: cloudapi.NewTurnstileVerifier(cfg.Cloud.Turnstile.SecretKey, expectedHostname, nil)}, CSRF: cloudapi.CSRFConfig{Tokens: cloudapi.NewCSRFTokens(10*time.Minute, 1024)}})
 	return serveHTTP(ctx, cfg, logger, options, cloudHandler, stdout)
 }
 
@@ -147,11 +147,4 @@ func normalizeServeError(err error) error {
 		return nil
 	}
 	return err
-}
-
-func tunnelAudience(cfg Config) string {
-	if strings.TrimSpace(cfg.Cloud.PublicURL) != "" {
-		return cfg.Cloud.PublicURL
-	}
-	return cfg.Server.ListenURL
 }

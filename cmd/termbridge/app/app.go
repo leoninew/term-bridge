@@ -257,7 +257,8 @@ func agentConfig(cfg config.Config) agentserver.Config {
 		Auth: agentserver.AuthConfig{JwtTTL: cfg.Auth.JwtTTL},
 		Jwt:  agentserver.JwtConfig{SecretKey: cfg.Jwt.SecretKey},
 		Cloud: agentserver.CloudConnectorConfig{
-			PublicURL: cfg.Cloud.PublicUrl,
+			PublicURL:  cfg.Cloud.PublicUrl,
+			ApiBaseUrl: cfg.Cloud.ApiBaseUrl,
 			OAuthClient: agentserver.OAuthClientConfig{
 				ClientId:     cfg.Local.OAuth.ClientId,
 				ClientSecret: cfg.Local.OAuth.ClientSecret,
@@ -307,7 +308,8 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 			FromEmail: cfg.Resend.FromEmail,
 		},
 		Cloud: cloudserver.CloudConfig{
-			PublicURL: cfg.Cloud.PublicUrl,
+			PublicURL:  cfg.Cloud.PublicUrl,
+			ApiBaseUrl: cfg.Cloud.ApiBaseUrl,
 			Turnstile: cloudserver.TurnstileConfig{
 				SiteKey:   cfg.Cloud.Turnstile.SiteKey,
 				SecretKey: cfg.Cloud.Turnstile.SecretKey,

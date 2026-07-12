@@ -86,6 +86,7 @@ type JwtConfig struct {
 
 type CloudConnectorConfig struct {
 	PublicURL   string
+	ApiBaseUrl  string
 	OAuthClient OAuthClientConfig
 }
 

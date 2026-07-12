@@ -94,6 +94,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Cloud.PublicUrl != "" {
 		t.Fatalf("Cloud.PublicUrl = %q, want empty by default", cfg.Cloud.PublicUrl)
 	}
+	if cfg.Cloud.ApiBaseUrl != "http://127.0.0.1:9030" {
+		t.Fatalf("Cloud.ApiBaseUrl = %q, want default Cloud API base URL", cfg.Cloud.ApiBaseUrl)
+	}
 	if cfg.Auth.LocalAdmin.Username != DefaultAuthUsername || cfg.Auth.LocalAdmin.Password != DefaultAuthPassword {
 		t.Fatalf("Auth.LocalAdmin = %#v, want default PoC auth", cfg.Auth.LocalAdmin)
 	}
@@ -395,6 +398,38 @@ func TestLoadRejectsInvalidHistoryLimit(t *testing.T) {
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
 	writeEnvConfig(t, cwd, "develop", "history:\n  max_lines: 0\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !apperrors.IsConfig(err) {
+		t.Fatalf("Load() error = %T, want config error", err)
+	}
+}
+
+func TestLoadRejectsMissingCloudApiBaseUrl(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeEnvConfig(t, cwd, "develop", "cloud:\n  api_base_url: '  '\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !apperrors.IsConfig(err) {
+		t.Fatalf("Load() error = %T, want config error", err)
+	}
+}
+
+func TestLoadRejectsInvalidCloudApiBaseUrl(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeEnvConfig(t, cwd, "develop", "cloud:\n  api_base_url: ftp://cloud.example.test\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	_, err := Load(Options{Cwd: cwd})

@@ -4,7 +4,7 @@
       v-if="!cloudAuth.authInitialized"
       class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
     >
-      {{ t('cloudAuth.checkingAuth') }}
+      {{ t('cloud.checkingAuth') }}
     </section>
     <section
       v-else
@@ -41,7 +41,7 @@
     try {
       window.location.href = await cloudOAuthAuthorize(route.fullPath)
     } catch (err) {
-      notifications.notifyError(t('cloudAuth.loginFailed'), err)
+      notifications.notifyError(t('cloud.loginFailed'), err)
       await router.replace({ name: 'home' })
     }
   })

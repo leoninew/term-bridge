@@ -170,6 +170,7 @@ type CloudConfig struct {
 	ListenUrl          string
 	StaticDir          string
 	PublicUrl          string
+	ApiBaseUrl         string
 	CorsAllowedOrigins []string
 	ExposeErrors       bool
 	Turnstile          TurnstileConfig
@@ -314,6 +315,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			ListenUrl:          strings.TrimSpace(v.GetString("cloud.listen_url")),
 			StaticDir:          cloudStaticDir,
 			PublicUrl:          strings.TrimSpace(v.GetString("cloud.public_url")),
+			ApiBaseUrl:         strings.TrimSpace(v.GetString("cloud.api_base_url")),
 			CorsAllowedOrigins: getStringSlice(v, "cloud.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("cloud.expose_errors"),
 			Turnstile: TurnstileConfig{
@@ -836,6 +838,7 @@ func configKeys() []string {
 		"cloud.listen_url",
 		"cloud.static_dir",
 		"cloud.public_url",
+		"cloud.api_base_url",
 		"cloud.cors_allowed_origins",
 		"cloud.expose_errors",
 		"cloud.turnstile.site_key",
@@ -1048,6 +1051,7 @@ func normalizeHttpOrigins(values []string) []string {
 func normalizeCloudConfig(cfg *Config) {
 	cfg.Cloud.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.ListenUrl), "/")
 	cfg.Cloud.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.PublicUrl), "/")
+	cfg.Cloud.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.ApiBaseUrl), "/")
 	cfg.Cloud.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Cloud.CorsAllowedOrigins)
 	cfg.Cloud.Turnstile.SiteKey = strings.TrimSpace(cfg.Cloud.Turnstile.SiteKey)
 	cfg.Cloud.Turnstile.SecretKey = strings.TrimSpace(cfg.Cloud.Turnstile.SecretKey)
@@ -1072,6 +1076,9 @@ func validateLocal(cfg LocalConfig) error {
 
 func validateCloud(cfg Config) error {
 	if err := validateHTTPServerConfig("cloud", cfg.Cloud.ListenUrl, cfg.Cloud.PublicUrl, cfg.Cloud.CorsAllowedOrigins); err != nil {
+		return err
+	}
+	if err := validateHTTPURL("cloud.api_base_url", cfg.Cloud.ApiBaseUrl); err != nil {
 		return err
 	}
 	if err := validateTurnstile(cfg.Environment, cfg.Cloud); err != nil {

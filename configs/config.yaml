@@ -100,8 +100,10 @@ cloud:
   listen_url: http://127.0.0.1:9030
   # Web 静态资源目录；为空时只提供 API，部署场景可指向已构建前端目录。
   static_dir: ""
-  # Cloud 对外访问地址。Agent 连接云端和云端 OAuth/API 入口使用该地址。
+  # Cloud 对外访问地址，供浏览器页面、OAuth 授权跳转和帮助链接使用。
   public_url: ""
+  # Agent 到 Cloud API 与 Tunnel 的服务间地址，必须显式配置。
+  api_base_url: http://127.0.0.1:9030
   # 跨域 API Origin allowlist；空列表表示不开放跨域。
   # 终端 WebSocket 也会使用该列表校验浏览器 Origin；同源访问不需要配置。
   cors_allowed_origins: []
