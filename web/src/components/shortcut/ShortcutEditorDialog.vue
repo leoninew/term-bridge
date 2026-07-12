@@ -18,23 +18,27 @@
               v-model="command"
               class="shortcut-command-input"
               :disabled="saving"
-              rows="4"
+              rows="1"
               spellcheck="false"
             />
           </label>
           <label>
             <span>{{ t('shortcut.descriptionField') }}</span>
-            <textarea v-model="description" :disabled="saving" rows="3" />
+            <textarea v-model="description" :disabled="saving" rows="1" />
           </label>
 
           <div class="dialog-actions">
             <DialogClose as-child>
-              <button type="button" class="button button-secondary" :disabled="saving">
+              <button
+                type="button"
+                class="button button-secondary bg-[var(--color-surface-raised)]"
+                :disabled="saving"
+              >
                 {{ t('common.cancel') }}
               </button>
             </DialogClose>
             <button type="submit" class="button button-primary" :disabled="saving">
-              {{ saving ? t('common.editing') : shortcut ? t('common.edit') : t('common.create') }}
+              {{ t('common.confirm') }}
             </button>
           </div>
         </form>

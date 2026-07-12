@@ -11,10 +11,11 @@
             </h1>
             <button
               type="button"
-              class="button button-primary shortcut-create-button shrink-0"
+              class="button button-primary shortcut-create-button inline-flex shrink-0 items-center gap-1"
               @click="openCreate"
             >
-              {{ t('shortcut.createTitle') }}
+              <Plus class="size-4" aria-hidden="true" />
+              {{ t('common.create') }}
             </button>
           </header>
 
@@ -64,6 +65,7 @@
 </template>
 
 <script setup lang="ts">
+  import { Plus } from '@lucide/vue'
   import { onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { ToastProvider } from 'reka-ui'
