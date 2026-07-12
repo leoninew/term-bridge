@@ -1,6 +1,6 @@
 # 命令快捷方式实施计划
 
-最后修改时间: 2026-07-10 22:17:28
+最后修改时间: 2026-07-12 20:59:11
 
 Review status: Accepted
 
@@ -22,6 +22,9 @@ Review status: Accepted
 2. 快捷方式不与 `Session` 或 `SessionRun` 建立外键关系；新建/编辑 Session 时只复制所选快捷方式当时的原始命令文本。
 3. 快捷方式允许硬删除：删除只影响后续选择，不追溯影响已保存的 Session 命令、历史运行记录或已归档输出。由于没有外键引用，硬删除避免为用户不可恢复的本地偏好数据引入多余的软删除语义。
 4. 名称不要求唯一；用户可为不同环境或用途创建同名快捷方式，卡片以完整命令与描述帮助区分。
+5. 快捷方式顺序为每设备持久化的 `sort_order`：新建追加到末尾，内容编辑不改变位置，列表按 `sort_order ASC, id ASC` 返回。
+6. 排序接口仅接受当前设备完整、无重复的快捷方式 ID 排列；未知、跨设备、缺失和重复 ID 均拒绝，验证与顺序更新在同一事务内完成。
+7. 前端以卡片主体作为拖动区域，不添加专用手柄；编辑、删除按钮通过 draggable filter 保持正常点击交互。
 
 ### 命令与会话编辑语义
 
@@ -211,7 +214,30 @@ Review status: Accepted
 6. 更新会话成功后以 API 返回的 summary 覆盖 workspace store；不重启、不新开 terminal tab。快捷方式选择后创建成功时维持已有 create → refresh → open tab 流程。
 7. 覆盖 draft 原始命令无损、默认快捷方式、空列表禁止 shortcut 提交、切换直接命令、选择后复制快照；覆盖 stopped-only 编辑可见性、只读 cwd、编辑请求和后续 rerun 命令语义。新增 shortcut API/composable 测试，分别断言 Local 与 device-Cloud URL 及 mutation 后刷新逻辑。
 
-### 9. 格式化、收敛和防回归
+### 9. 增加设备级拖拽排序
+
+修改：
+
+- `proto/termbridge/agent/v1/shortcut.proto`
+- `proto/termbridge/shared/v1/tunnel.proto`
+- `migrations/agent/sqlite/202607120001_shortcut_ordering.sql`
+- `migrations/agent/mysql/202607120001_shortcut_ordering.sql`
+- `internal/agent/repository/task/state/db_store.go` 及测试
+- Agent Local runtime、Agent tunnel、Cloud relay 的 endpoint/route 及测试
+- `web/src/features/{local,cloud}/api.ts`、`web/src/features/sessions/runtime.ts`
+- Local/Cloud `SessionsView.vue`、`ShortcutsView.vue` 与 `ShortcutsPageShell.vue`
+
+实施：
+
+1. 通过 SQLite/MySQL migration 增加 `sort_order`，按原有 `updated_at DESC, id ASC` 顺序为每设备确定性回填连续位置；SQLite/MySQL 均提供可逆 migration。
+2. `DbStore` 在创建时分配尾部位置；MySQL 创建使用串行化事务与锁定查询，防止并发追加重复位置。编辑不更新排序字段。
+3. 新增 `UpdateShortcutOrderReq/Resp` 和 tunnel oneof，打通 Local HTTP `PATCH /shortcuts/order`、Cloud device route、Agent runtime access 和 response dispatch。
+4. Repository 在单一事务内读取当前设备列表、校验精确排列并更新所有位置；返回规范排序，验证失败零写入。
+5. 快捷方式页面用 `VueDraggable` 绑定卡片网格，拖动开始保存快照，结束后提交完整 ID 顺序；成功替换为服务端顺序，失败恢复快照、提示错误并重新加载；无实际位移不请求。
+6. 不添加拖拽手柄；拖动来源为卡片表面，`button` filter 让编辑/删除按钮维持独立操作。
+7. 生成 binding 后补充 repository、service、Local frame、Agent tunnel 和 Cloud relay 测试，重点覆盖设备隔离、非法排列零写入与 Cloud response 分发。
+
+### 10. 格式化、收敛和防回归
 
 1. 用项目工具生成 Proto 后执行 Go 格式化；不手工格式化或重排无关的生成文件。
 2. 清除被替代的 name-only 编辑状态、重复校验和无调用 helper，保持创建/编辑表单的单一命令来源实现。
@@ -275,7 +301,7 @@ Review status: Accepted
 - `migrations/cloud/**`：快捷方式不属于 Cloud identity/binding 数据。
 - PTY manager、shell command parse、terminal WebSocket 协议和原始命令执行逻辑。
 - 已有 Session / SessionRun 的历史命令与输出数据。
-- 快捷方式跨设备同步、账号级共享、导入导出、模板变量、标签/分组/排序功能。
+- 快捷方式跨设备同步、账号级共享、导入导出、模板变量、标签/分组功能。
 
 ## Verification plan
 

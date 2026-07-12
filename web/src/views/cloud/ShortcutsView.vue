@@ -8,6 +8,7 @@
     deleteShortcut,
     listShortcuts,
     updateShortcut,
+    updateShortcutOrder,
   } from '../../features/cloud/api'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
   const route = useRoute()
@@ -21,6 +22,8 @@
       createShortcut(target.value, request),
     updateShortcut: (id: string, request: Parameters<typeof updateShortcut>[2]) =>
       updateShortcut(target.value, id, request),
+    updateShortcutOrder: (request: Parameters<typeof updateShortcutOrder>[1]) =>
+      updateShortcutOrder(target.value, request),
     deleteShortcut: (id: string) => deleteShortcut(target.value, id),
   }))
 </script>

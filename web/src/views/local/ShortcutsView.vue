@@ -6,6 +6,7 @@
     deleteShortcut,
     listShortcuts,
     updateShortcut,
+    updateShortcutOrder,
   } from '../../features/local/api'
-  const api = { listShortcuts, createShortcut, updateShortcut, deleteShortcut }
+  const api = { listShortcuts, createShortcut, updateShortcut, updateShortcutOrder, deleteShortcut }
 </script>

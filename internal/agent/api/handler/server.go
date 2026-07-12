@@ -280,6 +280,10 @@ func (s *Handler) handleLocalShortcuts(w http.ResponseWriter, r *http.Request) {
 		s.handleShortcutRoute(w, r, s.localRuntime, "", nil)
 		return
 	}
+	if path == "/order" {
+		s.handleShortcutOrderRoute(w, r, s.localRuntime, "")
+		return
+	}
 	if !strings.HasPrefix(path, "/") {
 		s.writeNotFound(w, r)
 		return
@@ -290,6 +294,18 @@ func (s *Handler) handleLocalShortcuts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.handleShortcutRoute(w, r, s.localRuntime, "", &shortcutId)
+}
+
+func (s *Handler) handleShortcutOrderRoute(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string) {
+	if r.Method != http.MethodPatch {
+		s.methodNotAllowed(w, r, http.MethodPatch)
+		return
+	}
+	request := &agent.UpdateShortcutOrderReq{}
+	if !s.decodeJSONRequest(w, r, request) {
+		return
+	}
+	s.handleJSONRuntime(w, r, endpoint, deviceId, "update_shortcut_order", request, "")
 }
 
 func (s *Handler) handleShortcutRoute(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, shortcutId *string) {

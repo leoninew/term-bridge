@@ -36,6 +36,8 @@ import type {
   CreateShortcutReq,
   ListShortcutsResp,
   Shortcut,
+  UpdateShortcutOrderReq,
+  UpdateShortcutOrderResp,
   UpdateShortcutReq,
 } from '../../gen/proto/termbridge/agent/v1/shortcut'
 import { cloudApiClient } from '../api/client'
@@ -232,6 +234,17 @@ export async function updateShortcut(
     request,
   )
   return response.data
+}
+
+export async function updateShortcutOrder(
+  target: RuntimeTarget,
+  request: UpdateShortcutOrderReq,
+): Promise<Shortcut[]> {
+  const response = await cloudApiClient.patch<UpdateShortcutOrderResp>(
+    cloudRuntimePath(target, '/shortcuts/order'),
+    request,
+  )
+  return response.data.items
 }
 
 export async function deleteShortcut(target: RuntimeTarget, shortcutId: string): Promise<void> {

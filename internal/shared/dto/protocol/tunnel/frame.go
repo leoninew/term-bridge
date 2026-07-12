@@ -124,6 +124,8 @@ func responseMessage(frame *shared.TunnelFrame) proto.Message {
 		return payload.UpdateShortcutResp.GetShortcut()
 	case *shared.TunnelFrame_DeleteShortcutResp:
 		return payload.DeleteShortcutResp
+	case *shared.TunnelFrame_UpdateShortcutOrderResp:
+		return payload.UpdateShortcutOrderResp
 	default:
 		return nil
 	}

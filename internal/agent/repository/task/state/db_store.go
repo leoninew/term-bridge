@@ -328,8 +328,25 @@ func (s DbStore) CreateShortcut(value shortcut.Shortcut) (shortcut.Shortcut, err
 	if value.UpdatedAt.IsZero() {
 		value.UpdatedAt = value.CreatedAt
 	}
-	_, err := s.db.ExecContext(context.Background(), `INSERT INTO shortcuts (id,device_id,name,command,description,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`, value.Id, s.deviceId, value.Name, value.Command, value.Description, s.storeTime(value.CreatedAt), s.storeTime(value.UpdatedAt))
+	ctx := context.Background()
+	var txOptions *sql.TxOptions
+	if s.driver == "mysql" {
+		txOptions = &sql.TxOptions{Isolation: sql.LevelSerializable}
+	}
+	tx, err := s.db.BeginTx(ctx, txOptions)
 	if err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	sortOrder, err := s.nextShortcutOrderTx(ctx, tx)
+	if err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO shortcuts (id,device_id,name,command,description,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`, value.Id, s.deviceId, value.Name, value.Command, value.Description, sortOrder, s.storeTime(value.CreatedAt), s.storeTime(value.UpdatedAt))
+	if err != nil {
+		return shortcut.Shortcut{}, err
+	}
+	if err := tx.Commit(); err != nil {
 		return shortcut.Shortcut{}, err
 	}
 	value.SchemaVersion = shortcut.SchemaVersion
@@ -340,7 +357,7 @@ func (s DbStore) ListShortcuts() ([]shortcut.Shortcut, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(context.Background(), `SELECT id,name,command,description,created_at,updated_at FROM shortcuts WHERE device_id=? ORDER BY updated_at DESC, id ASC`, s.deviceId)
+	rows, err := s.db.QueryContext(context.Background(), `SELECT id,name,command,description,created_at,updated_at FROM shortcuts WHERE device_id=? ORDER BY sort_order ASC, id ASC`, s.deviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -357,6 +374,84 @@ func (s DbStore) ListShortcuts() ([]shortcut.Shortcut, error) {
 		return nil, err
 	}
 	return values, nil
+}
+
+func (s DbStore) UpdateShortcutOrder(shortcutIds []string) ([]shortcut.Shortcut, error) {
+	if err := s.validate(); err != nil {
+		return nil, err
+	}
+	ctx := context.Background()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	values, err := s.listShortcutsTx(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	ordered, err := completeShortcutIds(shortcutIds, values)
+	if err != nil {
+		return nil, err
+	}
+	for index, id := range ordered {
+		result, err := tx.ExecContext(ctx, `UPDATE shortcuts SET sort_order=? WHERE id=? AND device_id=?`, index, id, s.deviceId)
+		if err != nil {
+			return nil, err
+		}
+		if affected, err := result.RowsAffected(); err == nil && affected != 1 {
+			return nil, os.ErrNotExist
+		}
+	}
+	updated, err := s.listShortcutsTx(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return updated, nil
+}
+
+func (s DbStore) listShortcutsTx(ctx context.Context, tx *sql.Tx) ([]shortcut.Shortcut, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT id,name,command,description,created_at,updated_at FROM shortcuts WHERE device_id=? ORDER BY sort_order ASC, id ASC`, s.deviceId)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	values := make([]shortcut.Shortcut, 0)
+	for rows.Next() {
+		value, err := scanShortcut(rows)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return values, nil
+}
+
+func completeShortcutIds(ids []string, values []shortcut.Shortcut) ([]string, error) {
+	if len(ids) != len(values) {
+		return nil, fmt.Errorf("shortcut_ids must include every shortcut: %w", os.ErrInvalid)
+	}
+	byId := make(map[string]bool, len(values))
+	for _, value := range values {
+		byId[value.Id] = true
+	}
+	seen := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			return nil, fmt.Errorf("duplicate shortcut_id %q: %w", id, os.ErrInvalid)
+		}
+		if !byId[id] {
+			return nil, fmt.Errorf("shortcut_id %q: %w", id, os.ErrNotExist)
+		}
+		seen[id] = true
+	}
+	return append([]string(nil), ids...), nil
 }
 
 func (s DbStore) UpdateShortcut(shortcutId string, update func(*shortcut.Shortcut) error) (shortcut.Shortcut, error) {
@@ -1046,6 +1141,22 @@ func (s DbStore) ensureCurrentRunTx(ctx context.Context, tx *sql.Tx, workspaceId
 		return "", err
 	}
 	return runId, nil
+}
+
+func (s DbStore) nextShortcutOrderTx(ctx context.Context, tx *sql.Tx) (int, error) {
+	query := `SELECT sort_order FROM shortcuts WHERE device_id=? ORDER BY sort_order DESC LIMIT 1`
+	if s.driver == "mysql" {
+		query += ` FOR UPDATE`
+	}
+	var order int
+	err := tx.QueryRowContext(ctx, query, s.deviceId).Scan(&order)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return order + 1, nil
 }
 
 func (s DbStore) nextWorkspaceOrderTx(ctx context.Context, tx *sql.Tx) (int, error) {

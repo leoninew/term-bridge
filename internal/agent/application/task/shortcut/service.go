@@ -16,6 +16,7 @@ type Store interface {
 	ListShortcuts() ([]shortcutmodel.Shortcut, error)
 	CreateShortcut(shortcutmodel.Shortcut) (shortcutmodel.Shortcut, error)
 	UpdateShortcut(shortcutId string, update func(*shortcutmodel.Shortcut) error) (shortcutmodel.Shortcut, error)
+	UpdateShortcutOrder(shortcutIds []string) ([]shortcutmodel.Shortcut, error)
 	DeleteShortcut(shortcutId string) error
 }
 
@@ -76,6 +77,27 @@ func (s Service) Update(shortcutId string, request *agent.UpdateShortcutReq) (*a
 		return nil, shortcutError("update shortcut", err)
 	}
 	return protoFromModel(updated), nil
+}
+
+func (s Service) UpdateOrder(request *agent.UpdateShortcutOrderReq) ([]*agent.Shortcut, error) {
+	if request == nil || len(request.GetShortcutIds()) == 0 {
+		return nil, apperrors.Usage("shortcut_ids is required")
+	}
+	updated, err := s.store.UpdateShortcutOrder(request.GetShortcutIds())
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, apperrors.NotFound("shortcut not found", err)
+		}
+		if errors.Is(err, os.ErrInvalid) {
+			return nil, apperrors.Usage(err.Error())
+		}
+		return nil, apperrors.Runtime("update shortcut order", err)
+	}
+	items := make([]*agent.Shortcut, 0, len(updated))
+	for _, value := range updated {
+		items = append(items, protoFromModel(value))
+	}
+	return items, nil
 }
 
 func (s Service) Delete(shortcutId string) error {

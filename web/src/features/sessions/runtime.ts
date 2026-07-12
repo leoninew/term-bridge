@@ -14,6 +14,7 @@ import type {
 import type {
   CreateShortcutReq,
   Shortcut,
+  UpdateShortcutOrderReq,
   UpdateShortcutReq,
 } from '../../gen/proto/termbridge/agent/v1/shortcut'
 import { runtimePath, type RuntimeTarget } from '../runtimeTarget'
@@ -27,6 +28,7 @@ export type ShortcutRuntimeApi = {
   listShortcuts(): Promise<Shortcut[]>
   createShortcut(request: CreateShortcutReq): Promise<Shortcut>
   updateShortcut(shortcutId: string, request: UpdateShortcutReq): Promise<Shortcut>
+  updateShortcutOrder(request: UpdateShortcutOrderReq): Promise<Shortcut[]>
   deleteShortcut(shortcutId: string): Promise<void>
 }
 

@@ -55,9 +55,26 @@ func TestServiceRejectsEmptyUpdate(t *testing.T) {
 	}
 }
 
+func TestServiceRejectsMalformedShortcutOrder(t *testing.T) {
+	service := NewService(&fakeStore{orderErr: errors.Join(errors.New("duplicate shortcut_id \"shortcut-1\""), os.ErrInvalid)})
+
+	if _, err := service.UpdateOrder(&agent.UpdateShortcutOrderReq{ShortcutIds: []string{"shortcut-1", "shortcut-1"}}); !apperrors.IsUsage(err) {
+		t.Fatalf("UpdateOrder(duplicate) error kind = %s, want usage; error=%v", apperrors.KindOf(err), err)
+	}
+}
+
+func TestServiceMapsMissingShortcutOrderToNotFound(t *testing.T) {
+	service := NewService(&fakeStore{orderErr: os.ErrNotExist})
+
+	if _, err := service.UpdateOrder(&agent.UpdateShortcutOrderReq{ShortcutIds: []string{"missing"}}); !apperrors.IsNotFound(err) {
+		t.Fatalf("UpdateOrder(missing) error kind = %s, want not_found; error=%v", apperrors.KindOf(err), err)
+	}
+}
+
 type fakeStore struct {
 	value     shortcutmodel.Shortcut
 	deleteErr error
+	orderErr  error
 }
 
 func (s *fakeStore) ListShortcuts() ([]shortcutmodel.Shortcut, error) {
@@ -90,6 +107,13 @@ func (s *fakeStore) UpdateShortcut(shortcutId string, update func(*shortcutmodel
 		return shortcutmodel.Shortcut{}, err
 	}
 	return s.value, nil
+}
+
+func (s *fakeStore) UpdateShortcutOrder([]string) ([]shortcutmodel.Shortcut, error) {
+	if s.orderErr != nil {
+		return nil, s.orderErr
+	}
+	return s.ListShortcuts()
 }
 
 func (s *fakeStore) DeleteShortcut(string) error {

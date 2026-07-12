@@ -44,6 +44,12 @@ func TestBrowserAPIRelay(t *testing.T) {
 				return responseFrame(frame, &shared.TunnelFrame_CreateShortcutResp{CreateShortcutResp: &agent.CreateShortcutResp{Shortcut: &agent.Shortcut{Id: "shortcut-created", Name: payload.CreateShortcutReq.GetName(), Command: payload.CreateShortcutReq.GetCommand(), Description: payload.CreateShortcutReq.Description}}})
 			case *shared.TunnelFrame_UpdateShortcutReq:
 				return responseFrame(frame, &shared.TunnelFrame_UpdateShortcutResp{UpdateShortcutResp: &agent.UpdateShortcutResp{Shortcut: &agent.Shortcut{Id: payload.UpdateShortcutReq.GetShortcutId(), Name: payload.UpdateShortcutReq.GetRequest().GetName(), Command: payload.UpdateShortcutReq.GetRequest().GetCommand(), Description: payload.UpdateShortcutReq.GetRequest().Description}}})
+			case *shared.TunnelFrame_UpdateShortcutOrderReq:
+				items := make([]*agent.Shortcut, 0, len(payload.UpdateShortcutOrderReq.GetShortcutIds()))
+				for _, shortcutId := range payload.UpdateShortcutOrderReq.GetShortcutIds() {
+					items = append(items, &agent.Shortcut{Id: shortcutId})
+				}
+				return responseFrame(frame, &shared.TunnelFrame_UpdateShortcutOrderResp{UpdateShortcutOrderResp: &agent.UpdateShortcutOrderResp{Items: items}})
 			case *shared.TunnelFrame_DeleteShortcutReq:
 				return responseFrame(frame, &shared.TunnelFrame_DeleteShortcutResp{DeleteShortcutResp: &agent.DeleteShortcutResp{}})
 			default:
@@ -83,6 +89,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 	}{
 		{http.MethodPost, "/api/devices/dev-1/shortcuts", `{"name":"Created shell","command":"cmd /c \"echo created\""}`, http.StatusCreated, "Created shell"},
 		{http.MethodPatch, "/api/devices/dev-1/shortcuts/shortcut-1", `{"name":"Updated shell"}`, http.StatusOK, "Updated shell"},
+		{http.MethodPatch, "/api/devices/dev-1/shortcuts/order", `{"shortcut_ids":["shortcut-2","shortcut-1"]}`, http.StatusOK, "shortcut-2"},
 		{http.MethodDelete, "/api/devices/dev-1/shortcuts/shortcut-1", "", http.StatusNoContent, ""},
 	} {
 		request := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
@@ -180,6 +187,8 @@ func responseFrame(request *shared.TunnelFrame, payload any) *shared.TunnelFrame
 		frame.Payload = value
 	case *shared.TunnelFrame_UpdateShortcutResp:
 		frame.Payload = value
+	case *shared.TunnelFrame_UpdateShortcutOrderResp:
+		frame.Payload = value
 	case *shared.TunnelFrame_DeleteShortcutResp:
 		frame.Payload = value
 	}
@@ -194,6 +203,7 @@ func isRuntimeRequestFrame(frame *shared.TunnelFrame) bool {
 		*shared.TunnelFrame_ListShortcutsReq,
 		*shared.TunnelFrame_CreateShortcutReq,
 		*shared.TunnelFrame_UpdateShortcutReq,
+		*shared.TunnelFrame_UpdateShortcutOrderReq,
 		*shared.TunnelFrame_DeleteShortcutReq:
 		return true
 	default:

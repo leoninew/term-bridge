@@ -37,6 +37,7 @@ message TunnelFrame {
     termbridge.agent.CreateShortcutReq create_shortcut_req = 114;
     termbridge.agent.UpdateShortcutRequest update_shortcut_req = 115;
     termbridge.agent.DeleteShortcutReq delete_shortcut_req = 116;
+    termbridge.agent.UpdateShortcutOrderReq update_shortcut_order_req = 117;
 
     termbridge.agent.ListWorkspacesResp list_workspaces_resp = 200;
     termbridge.agent.WorkspaceTreeResp workspace_tree_resp = 201;
@@ -55,6 +56,7 @@ message TunnelFrame {
     termbridge.agent.CreateShortcutResp create_shortcut_resp = 214;
     termbridge.agent.UpdateShortcutResp update_shortcut_resp = 215;
     termbridge.agent.DeleteShortcutResp delete_shortcut_resp = 216;
+    termbridge.agent.UpdateShortcutOrderResp update_shortcut_order_resp = 217;
 
     TerminalAttachReq terminal_attach = 300;
     TerminalInput terminal_input = 301;

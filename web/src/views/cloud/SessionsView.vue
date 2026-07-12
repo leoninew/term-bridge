@@ -30,6 +30,7 @@
     updateSession,
     updateSessionOrder,
     updateShortcut,
+    updateShortcutOrder,
     updateWorkspaceOrder,
   } from '../../features/cloud/api'
   import type { SessionRuntimeApi, ShortcutRuntimeApi } from '../../features/sessions/runtime'
@@ -69,6 +70,9 @@
     },
     updateShortcut(shortcutId: string, request: Parameters<typeof updateShortcut>[2]) {
       return updateShortcut(runtimeTarget.value, shortcutId, request)
+    },
+    updateShortcutOrder(request: Parameters<typeof updateShortcutOrder>[1]) {
+      return updateShortcutOrder(runtimeTarget.value, request)
     },
     deleteShortcut(shortcutId: string) {
       return deleteShortcut(runtimeTarget.value, shortcutId)

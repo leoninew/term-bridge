@@ -47,8 +47,18 @@ func TestHandleRuntimeRequestDispatchesShortcutCRUD(t *testing.T) {
 			},
 		},
 		{
+			name:    "update order",
+			request: &shared.TunnelFrame{StreamId: "order", RequestId: "request-4", Payload: &shared.TunnelFrame_UpdateShortcutOrderReq{UpdateShortcutOrderReq: &agent.UpdateShortcutOrderReq{ShortcutIds: []string{"shortcut-2", "shortcut-1"}}}},
+			assert: func(t *testing.T, response *shared.TunnelFrame) {
+				items := response.GetUpdateShortcutOrderResp().GetItems()
+				if len(items) != 2 || items[0].GetId() != "shortcut-2" || items[1].GetId() != "shortcut-1" {
+					t.Fatalf("order response = %#v, want canonical shortcut order", response)
+				}
+			},
+		},
+		{
 			name:    "delete",
-			request: &shared.TunnelFrame{StreamId: "delete", RequestId: "request-4", Payload: &shared.TunnelFrame_DeleteShortcutReq{DeleteShortcutReq: &agent.DeleteShortcutReq{ShortcutId: "shortcut-1"}}},
+			request: &shared.TunnelFrame{StreamId: "delete", RequestId: "request-5", Payload: &shared.TunnelFrame_DeleteShortcutReq{DeleteShortcutReq: &agent.DeleteShortcutReq{ShortcutId: "shortcut-1"}}},
 			assert: func(t *testing.T, response *shared.TunnelFrame) {
 				if response.GetDeleteShortcutResp() == nil {
 					t.Fatalf("delete response = %#v", response)
@@ -74,13 +84,17 @@ func TestHandleRuntimeRequestDispatchesShortcutCRUD(t *testing.T) {
 	if runtime.updatedId != "shortcut-1" || runtime.deletedId != "shortcut-1" {
 		t.Fatalf("shortcut target ids = updated %q / deleted %q", runtime.updatedId, runtime.deletedId)
 	}
+	if len(runtime.updatedOrderIds) != 2 || runtime.updatedOrderIds[0] != "shortcut-2" || runtime.updatedOrderIds[1] != "shortcut-1" {
+		t.Fatalf("shortcut order ids = %v, want [shortcut-2 shortcut-1]", runtime.updatedOrderIds)
+	}
 }
 
 type shortcutRuntime struct {
 	RuntimeAccess
-	value     *agent.Shortcut
-	updatedId string
-	deletedId string
+	value           *agent.Shortcut
+	updatedId       string
+	updatedOrderIds []string
+	deletedId       string
 }
 
 func (r shortcutRuntime) ListShortcuts(context.Context) ([]*agent.Shortcut, error) {
@@ -95,6 +109,15 @@ func (r *shortcutRuntime) UpdateShortcut(_ context.Context, shortcutId string, r
 	r.updatedId = shortcutId
 	r.value.Name = request.GetName()
 	return r.value, nil
+}
+
+func (r *shortcutRuntime) UpdateShortcutOrder(_ context.Context, shortcutIds []string) ([]*agent.Shortcut, error) {
+	r.updatedOrderIds = append([]string(nil), shortcutIds...)
+	items := make([]*agent.Shortcut, 0, len(shortcutIds))
+	for _, shortcutId := range shortcutIds {
+		items = append(items, &agent.Shortcut{Id: shortcutId})
+	}
+	return items, nil
 }
 
 func (r *shortcutRuntime) DeleteShortcut(_ context.Context, shortcutId string) error {

@@ -37,8 +37,8 @@ func TestMigrateUpgradesCompleteRuntimeSchema(t *testing.T) {
 	if _, err := db.Exec(`DROP TABLE shortcuts`); err != nil {
 		t.Fatalf("drop shortcuts for upgrade simulation: %v", err)
 	}
-	if _, err := db.Exec(`DELETE FROM goose_agent_db_version WHERE version_id=202607100001`); err != nil {
-		t.Fatalf("reset shortcut migration version: %v", err)
+	if _, err := db.Exec(`DELETE FROM goose_agent_db_version WHERE version_id IN (202607100001, 202607120001)`); err != nil {
+		t.Fatalf("reset shortcut migration versions: %v", err)
 	}
 
 	if err := Migrate(context.Background(), db, "sqlite"); err != nil {
@@ -47,6 +47,27 @@ func TestMigrateUpgradesCompleteRuntimeSchema(t *testing.T) {
 	if !testTableExists(t, db, "shortcuts") {
 		t.Fatal("Migrate() did not add shortcuts to a complete pre-existing runtime schema")
 	}
+	columns, err := db.Query(`PRAGMA table_info(shortcuts)`)
+	if err != nil {
+		t.Fatalf("inspect shortcuts columns: %v", err)
+	}
+	defer func() { _ = columns.Close() }()
+	for columns.Next() {
+		var position int
+		var name, columnType string
+		var notNull, primaryKey int
+		var defaultValue any
+		if err := columns.Scan(&position, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			t.Fatalf("scan shortcuts column: %v", err)
+		}
+		if name == "sort_order" {
+			return
+		}
+	}
+	if err := columns.Err(); err != nil {
+		t.Fatalf("iterate shortcuts columns: %v", err)
+	}
+	t.Fatal("Migrate() did not add persisted shortcut ordering")
 }
 
 func TestMigrateRejectsPartialAgentSchemaState(t *testing.T) {

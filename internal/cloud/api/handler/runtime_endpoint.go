@@ -142,6 +142,12 @@ func runtimeRequestFrame(method string, params any, requestId string) (*shared.T
 			return nil, fmt.Errorf("update_shortcut params have type %T", params)
 		}
 		frame.Payload = &shared.TunnelFrame_UpdateShortcutReq{UpdateShortcutReq: req}
+	case "update_shortcut_order":
+		req, ok := params.(*agent.UpdateShortcutOrderReq)
+		if !ok {
+			return nil, fmt.Errorf("update_shortcut_order params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_UpdateShortcutOrderReq{UpdateShortcutOrderReq: req}
 	case "delete_shortcut":
 		req, ok := params.(*agent.DeleteShortcutReq)
 		if !ok {

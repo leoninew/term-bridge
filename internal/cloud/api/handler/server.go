@@ -789,6 +789,18 @@ func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (s *Handler) handleShortcutRoute(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, parts []string) {
+	if len(parts) == 1 && parts[0] == "order" {
+		if r.Method != http.MethodPatch {
+			s.methodNotAllowed(w, r, http.MethodPatch)
+			return
+		}
+		request := &agent.UpdateShortcutOrderReq{}
+		if !s.decodeJSONRequest(w, r, request) {
+			return
+		}
+		s.handleJSONRuntime(w, r, endpoint, deviceId, "update_shortcut_order", request, "")
+		return
+	}
 	if len(parts) == 0 {
 		switch r.Method {
 		case http.MethodGet:

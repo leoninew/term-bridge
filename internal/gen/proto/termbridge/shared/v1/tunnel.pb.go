@@ -49,6 +49,7 @@ type TunnelFrame struct {
 	//	*TunnelFrame_CreateShortcutReq
 	//	*TunnelFrame_UpdateShortcutReq
 	//	*TunnelFrame_DeleteShortcutReq
+	//	*TunnelFrame_UpdateShortcutOrderReq
 	//	*TunnelFrame_ListWorkspacesResp
 	//	*TunnelFrame_WorkspaceTreeResp
 	//	*TunnelFrame_WorkspaceSessionsResp
@@ -66,6 +67,7 @@ type TunnelFrame struct {
 	//	*TunnelFrame_CreateShortcutResp
 	//	*TunnelFrame_UpdateShortcutResp
 	//	*TunnelFrame_DeleteShortcutResp
+	//	*TunnelFrame_UpdateShortcutOrderResp
 	//	*TunnelFrame_TerminalAttach
 	//	*TunnelFrame_TerminalInput
 	//	*TunnelFrame_TerminalOutput
@@ -318,6 +320,15 @@ func (x *TunnelFrame) GetDeleteShortcutReq() *v1.DeleteShortcutReq {
 	return nil
 }
 
+func (x *TunnelFrame) GetUpdateShortcutOrderReq() *v1.UpdateShortcutOrderReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_UpdateShortcutOrderReq); ok {
+			return x.UpdateShortcutOrderReq
+		}
+	}
+	return nil
+}
+
 func (x *TunnelFrame) GetListWorkspacesResp() *v1.ListWorkspacesResp {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_ListWorkspacesResp); ok {
@@ -466,6 +477,15 @@ func (x *TunnelFrame) GetDeleteShortcutResp() *v1.DeleteShortcutResp {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_DeleteShortcutResp); ok {
 			return x.DeleteShortcutResp
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetUpdateShortcutOrderResp() *v1.UpdateShortcutOrderResp {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_UpdateShortcutOrderResp); ok {
+			return x.UpdateShortcutOrderResp
 		}
 	}
 	return nil
@@ -622,6 +642,10 @@ type TunnelFrame_DeleteShortcutReq struct {
 	DeleteShortcutReq *v1.DeleteShortcutReq `protobuf:"bytes,116,opt,name=delete_shortcut_req,json=deleteShortcutReq,proto3,oneof"`
 }
 
+type TunnelFrame_UpdateShortcutOrderReq struct {
+	UpdateShortcutOrderReq *v1.UpdateShortcutOrderReq `protobuf:"bytes,117,opt,name=update_shortcut_order_req,json=updateShortcutOrderReq,proto3,oneof"`
+}
+
 type TunnelFrame_ListWorkspacesResp struct {
 	ListWorkspacesResp *v1.ListWorkspacesResp `protobuf:"bytes,200,opt,name=list_workspaces_resp,json=listWorkspacesResp,proto3,oneof"`
 }
@@ -688,6 +712,10 @@ type TunnelFrame_UpdateShortcutResp struct {
 
 type TunnelFrame_DeleteShortcutResp struct {
 	DeleteShortcutResp *v1.DeleteShortcutResp `protobuf:"bytes,216,opt,name=delete_shortcut_resp,json=deleteShortcutResp,proto3,oneof"`
+}
+
+type TunnelFrame_UpdateShortcutOrderResp struct {
+	UpdateShortcutOrderResp *v1.UpdateShortcutOrderResp `protobuf:"bytes,217,opt,name=update_shortcut_order_resp,json=updateShortcutOrderResp,proto3,oneof"`
 }
 
 type TunnelFrame_TerminalAttach struct {
@@ -760,6 +788,8 @@ func (*TunnelFrame_UpdateShortcutReq) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_DeleteShortcutReq) isTunnelFrame_Payload() {}
 
+func (*TunnelFrame_UpdateShortcutOrderReq) isTunnelFrame_Payload() {}
+
 func (*TunnelFrame_ListWorkspacesResp) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_WorkspaceTreeResp) isTunnelFrame_Payload() {}
@@ -793,6 +823,8 @@ func (*TunnelFrame_CreateShortcutResp) isTunnelFrame_Payload() {}
 func (*TunnelFrame_UpdateShortcutResp) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_DeleteShortcutResp) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_UpdateShortcutOrderResp) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_TerminalAttach) isTunnelFrame_Payload() {}
 
@@ -1300,7 +1332,7 @@ var File_termbridge_shared_v1_tunnel_proto protoreflect.FileDescriptor
 
 const file_termbridge_shared_v1_tunnel_proto_rawDesc = "" +
 	"\n" +
-	"!termbridge/shared/v1/tunnel.proto\x12\x11termbridge.shared\x1a#termbridge/agent/v1/workspace.proto\x1a!termbridge/agent/v1/session.proto\x1a!termbridge/agent/v1/history.proto\x1a\"termbridge/agent/v1/shortcut.proto\x1a!termbridge/shared/v1/common.proto\"\x96\x1e\n" +
+	"!termbridge/shared/v1/tunnel.proto\x12\x11termbridge.shared\x1a#termbridge/agent/v1/workspace.proto\x1a!termbridge/agent/v1/session.proto\x1a!termbridge/agent/v1/history.proto\x1a\"termbridge/agent/v1/shortcut.proto\x1a!termbridge/shared/v1/common.proto\"\xe8\x1f\n" +
 	"\vTunnelFrame\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12\x1d\n" +
 	"\n" +
@@ -1326,7 +1358,8 @@ const file_termbridge_shared_v1_tunnel_proto_rawDesc = "" +
 	"\x12list_shortcuts_req\x18q \x01(\v2\".termbridge.agent.ListShortcutsReqH\x00R\x10listShortcutsReq\x12U\n" +
 	"\x13create_shortcut_req\x18r \x01(\v2#.termbridge.agent.CreateShortcutReqH\x00R\x11createShortcutReq\x12Y\n" +
 	"\x13update_shortcut_req\x18s \x01(\v2'.termbridge.agent.UpdateShortcutRequestH\x00R\x11updateShortcutReq\x12U\n" +
-	"\x13delete_shortcut_req\x18t \x01(\v2#.termbridge.agent.DeleteShortcutReqH\x00R\x11deleteShortcutReq\x12Y\n" +
+	"\x13delete_shortcut_req\x18t \x01(\v2#.termbridge.agent.DeleteShortcutReqH\x00R\x11deleteShortcutReq\x12e\n" +
+	"\x19update_shortcut_order_req\x18u \x01(\v2(.termbridge.agent.UpdateShortcutOrderReqH\x00R\x16updateShortcutOrderReq\x12Y\n" +
 	"\x14list_workspaces_resp\x18\xc8\x01 \x01(\v2$.termbridge.agent.ListWorkspacesRespH\x00R\x12listWorkspacesResp\x12V\n" +
 	"\x13workspace_tree_resp\x18\xc9\x01 \x01(\v2#.termbridge.agent.WorkspaceTreeRespH\x00R\x11workspaceTreeResp\x12b\n" +
 	"\x17workspace_sessions_resp\x18\xca\x01 \x01(\v2'.termbridge.agent.WorkspaceSessionsRespH\x00R\x15workspaceSessionsResp\x12V\n" +
@@ -1343,7 +1376,8 @@ const file_termbridge_shared_v1_tunnel_proto_rawDesc = "" +
 	"\x13list_shortcuts_resp\x18\xd5\x01 \x01(\v2#.termbridge.agent.ListShortcutsRespH\x00R\x11listShortcutsResp\x12Y\n" +
 	"\x14create_shortcut_resp\x18\xd6\x01 \x01(\v2$.termbridge.agent.CreateShortcutRespH\x00R\x12createShortcutResp\x12Y\n" +
 	"\x14update_shortcut_resp\x18\xd7\x01 \x01(\v2$.termbridge.agent.UpdateShortcutRespH\x00R\x12updateShortcutResp\x12Y\n" +
-	"\x14delete_shortcut_resp\x18\xd8\x01 \x01(\v2$.termbridge.agent.DeleteShortcutRespH\x00R\x12deleteShortcutResp\x12P\n" +
+	"\x14delete_shortcut_resp\x18\xd8\x01 \x01(\v2$.termbridge.agent.DeleteShortcutRespH\x00R\x12deleteShortcutResp\x12i\n" +
+	"\x1aupdate_shortcut_order_resp\x18\xd9\x01 \x01(\v2).termbridge.agent.UpdateShortcutOrderRespH\x00R\x17updateShortcutOrderResp\x12P\n" +
 	"\x0fterminal_attach\x18\xac\x02 \x01(\v2$.termbridge.shared.TerminalAttachReqH\x00R\x0eterminalAttach\x12J\n" +
 	"\x0eterminal_input\x18\xad\x02 \x01(\v2 .termbridge.shared.TerminalInputH\x00R\rterminalInput\x12M\n" +
 	"\x0fterminal_output\x18\xae\x02 \x01(\v2!.termbridge.shared.TerminalOutputH\x00R\x0eterminalOutput\x12M\n" +
@@ -1422,23 +1456,25 @@ var file_termbridge_shared_v1_tunnel_proto_goTypes = []any{
 	(*v1.CreateShortcutReq)(nil),              // 23: termbridge.agent.CreateShortcutReq
 	(*v1.UpdateShortcutRequest)(nil),          // 24: termbridge.agent.UpdateShortcutRequest
 	(*v1.DeleteShortcutReq)(nil),              // 25: termbridge.agent.DeleteShortcutReq
-	(*v1.ListWorkspacesResp)(nil),             // 26: termbridge.agent.ListWorkspacesResp
-	(*v1.WorkspaceTreeResp)(nil),              // 27: termbridge.agent.WorkspaceTreeResp
-	(*v1.WorkspaceSessionsResp)(nil),          // 28: termbridge.agent.WorkspaceSessionsResp
-	(*v1.CreateSessionResp)(nil),              // 29: termbridge.agent.CreateSessionResp
-	(*v1.GetSessionResp)(nil),                 // 30: termbridge.agent.GetSessionResp
-	(*v1.UpdateSessionResp)(nil),              // 31: termbridge.agent.UpdateSessionResp
-	(*v1.CloseSessionResp)(nil),               // 32: termbridge.agent.CloseSessionResp
-	(*v1.DeleteSessionResp)(nil),              // 33: termbridge.agent.DeleteSessionResp
-	(*v1.ReadHistoryResp)(nil),                // 34: termbridge.agent.ReadHistoryResp
-	(*v1.UpdateWorkspaceOrderResp)(nil),       // 35: termbridge.agent.UpdateWorkspaceOrderResp
-	(*v1.UpdateSessionOrderResp)(nil),         // 36: termbridge.agent.UpdateSessionOrderResp
-	(*v1.DeleteWorkspaceResp)(nil),            // 37: termbridge.agent.DeleteWorkspaceResp
-	(*v1.ListShortcutsResp)(nil),              // 38: termbridge.agent.ListShortcutsResp
-	(*v1.CreateShortcutResp)(nil),             // 39: termbridge.agent.CreateShortcutResp
-	(*v1.UpdateShortcutResp)(nil),             // 40: termbridge.agent.UpdateShortcutResp
-	(*v1.DeleteShortcutResp)(nil),             // 41: termbridge.agent.DeleteShortcutResp
-	(*ErrorResp)(nil),                         // 42: termbridge.shared.ErrorResp
+	(*v1.UpdateShortcutOrderReq)(nil),         // 26: termbridge.agent.UpdateShortcutOrderReq
+	(*v1.ListWorkspacesResp)(nil),             // 27: termbridge.agent.ListWorkspacesResp
+	(*v1.WorkspaceTreeResp)(nil),              // 28: termbridge.agent.WorkspaceTreeResp
+	(*v1.WorkspaceSessionsResp)(nil),          // 29: termbridge.agent.WorkspaceSessionsResp
+	(*v1.CreateSessionResp)(nil),              // 30: termbridge.agent.CreateSessionResp
+	(*v1.GetSessionResp)(nil),                 // 31: termbridge.agent.GetSessionResp
+	(*v1.UpdateSessionResp)(nil),              // 32: termbridge.agent.UpdateSessionResp
+	(*v1.CloseSessionResp)(nil),               // 33: termbridge.agent.CloseSessionResp
+	(*v1.DeleteSessionResp)(nil),              // 34: termbridge.agent.DeleteSessionResp
+	(*v1.ReadHistoryResp)(nil),                // 35: termbridge.agent.ReadHistoryResp
+	(*v1.UpdateWorkspaceOrderResp)(nil),       // 36: termbridge.agent.UpdateWorkspaceOrderResp
+	(*v1.UpdateSessionOrderResp)(nil),         // 37: termbridge.agent.UpdateSessionOrderResp
+	(*v1.DeleteWorkspaceResp)(nil),            // 38: termbridge.agent.DeleteWorkspaceResp
+	(*v1.ListShortcutsResp)(nil),              // 39: termbridge.agent.ListShortcutsResp
+	(*v1.CreateShortcutResp)(nil),             // 40: termbridge.agent.CreateShortcutResp
+	(*v1.UpdateShortcutResp)(nil),             // 41: termbridge.agent.UpdateShortcutResp
+	(*v1.DeleteShortcutResp)(nil),             // 42: termbridge.agent.DeleteShortcutResp
+	(*v1.UpdateShortcutOrderResp)(nil),        // 43: termbridge.agent.UpdateShortcutOrderResp
+	(*ErrorResp)(nil),                         // 44: termbridge.shared.ErrorResp
 }
 var file_termbridge_shared_v1_tunnel_proto_depIdxs = []int32{
 	1,  // 0: termbridge.shared.TunnelFrame.hello:type_name -> termbridge.shared.Hello
@@ -1462,35 +1498,37 @@ var file_termbridge_shared_v1_tunnel_proto_depIdxs = []int32{
 	23, // 18: termbridge.shared.TunnelFrame.create_shortcut_req:type_name -> termbridge.agent.CreateShortcutReq
 	24, // 19: termbridge.shared.TunnelFrame.update_shortcut_req:type_name -> termbridge.agent.UpdateShortcutRequest
 	25, // 20: termbridge.shared.TunnelFrame.delete_shortcut_req:type_name -> termbridge.agent.DeleteShortcutReq
-	26, // 21: termbridge.shared.TunnelFrame.list_workspaces_resp:type_name -> termbridge.agent.ListWorkspacesResp
-	27, // 22: termbridge.shared.TunnelFrame.workspace_tree_resp:type_name -> termbridge.agent.WorkspaceTreeResp
-	28, // 23: termbridge.shared.TunnelFrame.workspace_sessions_resp:type_name -> termbridge.agent.WorkspaceSessionsResp
-	29, // 24: termbridge.shared.TunnelFrame.create_session_resp:type_name -> termbridge.agent.CreateSessionResp
-	30, // 25: termbridge.shared.TunnelFrame.get_session_resp:type_name -> termbridge.agent.GetSessionResp
-	29, // 26: termbridge.shared.TunnelFrame.rerun_session_resp:type_name -> termbridge.agent.CreateSessionResp
-	31, // 27: termbridge.shared.TunnelFrame.update_session_resp:type_name -> termbridge.agent.UpdateSessionResp
-	32, // 28: termbridge.shared.TunnelFrame.close_session_resp:type_name -> termbridge.agent.CloseSessionResp
-	33, // 29: termbridge.shared.TunnelFrame.delete_session_resp:type_name -> termbridge.agent.DeleteSessionResp
-	34, // 30: termbridge.shared.TunnelFrame.read_history_resp:type_name -> termbridge.agent.ReadHistoryResp
-	35, // 31: termbridge.shared.TunnelFrame.update_workspace_order_resp:type_name -> termbridge.agent.UpdateWorkspaceOrderResp
-	36, // 32: termbridge.shared.TunnelFrame.update_session_order_resp:type_name -> termbridge.agent.UpdateSessionOrderResp
-	37, // 33: termbridge.shared.TunnelFrame.delete_workspace_resp:type_name -> termbridge.agent.DeleteWorkspaceResp
-	38, // 34: termbridge.shared.TunnelFrame.list_shortcuts_resp:type_name -> termbridge.agent.ListShortcutsResp
-	39, // 35: termbridge.shared.TunnelFrame.create_shortcut_resp:type_name -> termbridge.agent.CreateShortcutResp
-	40, // 36: termbridge.shared.TunnelFrame.update_shortcut_resp:type_name -> termbridge.agent.UpdateShortcutResp
-	41, // 37: termbridge.shared.TunnelFrame.delete_shortcut_resp:type_name -> termbridge.agent.DeleteShortcutResp
-	5,  // 38: termbridge.shared.TunnelFrame.terminal_attach:type_name -> termbridge.shared.TerminalAttachReq
-	6,  // 39: termbridge.shared.TunnelFrame.terminal_input:type_name -> termbridge.shared.TerminalInput
-	7,  // 40: termbridge.shared.TunnelFrame.terminal_output:type_name -> termbridge.shared.TerminalOutput
-	8,  // 41: termbridge.shared.TunnelFrame.terminal_resize:type_name -> termbridge.shared.TerminalResize
-	9,  // 42: termbridge.shared.TunnelFrame.terminal_closed:type_name -> termbridge.shared.TerminalClosed
-	42, // 43: termbridge.shared.TunnelFrame.error:type_name -> termbridge.shared.ErrorResp
-	10, // 44: termbridge.shared.TunnelFrame.close:type_name -> termbridge.shared.Close
-	45, // [45:45] is the sub-list for method output_type
-	45, // [45:45] is the sub-list for method input_type
-	45, // [45:45] is the sub-list for extension type_name
-	45, // [45:45] is the sub-list for extension extendee
-	0,  // [0:45] is the sub-list for field type_name
+	26, // 21: termbridge.shared.TunnelFrame.update_shortcut_order_req:type_name -> termbridge.agent.UpdateShortcutOrderReq
+	27, // 22: termbridge.shared.TunnelFrame.list_workspaces_resp:type_name -> termbridge.agent.ListWorkspacesResp
+	28, // 23: termbridge.shared.TunnelFrame.workspace_tree_resp:type_name -> termbridge.agent.WorkspaceTreeResp
+	29, // 24: termbridge.shared.TunnelFrame.workspace_sessions_resp:type_name -> termbridge.agent.WorkspaceSessionsResp
+	30, // 25: termbridge.shared.TunnelFrame.create_session_resp:type_name -> termbridge.agent.CreateSessionResp
+	31, // 26: termbridge.shared.TunnelFrame.get_session_resp:type_name -> termbridge.agent.GetSessionResp
+	30, // 27: termbridge.shared.TunnelFrame.rerun_session_resp:type_name -> termbridge.agent.CreateSessionResp
+	32, // 28: termbridge.shared.TunnelFrame.update_session_resp:type_name -> termbridge.agent.UpdateSessionResp
+	33, // 29: termbridge.shared.TunnelFrame.close_session_resp:type_name -> termbridge.agent.CloseSessionResp
+	34, // 30: termbridge.shared.TunnelFrame.delete_session_resp:type_name -> termbridge.agent.DeleteSessionResp
+	35, // 31: termbridge.shared.TunnelFrame.read_history_resp:type_name -> termbridge.agent.ReadHistoryResp
+	36, // 32: termbridge.shared.TunnelFrame.update_workspace_order_resp:type_name -> termbridge.agent.UpdateWorkspaceOrderResp
+	37, // 33: termbridge.shared.TunnelFrame.update_session_order_resp:type_name -> termbridge.agent.UpdateSessionOrderResp
+	38, // 34: termbridge.shared.TunnelFrame.delete_workspace_resp:type_name -> termbridge.agent.DeleteWorkspaceResp
+	39, // 35: termbridge.shared.TunnelFrame.list_shortcuts_resp:type_name -> termbridge.agent.ListShortcutsResp
+	40, // 36: termbridge.shared.TunnelFrame.create_shortcut_resp:type_name -> termbridge.agent.CreateShortcutResp
+	41, // 37: termbridge.shared.TunnelFrame.update_shortcut_resp:type_name -> termbridge.agent.UpdateShortcutResp
+	42, // 38: termbridge.shared.TunnelFrame.delete_shortcut_resp:type_name -> termbridge.agent.DeleteShortcutResp
+	43, // 39: termbridge.shared.TunnelFrame.update_shortcut_order_resp:type_name -> termbridge.agent.UpdateShortcutOrderResp
+	5,  // 40: termbridge.shared.TunnelFrame.terminal_attach:type_name -> termbridge.shared.TerminalAttachReq
+	6,  // 41: termbridge.shared.TunnelFrame.terminal_input:type_name -> termbridge.shared.TerminalInput
+	7,  // 42: termbridge.shared.TunnelFrame.terminal_output:type_name -> termbridge.shared.TerminalOutput
+	8,  // 43: termbridge.shared.TunnelFrame.terminal_resize:type_name -> termbridge.shared.TerminalResize
+	9,  // 44: termbridge.shared.TunnelFrame.terminal_closed:type_name -> termbridge.shared.TerminalClosed
+	44, // 45: termbridge.shared.TunnelFrame.error:type_name -> termbridge.shared.ErrorResp
+	10, // 46: termbridge.shared.TunnelFrame.close:type_name -> termbridge.shared.Close
+	47, // [47:47] is the sub-list for method output_type
+	47, // [47:47] is the sub-list for method input_type
+	47, // [47:47] is the sub-list for extension type_name
+	47, // [47:47] is the sub-list for extension extendee
+	0,  // [0:47] is the sub-list for field type_name
 }
 
 func init() { file_termbridge_shared_v1_tunnel_proto_init() }
@@ -1521,6 +1559,7 @@ func file_termbridge_shared_v1_tunnel_proto_init() {
 		(*TunnelFrame_CreateShortcutReq)(nil),
 		(*TunnelFrame_UpdateShortcutReq)(nil),
 		(*TunnelFrame_DeleteShortcutReq)(nil),
+		(*TunnelFrame_UpdateShortcutOrderReq)(nil),
 		(*TunnelFrame_ListWorkspacesResp)(nil),
 		(*TunnelFrame_WorkspaceTreeResp)(nil),
 		(*TunnelFrame_WorkspaceSessionsResp)(nil),
@@ -1538,6 +1577,7 @@ func file_termbridge_shared_v1_tunnel_proto_init() {
 		(*TunnelFrame_CreateShortcutResp)(nil),
 		(*TunnelFrame_UpdateShortcutResp)(nil),
 		(*TunnelFrame_DeleteShortcutResp)(nil),
+		(*TunnelFrame_UpdateShortcutOrderResp)(nil),
 		(*TunnelFrame_TerminalAttach)(nil),
 		(*TunnelFrame_TerminalInput)(nil),
 		(*TunnelFrame_TerminalOutput)(nil),

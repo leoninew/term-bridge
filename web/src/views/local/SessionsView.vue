@@ -26,6 +26,7 @@
     updateSession,
     updateSessionOrder,
     updateShortcut,
+    updateShortcutOrder,
     updateWorkspaceOrder,
   } from '../../features/local/api'
   import type { SessionRuntimeApi, ShortcutRuntimeApi } from '../../features/sessions/runtime'
@@ -44,6 +45,7 @@
     rerunSession,
     updateSessionOrder,
     updateShortcut,
+    updateShortcutOrder,
     listShortcuts,
     listWorkspaceTree,
     updateWorkspaceOrder,

@@ -41,6 +41,15 @@ func TestLocalRuntimeRequestFrameBuildsShortcutFrames(t *testing.T) {
 			},
 		},
 		{
+			method: "update_shortcut_order",
+			params: &agent.UpdateShortcutOrderReq{ShortcutIds: []string{"shortcut-2", "shortcut-1"}},
+			assert: func(t *testing.T, frame *shared.TunnelFrame) {
+				if got := frame.GetUpdateShortcutOrderReq().GetShortcutIds(); len(got) != 2 || got[0] != "shortcut-2" || got[1] != "shortcut-1" {
+					t.Fatalf("shortcut order request = %v, want [shortcut-2 shortcut-1]", got)
+				}
+			},
+		},
+		{
 			method: "delete_shortcut",
 			params: &agent.DeleteShortcutReq{ShortcutId: "shortcut-1"},
 			assert: func(t *testing.T, frame *shared.TunnelFrame) {

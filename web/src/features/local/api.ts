@@ -19,6 +19,8 @@ import type {
   CreateShortcutReq,
   ListShortcutsResp,
   Shortcut,
+  UpdateShortcutOrderReq,
+  UpdateShortcutOrderResp,
   UpdateShortcutReq,
 } from '../../gen/proto/termbridge/agent/v1/shortcut'
 import type {
@@ -126,6 +128,14 @@ export async function updateShortcut(
     request,
   )
   return response.data
+}
+
+export async function updateShortcutOrder(request: UpdateShortcutOrderReq): Promise<Shortcut[]> {
+  const response = await localApiClient.patch<UpdateShortcutOrderResp>(
+    localRuntimePath('/shortcuts/order'),
+    request,
+  )
+  return response.data.items
 }
 
 export async function deleteShortcut(shortcutId: string): Promise<void> {

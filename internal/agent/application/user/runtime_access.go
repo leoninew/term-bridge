@@ -22,6 +22,7 @@ type RuntimeAccess interface {
 	ListShortcuts(ctx context.Context) ([]*agent.Shortcut, error)
 	CreateShortcut(ctx context.Context, request *agent.CreateShortcutReq) (*agent.Shortcut, error)
 	UpdateShortcut(ctx context.Context, shortcutId string, request *agent.UpdateShortcutReq) (*agent.Shortcut, error)
+	UpdateShortcutOrder(ctx context.Context, shortcutIds []string) ([]*agent.Shortcut, error)
 	DeleteShortcut(ctx context.Context, shortcutId string) error
 	DeleteSession(ctx context.Context, workspaceId string, sessionId string) error
 	CloseSession(ctx context.Context, workspaceId string, sessionId string) (*agent.SessionSummary, error)
@@ -131,6 +132,13 @@ func (a WebTerminalAccess) UpdateShortcut(ctx context.Context, shortcutId string
 		return nil, err
 	}
 	return a.Shortcuts.Update(shortcutId, request)
+}
+
+func (a WebTerminalAccess) UpdateShortcutOrder(ctx context.Context, shortcutIds []string) ([]*agent.Shortcut, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return a.Shortcuts.UpdateOrder(&agent.UpdateShortcutOrderReq{ShortcutIds: shortcutIds})
 }
 
 func (a WebTerminalAccess) DeleteShortcut(ctx context.Context, shortcutId string) error {

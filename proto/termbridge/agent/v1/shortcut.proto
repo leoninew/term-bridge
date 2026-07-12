@@ -46,6 +46,14 @@ message UpdateShortcutResp {
   Shortcut shortcut = 1;
 }
 
+message UpdateShortcutOrderReq {
+  repeated string shortcut_ids = 1;
+}
+
+message UpdateShortcutOrderResp {
+  repeated Shortcut items = 1;
+}
+
 message DeleteShortcutReq {
   string shortcut_id = 1;
 }

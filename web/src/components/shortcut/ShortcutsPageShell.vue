@@ -23,9 +23,18 @@
             {{ t('shortcut.loading') }}
           </p>
 
-          <div
+          <VueDraggable
             v-else-if="shortcuts.length"
+            v-model="shortcuts"
+            tag="div"
             class="shortcut-grid grid sm:grid-cols-2 lg:grid-cols-4"
+            item-key="id"
+            :animation="150"
+            :disabled="reordering"
+            :filter="'button'"
+            :prevent-on-filter="false"
+            @start="rememberOrder"
+            @end="persistOrder"
           >
             <ShortcutCard
               v-for="shortcut in shortcuts"
@@ -34,7 +43,7 @@
               @edit="openEdit"
               @delete="openDelete"
             />
-          </div>
+          </VueDraggable>
 
           <section
             v-else
@@ -67,6 +76,7 @@
 <script setup lang="ts">
   import { Plus } from '@lucide/vue'
   import { onMounted, ref } from 'vue'
+  import { VueDraggable } from 'vue-draggable-plus'
   import { useI18n } from 'vue-i18n'
   import { ToastProvider } from 'reka-ui'
   import type { Shortcut } from '../../gen/proto/termbridge/agent/v1/shortcut'
@@ -85,6 +95,8 @@
   const loading = ref(false)
   const saving = ref(false)
   const deleting = ref(false)
+  const reordering = ref(false)
+  const previousOrder = ref<Shortcut[]>([])
   const editorOpen = ref(false)
   const deleteOpen = ref(false)
   const selected = ref<Shortcut | null>(null)
@@ -98,6 +110,42 @@
     } finally {
       loading.value = false
     }
+  }
+
+  function rememberOrder() {
+    previousOrder.value = [...shortcuts.value]
+  }
+
+  async function persistOrder() {
+    if (
+      reordering.value ||
+      previousOrder.value.length === 0 ||
+      sameShortcutOrder(previousOrder.value, shortcuts.value)
+    ) {
+      previousOrder.value = []
+      return
+    }
+    const previous = previousOrder.value
+    reordering.value = true
+    try {
+      shortcuts.value = await props.api.updateShortcutOrder({
+        shortcut_ids: shortcuts.value.map((shortcut) => shortcut.id),
+      })
+    } catch (err) {
+      shortcuts.value = previous
+      notifications.notifyError(t('toast.updateShortcutOrderFailed'), err)
+      await load()
+    } finally {
+      previousOrder.value = []
+      reordering.value = false
+    }
+  }
+
+  function sameShortcutOrder(left: Shortcut[], right: Shortcut[]) {
+    return (
+      left.length === right.length &&
+      left.every((shortcut, index) => shortcut.id === right[index]?.id)
+    )
   }
 
   function openCreate() {

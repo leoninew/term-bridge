@@ -49,6 +49,14 @@ export interface UpdateShortcutResp {
   shortcut: Shortcut | undefined;
 }
 
+export interface UpdateShortcutOrderReq {
+  shortcut_ids: string[];
+}
+
+export interface UpdateShortcutOrderResp {
+  items: Shortcut[];
+}
+
 export interface DeleteShortcutReq {
   shortcut_id: string;
 }

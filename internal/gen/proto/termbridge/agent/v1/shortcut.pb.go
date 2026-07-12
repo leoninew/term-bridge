@@ -446,6 +446,94 @@ func (x *UpdateShortcutResp) GetShortcut() *Shortcut {
 	return nil
 }
 
+type UpdateShortcutOrderReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ShortcutIds   []string               `protobuf:"bytes,1,rep,name=shortcut_ids,json=shortcutIds,proto3" json:"shortcut_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateShortcutOrderReq) Reset() {
+	*x = UpdateShortcutOrderReq{}
+	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateShortcutOrderReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateShortcutOrderReq) ProtoMessage() {}
+
+func (x *UpdateShortcutOrderReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateShortcutOrderReq.ProtoReflect.Descriptor instead.
+func (*UpdateShortcutOrderReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_shortcut_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *UpdateShortcutOrderReq) GetShortcutIds() []string {
+	if x != nil {
+		return x.ShortcutIds
+	}
+	return nil
+}
+
+type UpdateShortcutOrderResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*Shortcut            `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateShortcutOrderResp) Reset() {
+	*x = UpdateShortcutOrderResp{}
+	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateShortcutOrderResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateShortcutOrderResp) ProtoMessage() {}
+
+func (x *UpdateShortcutOrderResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateShortcutOrderResp.ProtoReflect.Descriptor instead.
+func (*UpdateShortcutOrderResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_shortcut_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *UpdateShortcutOrderResp) GetItems() []*Shortcut {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
 type DeleteShortcutReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ShortcutId    string                 `protobuf:"bytes,1,opt,name=shortcut_id,json=shortcutId,proto3" json:"shortcut_id,omitempty"`
@@ -455,7 +543,7 @@ type DeleteShortcutReq struct {
 
 func (x *DeleteShortcutReq) Reset() {
 	*x = DeleteShortcutReq{}
-	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[8]
+	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +555,7 @@ func (x *DeleteShortcutReq) String() string {
 func (*DeleteShortcutReq) ProtoMessage() {}
 
 func (x *DeleteShortcutReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[8]
+	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +568,7 @@ func (x *DeleteShortcutReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteShortcutReq.ProtoReflect.Descriptor instead.
 func (*DeleteShortcutReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_shortcut_proto_rawDescGZIP(), []int{8}
+	return file_termbridge_agent_v1_shortcut_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DeleteShortcutReq) GetShortcutId() string {
@@ -498,7 +586,7 @@ type DeleteShortcutResp struct {
 
 func (x *DeleteShortcutResp) Reset() {
 	*x = DeleteShortcutResp{}
-	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[9]
+	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -510,7 +598,7 @@ func (x *DeleteShortcutResp) String() string {
 func (*DeleteShortcutResp) ProtoMessage() {}
 
 func (x *DeleteShortcutResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[9]
+	mi := &file_termbridge_agent_v1_shortcut_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -523,7 +611,7 @@ func (x *DeleteShortcutResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteShortcutResp.ProtoReflect.Descriptor instead.
 func (*DeleteShortcutResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_shortcut_proto_rawDescGZIP(), []int{9}
+	return file_termbridge_agent_v1_shortcut_proto_rawDescGZIP(), []int{11}
 }
 
 var File_termbridge_agent_v1_shortcut_proto protoreflect.FileDescriptor
@@ -564,7 +652,11 @@ const file_termbridge_agent_v1_shortcut_proto_rawDesc = "" +
 	"shortcutId\x12=\n" +
 	"\arequest\x18\x02 \x01(\v2#.termbridge.agent.UpdateShortcutReqR\arequest\"L\n" +
 	"\x12UpdateShortcutResp\x126\n" +
-	"\bshortcut\x18\x01 \x01(\v2\x1a.termbridge.agent.ShortcutR\bshortcut\"4\n" +
+	"\bshortcut\x18\x01 \x01(\v2\x1a.termbridge.agent.ShortcutR\bshortcut\";\n" +
+	"\x16UpdateShortcutOrderReq\x12!\n" +
+	"\fshortcut_ids\x18\x01 \x03(\tR\vshortcutIds\"K\n" +
+	"\x17UpdateShortcutOrderResp\x120\n" +
+	"\x05items\x18\x01 \x03(\v2\x1a.termbridge.agent.ShortcutR\x05items\"4\n" +
 	"\x11DeleteShortcutReq\x12\x1f\n" +
 	"\vshortcut_id\x18\x01 \x01(\tR\n" +
 	"shortcutId\"\x14\n" +
@@ -583,32 +675,35 @@ func file_termbridge_agent_v1_shortcut_proto_rawDescGZIP() []byte {
 	return file_termbridge_agent_v1_shortcut_proto_rawDescData
 }
 
-var file_termbridge_agent_v1_shortcut_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_termbridge_agent_v1_shortcut_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_termbridge_agent_v1_shortcut_proto_goTypes = []any{
-	(*Shortcut)(nil),              // 0: termbridge.agent.Shortcut
-	(*ListShortcutsReq)(nil),      // 1: termbridge.agent.ListShortcutsReq
-	(*ListShortcutsResp)(nil),     // 2: termbridge.agent.ListShortcutsResp
-	(*CreateShortcutReq)(nil),     // 3: termbridge.agent.CreateShortcutReq
-	(*CreateShortcutResp)(nil),    // 4: termbridge.agent.CreateShortcutResp
-	(*UpdateShortcutReq)(nil),     // 5: termbridge.agent.UpdateShortcutReq
-	(*UpdateShortcutRequest)(nil), // 6: termbridge.agent.UpdateShortcutRequest
-	(*UpdateShortcutResp)(nil),    // 7: termbridge.agent.UpdateShortcutResp
-	(*DeleteShortcutReq)(nil),     // 8: termbridge.agent.DeleteShortcutReq
-	(*DeleteShortcutResp)(nil),    // 9: termbridge.agent.DeleteShortcutResp
-	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
+	(*Shortcut)(nil),                // 0: termbridge.agent.Shortcut
+	(*ListShortcutsReq)(nil),        // 1: termbridge.agent.ListShortcutsReq
+	(*ListShortcutsResp)(nil),       // 2: termbridge.agent.ListShortcutsResp
+	(*CreateShortcutReq)(nil),       // 3: termbridge.agent.CreateShortcutReq
+	(*CreateShortcutResp)(nil),      // 4: termbridge.agent.CreateShortcutResp
+	(*UpdateShortcutReq)(nil),       // 5: termbridge.agent.UpdateShortcutReq
+	(*UpdateShortcutRequest)(nil),   // 6: termbridge.agent.UpdateShortcutRequest
+	(*UpdateShortcutResp)(nil),      // 7: termbridge.agent.UpdateShortcutResp
+	(*UpdateShortcutOrderReq)(nil),  // 8: termbridge.agent.UpdateShortcutOrderReq
+	(*UpdateShortcutOrderResp)(nil), // 9: termbridge.agent.UpdateShortcutOrderResp
+	(*DeleteShortcutReq)(nil),       // 10: termbridge.agent.DeleteShortcutReq
+	(*DeleteShortcutResp)(nil),      // 11: termbridge.agent.DeleteShortcutResp
+	(*timestamppb.Timestamp)(nil),   // 12: google.protobuf.Timestamp
 }
 var file_termbridge_agent_v1_shortcut_proto_depIdxs = []int32{
-	10, // 0: termbridge.agent.Shortcut.created_at:type_name -> google.protobuf.Timestamp
-	10, // 1: termbridge.agent.Shortcut.updated_at:type_name -> google.protobuf.Timestamp
+	12, // 0: termbridge.agent.Shortcut.created_at:type_name -> google.protobuf.Timestamp
+	12, // 1: termbridge.agent.Shortcut.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: termbridge.agent.ListShortcutsResp.items:type_name -> termbridge.agent.Shortcut
 	0,  // 3: termbridge.agent.CreateShortcutResp.shortcut:type_name -> termbridge.agent.Shortcut
 	5,  // 4: termbridge.agent.UpdateShortcutRequest.request:type_name -> termbridge.agent.UpdateShortcutReq
 	0,  // 5: termbridge.agent.UpdateShortcutResp.shortcut:type_name -> termbridge.agent.Shortcut
-	6,  // [6:6] is the sub-list for method output_type
-	6,  // [6:6] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	0,  // 6: termbridge.agent.UpdateShortcutOrderResp.items:type_name -> termbridge.agent.Shortcut
+	7,  // [7:7] is the sub-list for method output_type
+	7,  // [7:7] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_termbridge_agent_v1_shortcut_proto_init() }
@@ -625,7 +720,7 @@ func file_termbridge_agent_v1_shortcut_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_termbridge_agent_v1_shortcut_proto_rawDesc), len(file_termbridge_agent_v1_shortcut_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

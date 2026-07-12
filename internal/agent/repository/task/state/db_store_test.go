@@ -298,6 +298,124 @@ func TestDBStorePersistsDeviceScopedShortcuts(t *testing.T) {
 	}
 }
 
+func TestDBStorePersistsShortcutOrderWithoutChangingContentEditPlacement(t *testing.T) {
+	store, _ := newTestDBStore(t)
+	first, err := store.CreateShortcut(shortcut.Shortcut{Id: "shortcut-1", Name: "first", Command: "first"})
+	if err != nil {
+		t.Fatalf("CreateShortcut(first) error = %v", err)
+	}
+	second, err := store.CreateShortcut(shortcut.Shortcut{Id: "shortcut-2", Name: "second", Command: "second"})
+	if err != nil {
+		t.Fatalf("CreateShortcut(second) error = %v", err)
+	}
+	third, err := store.CreateShortcut(shortcut.Shortcut{Id: "shortcut-3", Name: "third", Command: "third"})
+	if err != nil {
+		t.Fatalf("CreateShortcut(third) error = %v", err)
+	}
+
+	ordered, err := store.UpdateShortcutOrder([]string{third.Id, first.Id, second.Id})
+	if err != nil {
+		t.Fatalf("UpdateShortcutOrder() error = %v", err)
+	}
+	if got := shortcutIds(ordered); !equalShortcutIds(got, []string{third.Id, first.Id, second.Id}) {
+		t.Fatalf("UpdateShortcutOrder() ids = %v, want [%s %s %s]", got, third.Id, first.Id, second.Id)
+	}
+
+	if _, err := store.UpdateShortcut(first.Id, func(value *shortcut.Shortcut) error {
+		value.Name = "first renamed"
+		return nil
+	}); err != nil {
+		t.Fatalf("UpdateShortcut() error = %v", err)
+	}
+	listed, err := store.ListShortcuts()
+	if err != nil {
+		t.Fatalf("ListShortcuts() error = %v", err)
+	}
+	if got := shortcutIds(listed); !equalShortcutIds(got, []string{third.Id, first.Id, second.Id}) {
+		t.Fatalf("ListShortcuts() ids after content edit = %v, want [%s %s %s]", got, third.Id, first.Id, second.Id)
+	}
+
+	fourth, err := store.CreateShortcut(shortcut.Shortcut{Id: "shortcut-4", Name: "fourth", Command: "fourth"})
+	if err != nil {
+		t.Fatalf("CreateShortcut(fourth) error = %v", err)
+	}
+	listed, err = store.ListShortcuts()
+	if err != nil {
+		t.Fatalf("ListShortcuts() after create error = %v", err)
+	}
+	if got := shortcutIds(listed); !equalShortcutIds(got, []string{third.Id, first.Id, second.Id, fourth.Id}) {
+		t.Fatalf("ListShortcuts() ids after append = %v, want [%s %s %s %s]", got, third.Id, first.Id, second.Id, fourth.Id)
+	}
+}
+
+func TestDBStoreRejectsInvalidShortcutOrderWithoutChangingPersistedOrder(t *testing.T) {
+	store, db := newTestDBStore(t)
+	first, err := store.CreateShortcut(shortcut.Shortcut{Id: "shortcut-1", Name: "first", Command: "first"})
+	if err != nil {
+		t.Fatalf("CreateShortcut(first) error = %v", err)
+	}
+	second, err := store.CreateShortcut(shortcut.Shortcut{Id: "shortcut-2", Name: "second", Command: "second"})
+	if err != nil {
+		t.Fatalf("CreateShortcut(second) error = %v", err)
+	}
+	if _, err := store.UpdateShortcutOrder([]string{second.Id, first.Id}); err != nil {
+		t.Fatalf("UpdateShortcutOrder(valid) error = %v", err)
+	}
+
+	for _, ids := range [][]string{
+		{first.Id},
+		{first.Id, first.Id},
+		{first.Id, "shortcut-missing"},
+	} {
+		if _, err := store.UpdateShortcutOrder(ids); err == nil {
+			t.Fatalf("UpdateShortcutOrder(%v) error = nil, want rejected permutation", ids)
+		}
+		listed, err := store.ListShortcuts()
+		if err != nil {
+			t.Fatalf("ListShortcuts() error = %v", err)
+		}
+		if got := shortcutIds(listed); !equalShortcutIds(got, []string{second.Id, first.Id}) {
+			t.Fatalf("ListShortcuts() ids after rejected %v = %v, want [%s %s]", ids, got, second.Id, first.Id)
+		}
+	}
+
+	otherDeviceStore := NewDbStore(db, "sqlite", t.TempDir(), "device-2")
+	third, err := otherDeviceStore.CreateShortcut(shortcut.Shortcut{Id: "shortcut-3", Name: "third", Command: "third"})
+	if err != nil {
+		t.Fatalf("CreateShortcut(other device) error = %v", err)
+	}
+	if _, err := store.UpdateShortcutOrder([]string{second.Id, third.Id}); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("UpdateShortcutOrder(cross device) error = %v, want os.ErrNotExist", err)
+	}
+	listed, err := store.ListShortcuts()
+	if err != nil {
+		t.Fatalf("ListShortcuts() after cross-device rejection error = %v", err)
+	}
+	if got := shortcutIds(listed); !equalShortcutIds(got, []string{second.Id, first.Id}) {
+		t.Fatalf("ListShortcuts() ids after cross-device rejection = %v, want [%s %s]", got, second.Id, first.Id)
+	}
+}
+
+func shortcutIds(values []shortcut.Shortcut) []string {
+	ids := make([]string, 0, len(values))
+	for _, value := range values {
+		ids = append(ids, value.Id)
+	}
+	return ids
+}
+
+func equalShortcutIds(got []string, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for index := range got {
+		if got[index] != want[index] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestDBStoreRejectsBlankShortcutRequiredFields(t *testing.T) {
 	store, _ := newTestDBStore(t)
 	for _, value := range []shortcut.Shortcut{{Name: "", Command: "cmd"}, {Name: "shell", Command: " \t "}} {
@@ -384,8 +502,9 @@ func newTestDBStore(t *testing.T) (DbStore, *sql.DB) {
 		`CREATE INDEX idx_sessions_device_deleted ON sessions(device_id, deleted_at)`,
 		`CREATE TABLE session_runs (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, workspace_id TEXT NOT NULL, device_id TEXT NOT NULL, sequence INTEGER NOT NULL, command_json TEXT NOT NULL, terminal_size_json TEXT NOT NULL DEFAULT '{}', process_json TEXT NOT NULL DEFAULT '{}', exit_json TEXT NOT NULL DEFAULT '{}', state TEXT NOT NULL, state_reason TEXT NOT NULL DEFAULT '', started_at TEXT NULL, ended_at TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT NULL, FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`,
 		`CREATE INDEX idx_session_runs_session_sequence ON session_runs(session_id, sequence)`,
-		`CREATE TABLE shortcuts (id TEXT PRIMARY KEY, device_id TEXT NOT NULL, name TEXT NOT NULL, command TEXT NOT NULL, description TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
+		`CREATE TABLE shortcuts (id TEXT PRIMARY KEY, device_id TEXT NOT NULL, name TEXT NOT NULL, command TEXT NOT NULL, description TEXT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
 		`CREATE INDEX idx_shortcuts_device_updated ON shortcuts(device_id, updated_at)`,
+		`CREATE INDEX idx_shortcuts_device_order ON shortcuts(device_id, sort_order)`,
 	}
 	for _, statement := range statements {
 		if _, err := db.ExecContext(context.Background(), statement); err != nil {
