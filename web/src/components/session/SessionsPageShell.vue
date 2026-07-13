@@ -55,10 +55,16 @@
           :active-session="activeSession"
           :current-device="workbenchDevice"
           :terminal-ws-url="activeTerminalWsUrl"
+          :has-terminal-tabs="terminalTabs.length > 0"
+          :has-background-running-sessions="hasRunningSessions"
           :session-title="sessionTitle"
           :session-lifecycle-state="sessionLifecycleState"
+          :session-command-source="sessionCommandSource"
+          :session-source-label="sessionSourceLabel"
           @activate-tab="activateOpenedTab"
           @close-tab="closeTab"
+          @close-terminal-tabs="closeTerminalTabs"
+          @open-close-background-sessions-drawer="openCloseBackgroundSessionsDrawer"
           @reorder-tabs="workbench.openedTabs = $event"
           @open-create="() => openCreateSessionForm()"
           @workbench="terminalWorkbench = $event"
@@ -112,6 +118,15 @@
       @confirm="removeSelectedWorkspace"
     />
 
+    <CloseBackgroundSessionsDrawer
+      :open="closeBackgroundSessionsDrawerOpen"
+      :workspace-tree="sessionWorkspaceTree"
+      :opened-tabs="workbench.openedTabs"
+      :closing="closingBackgroundSessions"
+      @update:open="closeBackgroundSessionsDrawerOpen = $event"
+      @confirm="closeBackgroundSessions"
+    />
+
     <ToastHost />
   </ToastProvider>
 </template>
@@ -121,6 +136,7 @@
   import { useI18n } from 'vue-i18n'
   import { useRouter } from 'vue-router'
   import { SplitterGroup, SplitterPanel, SplitterResizeHandle, ToastProvider } from 'reka-ui'
+  import CloseBackgroundSessionsDrawer from './CloseBackgroundSessionsDrawer.vue'
   import CreateSessionDialog from './CreateSessionDialog.vue'
   import DeleteSessionDialog from './DeleteSessionDialog.vue'
   import EditSessionDialog from './EditSessionDialog.vue'
@@ -137,6 +153,13 @@
   import { useCloudDevicesStore } from '../../store/cloudDevices'
   import { useLocalAuthStore } from '../../store/localAuth'
   import { useRuntimeConfigStore } from '../../store/runtimeConfig'
+  import {
+    closeSessionsSerially,
+    normalizedSessionWorkspaceTree,
+    selectedSessionWorkspaceTreeTargets,
+    terminalTabTargets,
+    type SessionIdentity,
+  } from '../../features/sessions/tabManagement'
   import {
     terminalWsUrl,
     type SessionRuntimeApi,
@@ -187,6 +210,8 @@
   const rerunningSessionId = ref<string | null>(null)
   const deletingSessionId = ref<string | null>(null)
   const removingWorkspaceId = ref<string | null>(null)
+  const closeBackgroundSessionsDrawerOpen = ref(false)
+  const closingBackgroundSessions = ref(false)
 
   const isLocalMode = computed(() => props.runtimeTarget.mode === 'local')
   const authInitialized = computed(() =>
@@ -215,6 +240,18 @@
       tokens.tokenForTarget(props.runtimeTarget.mode) ?? undefined,
     )
   })
+
+  const terminalTabs = computed(() =>
+    terminalTabTargets(workbench.openedTabs, workspaceSessions.sessionById),
+  )
+  const sessionWorkspaceTree = computed(() =>
+    normalizedSessionWorkspaceTree(workspaceSessions.workspaceTree),
+  )
+  const hasRunningSessions = computed(() =>
+    sessionWorkspaceTree.value.some((workspace) =>
+      workspace.children.some((session) => session.lifecycle_state === 'running'),
+    ),
+  )
 
   async function refresh() {
     try {
@@ -278,6 +315,8 @@
     dialogs.clearSelectedSession()
     dialogs.removeWorkspaceDialogOpen = false
     dialogs.clearSelectedWorkspace()
+    closeBackgroundSessionsDrawerOpen.value = false
+    closingBackgroundSessions.value = false
     workbench.resetForSourceChange()
     await router.replace(
       isLocalMode.value ? { name: props.homeRouteName } : { name: 'cloud-login' },
@@ -465,8 +504,56 @@
     )
   }
 
-  async function closeTab(workspaceId: string, sessionId: string) {
-    const nextSession = workbench.closeTab(workspaceId, sessionId, workspaceSessions.sessionById)
+  async function closeTab(_workspaceId: string, sessionId: string) {
+    await closeTabs([sessionId])
+  }
+
+  async function closeTerminalTabs() {
+    await closeTabs(terminalTabs.value.map((tab) => tab.sessionId))
+  }
+
+  function openCloseBackgroundSessionsDrawer() {
+    if (!hasRunningSessions.value || closingBackgroundSessions.value) {
+      return
+    }
+    closeBackgroundSessionsDrawerOpen.value = true
+  }
+
+  async function closeBackgroundSessions(selectedSessions: SessionIdentity[]) {
+    if (closingBackgroundSessions.value) {
+      return
+    }
+
+    const sessions = selectedSessionWorkspaceTreeTargets(
+      sessionWorkspaceTree.value,
+      selectedSessions,
+    )
+    if (sessions.length === 0) {
+      return
+    }
+
+    closingBackgroundSessions.value = true
+    let completed = false
+    try {
+      await closeSessionsSerially(
+        sessions,
+        props.runtimeApi.closeSession,
+        workspaceSessions.updateSession,
+      )
+      completed = true
+    } catch (err) {
+      notifications.notifyError(t('toast.closeBackgroundSessionsFailed'), err)
+    } finally {
+      await refresh()
+      closingBackgroundSessions.value = false
+      if (completed) {
+        closeBackgroundSessionsDrawerOpen.value = false
+      }
+    }
+  }
+
+  async function closeTabs(sessionIds: string[]) {
+    const nextSession = workbench.closeTabs(sessionIds, workspaceSessions.sessionById)
     if (nextSession) {
       await notifyHistoryError(
         await workbench.ensureHistoryLoaded(props.runtimeTarget, props.runtimeApi, nextSession),
@@ -478,7 +565,7 @@
     logTerminalDiagnostic('session.form.open', {
       workspaceId: workspace?.id,
       workspacePath: workspace?.path,
-      activeSessionId: workbench.activeSessionId,
+      activeSessionId: activeSession.value?.id ?? null,
     })
     createDraft.reset(workspace, t('dialog.defaultSessionName'), shortcuts.value)
     dialogs.openCreateSessionDialog()
@@ -563,6 +650,16 @@
 
   function sessionLifecycleState(workspaceId: string, sessionId: string) {
     return workspaceSessions.sessionById(workspaceId, sessionId)?.lifecycle_state ?? ''
+  }
+
+  function sessionCommandSource(workspaceId: string, sessionId: string) {
+    return workspaceSessions.sessionById(workspaceId, sessionId)?.command_source ?? ''
+  }
+
+  function sessionSourceLabel(workspaceId: string, sessionId: string) {
+    return sessionCommandSource(workspaceId, sessionId) === 'shortcut'
+      ? t('dialog.shortcut')
+      : t('workbench.launchCommand')
   }
 
   function isActiveLifecycle(session: SessionSummary) {

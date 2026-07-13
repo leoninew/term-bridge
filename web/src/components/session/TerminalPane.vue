@@ -1,4 +1,5 @@
 <template>
+  <!-- Keep this aligned with SessionWorkbench TabsTrigger: sessionId is the globally unique Tab value. -->
   <TabsContent
     v-if="session && tab"
     :key="session.id"

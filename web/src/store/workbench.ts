@@ -17,6 +17,7 @@ export type OpenSessionTab = {
 export type RemovedSession = Pick<SessionSummary, 'id' | 'workspace_id'>
 
 export const useWorkbenchStore = defineStore('workbench', () => {
+  // Session IDs are globally unique ULIDs; TabsRoot, TabsTrigger, and TerminalPane must share sessionId values.
   const openedTabs = ref<OpenSessionTab[]>([])
   const activeSessionId = ref<string | null>(null)
 
@@ -74,15 +75,38 @@ export const useWorkbenchStore = defineStore('workbench', () => {
     sessionId: string,
     sessionResolver: (workspaceId: string, sessionId: string) => SessionSummary | null,
   ) {
-    const closingIndex = openedTabs.value.findIndex((tab) => tab.sessionId === sessionId)
-    if (closingIndex === -1) {
+    return closeTabs([sessionId], sessionResolver)
+  }
+
+  function closeTabs(
+    sessionIds: string[],
+    sessionResolver: (workspaceId: string, sessionId: string) => SessionSummary | null,
+  ) {
+    const closingSessionIds = new Set(sessionIds)
+    const activeIndex = openedTabs.value.findIndex((tab) => tab.sessionId === activeSessionId.value)
+    const activeTabIsClosing =
+      activeIndex !== -1 && closingSessionIds.has(openedTabs.value[activeIndex].sessionId)
+    const nextTab = activeTabIsClosing
+      ? (openedTabs.value
+          .slice(activeIndex + 1)
+          .find((tab) => !closingSessionIds.has(tab.sessionId)) ??
+        openedTabs.value
+          .slice(0, activeIndex)
+          .reverse()
+          .find((tab) => !closingSessionIds.has(tab.sessionId)) ??
+        null)
+      : null
+    const remainingTabs = openedTabs.value.filter((tab) => !closingSessionIds.has(tab.sessionId))
+
+    if (remainingTabs.length === openedTabs.value.length) {
       return null
     }
-    openedTabs.value.splice(closingIndex, 1)
-    if (activeSessionId.value !== sessionId) {
+
+    openedTabs.value = remainingTabs
+    if (!activeTabIsClosing) {
       return null
     }
-    const nextTab = openedTabs.value[Math.min(closingIndex, openedTabs.value.length - 1)] ?? null
+
     activeSessionId.value = nextTab?.sessionId ?? null
     return nextTab ? sessionResolver(nextTab.workspaceId, nextTab.sessionId) : null
   }
@@ -167,6 +191,7 @@ export const useWorkbenchStore = defineStore('workbench', () => {
     setActiveSession,
     activateSession,
     closeTab,
+    closeTabs,
     ensureHistoryLoaded,
     ensureActiveHistoryLoaded,
     resetTabHistory,

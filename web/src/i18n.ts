@@ -32,6 +32,7 @@ export const messages = {
       language: '语言',
       theme: '主题',
       close: '关闭',
+      closing: '关闭中…',
       retry: '重试',
       more: '更多',
     },
@@ -216,6 +217,13 @@ export const messages = {
       launchCommand: '启动命令',
       noActiveSession: '没有活跃会话',
       closeTabAria: '关闭 {name} 标签页',
+      tabMenuAria: '打开标签页管理菜单',
+      closeTerminalTabs: '关闭已停止标签页',
+      closeTerminalTabsDescription: '关闭当前已打开、但不再进行中的标签页。',
+      closeBackgroundSessions: '关闭运行中会话',
+      closeBackgroundSessionsDescription: '选择要关闭的运行中会话；未打开的会话默认勾选。',
+      openTabs: '已打开标签页',
+      activeTab: '当前',
     },
     dialog: {
       newSessionTitle: '新建会话',
@@ -240,6 +248,10 @@ export const messages = {
       fallbackSession: '此会话',
       removeWorkspaceTitle: '移除工作区',
       removeWorkspaceDescription: '移除 "{name}" 及其所有会话。本地文件不受影响。',
+      closeBackgroundSessionsTitle: '关闭运行中会话',
+      closeBackgroundSessionsDescription:
+        '选择要关闭的运行中会话；未打开的会话默认勾选。确认后将按顺序关闭所选会话。',
+      noBackgroundSessions: '没有运行中的会话可关闭。',
     },
     toast: {
       refreshFailed: '刷新失败',
@@ -259,6 +271,7 @@ export const messages = {
       terminalError: '终端错误：{code}',
       terminalConnectionFailed: '终端连接失败',
       stopSessionFailed: '停止会话失败',
+      closeBackgroundSessionsFailed: '关闭会话失败',
       rerunSessionFailed: '重新运行会话失败',
       sessionRerun: '会话已重新运行',
       loadShortcutsFailed: '加载快捷方式失败',
@@ -300,6 +313,7 @@ export const messages = {
       language: 'Language',
       theme: 'Theme',
       close: 'Close',
+      closing: 'Closing…',
       retry: 'Retry',
       more: 'More',
     },
@@ -502,6 +516,14 @@ export const messages = {
       launchCommand: 'Launch command',
       noActiveSession: 'No active session',
       closeTabAria: 'Close {name} tab',
+      tabMenuAria: 'Open tab management menu',
+      closeTerminalTabs: 'Close stopped tabs',
+      closeTerminalTabsDescription: 'Close tabs that are open but no longer running.',
+      closeBackgroundSessions: 'Close running sessions',
+      closeBackgroundSessionsDescription:
+        'Select running sessions to close. Unopened sessions are selected by default.',
+      openTabs: 'Open tabs',
+      activeTab: 'Active',
     },
     dialog: {
       newSessionTitle: 'New session',
@@ -529,6 +551,10 @@ export const messages = {
       removeWorkspaceTitle: 'Remove workspace',
       removeWorkspaceDescription:
         'Remove "{name}" and all its sessions. Local files are unaffected.',
+      closeBackgroundSessionsTitle: 'Close running sessions',
+      closeBackgroundSessionsDescription:
+        'Select running sessions to close. Unopened sessions are selected by default and selected sessions close in order.',
+      noBackgroundSessions: 'No running sessions can be closed.',
     },
     toast: {
       refreshFailed: 'Refresh failed',
@@ -548,6 +574,7 @@ export const messages = {
       terminalError: 'Terminal error: {code}',
       terminalConnectionFailed: 'Terminal connection failed',
       stopSessionFailed: 'Stop session failed',
+      closeBackgroundSessionsFailed: 'Close sessions failed',
       rerunSessionFailed: 'Rerun session failed',
       sessionRerun: 'Session rerun',
       loadShortcutsFailed: 'Load shortcuts failed',

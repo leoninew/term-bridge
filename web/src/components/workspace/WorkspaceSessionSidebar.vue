@@ -167,17 +167,22 @@
               @keydown.enter="handleSessionKeydown($event, session.session)"
               @keydown.space="handleSessionKeydown($event, session.session)"
             >
-              <SquareTerminal
-                class="size-4 shrink-0"
-                :class="lifecycleStateClassName(session.session.lifecycle_state)"
-                aria-hidden="true"
+              <SessionSourceIcon
+                :command-source="session.session.command_source"
+                :label="sessionSourceLabel(session.session)"
               />
               <span class="min-w-0 flex-1 truncate text-sm">{{
                 session.session.name || session.session.command
               }}</span>
               <span
+                v-if="session.session.lifecycle_state === 'running'"
+                class="size-2 shrink-0 rounded-full"
+                :class="lifecycleIndicatorClassName(session.session.lifecycle_state)"
+                aria-hidden="true"
+              />
+              <span
                 v-if="isEditableSession(session.session)"
-                class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
+                class="flex size-5 shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
               >
                 <button
                   type="button"
@@ -425,7 +430,6 @@
     RotateCcw,
     Search,
     Settings,
-    SquareTerminal,
     Sun,
     Trash2,
   } from '@lucide/vue'
@@ -443,8 +447,9 @@
   } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
   import type { SortableEvent } from 'sortablejs'
-  import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
+  import { lifecycleIndicatorClassName } from '../../features/sessions/lifecycleState'
   import { localeLabels, locales, setLocale, type AppLocale } from '../../i18n'
+  import SessionSourceIcon from '../session/SessionSourceIcon.vue'
   import { themes, useThemeStore, type AppTheme } from '../../store/theme'
   import type {
     SessionSummary,
@@ -710,6 +715,12 @@
 
   function isEditableSession(session: SessionSummary) {
     return ['stopped', 'failed'].includes(session.lifecycle_state)
+  }
+
+  function sessionSourceLabel(session: SessionSummary) {
+    return session.command_source === 'shortcut'
+      ? t('dialog.shortcut')
+      : t('workbench.launchCommand')
   }
 
   function canRemoveWorkspace(workspace: WorkspaceTreeItem) {

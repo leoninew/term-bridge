@@ -92,6 +92,62 @@ describe('useWorkbenchStore', () => {
     expect(store.activeSessionId).toBe(second.id)
   })
 
+  it('closes multiple tabs atomically and selects the next surviving tab', async () => {
+    const store = useWorkbenchStore()
+    const first = session()
+    const second = session({ id: 'session-2', workspace_id: 'workspace-2' })
+    const third = session({ id: 'session-3', workspace_id: 'workspace-3' })
+    const fourth = session({ id: 'session-4', workspace_id: 'workspace-4' })
+    const sessions = [first, second, third, fourth]
+    const resolver = (workspaceId: string, sessionId: string) =>
+      sessions.find((item) => item.workspace_id === workspaceId && item.id === sessionId) ?? null
+
+    for (const item of sessions) {
+      await store.openSession(null, runtimeApi, item)
+    }
+    store.setActiveSession(second.id)
+
+    expect(store.closeTabs([second.id, third.id], resolver)).toEqual(fourth)
+    expect(store.openedTabs.map((tab) => tab.sessionId)).toEqual([first.id, fourth.id])
+    expect(store.activeSessionId).toBe(fourth.id)
+  })
+
+  it('preserves the active tab for background closes and falls back left when needed', async () => {
+    const store = useWorkbenchStore()
+    const first = session()
+    const second = session({ id: 'session-2', workspace_id: 'workspace-2' })
+    const third = session({ id: 'session-3', workspace_id: 'workspace-3' })
+    const sessions = [first, second, third]
+    const resolver = (workspaceId: string, sessionId: string) =>
+      sessions.find((item) => item.workspace_id === workspaceId && item.id === sessionId) ?? null
+
+    for (const item of sessions) {
+      await store.openSession(null, runtimeApi, item)
+    }
+    store.setActiveSession(second.id)
+
+    expect(store.closeTabs([third.id], resolver)).toBeNull()
+    expect(store.activeSessionId).toBe(second.id)
+    expect(store.closeTabs([second.id], resolver)).toEqual(first)
+    expect(store.activeSessionId).toBe(first.id)
+    expect(store.closeTabs([first.id], resolver)).toEqual(null)
+    expect(store.openedTabs).toEqual([])
+    expect(store.activeSessionId).toBeNull()
+  })
+
+  it('leaves tab state unchanged when bulk targets are not open', async () => {
+    const store = useWorkbenchStore()
+    const first = session()
+    const resolver = vi.fn(() => first)
+
+    await store.openSession(null, runtimeApi, first)
+
+    expect(store.closeTabs(['missing'], resolver)).toBeNull()
+    expect(store.openedTabs.map((tab) => tab.sessionId)).toEqual([first.id])
+    expect(store.activeSessionId).toBe(first.id)
+    expect(resolver).not.toHaveBeenCalled()
+  })
+
   it('closes tabs for removed workspace sessions', async () => {
     const store = useWorkbenchStore()
 

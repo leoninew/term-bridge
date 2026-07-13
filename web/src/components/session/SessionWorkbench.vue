@@ -15,7 +15,7 @@
           <VueDraggable
             :model-value="openedTabs"
             tag="div"
-            class="flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
+            class="tab-strip flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
             :animation="150"
             handle=".tab-drag-handle"
             item-key="sessionId"
@@ -35,12 +35,9 @@
                 :value="tab.sessionId"
                 class="tab-drag-handle flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 outline-none"
               >
-                <SquareTerminal
-                  class="size-4 shrink-0"
-                  :class="
-                    lifecycleStateClassName(sessionLifecycleState(tab.workspaceId, tab.sessionId))
-                  "
-                  aria-hidden="true"
+                <SessionSourceIcon
+                  :command-source="sessionCommandSource(tab.workspaceId, tab.sessionId)"
+                  :label="sessionSourceLabel(tab.workspaceId, tab.sessionId)"
                 />
                 <span
                   class="truncate"
@@ -71,6 +68,76 @@
             </div>
           </VueDraggable>
         </TabsList>
+        <DropdownMenuRoot>
+          <DropdownMenuTrigger
+            class="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-[var(--color-text-subtle)] outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus:bg-[var(--color-control-hover)] focus:text-[var(--color-text)]"
+            :aria-label="t('workbench.tabMenuAria')"
+            :title="t('workbench.tabMenuAria')"
+          >
+            <MoreHorizontal class="size-4" aria-hidden="true" />
+          </DropdownMenuTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuContent
+              align="end"
+              :side-offset="8"
+              class="z-50 max-h-80 w-72 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
+            >
+              <DropdownMenuItem
+                :disabled="!hasTerminalTabs"
+                :title="t('workbench.closeTerminalTabsDescription')"
+                class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[highlighted]:bg-[var(--color-control-hover)]"
+                @select="emit('closeTerminalTabs')"
+              >
+                <CircleStop
+                  class="size-4 shrink-0 text-[var(--color-text-subtle)]"
+                  aria-hidden="true"
+                />
+                {{ t('workbench.closeTerminalTabs') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                :disabled="!hasBackgroundRunningSessions"
+                :title="t('workbench.closeBackgroundSessionsDescription')"
+                class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[highlighted]:bg-[var(--color-control-hover)]"
+                @select="emit('openCloseBackgroundSessionsDrawer')"
+              >
+                <SquareTerminal
+                  class="size-4 shrink-0 text-[var(--color-text-subtle)]"
+                  aria-hidden="true"
+                />
+                {{ t('workbench.closeBackgroundSessions') }}
+              </DropdownMenuItem>
+              <div class="my-1 border-t border-[var(--color-border)]" role="separator" />
+              <p class="px-2 py-1 text-xs text-[var(--color-text-subtle)]">
+                {{ t('workbench.openTabs') }}
+              </p>
+              <DropdownMenuItem
+                v-for="tab in openedTabs"
+                :key="tab.sessionId"
+                class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none data-[highlighted]:bg-[var(--color-control-hover)]"
+                @select="emit('activateTab', tab.sessionId)"
+              >
+                <SessionSourceIcon
+                  :command-source="sessionCommandSource(tab.workspaceId, tab.sessionId)"
+                  :label="sessionSourceLabel(tab.workspaceId, tab.sessionId)"
+                />
+                <span
+                  class="min-w-0 flex-1 truncate"
+                  :class="
+                    lifecycleStateClassName(sessionLifecycleState(tab.workspaceId, tab.sessionId))
+                  "
+                >
+                  {{ sessionTitle(tab.workspaceId, tab.sessionId) }}
+                </span>
+                <span
+                  v-if="activeSessionId === tab.sessionId"
+                  class="shrink-0 text-xs text-[var(--color-text-subtle)]"
+                >
+                  {{ t('workbench.activeTab') }}
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenuPortal>
+        </DropdownMenuRoot>
       </div>
 
       <TerminalPane
@@ -107,10 +174,20 @@
 <script setup lang="ts">
   import { useTemplateRef, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { SquareTerminal, X } from '@lucide/vue'
-  import { TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
+  import { CircleStop, MoreHorizontal, SquareTerminal, X } from '@lucide/vue'
+  import {
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuPortal,
+    DropdownMenuRoot,
+    DropdownMenuTrigger,
+    TabsList,
+    TabsRoot,
+    TabsTrigger,
+  } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
   import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
+  import SessionSourceIcon from './SessionSourceIcon.vue'
   import SessionStatusBar from './SessionStatusBar.vue'
   import TerminalPane from './TerminalPane.vue'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
@@ -126,13 +203,19 @@
     activeSession: SessionSummary | null
     currentDevice: DeviceSummary | CloudSessionSummary | null
     terminalWsUrl: string | null
+    hasTerminalTabs: boolean
+    hasBackgroundRunningSessions: boolean
     sessionTitle: (workspaceId: string, sessionId: string) => string
     sessionLifecycleState: (workspaceId: string, sessionId: string) => string
+    sessionCommandSource: (workspaceId: string, sessionId: string) => string
+    sessionSourceLabel: (workspaceId: string, sessionId: string) => string
   }>()
 
   const emit = defineEmits<{
     activateTab: [sessionId: string]
     closeTab: [workspaceId: string, sessionId: string]
+    closeTerminalTabs: []
+    openCloseBackgroundSessionsDrawer: []
     reorderTabs: [tabs: OpenSessionTab[]]
     openCreate: []
     workbench: [element: HTMLElement | null]
