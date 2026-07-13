@@ -1,20 +1,15 @@
 <template>
-  <ToastProvider>
-    <section
-      class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
-    >
-      {{ t('cloud.googleSigningIn') }}
-    </section>
-    <ToastHost />
-  </ToastProvider>
+  <section
+    class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
+  >
+    {{ t('cloud.googleSigningIn') }}
+  </section>
 </template>
 
 <script setup lang="ts">
   import { onMounted } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
-  import { ToastProvider } from 'reka-ui'
-  import ToastHost from '../../components/session/ToastHost.vue'
   import { authGoogleCallback } from '../../features/cloud/api'
   import { consumeCloudLoginRedirect } from '../../features/cloud/loginRedirect'
   import { useCloudAuthStore } from '../../store/cloudAuth'

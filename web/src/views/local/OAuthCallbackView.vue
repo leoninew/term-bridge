@@ -1,20 +1,15 @@
 <template>
-  <ToastProvider>
-    <section
-      class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
-    >
-      {{ t('cloud.checkingAuth') }}
-    </section>
-    <ToastHost />
-  </ToastProvider>
+  <section
+    class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
+  >
+    {{ t('cloud.checkingAuth') }}
+  </section>
 </template>
 
 <script setup lang="ts">
   import { onMounted } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
-  import { ToastProvider } from 'reka-ui'
-  import ToastHost from '../../components/session/ToastHost.vue'
   import { assertCloudOAuthState, consumeCloudOAuthRedirect } from '../../features/cloud/oauth'
   import { exchangeOAuthCode } from '../../features/local/api'
   import { useAuthTokensStore } from '../../store/authTokens'

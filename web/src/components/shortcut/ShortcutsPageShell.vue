@@ -1,6 +1,5 @@
 <template>
-  <ToastProvider>
-    <section class="shortcut-page min-h-screen bg-[var(--color-app-bg)] text-[var(--color-text)]">
+  <section class="shortcut-page min-h-screen bg-[var(--color-app-bg)] text-[var(--color-text)]">
       <AppHeader />
 
       <main class="shortcut-page-main min-h-[calc(100vh-4rem)]">
@@ -69,8 +68,6 @@
       @update:open="deleteOpen = $event"
       @confirm="remove"
     />
-    <ToastHost />
-  </ToastProvider>
 </template>
 
 <script setup lang="ts">
@@ -78,12 +75,10 @@
   import { onMounted, ref } from 'vue'
   import { VueDraggable } from 'vue-draggable-plus'
   import { useI18n } from 'vue-i18n'
-  import { ToastProvider } from 'reka-ui'
   import type { Shortcut } from '../../gen/proto/termbridge/agent/v1/shortcut'
   import type { ShortcutRuntimeApi } from '../../features/sessions/runtime'
   import { useNotificationsStore } from '../../store/notifications'
   import AppHeader from '../layout/AppHeader.vue'
-  import ToastHost from '../session/ToastHost.vue'
   import DeleteShortcutDialog from './DeleteShortcutDialog.vue'
   import ShortcutCard from './ShortcutCard.vue'
   import ShortcutEditorDialog from './ShortcutEditorDialog.vue'

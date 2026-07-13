@@ -1,44 +1,38 @@
 <template>
-  <ToastProvider>
-    <section
-      v-if="!cloudAuth.authInitialized"
-      class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
-    >
-      {{ t('cloud.checkingAuth') }}
-    </section>
+  <section
+    v-if="!cloudAuth.authInitialized"
+    class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
+  >
+    {{ t('cloud.checkingAuth') }}
+  </section>
 
-    <LoginPanel
-      v-else
-      :username="cloudAuth.usernameInput"
-      :password="cloudAuth.passwordInput"
-      :logging-in="cloudAuth.loggingIn"
-      :google-logging-in="googleLoggingIn"
-      :turnstile-ready="!!turnstileToken"
-      @update:username="cloudAuth.usernameInput = $event"
-      @update:password="cloudAuth.passwordInput = $event"
-      @submit="login"
-      @google="loginWithGoogle"
-    >
-      <TurnstileChallenge
-        v-if="turnstileSiteKey"
-        ref="turnstile"
-        :site-key="turnstileSiteKey"
-        @token="turnstileToken = $event"
-        @reset="turnstileToken = ''"
-      />
-    </LoginPanel>
-
-    <ToastHost />
-  </ToastProvider>
+  <LoginPanel
+    v-else
+    :username="cloudAuth.usernameInput"
+    :password="cloudAuth.passwordInput"
+    :logging-in="cloudAuth.loggingIn"
+    :google-logging-in="googleLoggingIn"
+    :turnstile-ready="!!turnstileToken"
+    @update:username="cloudAuth.usernameInput = $event"
+    @update:password="cloudAuth.passwordInput = $event"
+    @submit="login"
+    @google="loginWithGoogle"
+  >
+    <TurnstileChallenge
+      v-if="turnstileSiteKey"
+      ref="turnstile"
+      :site-key="turnstileSiteKey"
+      @token="turnstileToken = $event"
+      @reset="turnstileToken = ''"
+    />
+  </LoginPanel>
 </template>
 
 <script setup lang="ts">
   import { onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
-  import { ToastProvider } from 'reka-ui'
   import LoginPanel from '../../components/session/LoginPanel.vue'
-  import ToastHost from '../../components/session/ToastHost.vue'
   import TurnstileChallenge from '../../components/cloud/TurnstileChallenge.vue'
   import { authGoogleUrl, authLoginCSRFToken, authTurnstileSiteKey } from '../../features/cloud/api'
   import {

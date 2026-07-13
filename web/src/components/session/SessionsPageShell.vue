@@ -1,6 +1,5 @@
 <template>
-  <ToastProvider>
-    <section
+  <section
       v-if="!authInitialized"
       class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
     >
@@ -127,22 +126,19 @@
       @confirm="closeBackgroundSessions"
     />
 
-    <ToastHost />
-  </ToastProvider>
 </template>
 
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRouter } from 'vue-router'
-  import { SplitterGroup, SplitterPanel, SplitterResizeHandle, ToastProvider } from 'reka-ui'
+  import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
   import CloseBackgroundSessionsDrawer from './CloseBackgroundSessionsDrawer.vue'
   import CreateSessionDialog from './CreateSessionDialog.vue'
   import DeleteSessionDialog from './DeleteSessionDialog.vue'
   import EditSessionDialog from './EditSessionDialog.vue'
   import RemoveWorkspaceDialog from './RemoveWorkspaceDialog.vue'
   import SessionWorkbench from './SessionWorkbench.vue'
-  import ToastHost from './ToastHost.vue'
   import WorkspaceSessionSidebar from '../workspace/WorkspaceSessionSidebar.vue'
   import { logTerminalDiagnostic } from '../terminal/diagnostics'
   import { useCreateSessionDraft } from '../../composable/useCreateSessionDraft'

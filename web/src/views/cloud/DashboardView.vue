@@ -1,6 +1,5 @@
 <template>
-  <ToastProvider>
-    <section class="min-h-screen bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]">
+  <section class="min-h-screen bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]">
       <AppHeader>
         <template #actions>
           <CloudAccountMenu
@@ -133,8 +132,6 @@
       </DialogPortal>
     </DialogRoot>
 
-    <ToastHost />
-  </ToastProvider>
 </template>
 
 <script setup lang="ts">
@@ -150,10 +147,8 @@
     DialogPortal,
     DialogRoot,
     DialogTitle,
-    ToastProvider,
   } from 'reka-ui'
   import CloudAccountMenu from '../../components/dashboard/CloudAccountMenu.vue'
-  import ToastHost from '../../components/session/ToastHost.vue'
   import { authChangePassword, authLogout } from '../../features/cloud/api'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
   import { useCloudAuthStore } from '../../store/cloudAuth'
