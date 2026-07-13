@@ -21,18 +21,34 @@ export function useCreateSessionDraft() {
   const commandSource = ref<CommandSource>('shortcut')
   const selectedShortcutId = ref<string | null>(null)
 
-  function reset(nextWorkspace: WorkspaceSummary | undefined, defaultName: string) {
+  function reset(
+    nextWorkspace: WorkspaceSummary | undefined,
+    defaultName: string,
+    shortcuts: Shortcut[],
+  ) {
     workspace.value = nextWorkspace ?? null
     sessionName.value = defaultName
     cwd.value = nextWorkspace?.path ?? '~'
     commandText.value = ''
     commandSource.value = 'shortcut'
     selectedShortcutId.value = null
+    selectShortcut(shortcuts[0])
+  }
+
+  function selectCommandSource(source: CommandSource, shortcuts: Shortcut[]) {
+    commandSource.value = source
+    if (source === 'command') return
+
+    selectShortcut(
+      shortcuts.find((shortcut) => shortcut.id === selectedShortcutId.value) ?? shortcuts[0],
+    )
+    if (shortcuts.length === 0) selectedShortcutId.value = null
   }
 
   function selectShortcut(value: Shortcut | undefined) {
-    selectedShortcutId.value = value?.id ?? null
-    commandText.value = value?.command ?? ''
+    if (!value) return
+    selectedShortcutId.value = value.id
+    commandText.value = value.command
   }
 
   function validate():
@@ -68,6 +84,7 @@ export function useCreateSessionDraft() {
     commandSource,
     selectedShortcutId,
     reset,
+    selectCommandSource,
     selectShortcut,
     validate,
   })

@@ -80,7 +80,7 @@
       @update:cwd="createDraft.cwd = $event"
       @update:name="createDraft.sessionName = $event"
       @update:command="createDraft.commandText = $event"
-      @update:command-source="createDraft.commandSource = $event"
+      @update:command-source="createDraft.selectCommandSource($event, shortcuts)"
       @update:selected-shortcut-id="selectCreateShortcut"
       @submit="startSession"
     />
@@ -242,10 +242,6 @@
   }
 
   function selectCreateShortcut(shortcutId: string | null) {
-    if (shortcutId === null) {
-      createDraft.selectedShortcutId = null
-      return
-    }
     createDraft.selectShortcut(shortcuts.value.find((value) => value.id === shortcutId))
   }
 
@@ -328,7 +324,7 @@
       if (!workspaceSessions.upsertSession(session)) {
         await refresh()
       }
-      createDraft.reset(undefined, t('dialog.defaultSessionName'))
+      createDraft.reset(undefined, t('dialog.defaultSessionName'), shortcuts.value)
       dialogs.createSessionDialogOpen = false
       await openSessionTab(session)
       notifications.pushToast('success', t('toast.sessionCreated'), session.name)
@@ -479,7 +475,7 @@
       workspacePath: workspace?.path,
       activeSessionId: workbench.activeSessionId,
     })
-    createDraft.reset(workspace, t('dialog.defaultSessionName'))
+    createDraft.reset(workspace, t('dialog.defaultSessionName'), shortcuts.value)
     dialogs.openCreateSessionDialog()
   }
 

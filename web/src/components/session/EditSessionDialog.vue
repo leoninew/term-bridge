@@ -16,7 +16,7 @@
             @update:cwd="cwd = $event"
             @update:name="name = $event"
             @update:command="command = $event"
-            @update:command-source="commandSource = $event"
+            @update:command-source="selectCommandSource"
             @update:selected-shortcut-id="selectShortcut"
           />
           <div class="dialog-actions">
@@ -78,10 +78,22 @@
       selectedShortcutId.value = null
     },
   )
+  function selectCommandSource(source: CommandSource) {
+    commandSource.value = source
+    if (source === 'command') return
+
+    selectShortcut(
+      props.shortcuts.find((shortcut) => shortcut.id === selectedShortcutId.value)?.id ??
+        props.shortcuts[0]?.id ??
+        null,
+    )
+  }
+
   function selectShortcut(id: string | null) {
-    selectedShortcutId.value = id
     const shortcut = props.shortcuts.find((value) => value.id === id)
-    if (shortcut) command.value = shortcut.command
+    if (!shortcut) return
+    selectedShortcutId.value = shortcut.id
+    command.value = shortcut.command
   }
   function submit() {
     emit('submit', { name: name.value.trim(), command: command.value })

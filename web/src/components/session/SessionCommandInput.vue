@@ -86,11 +86,31 @@
                 v-for="shortcut in shortcuts"
                 :key="shortcut.id"
                 :value="shortcut.id"
-                :text-value="shortcutLabel(shortcut)"
-                class="block cursor-pointer truncate rounded px-2 py-1.5 outline-none data-[highlighted]:bg-[var(--color-control-hover)] data-[state=checked]:bg-[var(--color-control-active)]"
-                :title="shortcutLabel(shortcut)"
+                :text-value="shortcutSearchText(shortcut)"
+                class="group flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none data-[highlighted]:bg-[var(--color-control-hover)] data-[state=checked]:bg-[var(--color-control-active)]"
               >
-                {{ shortcutLabel(shortcut) }}
+                <Command
+                  class="size-4 shrink-0 text-[var(--color-text-subtle)]"
+                  aria-hidden="true"
+                />
+                <span class="min-w-0 flex-1">
+                  <span
+                    class="block truncate text-sm font-semibold text-[var(--color-text-strong)]"
+                    :title="shortcut.name"
+                  >
+                    {{ shortcut.name }}
+                  </span>
+                  <span
+                    class="block truncate font-mono text-xs leading-[18px] text-[var(--color-text-muted)]"
+                    :title="shortcut.command"
+                  >
+                    {{ shortcut.command }}
+                  </span>
+                </span>
+                <Check
+                  class="size-4 shrink-0 text-[var(--color-text-subtle)] opacity-0 group-data-[state=checked]:opacity-100"
+                  aria-hidden="true"
+                />
               </ComboboxItem>
             </ComboboxViewport>
           </ComboboxContent>
@@ -110,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-  import { ChevronDown } from '@lucide/vue'
+  import { Check, ChevronDown, Command } from '@lucide/vue'
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import {
@@ -150,17 +170,13 @@
   function selectCommandSource(source: CommandSource) {
     sourcePickerOpen.value = false
     emit('update:commandSource', source)
-    if (source === 'command') {
-      emit('update:selectedShortcutId', null)
-    }
   }
 
   function shortcutDisplayValue(shortcutId: string | null) {
-    const shortcut = props.shortcuts.find((value) => value.id === shortcutId)
-    return shortcut ? shortcutLabel(shortcut) : ''
+    return props.shortcuts.find((shortcut) => shortcut.id === shortcutId)?.name ?? ''
   }
 
-  function shortcutLabel(shortcut: Shortcut) {
-    return `${shortcut.name}(${shortcut.command})`
+  function shortcutSearchText(shortcut: Shortcut) {
+    return `${shortcut.name} ${shortcut.command}`
   }
 </script>

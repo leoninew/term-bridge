@@ -1,9 +1,22 @@
 import { describe, expect, it } from 'vitest'
+import type { Shortcut } from '../gen/proto/termbridge/agent/v1/shortcut'
 import { useCreateSessionDraft } from './useCreateSessionDraft'
 
+function shortcut(id: string, name: string, command: string): Shortcut {
+  return {
+    id,
+    name,
+    command,
+    description: undefined,
+    created_at: undefined,
+    updated_at: undefined,
+  }
+}
+
 describe('useCreateSessionDraft', () => {
-  it('resets from an optional workspace and default session name', () => {
+  it('resets from an optional workspace and selects the first shortcut command', () => {
     const draft = useCreateSessionDraft()
+    const firstShortcut = shortcut('shortcut-1', 'Review', 'codex review')
 
     draft.reset(
       {
@@ -13,20 +26,30 @@ describe('useCreateSessionDraft', () => {
         updated_at: '2026-06-24T00:00:00Z',
       },
       'New Session',
+      [firstShortcut],
     )
 
     expect(draft.workspace?.id).toBe('workspace-1')
     expect(draft.sessionName).toBe('New Session')
     expect(draft.cwd).toBe('/work/one')
-    expect(draft.commandText).toBe('')
+    expect(draft.commandText).toBe('codex review')
     expect(draft.commandSource).toBe('shortcut')
-    expect(draft.selectedShortcutId).toBeNull()
+    expect(draft.selectedShortcutId).toBe('shortcut-1')
+    expect(draft.validate()).toEqual({
+      value: {
+        workspaceId: 'workspace-1',
+        name: 'New Session',
+        cwd: '/work/one',
+        commandText: 'codex review',
+      },
+      error: null,
+    })
   })
 
   it('preserves raw command text while validating create-session input', () => {
     const draft = useCreateSessionDraft()
 
-    draft.reset(undefined, 'New Session')
+    draft.reset(undefined, 'New Session', [])
     draft.cwd = '  /tmp  '
     draft.commandText = 'ccs list --filter "my project"'
 
@@ -41,35 +64,52 @@ describe('useCreateSessionDraft', () => {
     })
   })
 
-  it('copies the selected shortcut command without changing its raw text', () => {
+  it('restores the previously selected shortcut after a direct command round trip', () => {
     const draft = useCreateSessionDraft()
-    const command = `codex --dangerously-bypass-approvals-and-sandbox -c "review changes"`
+    const shortcuts = [
+      shortcut('shortcut-1', 'Review', 'codex review'),
+      shortcut('shortcut-2', 'Run', 'ccs run c1'),
+    ]
 
-    draft.reset(undefined, 'New Session')
-    draft.selectShortcut({
-      id: 'shortcut-1',
-      name: 'Review',
-      command,
-      description: undefined,
-      created_at: undefined,
-      updated_at: undefined,
-    })
-    draft.commandSource = 'command'
+    draft.reset(undefined, 'New Session', shortcuts)
+    draft.selectShortcut(shortcuts[1])
+    draft.selectCommandSource('command', shortcuts)
+    draft.commandText = 'manual command'
+    draft.selectCommandSource('shortcut', shortcuts)
+
+    expect(draft.commandSource).toBe('shortcut')
+    expect(draft.selectedShortcutId).toBe('shortcut-2')
+    expect(draft.commandText).toBe('ccs run c1')
+  })
+
+  it('falls back to the first available shortcut when the remembered shortcut is missing', () => {
+    const draft = useCreateSessionDraft()
+    const shortcuts = [
+      shortcut('shortcut-1', 'Review', 'codex review'),
+      shortcut('shortcut-2', 'Run', 'ccs run c1'),
+    ]
+
+    draft.reset(undefined, 'New Session', [])
+    draft.selectedShortcutId = 'removed-shortcut'
+    draft.commandText = 'manual command'
+    draft.selectCommandSource('shortcut', shortcuts)
 
     expect(draft.selectedShortcutId).toBe('shortcut-1')
-    expect(draft.commandText).toBe(command)
-    expect(draft.commandSource).toBe('command')
-    draft.selectedShortcutId = null
-    expect(draft.commandText).toBe(command)
-    expect(draft.validate()).toEqual({
-      value: {
-        workspaceId: null,
-        name: 'New Session',
-        cwd: '~',
-        commandText: command,
-      },
-      error: null,
-    })
+    expect(draft.commandText).toBe('codex review')
+  })
+
+  it('keeps a direct command when no shortcuts are available', () => {
+    const draft = useCreateSessionDraft()
+
+    draft.reset(undefined, 'New Session', [])
+    draft.commandSource = 'command'
+    draft.commandText = 'ccs run c1'
+    draft.selectedShortcutId = 'removed-shortcut'
+    draft.selectCommandSource('shortcut', [])
+
+    expect(draft.commandSource).toBe('shortcut')
+    expect(draft.selectedShortcutId).toBeNull()
+    expect(draft.commandText).toBe('ccs run c1')
   })
 
   it('returns specific validation errors', () => {
