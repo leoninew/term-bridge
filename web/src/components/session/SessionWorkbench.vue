@@ -16,6 +16,9 @@
             :model-value="openedTabs"
             tag="div"
             class="tab-strip flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
+            ghost-class="tab-sortable-ghost"
+            chosen-class="tab-sortable-chosen"
+            drag-class="tab-sortable-dragging"
             :animation="150"
             handle=".tab-drag-handle"
             item-key="sessionId"
@@ -227,3 +230,26 @@
   const workbench = useTemplateRef<HTMLElement>('workbench')
   watch(workbench, (element) => emit('workbench', element), { immediate: true })
 </script>
+
+<style scoped>
+  .tab-sortable-ghost {
+    border-color: var(--color-border-strong) !important;
+    border-style: dashed;
+    background: var(--color-surface-muted) !important;
+    color: var(--color-text-subtle) !important;
+    opacity: 0.72;
+  }
+
+  .tab-sortable-chosen {
+    border-color: var(--color-border-strong) !important;
+    background: var(--color-control-hover) !important;
+    box-shadow: 0 0 0 1px var(--color-border-strong);
+  }
+
+  .tab-sortable-dragging {
+    border-color: var(--color-border-strong) !important;
+    background: var(--color-control-active) !important;
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 20%, transparent);
+    opacity: 0.96;
+  }
+</style>

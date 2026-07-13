@@ -66,6 +66,9 @@
         draggable=".workspace-sortable-item"
         :filter="workspaceSortableFilter"
         :prevent-on-filter="false"
+        ghost-class="workspace-sortable-ghost"
+        chosen-class="workspace-sortable-chosen"
+        drag-class="workspace-sortable-dragging"
         :animation="150"
         :disabled="Boolean(normalizedSearchQuery)"
         @update:model-value="updateWorkspaceOrder"
@@ -160,7 +163,7 @@
                 isActiveSessionSelection(session.session.id)
                   ? 'border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text-strong)]'
                   : 'border-transparent text-[var(--color-text-muted)] hover:border-[var(--color-border)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)]',
-                sessionSortableClassName,
+                normalizedSearchQuery ? 'cursor-pointer' : '',
               ]"
               :style="{ paddingLeft: '24px' }"
               @click="handleSessionClick($event, session.session)"
@@ -523,9 +526,6 @@
   const sessionSortableFilter = interactiveSortableFilter
 
   const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
-  const sessionSortableClassName = computed(() =>
-    normalizedSearchQuery.value ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
-  )
   const localeOptions = computed(() =>
     locales.map((value) => ({ value, label: localeLabels[value] })),
   )
@@ -756,6 +756,7 @@
 </script>
 
 <style scoped>
+  .workspace-sortable-ghost > .workspace-drag-handle,
   .session-sortable-ghost {
     border-color: var(--color-border-strong) !important;
     border-style: dashed;
@@ -764,12 +765,14 @@
     opacity: 0.72;
   }
 
+  .workspace-sortable-chosen > .workspace-drag-handle,
   .session-sortable-chosen {
     border-color: var(--color-border-strong) !important;
     background: var(--color-control-hover) !important;
     box-shadow: 0 0 0 1px var(--color-border-strong);
   }
 
+  .workspace-sortable-dragging > .workspace-drag-handle,
   .session-sortable-dragging {
     border-color: var(--color-border-strong) !important;
     background: var(--color-control-active) !important;

@@ -630,6 +630,47 @@ p {
   background: var(--color-surface-raised);
 }
 
+.shortcut-card.shortcut-sortable-ghost {
+  border-color: var(--color-border-strong);
+  border-style: dashed;
+  background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
+  opacity: 0.72;
+}
+
+.shortcut-card.shortcut-sortable-chosen {
+  border-color: var(--color-border-strong);
+  background: var(--color-control-hover);
+  box-shadow: 0 0 0 1px var(--color-border-strong);
+}
+
+.shortcut-card.shortcut-sortable-dragging {
+  border-color: var(--color-border-strong);
+  background: var(--color-control-active);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 20%, transparent);
+  opacity: 0.96;
+}
+
+.shortcut-card.shortcut-sortable-ghost:hover,
+.shortcut-card.shortcut-sortable-ghost:focus-within,
+.shortcut-card.shortcut-sortable-chosen:hover,
+.shortcut-card.shortcut-sortable-chosen:focus-within,
+.shortcut-card.shortcut-sortable-dragging:hover,
+.shortcut-card.shortcut-sortable-dragging:focus-within {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-muted);
+}
+
+.shortcut-card.shortcut-sortable-chosen:hover,
+.shortcut-card.shortcut-sortable-chosen:focus-within {
+  background: var(--color-control-hover);
+}
+
+.shortcut-card.shortcut-sortable-dragging:hover,
+.shortcut-card.shortcut-sortable-dragging:focus-within {
+  background: var(--color-control-active);
+}
+
 .shortcut-card-header {
   gap: 8px;
 }

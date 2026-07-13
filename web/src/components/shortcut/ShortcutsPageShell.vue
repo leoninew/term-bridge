@@ -32,6 +32,9 @@
             :disabled="reordering"
             :filter="'button'"
             :prevent-on-filter="false"
+            ghost-class="shortcut-sortable-ghost"
+            chosen-class="shortcut-sortable-chosen"
+            drag-class="shortcut-sortable-dragging"
             @start="rememberOrder"
             @end="persistOrder"
           >

@@ -1,10 +1,10 @@
 # 命令快捷方式验证
 
-最后修改时间: 2026-07-12 20:59:11
+最后修改时间: 2026-07-13 22:56:32
 
 Flow mode: standard / 标准模式
 Stage: Verification / 验证
-Review status: Accepted
+Review status: Draft
 
 ## Requirement alignment
 
@@ -15,6 +15,16 @@ Review status: Accepted
 3. 卡片页面现支持按设备持久化的拖拽排序：直接拖动卡片主体，不添加拖拽手柄；编辑、删除按钮维持独立操作。
 4. 新建快捷方式追加到末尾，编辑内容不移动卡片；刷新或从 Cloud 访问同一设备时，服务端顺序保持一致。
 5. 排序请求必须是当前设备完整、无重复的 ID 排列；缺失、重复、未知或跨设备 ID 均拒绝且不写入。
+
+## 拖拽交互一致性补充验证
+
+按本轮补充并已接受的 Requirement 核对：
+
+- 工作区、会话树、标签和快捷方式卡片的 `VueDraggable` 均配置了组件专属的 `ghost-class`、`chosen-class`、`drag-class`。
+- 三态均遵循统一主题语义：ghost 为 `--color-border-strong` 虚线、`--color-surface-muted` 与弱化文字；chosen 使用 `--color-control-hover` 与细 ring；dragging 使用 `--color-control-active`、强边框和基于主题文字色的浮层阴影。
+- 工作区状态样式仅作用于 `.workspace-drag-handle`，不会让嵌套会话列表形成错误的大型高亮容器；会话现有独立 group、受控 `model-value` 和 click suppression 未改动。
+- 会话树移除了启用排序时的 `cursor-grab active:cursor-grabbing`；搜索禁用排序时继续提供 `cursor-pointer`，不影响选择行为。
+- 标签保留 `.tab-drag-handle`、关闭按钮与本地 tab 顺序更新路径；快捷方式保留 `button` filter、排序 API、无位移跳过和失败回滚/重载路径。
 
 ## Spec alignment
 
@@ -85,6 +95,24 @@ Review status: Accepted
 - [x] 失败后恢复拖动前快照、展示本地化错误并重新加载。
 - [x] 无实际位移时不发送排序请求。
 
+### 拖拽交互一致性
+
+- [x] 工作区、会话、标签和快捷方式卡片均配置 ghost、chosen、dragging 三态，且保持既有 `150ms` 重排动画。
+- [x] ghost 以虚线和弱化表面维持稳定占位；chosen 与 dragging 分别提供拾取强调和浮层预览。
+- [x] 会话树正常状态不再声明 `grab`/`grabbing` 光标；搜索禁用排序时仍为可选择的 pointer 行。
+- [x] 工作区/会话拖拽过滤、跨工作区禁令、标签关闭、快捷方式按钮过滤和持久化/失败回滚路径均未被本轮样式配置改变。
+
+## Actual diff summary
+
+本次增量验证的暂存范围为：
+
+- `docs/requirement/20260710-command-shortcuts.md`：补充统一拖拽反馈、会话树光标语义、验收项与风险。
+- `web/src/components/workspace/WorkspaceSessionSidebar.vue`：为工作区加入三态 Sortable class；移除会话树默认 `grab` 光标，保留搜索时 pointer。
+- `web/src/components/session/SessionWorkbench.vue`：为标签条加入三态 Sortable class 与 scoped 样式。
+- `web/src/components/shortcut/ShortcutsPageShell.vue` 与 `web/src/styles.css`：为卡片网格加入三态 Sortable class 与主题样式，并优先于 hover/focus-within 表现。
+
+未暂存的 Docker runtime config、Cloud token、认证邮件和其他页面变更不属于本验证范围。
+
 ## Command results
 
 ```text
@@ -99,24 +127,31 @@ yarn --cwd web build:cloud
 git diff --check
 ```
 
-结果：全部通过。
+本轮增量命令结果：
 
-- Go：`go test ./...` 和 `go vet ./...` 通过；其中覆盖 agent/cloud runtime、repository、migration 与 relay 的定向测试均为 `ok`。
-- Web：typecheck、ESLint、Prettier、Vitest（12 files / 62 tests）均通过。
-- Production build：local、cloud 两种 Vite 构建均通过。
-- 构建过程仍输出 `@vueuse/core` 的 Rolldown `INVALID_ANNOTATION` 第三方依赖 warning，但不影响产物生成，非本功能引入。
-- `git diff --check` 无空白错误。
+| Command | Result |
+| --- | --- |
+| `git diff --cached --check` | 通过，无空白错误。 |
+| `yarn --cwd web lint` | 通过。 |
+| `yarn --cwd web typecheck` | 通过。 |
+| `yarn --cwd web test` | 通过：14 files / 84 tests。 |
+| `yarn --cwd web format` | 未通过：工作树含 4 个 Prettier 不符合项，其中 `SessionWorkbench.vue`、`ShortcutsPageShell.vue`、`WorkspaceSessionSidebar.vue` 属于前端文件，另有未暂存的 `SessionsPageShell.vue` 与 `DashboardView.vue`。 |
+| 定向 `prettier --check`（四个实现文件） | 未通过：`ShortcutsPageShell.vue`、`WorkspaceSessionSidebar.vue` 需要格式化；本轮未自动重写，以免混入未暂存的并行改动。 |
+
+历史排序交付的 Go、构建和完整格式化结果保留在上文记录中；它们不是本轮样式增量的重新执行结果。
 
 ## Risks
 
 1. 本地环境没有真实 MySQL 实例，因此 MySQL migration 以 SQL 兼容性审查、代码路径和 SQLite migrator 测试验证；上线前仍应在目标 MySQL 版本执行 migration 烟测。
 2. 本轮未执行真实浏览器拖拽手工流；自动化验证覆盖 API/transport/repository 和前端静态检查，建议发布前在 Local 与 Cloud 各完成一次卡片拖拽、刷新与失败回滚人工验收。
 3. Vite build 的第三方 `@vueuse/core` annotation warning 仍存在，但两个模式均成功构建；需由依赖升级或构建链单独处理。
+4. 本轮暂存实现通过 lint、typecheck、Vitest 与空白检查，但 Prettier 未通过。`ShortcutsPageShell.vue` 和 `WorkspaceSessionSidebar.vue` 需要格式化，且全量 format 还报告未暂存的 `SessionsPageShell.vue` 和 `DashboardView.vue`；在整理这些格式问题前，不应将本轮验证标记为完全通过。
 
 ## Incomplete items
 
-无实现或自动化检查阻塞项。
+- [ ] 对本轮暂存的 `ShortcutsPageShell.vue` 和 `WorkspaceSessionSidebar.vue` 应用 Prettier 并重新暂存；随后重跑定向及全量 `yarn --cwd web format`。
+- [ ] 在真实 Local 与 Cloud runtime 页面手工验证工作区、会话、标签和快捷方式卡片的 ghost/chosen/dragging 三态，以及会话树无 grab 光标、按钮过滤和主题对比度。
 
 ## Conclusion
 
-快捷方式排序已完成并通过验证：排序按设备持久化，Local 与 Cloud 使用相同运行时链路，非法排列零写入，MySQL 并发追加有事务保护；前端直接拖动卡片主体且不添加拖拽手柄，编辑/删除操作不受影响，失败状态可恢复。验证结论为 **Accepted**。
+快捷方式排序的既有数据与传输验证仍有效。本轮统一拖拽反馈与树节点光标增量已通过 `git diff --cached --check`、ESLint、TypeScript typecheck 和 14 个 Vitest 文件中的 84 个测试；但 Prettier 尚未通过，且真实浏览器交互尚未执行。验证结论维持 **Draft**，待完成格式化与人工交互验收后更新。
