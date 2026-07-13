@@ -27,6 +27,8 @@
   --color-danger-border: #7f1d1d;
   --color-danger-hover: #7f1d1d;
   --color-danger-text: #fecaca;
+  --color-state-running-text: #4ade80;
+  --color-state-stopped-text: #94a3b8;
   --color-warning-bg: #451a03;
   --color-warning-border: #92400e;
   --color-warning-text: #fef3c7;
@@ -62,6 +64,9 @@
   --color-danger-border: #ef4444;
   --color-danger-hover: #fecaca;
   --color-danger-text: #991b1b;
+  --color-state-running-text: #15803d;
+  --color-state-stopped-text: #64748b;
+  --color-state-failed-text: #b91c1c;
   --color-warning-bg: #fef3c7;
   --color-warning-border: #f59e0b;
   --color-warning-text: #92400e;

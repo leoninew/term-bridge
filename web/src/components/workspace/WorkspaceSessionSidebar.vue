@@ -151,7 +151,8 @@
               @keydown.space.prevent="selectSession(session.session)"
             >
               <SquareTerminal
-                class="size-4 shrink-0 text-[var(--color-text-subtle)]"
+                class="size-4 shrink-0"
+                :class="lifecycleStateClassName(session.session.lifecycle_state)"
                 aria-hidden="true"
               />
               <span class="min-w-0 flex-1 truncate text-sm">{{
@@ -424,6 +425,7 @@
     DropdownMenuTrigger,
   } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
+  import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import { localeLabels, locales, setLocale, type AppLocale } from '../../i18n'
   import { themes, useThemeStore, type AppTheme } from '../../store/theme'
   import type {

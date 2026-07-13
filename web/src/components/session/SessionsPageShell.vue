@@ -56,6 +56,7 @@
           :current-device="workbenchDevice"
           :terminal-ws-url="activeTerminalWsUrl"
           :session-title="sessionTitle"
+          :session-lifecycle-state="sessionLifecycleState"
           @activate-tab="activateOpenedTab"
           @close-tab="closeTab"
           @reorder-tabs="workbench.openedTabs = $event"
@@ -558,6 +559,10 @@
   function sessionTitle(workspaceId: string, sessionId: string) {
     const session = workspaceSessions.sessionById(workspaceId, sessionId)
     return session ? workspaceSessions.sessionTitle(session) : sessionId.slice(0, 8)
+  }
+
+  function sessionLifecycleState(workspaceId: string, sessionId: string) {
+    return workspaceSessions.sessionById(workspaceId, sessionId)?.lifecycle_state ?? ''
   }
 
   function isActiveLifecycle(session: SessionSummary) {

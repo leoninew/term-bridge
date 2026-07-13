@@ -1,12 +1,12 @@
 # 会话生命周期状态主题色
 
-最后修改时间: 2026-07-13 11:32:46
+最后修改时间: 2026-07-13 11:41:58
 
-Review status: Draft
+Review status: Accepted
 
 ## Flow mode / Stage
 
-轻量模式 / light；需求 / Requirement。
+轻量模式 / light；需求 / Requirement 已接受，当前进入实现 / Implementation。
 
 ## Background
 
@@ -24,7 +24,7 @@ Review status: Draft
 
 - `running`：成功 / 活跃色。
 - `stopped`：中性 / 静止色。
-- `failed`：危险 / 失败色。
+- `failed`：中性 / 静止色，与 `stopped` 相同。
 
 ## Non-goal
 
@@ -42,7 +42,7 @@ Review status: Draft
 
 ## Acceptance
 
-- [ ] `running`、`stopped`、`failed` 分别具有固定且语义一致的主题色。
+- [ ] `running` 使用活跃主题色，`stopped` 与 `failed` 共用固定的中性主题色。
 - [ ] 左侧会话节点、底部状态栏、Tab 页标题均使用同一套状态映射。
 - [ ] 三处 UI 均保留状态文本或其他非颜色信息，不只依赖颜色传意。
 - [ ] 现有选中、悬浮、禁用和截断行为不被状态样式破坏。
@@ -68,3 +68,4 @@ Review status: Draft
 ## User review notes
 
 - 用户于 2026-07-13 要求为会话页面的左侧会话节点、底部状态栏和 Tab 页标题增加按生命周期状态区分的主题色，并要求使用 SpecFlow 记录任务。
+- 用户于 2026-07-13 要求移除失败红，使 `failed` 与 `stopped` 共用中性灰。

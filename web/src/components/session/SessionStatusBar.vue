@@ -4,7 +4,9 @@
   >
     <template v-if="session">
       <span>{{ t('workbench.status') }}</span>
-      <span class="text-[var(--color-text)]">{{ session.lifecycle_state }}</span>
+      <span :class="lifecycleStateClassName(session.lifecycle_state)">{{
+        session.lifecycle_state
+      }}</span>
       <span class="text-[var(--color-border-strong)]">·</span>
       <span>{{ commandSourceLabel }}</span>
       <span
@@ -16,9 +18,12 @@
       <span v-if="session.command_source === 'shortcut'" class="text-[var(--color-border-strong)]"
         >·</span
       >
-      <span class="min-w-0 truncate font-mono text-xs text-[var(--color-text)]">{{
-        session.command
-      }}</span>
+      <span
+        v-if="session.command_source !== 'shortcut'"
+        class="min-w-0 truncate font-mono text-xs text-[var(--color-text)]"
+      >
+        {{ session.command }}
+      </span>
     </template>
     <span v-else>{{ t('workbench.noActiveSession') }}</span>
     <span v-if="deviceLabel" class="ml-auto min-w-0 truncate text-[var(--color-text)]">
@@ -30,6 +35,7 @@
 <script setup lang="ts">
   import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
+  import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'

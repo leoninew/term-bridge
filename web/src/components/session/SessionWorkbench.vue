@@ -36,10 +36,20 @@
                 class="tab-drag-handle flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 outline-none"
               >
                 <SquareTerminal
-                  class="size-4 shrink-0 text-[var(--color-text-muted)]"
+                  class="size-4 shrink-0"
+                  :class="
+                    lifecycleStateClassName(sessionLifecycleState(tab.workspaceId, tab.sessionId))
+                  "
                   aria-hidden="true"
                 />
-                <span class="truncate">{{ sessionTitle(tab.workspaceId, tab.sessionId) }}</span>
+                <span
+                  class="truncate"
+                  :class="
+                    lifecycleStateClassName(sessionLifecycleState(tab.workspaceId, tab.sessionId))
+                  "
+                >
+                  {{ sessionTitle(tab.workspaceId, tab.sessionId) }}
+                </span>
               </TabsTrigger>
               <button
                 type="button"
@@ -100,6 +110,7 @@
   import { SquareTerminal, X } from '@lucide/vue'
   import { TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
+  import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import SessionStatusBar from './SessionStatusBar.vue'
   import TerminalPane from './TerminalPane.vue'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
@@ -116,6 +127,7 @@
     currentDevice: DeviceSummary | CloudSessionSummary | null
     terminalWsUrl: string | null
     sessionTitle: (workspaceId: string, sessionId: string) => string
+    sessionLifecycleState: (workspaceId: string, sessionId: string) => string
   }>()
 
   const emit = defineEmits<{
