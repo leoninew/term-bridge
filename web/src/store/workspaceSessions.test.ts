@@ -52,7 +52,34 @@ const workspaceTree: WorkspaceTreeSummary[] = [
     name: 'Workspace Two',
     path: '/work/two',
     updated_at: '2026-06-24T00:00:00Z',
-    children: [],
+    children: [
+      {
+        id: 'session-3',
+        workspace_id: 'workspace-2',
+        name: 'Tests',
+        command: 'npm test',
+        cwd: '/work/two',
+        lifecycle_state: 'running',
+        attachment_state: '',
+        command_source: '',
+        shortcut_id_snapshot: '',
+        shortcut_name_snapshot: '',
+        updated_at: '2026-06-24T00:00:00Z',
+      },
+      {
+        id: 'session-4',
+        workspace_id: 'workspace-2',
+        name: 'Logs',
+        command: 'tail -f app.log',
+        cwd: '/work/two',
+        lifecycle_state: 'stopped',
+        attachment_state: '',
+        command_source: '',
+        shortcut_id_snapshot: '',
+        shortcut_name_snapshot: '',
+        updated_at: '2026-06-24T00:00:01Z',
+      },
+    ],
   },
 ]
 
@@ -81,33 +108,11 @@ describe('useWorkspaceSessionsStore', () => {
         updated_at: '2026-06-24T00:00:00Z',
       },
     ])
-    expect(store.sessions).toEqual([
-      {
-        id: 'session-1',
-        workspace_id: 'workspace-1',
-        name: 'Shell',
-        command: 'bash',
-        cwd: '/work/one',
-        lifecycle_state: 'running',
-        attachment_state: '',
-        command_source: '',
-        shortcut_id_snapshot: '',
-        shortcut_name_snapshot: '',
-        updated_at: '2026-06-24T00:00:00Z',
-      },
-      {
-        id: 'session-2',
-        workspace_id: 'workspace-1',
-        name: 'Build',
-        command: 'npm run build',
-        cwd: '/work/one',
-        lifecycle_state: 'stopped',
-        attachment_state: '',
-        command_source: '',
-        shortcut_id_snapshot: '',
-        shortcut_name_snapshot: '',
-        updated_at: '2026-06-24T00:00:01Z',
-      },
+    expect(store.sessions.map((session) => session.id)).toEqual([
+      'session-1',
+      'session-2',
+      'session-3',
+      'session-4',
     ])
     expect(store.sessionById('workspace-1', 'session-1')?.workspace_id).toBe('workspace-1')
   })
@@ -119,7 +124,7 @@ describe('useWorkspaceSessionsStore', () => {
 
     expect(
       store.upsertSession({
-        id: 'session-3',
+        id: 'session-5',
         workspace_id: 'workspace-1',
         name: 'New Shell',
         command: 'zsh',
@@ -132,14 +137,14 @@ describe('useWorkspaceSessionsStore', () => {
         updated_at: '2026-06-24T00:00:01Z',
       }),
     ).toBe(true)
-    expect(store.sessionById('workspace-1', 'session-3')?.name).toBe('New Shell')
+    expect(store.sessionById('workspace-1', 'session-5')?.name).toBe('New Shell')
 
-    store.removeSession('workspace-1', 'session-3')
+    store.removeSession('workspace-1', 'session-5')
 
-    expect(store.sessionById('workspace-1', 'session-3')).toBeNull()
+    expect(store.sessionById('workspace-1', 'session-5')).toBeNull()
     expect(
       store.upsertSession({
-        id: 'session-3',
+        id: 'session-5',
         workspace_id: 'missing-workspace',
         name: 'Missing',
         command: 'bash',
@@ -182,13 +187,13 @@ describe('useWorkspaceSessionsStore', () => {
     ])
   })
 
-  it('reorders sessions within one workspace', async () => {
+  it('reorders one workspace with the server order while preserving another workspace', async () => {
     const store = useWorkspaceSessionsStore()
 
     store.applyWorkspaceTree(workspaceTree)
     vi.mocked(runtimeApi.updateSessionOrder).mockResolvedValueOnce([
-      workspaceTree[0].children[1],
       workspaceTree[0].children[0],
+      workspaceTree[0].children[1],
     ])
 
     await store.reorderSessions(target, runtimeApi, 'workspace-1', ['session-2', 'session-1'])
@@ -198,13 +203,70 @@ describe('useWorkspaceSessionsStore', () => {
       'session-1',
     ])
     expect(store.workspaceTree[0].children.map((session) => session.id)).toEqual([
+      'session-1',
+      'session-2',
+    ])
+    expect(store.workspaceTree[1].children.map((session) => session.id)).toEqual([
+      'session-3',
+      'session-4',
+    ])
+  })
+
+  it('reorders a later workspace without changing an earlier workspace', async () => {
+    const store = useWorkspaceSessionsStore()
+
+    store.applyWorkspaceTree(workspaceTree)
+    vi.mocked(runtimeApi.updateSessionOrder).mockResolvedValueOnce([
+      workspaceTree[1].children[1],
+      workspaceTree[1].children[0],
+    ])
+
+    await store.reorderSessions(target, runtimeApi, 'workspace-2', ['session-4', 'session-3'])
+
+    expect(runtimeApi.updateSessionOrder).toHaveBeenCalledWith('workspace-2', [
+      'session-4',
+      'session-3',
+    ])
+    expect(store.workspaceTree[0].children.map((session) => session.id)).toEqual([
+      'session-1',
+      'session-2',
+    ])
+    expect(store.workspaceTree[1].children.map((session) => session.id)).toEqual([
+      'session-4',
+      'session-3',
+    ])
+  })
+
+  it('persists consecutive reorders from one workspace as distinct requests', async () => {
+    const store = useWorkspaceSessionsStore()
+
+    store.applyWorkspaceTree(workspaceTree)
+    vi.mocked(runtimeApi.updateSessionOrder)
+      .mockResolvedValueOnce([workspaceTree[0].children[1], workspaceTree[0].children[0]])
+      .mockResolvedValueOnce([workspaceTree[0].children[0], workspaceTree[0].children[1]])
+
+    await store.reorderSessions(target, runtimeApi, 'workspace-1', ['session-2', 'session-1'])
+    await store.reorderSessions(target, runtimeApi, 'workspace-1', ['session-1', 'session-2'])
+
+    expect(runtimeApi.updateSessionOrder).toHaveBeenNthCalledWith(1, 'workspace-1', [
       'session-2',
       'session-1',
     ])
-    expect(store.workspaceTree[1].children).toEqual([])
+    expect(runtimeApi.updateSessionOrder).toHaveBeenNthCalledWith(2, 'workspace-1', [
+      'session-1',
+      'session-2',
+    ])
+    expect(store.workspaceTree[0].children.map((session) => session.id)).toEqual([
+      'session-1',
+      'session-2',
+    ])
+    expect(store.workspaceTree[1].children.map((session) => session.id)).toEqual([
+      'session-3',
+      'session-4',
+    ])
   })
 
-  it('rolls back optimistic session reorder when the API fails', async () => {
+  it('restores every workspace order when session reorder persistence fails', async () => {
     const store = useWorkspaceSessionsStore()
     const error = new Error('failed')
 
@@ -217,6 +279,28 @@ describe('useWorkspaceSessionsStore', () => {
     expect(store.workspaceTree[0].children.map((session) => session.id)).toEqual([
       'session-1',
       'session-2',
+    ])
+    expect(store.workspaceTree[1].children.map((session) => session.id)).toEqual([
+      'session-3',
+      'session-4',
+    ])
+  })
+
+  it('does not reorder sessions when no runtime target is selected', async () => {
+    const store = useWorkspaceSessionsStore()
+
+    store.applyWorkspaceTree(workspaceTree)
+
+    await store.reorderSessions(null, runtimeApi, 'workspace-1', ['session-2', 'session-1'])
+
+    expect(runtimeApi.updateSessionOrder).not.toHaveBeenCalled()
+    expect(store.workspaceTree[0].children.map((session) => session.id)).toEqual([
+      'session-1',
+      'session-2',
+    ])
+    expect(store.workspaceTree[1].children.map((session) => session.id)).toEqual([
+      'session-3',
+      'session-4',
     ])
   })
 })

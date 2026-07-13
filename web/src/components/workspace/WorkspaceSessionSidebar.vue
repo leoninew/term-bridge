@@ -58,24 +58,31 @@
 
       <VueDraggable
         v-else
-        v-model="draggableTreeItems"
+        :model-value="treeItems"
         tag="div"
         class="flex flex-col"
         item-key="value"
         handle=".workspace-drag-handle"
+        draggable=".workspace-sortable-item"
+        :filter="workspaceSortableFilter"
+        :prevent-on-filter="false"
         :animation="150"
         :disabled="Boolean(normalizedSearchQuery)"
-        @end="reorderDraggedWorkspaces"
+        @update:model-value="updateWorkspaceOrder"
       >
-        <div v-for="workspace in draggableTreeItems" :key="workspace.value" class="min-w-0">
+        <div
+          v-for="workspace in treeItems"
+          :key="workspace.value"
+          class="workspace-sortable-item min-w-0"
+        >
           <div
             role="button"
             tabindex="0"
             class="workspace-drag-handle group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border border-transparent px-1 py-0.5 text-left text-[var(--color-text)] hover:border-[var(--color-border)] hover:bg-[var(--color-control-hover)]"
             :style="{ paddingLeft: '6px' }"
-            @click="toggleWorkspace(workspace.value)"
-            @keydown.enter.prevent="toggleWorkspace(workspace.value)"
-            @keydown.space.prevent="toggleWorkspace(workspace.value)"
+            @click="handleWorkspaceClick($event, workspace.value)"
+            @keydown.enter="handleWorkspaceKeydown($event, workspace.value)"
+            @keydown.space="handleWorkspaceKeydown($event, workspace.value)"
           >
             <FolderOpen
               v-if="workspaceExpanded(workspace.value)"
@@ -126,29 +133,39 @@
 
           <VueDraggable
             v-if="workspaceExpanded(workspace.value)"
-            v-model="workspace.children"
+            :model-value="workspace.children"
             tag="div"
-            class="flex flex-col"
+            class="session-sortable-list flex flex-col"
             item-key="value"
+            draggable=".session-sortable-item"
+            :group="sessionSortableGroup(workspace.workspace.id)"
+            :filter="sessionSortableFilter"
+            :prevent-on-filter="false"
+            ghost-class="session-sortable-ghost"
+            chosen-class="session-sortable-chosen"
+            drag-class="session-sortable-dragging"
             :animation="150"
             :disabled="Boolean(normalizedSearchQuery)"
-            @end="reorderDraggedSessions(workspace)"
+            @start="startSessionDrag"
+            @update:model-value="updateSessionOrder(workspace, $event)"
+            @end="finishSessionDrag"
           >
             <div
               v-for="session in workspace.children"
               :key="session.value"
               role="button"
               tabindex="0"
-              class="group flex h-7 w-full min-w-0 cursor-pointer items-center gap-1 rounded-md border px-1 py-0.5 text-left transition"
-              :class="
+              class="session-sortable-item group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-left transition"
+              :class="[
                 isActiveSessionSelection(session.session.id)
                   ? 'border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text-strong)]'
-                  : 'border-transparent text-[var(--color-text-muted)] hover:border-[var(--color-border)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)]'
-              "
-              :style="{ paddingLeft: '38px' }"
-              @click="selectSession(session.session)"
-              @keydown.enter.prevent="selectSession(session.session)"
-              @keydown.space.prevent="selectSession(session.session)"
+                  : 'border-transparent text-[var(--color-text-muted)] hover:border-[var(--color-border)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)]',
+                sessionSortableClassName,
+              ]"
+              :style="{ paddingLeft: '24px' }"
+              @click="handleSessionClick($event, session.session)"
+              @keydown.enter="handleSessionKeydown($event, session.session)"
+              @keydown.space="handleSessionKeydown($event, session.session)"
             >
               <SquareTerminal
                 class="size-4 shrink-0"
@@ -388,7 +405,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue'
+  import { computed, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { RouterLink } from 'vue-router'
   import {
@@ -425,6 +442,7 @@
     DropdownMenuTrigger,
   } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
+  import type { SortableEvent } from 'sortablejs'
   import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import { localeLabels, locales, setLocale, type AppLocale } from '../../i18n'
   import { themes, useThemeStore, type AppTheme } from '../../store/theme'
@@ -445,6 +463,18 @@
     kind: 'session'
     value: string
     session: SessionSummary
+  }
+
+  type SidebarPointerEvent = {
+    target: unknown
+  }
+
+  type SidebarKeyboardEvent = SidebarPointerEvent & {
+    preventDefault: () => void
+  }
+
+  type InteractiveEventTarget = {
+    closest: (selectors: string) => unknown
   }
 
   const props = defineProps<{
@@ -478,11 +508,19 @@
   const { t, locale } = useI18n()
   const themeStore = useThemeStore()
   const searchQuery = ref('')
-  const expandedKeys = ref<string[]>([])
-  const initializedExpandedKeys = new Set<string>()
-  const draggableTreeItems = ref<WorkspaceTreeItem[]>([])
+  const workspaceExpansionOverrides = ref<Record<string, boolean>>({})
+  const suppressNextSessionClick = ref(false)
+  let sessionClickSuppressionTimer: ReturnType<typeof window.setTimeout> | null = null
+
+  const interactiveSortableFilter =
+    "button, a, input, textarea, select, [contenteditable='true'], [role='menuitem']"
+  const workspaceSortableFilter = `${interactiveSortableFilter}, .session-sortable-list, .session-sortable-list *`
+  const sessionSortableFilter = interactiveSortableFilter
 
   const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
+  const sessionSortableClassName = computed(() =>
+    normalizedSearchQuery.value ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
+  )
   const localeOptions = computed(() =>
     locales.map((value) => ({ value, label: localeLabels[value] })),
   )
@@ -528,58 +566,134 @@
       )
   })
 
-  watch(
-    treeItems,
-    (items) => {
-      draggableTreeItems.value = items
-      const nextExpanded = new Set(expandedKeys.value)
-      for (const item of items) {
-        if (
-          !initializedExpandedKeys.has(item.value) &&
-          item.children.some((child) => isActiveSession(child.session))
-        ) {
-          initializedExpandedKeys.add(item.value)
-          nextExpanded.add(item.value)
-        }
-      }
-      expandedKeys.value = Array.from(nextExpanded)
-    },
-    { immediate: true },
-  )
-
-  function reorderDraggedWorkspaces() {
-    if (normalizedSearchQuery.value) {
+  function updateWorkspaceOrder(items: WorkspaceTreeItem[]) {
+    if (normalizedSearchQuery.value || itemsHaveSameValues(items, treeItems.value)) {
       return
     }
     emit(
       'reorderWorkspaces',
-      draggableTreeItems.value.map((item) => item.workspace.id),
+      items.map((item) => item.workspace.id),
     )
   }
 
-  function reorderDraggedSessions(workspace: WorkspaceTreeItem) {
-    if (normalizedSearchQuery.value) {
+  function startSessionDrag() {
+    clearSessionClickSuppression()
+  }
+
+  function updateSessionOrder(workspace: WorkspaceTreeItem, items: SessionTreeItem[]) {
+    if (normalizedSearchQuery.value || itemsHaveSameValues(items, workspace.children)) {
       return
     }
     emit(
       'reorderSessions',
       workspace.workspace.id,
-      workspace.children.map((item) => item.session.id),
+      items.map((item) => item.session.id),
     )
   }
 
-  function toggleWorkspace(workspaceValue: string) {
-    const nextExpanded = new Set(expandedKeys.value)
-    if (nextExpanded.has(workspaceValue)) {
-      nextExpanded.delete(workspaceValue)
-    } else {
-      nextExpanded.add(workspaceValue)
+  function finishSessionDrag(event: SortableEvent) {
+    if (dragPositionChanged(event)) {
+      suppressSessionClick()
     }
-    expandedKeys.value = Array.from(nextExpanded)
+  }
+
+  function itemsHaveSameValues<T extends { value: string }>(left: T[], right: T[]) {
+    return left.length === right.length && left.every((item, index) => item.value === right[index]?.value)
+  }
+
+  function dragPositionChanged(event: SortableEvent) {
+    return (
+      typeof event.oldIndex === 'number' &&
+      typeof event.newIndex === 'number' &&
+      event.oldIndex !== event.newIndex
+    )
+  }
+
+  function suppressSessionClick() {
+    suppressNextSessionClick.value = true
+    if (sessionClickSuppressionTimer) {
+      window.clearTimeout(sessionClickSuppressionTimer)
+    }
+    sessionClickSuppressionTimer = window.setTimeout(clearSessionClickSuppression, 0)
+  }
+
+  function clearSessionClickSuppression() {
+    suppressNextSessionClick.value = false
+    if (sessionClickSuppressionTimer) {
+      window.clearTimeout(sessionClickSuppressionTimer)
+      sessionClickSuppressionTimer = null
+    }
+  }
+
+  function sessionSortableGroup(workspaceId: string) {
+    return {
+      name: `workspace-session-order:${workspaceId}`,
+      pull: false,
+      put: false,
+    }
+  }
+
+  function handleWorkspaceClick(event: SidebarPointerEvent, workspaceValue: string) {
+    if (eventTargetsInteractiveControl(event)) {
+      return
+    }
+    toggleWorkspace(workspaceValue)
+  }
+
+  function handleWorkspaceKeydown(event: SidebarKeyboardEvent, workspaceValue: string) {
+    if (eventTargetsInteractiveControl(event)) {
+      return
+    }
+    event.preventDefault()
+    toggleWorkspace(workspaceValue)
+  }
+
+  function toggleWorkspace(workspaceValue: string) {
+    workspaceExpansionOverrides.value = {
+      ...workspaceExpansionOverrides.value,
+      [workspaceValue]: !workspaceExpanded(workspaceValue),
+    }
   }
 
   function workspaceExpanded(workspaceValue: string) {
-    return expandedKeys.value.includes(workspaceValue)
+    const override = workspaceExpansionOverrides.value[workspaceValue]
+    if (override !== undefined) {
+      return override
+    }
+    return props.workspaceTree.some(
+      (workspace) =>
+        `workspace:${workspace.id}` === workspaceValue &&
+        workspace.children.some((session) => isActiveSession(session)),
+    )
+  }
+
+  function handleSessionClick(event: SidebarPointerEvent, session: SessionSummary) {
+    if (suppressNextSessionClick.value) {
+      suppressNextSessionClick.value = false
+      return
+    }
+    if (eventTargetsInteractiveControl(event)) {
+      return
+    }
+    selectSession(session)
+  }
+
+  function handleSessionKeydown(event: SidebarKeyboardEvent, session: SessionSummary) {
+    if (eventTargetsInteractiveControl(event)) {
+      return
+    }
+    event.preventDefault()
+    selectSession(session)
+  }
+
+  function eventTargetsInteractiveControl(event: SidebarPointerEvent) {
+    return (
+      typeof event.target === 'object' &&
+      event.target !== null &&
+      'closest' in event.target &&
+      typeof event.target.closest === 'function' &&
+      (event.target as InteractiveEventTarget).closest(interactiveSortableFilter) !== null
+    )
   }
 
   function selectSession(session: SessionSummary) {
@@ -629,3 +743,26 @@
     )
   }
 </script>
+
+<style scoped>
+  .session-sortable-ghost {
+    border-color: var(--color-border-strong) !important;
+    border-style: dashed;
+    background: var(--color-surface-muted) !important;
+    color: var(--color-text-subtle) !important;
+    opacity: 0.72;
+  }
+
+  .session-sortable-chosen {
+    border-color: var(--color-border-strong) !important;
+    background: var(--color-control-hover) !important;
+    box-shadow: 0 0 0 1px var(--color-border-strong);
+  }
+
+  .session-sortable-dragging {
+    border-color: var(--color-border-strong) !important;
+    background: var(--color-control-active) !important;
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 20%, transparent);
+    opacity: 0.96;
+  }
+</style>
