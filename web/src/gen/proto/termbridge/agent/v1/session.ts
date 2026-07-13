@@ -16,6 +16,9 @@ export interface CreateSessionReq {
   command: string[];
   cols: number;
   rows: number;
+  command_source: string;
+  shortcut_id_snapshot: string;
+  shortcut_name_snapshot: string;
 }
 
 export interface CreateSessionResp {
@@ -55,6 +58,9 @@ export interface RerunWorkspaceSessionReq {
 export interface UpdateSessionReq {
   name?: string | undefined;
   command?: string | undefined;
+  command_source?: string | undefined;
+  shortcut_id_snapshot?: string | undefined;
+  shortcut_name_snapshot?: string | undefined;
 }
 
 export interface UpdateWorkspaceSessionReq {

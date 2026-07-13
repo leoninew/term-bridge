@@ -151,6 +151,7 @@
     command: string
     commandSource: CommandSource
     selectedShortcutId: string | null
+    selectedShortcutName: string | null
     shortcuts: Shortcut[]
     disabled: boolean
   }>()
@@ -173,7 +174,10 @@
   }
 
   function shortcutDisplayValue(shortcutId: string | null) {
-    return props.shortcuts.find((shortcut) => shortcut.id === shortcutId)?.name ?? ''
+    return (
+      props.shortcuts.find((shortcut) => shortcut.id === shortcutId)?.name ??
+      (shortcutId === props.selectedShortcutId ? (props.selectedShortcutName ?? '') : '')
+    )
   }
 
   function shortcutSearchText(shortcut: Shortcut) {

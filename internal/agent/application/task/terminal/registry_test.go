@@ -71,6 +71,44 @@ func TestCreateSessionAcceptsHomeCwd(t *testing.T) {
 	}
 }
 
+func TestCreateSessionPersistsCommandSourceSnapshot(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: newFakeSession()}})
+
+	response, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{
+		Name:                 "Review",
+		Command:              []string{"codex review"},
+		CommandSource:        string(session.CommandSourceShortcut),
+		ShortcutIdSnapshot:   "shortcut-1",
+		ShortcutNameSnapshot: "Review shortcut",
+	})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	stored, err := state.NewStore(root).LoadSession(response.WorkspaceId, response.SessionId)
+	if err != nil {
+		t.Fatalf("LoadSession() error = %v", err)
+	}
+	if stored.Command.Source != session.CommandSourceShortcut || stored.Command.ShortcutIdSnapshot != "shortcut-1" || stored.Command.ShortcutNameSnapshot != "Review shortcut" {
+		t.Fatalf("stored command source = %#v, want shortcut snapshot", stored.Command)
+	}
+}
+
+func TestCreateSessionRejectsInvalidCommandSourceSnapshot(t *testing.T) {
+	cwd := t.TempDir()
+	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: state.NewStore(t.TempDir()), LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: newFakeSession()}})
+
+	_, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{
+		Name:          "Invalid",
+		Command:       []string{"go version"},
+		CommandSource: string(session.CommandSourceShortcut),
+	})
+	if err == nil || apperrors.KindOf(err) != apperrors.KindUsage {
+		t.Fatalf("CreateSession() error = %v, want usage error", err)
+	}
+}
+
 func TestCreateSessionPersistsRuntimeRecords(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()
@@ -433,19 +471,22 @@ func TestUpdateTerminalSessionChangesNameAndPreservesRawCommand(t *testing.T) {
 
 	newName := "New name"
 	commandText := `ccs run c1 --prompt "review changes"`
-	summary, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{Name: &newName, Command: &commandText})
+	commandSource := string(session.CommandSourceShortcut)
+	shortcutIdSnapshot := "shortcut-1"
+	shortcutNameSnapshot := "Review shortcut"
+	summary, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{Name: &newName, Command: &commandText, CommandSource: &commandSource, ShortcutIdSnapshot: &shortcutIdSnapshot, ShortcutNameSnapshot: &shortcutNameSnapshot})
 	if err != nil {
 		t.Fatalf("UpdateSession() error = %v", err)
 	}
-	if summary.Name != newName || summary.Command != commandText || summary.Cwd != cwd {
-		t.Fatalf("UpdateSession() summary = %#v, want updated name/raw command and unchanged cwd", summary)
+	if summary.Name != newName || summary.Command != commandText || summary.Cwd != cwd || summary.CommandSource != commandSource || summary.ShortcutIdSnapshot != shortcutIdSnapshot || summary.ShortcutNameSnapshot != shortcutNameSnapshot {
+		t.Fatalf("UpdateSession() summary = %#v, want updated name/raw command/source and unchanged cwd", summary)
 	}
 	stored, err := state.NewStore(root).LoadSession(response.WorkspaceId, response.SessionId)
 	if err != nil {
 		t.Fatalf("LoadSession() error = %v", err)
 	}
-	if stored.Name != newName || stored.Command.Command != commandText || stored.LaunchCwd != cwd {
-		t.Fatalf("stored session = %#v, want updated name/raw command and unchanged cwd", stored)
+	if stored.Name != newName || stored.Command.Command != commandText || stored.Command.Source != session.CommandSourceShortcut || stored.Command.ShortcutIdSnapshot != shortcutIdSnapshot || stored.Command.ShortcutNameSnapshot != shortcutNameSnapshot || stored.LaunchCwd != cwd {
+		t.Fatalf("stored session = %#v, want updated name/raw command/source and unchanged cwd", stored)
 	}
 }
 

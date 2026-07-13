@@ -2,10 +2,33 @@ package session
 
 import "time"
 
+type CommandSource string
+
+const (
+	CommandSourceShortcut CommandSource = "shortcut"
+	CommandSourceCommand  CommandSource = "command"
+)
+
 type CommandRecord struct {
-	Command     string `json:"command"`
-	EnvStrategy string `json:"env_strategy"`
-	EnvCount    int    `json:"env_count"`
+	Command              string        `json:"command"`
+	EnvStrategy          string        `json:"env_strategy"`
+	EnvCount             int           `json:"env_count"`
+	Source               CommandSource `json:"source,omitempty"`
+	ShortcutIdSnapshot   string        `json:"shortcut_id_snapshot,omitempty"`
+	ShortcutNameSnapshot string        `json:"shortcut_name_snapshot,omitempty"`
+}
+
+func (r CommandRecord) ValidSource() bool {
+	switch r.Source {
+	case "":
+		return r.ShortcutIdSnapshot == "" && r.ShortcutNameSnapshot == ""
+	case CommandSourceCommand:
+		return r.ShortcutIdSnapshot == "" && r.ShortcutNameSnapshot == ""
+	case CommandSourceShortcut:
+		return r.ShortcutIdSnapshot != "" && r.ShortcutNameSnapshot != ""
+	default:
+		return false
+	}
 }
 
 type HistoryRecord struct {

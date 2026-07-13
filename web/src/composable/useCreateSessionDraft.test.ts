@@ -41,6 +41,9 @@ describe('useCreateSessionDraft', () => {
         name: 'New Session',
         cwd: '/work/one',
         commandText: 'codex review',
+        commandSource: 'shortcut',
+        shortcutIdSnapshot: 'shortcut-1',
+        shortcutNameSnapshot: 'Review',
       },
       error: null,
     })
@@ -50,6 +53,7 @@ describe('useCreateSessionDraft', () => {
     const draft = useCreateSessionDraft()
 
     draft.reset(undefined, 'New Session', [])
+    draft.commandSource = 'command'
     draft.cwd = '  /tmp  '
     draft.commandText = 'ccs list --filter "my project"'
 
@@ -59,6 +63,9 @@ describe('useCreateSessionDraft', () => {
         name: 'New Session',
         cwd: '/tmp',
         commandText: 'ccs list --filter "my project"',
+        commandSource: 'command',
+        shortcutIdSnapshot: '',
+        shortcutNameSnapshot: '',
       },
       error: null,
     })

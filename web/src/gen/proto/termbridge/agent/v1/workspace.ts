@@ -33,6 +33,9 @@ export interface SessionSummary {
   attachment_state: string;
   exit_code?: number | undefined;
   updated_at: string | undefined;
+  command_source: string;
+  shortcut_id_snapshot: string;
+  shortcut_name_snapshot: string;
 }
 
 export interface ListWorkspacesReq {

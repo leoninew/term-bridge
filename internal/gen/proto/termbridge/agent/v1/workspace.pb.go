@@ -167,18 +167,21 @@ func (x *WorkspaceTreeNode) GetChildren() []*SessionSummary {
 }
 
 type SessionSummary struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	WorkspaceId     string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Name            string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Command         string                 `protobuf:"bytes,4,opt,name=command,proto3" json:"command,omitempty"`
-	Cwd             string                 `protobuf:"bytes,5,opt,name=cwd,proto3" json:"cwd,omitempty"`
-	LifecycleState  string                 `protobuf:"bytes,6,opt,name=lifecycle_state,json=lifecycleState,proto3" json:"lifecycle_state,omitempty"`
-	AttachmentState string                 `protobuf:"bytes,7,opt,name=attachment_state,json=attachmentState,proto3" json:"attachment_state,omitempty"`
-	ExitCode        *int32                 `protobuf:"varint,8,opt,name=exit_code,json=exitCode,proto3,oneof" json:"exit_code,omitempty"`
-	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Id                   string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	WorkspaceId          string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Name                 string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Command              string                 `protobuf:"bytes,4,opt,name=command,proto3" json:"command,omitempty"`
+	Cwd                  string                 `protobuf:"bytes,5,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	LifecycleState       string                 `protobuf:"bytes,6,opt,name=lifecycle_state,json=lifecycleState,proto3" json:"lifecycle_state,omitempty"`
+	AttachmentState      string                 `protobuf:"bytes,7,opt,name=attachment_state,json=attachmentState,proto3" json:"attachment_state,omitempty"`
+	ExitCode             *int32                 `protobuf:"varint,8,opt,name=exit_code,json=exitCode,proto3,oneof" json:"exit_code,omitempty"`
+	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	CommandSource        string                 `protobuf:"bytes,10,opt,name=command_source,json=commandSource,proto3" json:"command_source,omitempty"`
+	ShortcutIdSnapshot   string                 `protobuf:"bytes,11,opt,name=shortcut_id_snapshot,json=shortcutIdSnapshot,proto3" json:"shortcut_id_snapshot,omitempty"`
+	ShortcutNameSnapshot string                 `protobuf:"bytes,12,opt,name=shortcut_name_snapshot,json=shortcutNameSnapshot,proto3" json:"shortcut_name_snapshot,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *SessionSummary) Reset() {
@@ -272,6 +275,27 @@ func (x *SessionSummary) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *SessionSummary) GetCommandSource() string {
+	if x != nil {
+		return x.CommandSource
+	}
+	return ""
+}
+
+func (x *SessionSummary) GetShortcutIdSnapshot() string {
+	if x != nil {
+		return x.ShortcutIdSnapshot
+	}
+	return ""
+}
+
+func (x *SessionSummary) GetShortcutNameSnapshot() string {
+	if x != nil {
+		return x.ShortcutNameSnapshot
+	}
+	return ""
 }
 
 type ListWorkspacesReq struct {
@@ -619,7 +643,7 @@ const file_termbridge_agent_v1_workspace_proto_rawDesc = "" +
 	"\x04path\x18\x03 \x01(\tR\x04path\x129\n" +
 	"\n" +
 	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12<\n" +
-	"\bchildren\x18\x05 \x03(\v2 .termbridge.agent.SessionSummaryR\bchildren\"\xc2\x02\n" +
+	"\bchildren\x18\x05 \x03(\v2 .termbridge.agent.SessionSummaryR\bchildren\"\xd1\x03\n" +
 	"\x0eSessionSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x12\n" +
@@ -630,7 +654,11 @@ const file_termbridge_agent_v1_workspace_proto_rawDesc = "" +
 	"\x10attachment_state\x18\a \x01(\tR\x0fattachmentState\x12 \n" +
 	"\texit_code\x18\b \x01(\x05H\x00R\bexitCode\x88\x01\x01\x129\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtB\f\n" +
+	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12%\n" +
+	"\x0ecommand_source\x18\n" +
+	" \x01(\tR\rcommandSource\x120\n" +
+	"\x14shortcut_id_snapshot\x18\v \x01(\tR\x12shortcutIdSnapshot\x124\n" +
+	"\x16shortcut_name_snapshot\x18\f \x01(\tR\x14shortcutNameSnapshotB\f\n" +
 	"\n" +
 	"_exit_code\"\x13\n" +
 	"\x11ListWorkspacesReq\"G\n" +

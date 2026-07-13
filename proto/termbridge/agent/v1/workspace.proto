@@ -31,6 +31,9 @@ message SessionSummary {
   string attachment_state = 7;
   optional int32 exit_code = 8;
   google.protobuf.Timestamp updated_at = 9;
+  string command_source = 10;
+  string shortcut_id_snapshot = 11;
+  string shortcut_name_snapshot = 12;
 }
 
 message ListWorkspacesReq {}

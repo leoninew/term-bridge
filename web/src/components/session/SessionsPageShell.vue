@@ -74,6 +74,7 @@
       :command="createDraft.commandText"
       :command-source="createDraft.commandSource"
       :selected-shortcut-id="createDraft.selectedShortcutId"
+      :selected-shortcut-name="createDraft.selectedShortcutName"
       :shortcuts="shortcuts"
       :creating="creatingSession"
       @update:open="dialogs.createSessionDialogOpen = $event"
@@ -308,6 +309,9 @@
         command: [draft.value.commandText],
         cols: size.cols,
         rows: size.rows,
+        command_source: draft.value.commandSource,
+        shortcut_id_snapshot: draft.value.shortcutIdSnapshot,
+        shortcut_name_snapshot: draft.value.shortcutNameSnapshot,
       })
       logTerminalDiagnostic('session.create.response', {
         sessionId: created.session_id,

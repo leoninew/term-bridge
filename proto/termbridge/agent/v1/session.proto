@@ -13,6 +13,9 @@ message CreateSessionReq {
   repeated string command = 4;
   int32 cols = 5;
   int32 rows = 6;
+  string command_source = 7;
+  string shortcut_id_snapshot = 8;
+  string shortcut_name_snapshot = 9;
 }
 
 message CreateSessionResp {
@@ -52,6 +55,9 @@ message RerunWorkspaceSessionReq {
 message UpdateSessionReq {
   optional string name = 1;
   optional string command = 2;
+  optional string command_source = 3;
+  optional string shortcut_id_snapshot = 4;
+  optional string shortcut_name_snapshot = 5;
 }
 
 message UpdateWorkspaceSessionReq {

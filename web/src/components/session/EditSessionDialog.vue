@@ -11,11 +11,12 @@
             :command="command"
             :command-source="commandSource"
             :selected-shortcut-id="selectedShortcutId"
+            :selected-shortcut-name="selectedShortcutName"
             :shortcuts="shortcuts"
             :disabled="editing"
             @update:cwd="cwd = $event"
             @update:name="name = $event"
-            @update:command="command = $event"
+            @update:command="updateCommand"
             @update:command-source="selectCommandSource"
             @update:selected-shortcut-id="selectShortcut"
           />
@@ -59,7 +60,15 @@
   }>()
   const emit = defineEmits<{
     'update:open': [open: boolean]
-    submit: [payload: { name: string; command: string }]
+    submit: [
+      payload: {
+        name: string
+        command: string
+        command_source?: CommandSource
+        shortcut_id_snapshot?: string
+        shortcut_name_snapshot?: string
+      },
+    ]
   }>()
   const { t } = useI18n()
   const name = ref('')
@@ -67,6 +76,8 @@
   const cwd = ref('')
   const commandSource = ref<CommandSource>('command')
   const selectedShortcutId = ref<string | null>(null)
+  const selectedShortcutName = ref<string | null>(null)
+  const commandChanged = ref(false)
   watch(
     () => props.open,
     (open) => {
@@ -74,12 +85,15 @@
       name.value = props.session.name || props.session.command
       command.value = props.session.command
       cwd.value = props.session.cwd
-      commandSource.value = 'command'
-      selectedShortcutId.value = null
+      commandSource.value = props.session.command_source === 'shortcut' ? 'shortcut' : 'command'
+      selectedShortcutId.value = props.session.shortcut_id_snapshot || null
+      selectedShortcutName.value = props.session.shortcut_name_snapshot || null
+      commandChanged.value = false
     },
   )
   function selectCommandSource(source: CommandSource) {
     commandSource.value = source
+    commandChanged.value = true
     if (source === 'command') return
 
     selectShortcut(
@@ -93,9 +107,29 @@
     const shortcut = props.shortcuts.find((value) => value.id === id)
     if (!shortcut) return
     selectedShortcutId.value = shortcut.id
+    selectedShortcutName.value = shortcut.name
     command.value = shortcut.command
+    commandChanged.value = true
   }
+
+  function updateCommand(value: string) {
+    command.value = value
+    commandChanged.value = true
+  }
+
   function submit() {
-    emit('submit', { name: name.value.trim(), command: command.value })
+    emit('submit', {
+      name: name.value.trim(),
+      command: command.value,
+      ...(commandChanged.value
+        ? {
+            command_source: commandSource.value,
+            shortcut_id_snapshot:
+              commandSource.value === 'shortcut' ? (selectedShortcutId.value ?? '') : '',
+            shortcut_name_snapshot:
+              commandSource.value === 'shortcut' ? (selectedShortcutName.value ?? '') : '',
+          }
+        : {}),
+    })
   }
 </script>

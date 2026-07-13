@@ -9,6 +9,9 @@ export type ValidCreateSessionDraft = {
   name: string
   cwd: string
   commandText: string
+  commandSource: CommandSource
+  shortcutIdSnapshot: string
+  shortcutNameSnapshot: string
 }
 
 export type CreateSessionDraftError = 'name-required' | 'cwd-required' | 'command-required'
@@ -20,6 +23,7 @@ export function useCreateSessionDraft() {
   const commandText = ref('')
   const commandSource = ref<CommandSource>('shortcut')
   const selectedShortcutId = ref<string | null>(null)
+  const selectedShortcutName = ref<string | null>(null)
 
   function reset(
     nextWorkspace: WorkspaceSummary | undefined,
@@ -32,6 +36,7 @@ export function useCreateSessionDraft() {
     commandText.value = ''
     commandSource.value = 'shortcut'
     selectedShortcutId.value = null
+    selectedShortcutName.value = null
     selectShortcut(shortcuts[0])
   }
 
@@ -48,6 +53,7 @@ export function useCreateSessionDraft() {
   function selectShortcut(value: Shortcut | undefined) {
     if (!value) return
     selectedShortcutId.value = value.id
+    selectedShortcutName.value = value.name
     commandText.value = value.command
   }
 
@@ -65,12 +71,23 @@ export function useCreateSessionDraft() {
     if (!commandText.value.trim()) {
       return { value: null, error: 'command-required' }
     }
+    if (
+      commandSource.value === 'shortcut' &&
+      (!selectedShortcutId.value || !selectedShortcutName.value)
+    ) {
+      return { value: null, error: 'command-required' }
+    }
     return {
       value: {
         workspaceId: workspace.value?.id ?? null,
         name,
         cwd: trimmedCwd,
         commandText: commandText.value,
+        commandSource: commandSource.value,
+        shortcutIdSnapshot:
+          commandSource.value === 'shortcut' ? (selectedShortcutId.value ?? '') : '',
+        shortcutNameSnapshot:
+          commandSource.value === 'shortcut' ? (selectedShortcutName.value ?? '') : '',
       },
       error: null,
     }
@@ -83,6 +100,7 @@ export function useCreateSessionDraft() {
     commandText,
     commandSource,
     selectedShortcutId,
+    selectedShortcutName,
     reset,
     selectCommandSource,
     selectShortcut,

@@ -6,8 +6,19 @@
       <span>{{ t('workbench.status') }}</span>
       <span class="text-[var(--color-text)]">{{ session.lifecycle_state }}</span>
       <span class="text-[var(--color-border-strong)]">·</span>
-      <span>{{ t('workbench.command') }}</span>
-      <span class="min-w-0 truncate text-[var(--color-text)]">{{ session.command }}</span>
+      <span>{{ commandSourceLabel }}</span>
+      <span
+        v-if="session.command_source === 'shortcut'"
+        class="min-w-0 truncate text-[var(--color-text)]"
+      >
+        {{ session.shortcut_name_snapshot }}
+      </span>
+      <span v-if="session.command_source === 'shortcut'" class="text-[var(--color-border-strong)]"
+        >·</span
+      >
+      <span class="min-w-0 truncate font-mono text-xs text-[var(--color-text)]">{{
+        session.command
+      }}</span>
     </template>
     <span v-else>{{ t('workbench.noActiveSession') }}</span>
     <span v-if="deviceLabel" class="ml-auto min-w-0 truncate text-[var(--color-text)]">
@@ -29,6 +40,12 @@
   }>()
 
   const { t } = useI18n()
+  const commandSourceLabel = computed(() => {
+    if (!props.session) return ''
+    if (props.session.command_source === 'shortcut') return t('dialog.shortcut')
+    if (props.session.command_source === 'command') return t('dialog.directCommand')
+    return t('workbench.launchCommand')
+  })
   const deviceLabel = computed(() => {
     if (!props.device) {
       return ''

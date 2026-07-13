@@ -11,6 +11,7 @@
             :command="command"
             :command-source="commandSource"
             :selected-shortcut-id="selectedShortcutId"
+            :selected-shortcut-name="selectedShortcutName"
             :shortcuts="shortcuts"
             :disabled="creating"
             @update:cwd="emit('update:cwd', $event)"
@@ -60,6 +61,7 @@
     command: string
     commandSource: CommandSource
     selectedShortcutId: string | null
+    selectedShortcutName: string | null
     shortcuts: Shortcut[]
     creating: boolean
   }>()

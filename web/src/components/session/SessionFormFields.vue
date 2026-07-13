@@ -24,6 +24,7 @@
     :command="command"
     :command-source="commandSource"
     :selected-shortcut-id="selectedShortcutId"
+    :selected-shortcut-name="selectedShortcutName"
     :shortcuts="shortcuts"
     :disabled="disabled"
     @update:command="emit('update:command', $event)"
@@ -45,6 +46,7 @@
     command: string
     commandSource: CommandSource
     selectedShortcutId: string | null
+    selectedShortcutName: string | null
     shortcuts: Shortcut[]
     disabled: boolean
   }>()

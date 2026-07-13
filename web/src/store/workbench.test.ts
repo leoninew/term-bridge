@@ -18,6 +18,9 @@ function session(overrides: Partial<SessionSummary> = {}): SessionSummary {
     cwd: '/work/one',
     lifecycle_state: 'stopped',
     attachment_state: '',
+    command_source: '',
+    shortcut_id_snapshot: '',
+    shortcut_name_snapshot: '',
     updated_at: '2026-06-24T00:00:00Z',
     ...overrides,
   }

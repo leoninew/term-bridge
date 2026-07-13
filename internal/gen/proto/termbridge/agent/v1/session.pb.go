@@ -22,15 +22,18 @@ const (
 )
 
 type CreateSessionReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Cwd           string                 `protobuf:"bytes,3,opt,name=cwd,proto3" json:"cwd,omitempty"`
-	Command       []string               `protobuf:"bytes,4,rep,name=command,proto3" json:"command,omitempty"`
-	Cols          int32                  `protobuf:"varint,5,opt,name=cols,proto3" json:"cols,omitempty"`
-	Rows          int32                  `protobuf:"varint,6,opt,name=rows,proto3" json:"rows,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId          string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Name                 string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Cwd                  string                 `protobuf:"bytes,3,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	Command              []string               `protobuf:"bytes,4,rep,name=command,proto3" json:"command,omitempty"`
+	Cols                 int32                  `protobuf:"varint,5,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows                 int32                  `protobuf:"varint,6,opt,name=rows,proto3" json:"rows,omitempty"`
+	CommandSource        string                 `protobuf:"bytes,7,opt,name=command_source,json=commandSource,proto3" json:"command_source,omitempty"`
+	ShortcutIdSnapshot   string                 `protobuf:"bytes,8,opt,name=shortcut_id_snapshot,json=shortcutIdSnapshot,proto3" json:"shortcut_id_snapshot,omitempty"`
+	ShortcutNameSnapshot string                 `protobuf:"bytes,9,opt,name=shortcut_name_snapshot,json=shortcutNameSnapshot,proto3" json:"shortcut_name_snapshot,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *CreateSessionReq) Reset() {
@@ -103,6 +106,27 @@ func (x *CreateSessionReq) GetRows() int32 {
 		return x.Rows
 	}
 	return 0
+}
+
+func (x *CreateSessionReq) GetCommandSource() string {
+	if x != nil {
+		return x.CommandSource
+	}
+	return ""
+}
+
+func (x *CreateSessionReq) GetShortcutIdSnapshot() string {
+	if x != nil {
+		return x.ShortcutIdSnapshot
+	}
+	return ""
+}
+
+func (x *CreateSessionReq) GetShortcutNameSnapshot() string {
+	if x != nil {
+		return x.ShortcutNameSnapshot
+	}
+	return ""
 }
 
 type CreateSessionResp struct {
@@ -462,11 +486,14 @@ func (x *RerunWorkspaceSessionReq) GetRequest() *RerunSessionReq {
 }
 
 type UpdateSessionReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          *string                `protobuf:"bytes,1,opt,name=name,proto3,oneof" json:"name,omitempty"`
-	Command       *string                `protobuf:"bytes,2,opt,name=command,proto3,oneof" json:"command,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Name                 *string                `protobuf:"bytes,1,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Command              *string                `protobuf:"bytes,2,opt,name=command,proto3,oneof" json:"command,omitempty"`
+	CommandSource        *string                `protobuf:"bytes,3,opt,name=command_source,json=commandSource,proto3,oneof" json:"command_source,omitempty"`
+	ShortcutIdSnapshot   *string                `protobuf:"bytes,4,opt,name=shortcut_id_snapshot,json=shortcutIdSnapshot,proto3,oneof" json:"shortcut_id_snapshot,omitempty"`
+	ShortcutNameSnapshot *string                `protobuf:"bytes,5,opt,name=shortcut_name_snapshot,json=shortcutNameSnapshot,proto3,oneof" json:"shortcut_name_snapshot,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *UpdateSessionReq) Reset() {
@@ -509,6 +536,27 @@ func (x *UpdateSessionReq) GetName() string {
 func (x *UpdateSessionReq) GetCommand() string {
 	if x != nil && x.Command != nil {
 		return *x.Command
+	}
+	return ""
+}
+
+func (x *UpdateSessionReq) GetCommandSource() string {
+	if x != nil && x.CommandSource != nil {
+		return *x.CommandSource
+	}
+	return ""
+}
+
+func (x *UpdateSessionReq) GetShortcutIdSnapshot() string {
+	if x != nil && x.ShortcutIdSnapshot != nil {
+		return *x.ShortcutIdSnapshot
+	}
+	return ""
+}
+
+func (x *UpdateSessionReq) GetShortcutNameSnapshot() string {
+	if x != nil && x.ShortcutNameSnapshot != nil {
+		return *x.ShortcutNameSnapshot
 	}
 	return ""
 }
@@ -841,14 +889,17 @@ var File_termbridge_agent_v1_session_proto protoreflect.FileDescriptor
 
 const file_termbridge_agent_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"!termbridge/agent/v1/session.proto\x12\x10termbridge.agent\x1a#termbridge/agent/v1/workspace.proto\"\x9d\x01\n" +
+	"!termbridge/agent/v1/session.proto\x12\x10termbridge.agent\x1a#termbridge/agent/v1/workspace.proto\"\xac\x02\n" +
 	"\x10CreateSessionReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
 	"\x03cwd\x18\x03 \x01(\tR\x03cwd\x12\x18\n" +
 	"\acommand\x18\x04 \x03(\tR\acommand\x12\x12\n" +
 	"\x04cols\x18\x05 \x01(\x05R\x04cols\x12\x12\n" +
-	"\x04rows\x18\x06 \x01(\x05R\x04rows\"k\n" +
+	"\x04rows\x18\x06 \x01(\x05R\x04rows\x12%\n" +
+	"\x0ecommand_source\x18\a \x01(\tR\rcommandSource\x120\n" +
+	"\x14shortcut_id_snapshot\x18\b \x01(\tR\x12shortcutIdSnapshot\x124\n" +
+	"\x16shortcut_name_snapshot\x18\t \x01(\tR\x14shortcutNameSnapshot\"k\n" +
 	"\x11CreateSessionResp\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12!\n" +
@@ -871,13 +922,19 @@ const file_termbridge_agent_v1_session_proto_rawDesc = "" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x12;\n" +
-	"\arequest\x18\x03 \x01(\v2!.termbridge.agent.RerunSessionReqR\arequest\"_\n" +
+	"\arequest\x18\x03 \x01(\v2!.termbridge.agent.RerunSessionReqR\arequest\"\xc4\x02\n" +
 	"\x10UpdateSessionReq\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1d\n" +
-	"\acommand\x18\x02 \x01(\tH\x01R\acommand\x88\x01\x01B\a\n" +
+	"\acommand\x18\x02 \x01(\tH\x01R\acommand\x88\x01\x01\x12*\n" +
+	"\x0ecommand_source\x18\x03 \x01(\tH\x02R\rcommandSource\x88\x01\x01\x125\n" +
+	"\x14shortcut_id_snapshot\x18\x04 \x01(\tH\x03R\x12shortcutIdSnapshot\x88\x01\x01\x129\n" +
+	"\x16shortcut_name_snapshot\x18\x05 \x01(\tH\x04R\x14shortcutNameSnapshot\x88\x01\x01B\a\n" +
 	"\x05_nameB\n" +
 	"\n" +
-	"\b_command\"\x9b\x01\n" +
+	"\b_commandB\x11\n" +
+	"\x0f_command_sourceB\x17\n" +
+	"\x15_shortcut_id_snapshotB\x19\n" +
+	"\x17_shortcut_name_snapshot\"\x9b\x01\n" +
 	"\x19UpdateWorkspaceSessionReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1d\n" +
 	"\n" +

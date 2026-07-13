@@ -221,9 +221,15 @@ func (r *Registry) CreateSession(ctx context.Context, request *agent.CreateSessi
 
 	env := os.Environ()
 	commandRecord := session.CommandRecord{
-		Command:     commandText,
-		EnvStrategy: "inherit",
-		EnvCount:    len(env),
+		Command:              commandText,
+		EnvStrategy:          "inherit",
+		EnvCount:             len(env),
+		Source:               session.CommandSource(request.GetCommandSource()),
+		ShortcutIdSnapshot:   request.GetShortcutIdSnapshot(),
+		ShortcutNameSnapshot: request.GetShortcutNameSnapshot(),
+	}
+	if !commandRecord.ValidSource() {
+		return nil, apperrors.Usage("invalid session command source")
 	}
 	manager := sessionapp.Manager{Store: r.store}
 	sess, err := manager.Create(sessionapp.CreateOptions{
@@ -580,6 +586,10 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 			return nil, apperrors.Usage("missing session name")
 		}
 	}
+	commandSourceProvided := request.CommandSource != nil || request.ShortcutIdSnapshot != nil || request.ShortcutNameSnapshot != nil
+	if request.Command == nil && commandSourceProvided {
+		return nil, apperrors.Usage("session command source requires command")
+	}
 	var commandText string
 	if request.Command != nil {
 		commandText = request.GetCommand()
@@ -599,6 +609,14 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 			value.Name = name
 		}
 		if request.Command != nil {
+			if commandSourceProvided {
+				value.Command.Source = session.CommandSource(request.GetCommandSource())
+				value.Command.ShortcutIdSnapshot = request.GetShortcutIdSnapshot()
+				value.Command.ShortcutNameSnapshot = request.GetShortcutNameSnapshot()
+				if !value.Command.ValidSource() {
+					return apperrors.Usage("invalid session command source")
+				}
+			}
 			value.Command.Command = commandText
 		}
 		value.UpdatedAt = time.Now().UTC()
@@ -808,15 +826,18 @@ func (r *Registry) summaryFromView(view session.View) *agent.SessionSummary {
 	}
 	r.mu.Unlock()
 	return &agent.SessionSummary{
-		Id:              view.Session.Id,
-		Name:            view.Session.Name,
-		WorkspaceId:     view.Session.WorkspaceId,
-		Command:         view.CommandText,
-		Cwd:             view.Session.LaunchCwd,
-		LifecycleState:  string(lifecycleState),
-		AttachmentState: string(attachment),
-		ExitCode:        exitCodeFromInt(view.ExitCode),
-		UpdatedAt:       prototime.FromTime(view.Session.UpdatedAt),
+		Id:                   view.Session.Id,
+		Name:                 view.Session.Name,
+		WorkspaceId:          view.Session.WorkspaceId,
+		Command:              view.CommandText,
+		Cwd:                  view.Session.LaunchCwd,
+		LifecycleState:       string(lifecycleState),
+		AttachmentState:      string(attachment),
+		ExitCode:             exitCodeFromInt(view.ExitCode),
+		UpdatedAt:            prototime.FromTime(view.Session.UpdatedAt),
+		CommandSource:        string(view.Session.Command.Source),
+		ShortcutIdSnapshot:   view.Session.Command.ShortcutIdSnapshot,
+		ShortcutNameSnapshot: view.Session.Command.ShortcutNameSnapshot,
 	}
 }
 
