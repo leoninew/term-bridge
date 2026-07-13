@@ -90,23 +90,34 @@ tasks:
       - docker build -f Dockerfile.cn -t termbridge .
 
   package:
-    desc: Build Windows x64 portable zip package
+    desc: Build Windows, Linux, and macOS x64 portable zip packages
     vars:
-      PACKAGE_ROOT: bin/package/TermBridge
-      PACKAGE_ZIP: bin/TermBridge-windows-x64.zip
+      WINDOWS_ROOT: bin/package/windows/TermBridge
+      LINUX_ROOT: bin/package/linux/TermBridge
+      MACOS_ROOT: bin/package/macos/TermBridge
     cmds:
-      - rm -rf bin/package {{.PACKAGE_ZIP}}
-      - mkdir -p {{.PACKAGE_ROOT}}/web {{.PACKAGE_ROOT}}/configs
+      - rm -rf bin/package bin/TermBridge-windows-x64.zip bin/TermBridge-linux-x64.zip bin/TermBridge-macos-x64.zip
+      - mkdir -p {{.WINDOWS_ROOT}}/web {{.WINDOWS_ROOT}}/configs {{.LINUX_ROOT}}/web {{.LINUX_ROOT}}/configs {{.MACOS_ROOT}}/web {{.MACOS_ROOT}}/configs
       - cd web && yarn build:local
-      - env GOOS=windows GOARCH=amd64 go build -o {{.PACKAGE_ROOT}}/termbridge.exe ./cmd/termbridge
-      - cp -R web/dist/. {{.PACKAGE_ROOT}}/web/
-      - cp configs/config.yaml {{.PACKAGE_ROOT}}/configs/config.yaml
-      - cp scripts/package/.env.prod {{.PACKAGE_ROOT}}/.env.prod
-      - cp scripts/package/.env.test {{.PACKAGE_ROOT}}/.env.test
-      - cp scripts/package/start.cmd {{.PACKAGE_ROOT}}/start.cmd
-      - cp scripts/package/start.sh {{.PACKAGE_ROOT}}/start.sh
-      - chmod +x {{.PACKAGE_ROOT}}/start.sh
-      - cd bin/package && zip -r ../TermBridge-windows-x64.zip TermBridge
+      - env GOOS=windows GOARCH=amd64 go build -o {{.WINDOWS_ROOT}}/termbridge.exe ./cmd/termbridge
+      - env GOOS=linux GOARCH=amd64 go build -o {{.LINUX_ROOT}}/termbridge ./cmd/termbridge
+      - env GOOS=darwin GOARCH=amd64 go build -o {{.MACOS_ROOT}}/termbridge ./cmd/termbridge
+      - cp -R web/dist/. {{.WINDOWS_ROOT}}/web/
+      - cp -R web/dist/. {{.LINUX_ROOT}}/web/
+      - cp -R web/dist/. {{.MACOS_ROOT}}/web/
+      - cp configs/config.yaml {{.WINDOWS_ROOT}}/configs/config.yaml
+      - cp configs/config.yaml {{.LINUX_ROOT}}/configs/config.yaml
+      - cp configs/config.yaml {{.MACOS_ROOT}}/configs/config.yaml
+      - cp scripts/package/.env.prod scripts/package/.env.test {{.WINDOWS_ROOT}}/
+      - cp scripts/package/.env.prod scripts/package/.env.test {{.LINUX_ROOT}}/
+      - cp scripts/package/.env.prod scripts/package/.env.test {{.MACOS_ROOT}}/
+      - cp scripts/package/start.cmd {{.WINDOWS_ROOT}}/start.cmd
+      - cp scripts/package/start.sh {{.LINUX_ROOT}}/start.sh
+      - cp scripts/package/start.sh {{.MACOS_ROOT}}/start.sh
+      - chmod +x {{.LINUX_ROOT}}/termbridge {{.LINUX_ROOT}}/start.sh {{.MACOS_ROOT}}/termbridge {{.MACOS_ROOT}}/start.sh
+      - cd bin/package/windows && zip -r ../../TermBridge-windows-x64.zip TermBridge
+      - cd bin/package/linux && zip -r ../../TermBridge-linux-x64.zip TermBridge
+      - cd bin/package/macos && zip -r ../../TermBridge-macos-x64.zip TermBridge
 
   clean:
     desc: Remove build outputs

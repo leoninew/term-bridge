@@ -32,4 +32,4 @@ elif command -v open >/dev/null 2>&1; then
   open "$TERMBRIDGE_LOCAL__PUBLIC_URL" || true
 fi
 
-./termbridge.exe agent
+./termbridge agent
