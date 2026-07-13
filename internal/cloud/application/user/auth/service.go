@@ -385,7 +385,8 @@ func (s *Service) sendCode(ctx context.Context, userId *string, email, purpose s
 	if purpose == PurposePasswordReset {
 		subject = "TermBridge password reset code"
 	}
-	result, sendErr := s.sender.Send(ctx, email, subject, fmt.Sprintf("<p>Your TermBridge code is <strong>%s</strong>. It expires in 2 minutes.</p>", code))
+	html := fmt.Sprintf(`<div style="margin:0;padding:32px 16px;background-color:#f1f5f9;color:#0f172a;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"><div style="max-width:480px;margin:0 auto;padding:32px;background-color:#ffffff;border:1px solid:#cbd5e1;border-radius:12px"><p style="margin:0 0 24px;color:#0369a1;font-size:12px;font-weight:700;letter-spacing:1.5px">TERMBRIDGE</p><h1 style="margin:0 0 16px;color:#020617;font-size:24px;line-height:32px">Your TermBridge code</h1><p style="margin:0 0 20px;color:#475569;font-size:16px;line-height:24px">Use this code to continue:</p><p style="margin:0 0 20px;color:#0369a1;font-size:32px;font-weight:700;letter-spacing:6px;line-height:40px"><strong>%s</strong></p><p style="margin:0;color:#64748b;font-size:14px;line-height:20px">It expires in 2 minutes. Do not share this code with anyone.</p></div></div>`, code)
+	result, sendErr := s.sender.Send(ctx, email, subject, html)
 	status := "success"
 	if sendErr != nil || !result.Success {
 		status = "failed"

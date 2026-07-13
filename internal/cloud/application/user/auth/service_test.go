@@ -35,10 +35,27 @@ func (s *recordingSender) Send(ctx context.Context, to, subject, html string) (E
 
 func TestRegisterRecordsActiveCodeAndDeliveryLog(t *testing.T) {
 	db := openAuthServiceTestDB(t)
-	service := newAuthServiceForTest(db, &recordingSender{result: EmailResult{MessageId: "msg-1", Success: true, ResponseBody: "ok"}})
+	sender := &recordingSender{result: EmailResult{MessageId: "msg-1", Success: true, ResponseBody: "ok"}}
+	service := newAuthServiceForTest(db, sender)
 
 	if err := service.Register(context.Background(), "User@Example.Test", "valid-password"); err != nil {
 		t.Fatalf("Register() error = %v", err)
+	}
+
+	if len(sender.sent) != 1 {
+		t.Fatalf("sent email count = %d, want 1", len(sender.sent))
+	}
+	email := sender.sent[0]
+	if email.Subject != "TermBridge verification code" {
+		t.Fatalf("verification email subject = %q, want TermBridge verification code", email.Subject)
+	}
+	for _, want := range []string{"background-color:#f1f5f9", "max-width:480px", "letter-spacing:6px", "color:#0369a1", "It expires in 2 minutes. Do not share this code with anyone."} {
+		if !strings.Contains(email.HTML, want) {
+			t.Fatalf("verification email HTML does not contain %q: %s", want, email.HTML)
+		}
+	}
+	if code := codeFromLatestEmail(t, sender); len(code) != 6 {
+		t.Fatalf("verification email code length = %d, want 6", len(code))
 	}
 
 	assertAuthTableCount(t, db, "users", 1)
