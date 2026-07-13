@@ -3,7 +3,7 @@ WORKDIR /src/web
 COPY web/package.json web/yarn.lock ./
 RUN yarn install --frozen-lockfile
 COPY web/ ./
-RUN yarn build:cloud
+RUN yarn build
 
 FROM golang:1.25-bookworm AS go-build
 WORKDIR /src

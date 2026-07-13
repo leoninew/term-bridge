@@ -386,11 +386,13 @@ func TestDeploymentBuildsAreConfigurationNeutral(t *testing.T) {
 	}
 
 	packageJSON := readRepoFile(t, "web", "package.json")
-	assertContains(t, packageJSON, "\"build:local\": \"vue-tsc --noEmit && vite build\"", "local build script must use the neutral bundle build")
-	assertContains(t, packageJSON, "\"build:cloud\": \"vue-tsc --noEmit && vite build\"", "cloud build script must use the neutral bundle build")
+	assertContains(t, packageJSON, "\"build\": \"vue-tsc --noEmit && vite build\"", "build script must use the neutral bundle build")
+	assertNotContains(t, packageJSON, "\"build:local\"", "local build alias must be absent")
+	assertNotContains(t, packageJSON, "\"build:cloud\"", "cloud build alias must be absent")
 	for _, dockerfile := range []string{"Dockerfile", "Dockerfile.cn"} {
 		content := readRepoFile(t, dockerfile)
-		assertContains(t, content, "RUN yarn build:cloud", dockerfile+" must retain the cloud build script")
+		assertContains(t, content, "RUN yarn build", dockerfile+" must use the neutral bundle build")
+		assertNotContains(t, content, "RUN yarn build:", dockerfile+" must not use a product-line build alias")
 		assertNotContains(t, content, "TERMBRIDGE_", dockerfile+" must not bake runtime configuration")
 	}
 }
@@ -402,9 +404,11 @@ func TestPortablePackageShipsSelectableRuntimeProfiles(t *testing.T) {
 	prodEnv := readRepoFile(t, "scripts", "package", ".env.prod")
 	testEnv := readRepoFile(t, "scripts", "package", ".env.test")
 
-	assertContains(t, taskfile, "cd web && yarn build:local", "portable package must retain its local build script")
-	assertContains(t, taskfile, "cp scripts/package/.env.prod {{.PACKAGE_ROOT}}/.env.prod", "portable package must include the production runtime profile")
-	assertContains(t, taskfile, "cp scripts/package/.env.test {{.PACKAGE_ROOT}}/.env.test", "portable package must include the test runtime profile")
+	assertContains(t, taskfile, "cd web && yarn build", "portable package must use the neutral bundle build")
+	assertNotContains(t, taskfile, "yarn build:", "portable package must not use a product-line build alias")
+	for _, packageRoot := range []string{"{{.WINDOWS_ROOT}}", "{{.LINUX_ROOT}}", "{{.MACOS_ROOT}}"} {
+		assertContains(t, taskfile, "cp scripts/package/.env.prod scripts/package/.env.test "+packageRoot+"/", "portable package must include both selectable runtime profiles")
+	}
 	assertNotContains(t, taskfile, "scripts/package/.env.local", "portable package must not include the obsolete local runtime profile")
 
 	for scriptName, script := range map[string]string{"start.cmd": startCmd, "start.sh": startSh} {

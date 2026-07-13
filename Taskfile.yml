@@ -98,7 +98,7 @@ tasks:
     cmds:
       - rm -rf bin/package bin/TermBridge-windows-x64.zip bin/TermBridge-linux-x64.zip bin/TermBridge-macos-x64.zip
       - mkdir -p {{.WINDOWS_ROOT}}/web {{.WINDOWS_ROOT}}/configs {{.LINUX_ROOT}}/web {{.LINUX_ROOT}}/configs {{.MACOS_ROOT}}/web {{.MACOS_ROOT}}/configs
-      - cd web && yarn build:local
+      - cd web && yarn build
       - env GOOS=windows GOARCH=amd64 go build -o {{.WINDOWS_ROOT}}/termbridge.exe ./cmd/termbridge
       - env GOOS=linux GOARCH=amd64 go build -o {{.LINUX_ROOT}}/termbridge ./cmd/termbridge
       - env GOOS=darwin GOARCH=amd64 go build -o {{.MACOS_ROOT}}/termbridge ./cmd/termbridge

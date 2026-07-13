@@ -32,14 +32,11 @@
                 {{ cloudConnectionActionLabel }}
               </button>
               <button
-                v-if="cloudModeSwitchVisible"
                 type="button"
-                class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-subtle)]"
-                :disabled="!cloudSession"
-                :title="cloudSession ? '' : t('dashboard.cloudAccountNotConnected')"
-                @click="switchToCloudMode"
+                class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
+                @click="openCloudPage"
               >
-                {{ t('dashboard.switchToCloudMode') }}
+                {{ t('dashboard.openCloudPage') }}
               </button>
             </div>
           </div>
@@ -231,7 +228,7 @@
     Unplug,
     User,
   } from '@lucide/vue'
-  import { RouterLink, useRouter } from 'vue-router'
+  import { RouterLink } from 'vue-router'
   import AppHeader from '../layout/AppHeader.vue'
   import CloudAccountConnectionMenu from './CloudAccountConnectionMenu.vue'
   import {
@@ -259,7 +256,6 @@
   import { useNotificationsStore } from '../../store/notifications'
 
   const { t } = useI18n()
-  const router = useRouter()
   const runtimeConfig = useRuntimeConfigStore()
   const tokens = useAuthTokensStore()
   const localAuth = useLocalAuthStore()
@@ -287,7 +283,6 @@
   const localUserLabel = computed(() => localUser.value || t('dashboard.todoLocalUser'))
   const projectVersionLabel = computed(() => t('dashboard.todoProjectVersion'))
   const deviceName = computed(() => localDevice.value?.name || localDevice.value?.id || '')
-  const cloudModeSwitchVisible = computed(() => runtimeConfig.config.local.mode === 'hybrid')
 
   async function loadLocalHome() {
     workspacesLoading.value = true
@@ -422,11 +417,9 @@
     }
   }
 
-  async function switchToCloudMode() {
-    if (!runtimeConfig.switchMode('cloud')) {
-      return
-    }
-    await router.push({ name: 'home' })
+  function openCloudPage() {
+    const cloudDashboardURL = new URL('/dashboard', runtimeConfig.config.cloud.publicUrl)
+    window.open(cloudDashboardURL, '_blank', 'noopener,noreferrer')
   }
 
   function workspaceUpdatedAt(value: string | undefined) {

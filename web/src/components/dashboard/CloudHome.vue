@@ -48,11 +48,12 @@
                 <ArrowRight class="size-3.5 text-slate-100" />
               </RouterLink>
               <button
+                v-if="runtimeConfig.config.local.mode === 'hybrid'"
                 type="button"
                 class="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 text-sm text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
                 @click="openLocalEntry"
               >
-                {{ localEntryLabel }}
+                {{ t('dashboard.openLocalPage') }}
               </button>
             </div>
           </div>
@@ -138,11 +139,6 @@
   const cloudUserDisplayName = computed(
     () => cloudAuth.user?.display_name || cloudAuth.user?.email || t('dashboard.signedIn'),
   )
-  const localEntryLabel = computed(() =>
-    runtimeConfig.config.local.mode === 'cloud'
-      ? t('dashboard.openLocalPage')
-      : t('dashboard.switchToLocalMode'),
-  )
   async function loadCloudHome() {
     cloudAuthLoading.value = true
     try {
@@ -155,15 +151,8 @@
     }
   }
 
-  async function openLocalEntry() {
-    if (runtimeConfig.config.local.mode === 'cloud') {
-      window.open(runtimeConfig.config.local.publicUrl, '_blank', 'noopener,noreferrer')
-      return
-    }
-    if (!runtimeConfig.switchMode('local')) {
-      return
-    }
-    await router.push({ name: 'home' })
+  function openLocalEntry() {
+    window.open(runtimeConfig.config.local.publicUrl, '_blank', 'noopener,noreferrer')
   }
 
   async function openCloudLogin() {

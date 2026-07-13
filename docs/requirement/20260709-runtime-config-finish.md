@@ -1,5 +1,5 @@
 # runtime config 与 Home 入口收尾
-最后修改时间: 2026-07-09 13:11:17
+最后修改时间: 2026-07-13 23:43:43
 
 Flow mode: light / 轻量模式
 Stage: Requirement / 需求
@@ -32,14 +32,11 @@ Review status: Accepted
 - `local.mode` 是只读部署/能力配置，取值为 `local | cloud | hybrid`。
 - 页面当前模式由 `runtimeConfig.view.mode` 表达，取值仅为 `local | cloud`；只允许在 `local.mode === 'hybrid'` 时切换。
 - 认证、token、cloud session 和设备列表拆分到职责明确的 store，不再由单个混合 store 派生或持有运行模式、runtime target、current device 等模式职责。
-- 前端构建入口收敛为三类：
-  - `web/.env.development`：本地联调入口，`TERMBRIDGE_LOCAL__MODE=hybrid`。
-  - `web/.env.local`：本地制品入口，`TERMBRIDGE_LOCAL__MODE=local`。
-  - `web/.env.cloud`：云端镜像入口，`TERMBRIDGE_LOCAL__MODE=cloud`。
-- 不再使用 `web/.env.production` 作为前端制品配置；Docker runtime env 只影响 Go 后端配置，不改写已经构建进 JS 的前端公开配置。
-- Docker 镜像默认提供云端静态入口，因此镜像构建使用 `build:cloud`。
-- Windows portable package 是本地 Agent 包，因此 package 构建使用 `build:local`，运行时通过包根目录 `.env.local` 配置本机地址、静态目录、云端地址和 Agent OAuth client secret。
-- Home 页本地模式保持本机工作台入口，包括工作区列表、连接/断开云端、进入本机 session，以及仅 hybrid 可见的“切换到云端模式”。
+- 前端仅保留 `web/.env.development` 作为 Vite 本地联调配置，`TERMBRIDGE_LOCAL__MODE=hybrid`。
+- 不再使用 `web/.env.local`、`web/.env.cloud` 或 `web/.env.production` 作为前端制品配置；Docker runtime env 只影响 Go 后端配置，不改写已经构建进 JS 的前端公开配置。
+- `web/package.json` 只保留一个配置中立的 `build` 脚本，Docker 镜像和 portable package 使用同一份 `web/dist`。
+- Windows portable package 是本地 Agent 包，运行时通过包根目录 `.env.prod` 或 `.env.test` 配置本机地址、静态目录、云端地址和 Agent OAuth client secret。
+- Home 页本地模式保持本机工作台入口，包括工作区列表、连接/断开云端、进入本机 session，以及始终可见的“查看云端页面”链接；该链接在新页面打开 `TERMBRIDGE_CLOUD__PUBLIC_URL`，不依赖 `local.mode` 或本机 Cloud 连接状态。
 - Home 页云端模式作为产品入口首页，不展示业务状态卡片，不展示用户私有设备列表，不为首页入口拉取设备信息；设备列表属于 `/dashboard`。
 - Cloud Home 保留核心入口：云端登录/进入设备状态页、本地入口；不再保留独立“打开设备 Dashboard”重复按钮。
 - Cloud Dashboard 路径为 `/dashboard`，route name 为 `cloud-dashboard`，要求云端登录。
@@ -68,12 +65,12 @@ Review status: Accepted
 ## User scenarios
 
 - 作为本地开发用户，我通过 `web/.env.development` 使用 `hybrid`，在同一个 Vite dev server 中联调本地/云端前端。
-- 作为本地制品构建用户，我使用 `build:local` 得到 `local.mode=local` 的静态入口。
-- 作为 Cloud 镜像部署用户，我使用 `build:cloud` 得到 `local.mode=cloud` 的静态入口。
+- 作为本地制品构建用户，我使用 `build` 得到配置中立的静态入口，并由 Agent 在运行时注入 `local.mode=local`。
+- 作为 Cloud 镜像部署用户，我使用 `build` 得到同一份配置中立的静态入口，并由 Cloud 服务在运行时注入 `local.mode=cloud`。
 - 作为维护者，我希望配置错误在初始化阶段立即失败，而不是靠隐式 fallback 继续运行。
 - 作为维护者，我希望页面模式切换与部署能力配置分离，避免 `local.mode` 被误当作当前 UI 状态。
-- 作为本地入口用户，我在非 `hybrid` 构建下连接 Cloud 后，不应看到“切换到云端模式”按钮。
-- 作为本地联调用户，我在 `local.mode=hybrid` 时可以看到“切换到云端模式”按钮，并在本地 / 云端页面模式之间切换。
+- 作为本地入口用户，我可以不依赖本机 Cloud 连接状态，在任何 `local.mode` 下使用“查看云端页面”在新页面打开配置的 Cloud 公网地址。
+- 作为 Cloud 入口用户，我仅在 `local.mode=hybrid` 时可以看到“查看本地页面”，并在新页面打开配置的本机地址。
 - 作为 Cloud 入口用户，我在 Home 页只看到入口操作；设备列表和设备状态在 `/dashboard` 中处理。
 - 作为 Cloud 用户，我点击在线设备进入按钮后进入 `/devices/:deviceId/sessions`。
 - 作为本地用户，我断开 Cloud 后，本机不再展示已连接状态，Cloud connector 停止连接；Cloud 账号下的设备绑定仍保留。
@@ -91,16 +88,16 @@ Review status: Accepted
 - `web/.env.local` 中 `TERMBRIDGE_LOCAL__MODE=local`。
 - `web/.env.cloud` 中 `TERMBRIDGE_LOCAL__MODE=cloud`。
 - `web/.env.production` 不再作为前端制品配置保留。
-- `web/package.json` 提供明确产品线构建入口：`build:local` 与 `build:cloud`。
-- Dockerfile 和 Dockerfile.cn 使用 `yarn build:cloud` 构建镜像内置前端。
+- `web/package.json` 仅提供配置中立的 `build` 入口。
+- Dockerfile 和 Dockerfile.cn 使用 `yarn build` 构建镜像内置前端。
 - `web/index.html` 保留后端注入占位和空 `window.__CONFIG__` 初始化；空对象不应阻断 build-time env。
 - 后端静态服务不修改 `index.html`，继续原样返回构建产物。
-- 非 `hybrid` 的本地-only 入口不显示“切换到云端模式”按钮。
-- `hybrid` 模式的本地页面模式切换按钮保持可见可用。
+- 本地 Home 在所有 `local.mode` 下显示“查看云端页面”；点击后以新标签页打开 `TERMBRIDGE_CLOUD__PUBLIC_URL`，且不依赖 `cloud_session`。
+- Cloud Home 仅在 `local.mode=hybrid` 下显示“查看本地页面”；点击后以新标签页打开 `TERMBRIDGE_LOCAL__PUBLIC_URL`。
 - Cloud Home 不展示“账号会话 / 设备在线状态 / 工作台路由”等业务状态卡片。
 - Cloud Home 不展示用户私有设备列表，不拉取设备列表，不为了首页入口直跳设备会话列表。
 - Cloud Home 不保留独立“打开设备 Dashboard”重复按钮；进入设备或设备列表的入口以主 CTA/明确入口表达。
-- Cloud Home 保留本地入口：hybrid 下 SPA 切换到本地模式；cloud-only 下新开本地页面。
+- Cloud Home 在 `hybrid` 下保留“查看本地页面”入口，以新页面打开 `TERMBRIDGE_LOCAL__PUBLIC_URL`；cloud-only 下不展示该入口。
 - `/dashboard` route 存在，要求 Cloud 登录，未登录访问会跳转到登录并带 redirect。
 - `/dashboard` 展示设备列表，设备项包含名称、在线/离线状态、连接时间或最近在线时间、右侧进入按钮。
 - 在线设备进入按钮可选取设备并跳转到 `/devices/:deviceId/sessions`；离线设备不可进入。
@@ -124,9 +121,9 @@ Review status: Accepted
 - 不做兼容适配，配置错误直接 fail fast。
 - `client_secret` 仅供本地后端使用，不进入浏览器运行时配置。
 - 认证、token、cloud device 与 local auth store 职责分离；`runtimeConfig` 负责配置/页面模式。
-- 移除后端复杂配置注入，使用前端 `build:local` / `build:cloud` 和对应 `web/.env.<mode>` 完成静态入口配置。
+- 使用配置中立的前端 `build` 产物，运行时配置由服务静态入口注入。
 - `web/.env.development` 使用 `hybrid` 是仓库内明确的本地联调入口，不再要求 development 入口避免 `hybrid`。
-- “切换到云端模式”是开发环境本地/云端共用一个地址时的解决方式，预期当且仅当 `TERMBRIDGE_LOCAL__MODE=hybrid` 时可见可用。
+- 本地 Home 的“查看云端页面”直接打开 `TERMBRIDGE_CLOUD__PUBLIC_URL`，不依赖 `TERMBRIDGE_LOCAL__MODE=hybrid`；Cloud Home 的“查看本地页面”仅在 `TERMBRIDGE_LOCAL__MODE=hybrid` 时可见，并直接打开 `TERMBRIDGE_LOCAL__PUBLIC_URL`。
 - Cloud Home 定位为产品入口首页，不是管理后台，也不是企业/项目介绍页；业务数据进入 `/dashboard`。
 - Cloud Dashboard 路径使用 `/dashboard`，设备会话路径使用 `/devices/:deviceId/sessions`，不使用 `/cloud/...` 前缀。
 - `/agent/dashboard` 彻底删除路由，不做旧路径兼容 redirect。
@@ -150,9 +147,9 @@ Review status: Accepted
 - 用户明确：旧 `agent.mode` 是只读配置，页面切换使用单独 `view.mode`；术语收口后配置节点改为 `local.mode`。
 - 用户明确：旧混合 store 的职责重叠要消除。
 - 用户明确：Cloud 静态入口缺配置不是通过后端曲线解决，而是前端入口配置问题。
-- 用户明确：既然已有 `build:local` / `build:cloud`，移除后端复杂配置注入，前端构建期注入即可。
+- 用户最新决定：移除重复的 `build:local` / `build:cloud`，Docker 镜像和 portable package 均使用配置中立的 `build`；公开配置继续由运行时服务提供。
 - 用户明确：`index.html` 后端注入占位和空 `window.__CONFIG__` 保留，当前用不上但不删除。
-- 用户确认：“切换到云端模式”是开发环境本地/云端共用一个地址的解决方式，预期当且仅当 `TERMBRIDGE_LOCAL__MODE=hybrid` 时可见可用。
+- 用户最新决定：本地 Home 始终显示“查看云端页面”，以新标签页打开 `TERMBRIDGE_CLOUD__PUBLIC_URL`；Cloud Home 的“查看本地页面”仅在 `TERMBRIDGE_LOCAL__MODE=hybrid` 下显示，并以新标签页打开 `TERMBRIDGE_LOCAL__PUBLIC_URL`。
 - 用户要求移除 Cloud 模式首页“打开设备 Dashboard”相关重复内容，但保留进入设备/工作台的入口。
 - 用户要求 Cloud Home 不承担业务功能，移除“账号会话 / 设备在线状态 / 工作台路由”卡片。
 - 用户采纳 env mode 收敛建议：开发环境为 hybrid，本地制品与 Cloud 镜像使用独立构建入口，不再使用 `web/.env.production`。

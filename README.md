@@ -98,16 +98,15 @@ configs/config.yaml
 
 `task agent`、`task cloud` 和 `task run` 会设置 `TERMBRIDGE_ENV=development`，Air 启动时读取 `configs/config.development.yaml` 和根目录 `.env.development`。
 
-前端仅保留 `web/.env.development` 作为 Vite 本地联调配置，使用 `TERMBRIDGE_LOCAL__MODE=hybrid`。`build:local` 和 `build:cloud` 保留产品线脚本名称，但生成不含部署地址的相同静态制品；测试和正式部署的公开配置由 Go 服务在运行时提供。
+前端仅保留 `web/.env.development` 作为 Vite 本地联调配置，使用 `TERMBRIDGE_LOCAL__MODE=hybrid`。生产、镜像和 portable package 都使用同一个不含部署地址的静态制品；测试和正式部署的公开配置由 Go 服务在运行时提供。
 
 ```bash
-yarn --cwd web build:local
-yarn --cwd web build:cloud
+yarn --cwd web build
 ```
 
 Docker 镜像不固化任何 `TERMBRIDGE_*` 运行时环境变量，部署时必须显式提供 Cloud 服务配置。
 
-Windows portable package 是本地 Agent 包：`task package` 使用 `build:local` 构建前端，并同时包含 `.env.prod` 和 `.env.test`。启动脚本默认选择 `.env.prod`（Preflite HTTPS）；调用方设置 `TERMBRIDGE_ENV=test` 时选择 `.env.test`（lvh HTTP）。两个 profile 都是 Go 后端运行时配置，负责本地静态目录、本机访问地址、云端地址和 Agent OAuth client secret；不要与前端开发环境文件混淆。
+Windows portable package 是本地 Agent 包：`task package` 使用 `build` 构建前端，并同时包含 `.env.prod` 和 `.env.test`。启动脚本默认选择 `.env.prod`（Preflite HTTPS）；调用方设置 `TERMBRIDGE_ENV=test` 时选择 `.env.test`（lvh HTTP）。两个 profile 都是 Go 后端运行时配置，负责本地静态目录、本机访问地址、云端地址和 Agent OAuth client secret；不要与前端开发环境文件混淆。
 
 ## 运行角色
 
