@@ -36,7 +36,7 @@
             >
               <TabsTrigger
                 :value="tab.sessionId"
-                class="tab-drag-handle flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 outline-none"
+                class="tab-drag-handle flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 outline-none"
               >
                 <SessionSourceIcon
                   :command-source="sessionCommandSource(tab.workspaceId, tab.sessionId)"
@@ -244,12 +244,14 @@
     border-color: var(--color-border-strong) !important;
     background: var(--color-control-hover) !important;
     box-shadow: 0 0 0 1px var(--color-border-strong);
+    cursor: pointer;
   }
 
   .tab-sortable-dragging {
     border-color: var(--color-border-strong) !important;
     background: var(--color-control-active) !important;
     box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 20%, transparent);
+    cursor: pointer;
     opacity: 0.96;
   }
 </style>

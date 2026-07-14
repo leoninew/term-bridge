@@ -42,6 +42,7 @@
             v-for="shortcut in shortcuts"
             :key="shortcut.id"
             :shortcut="shortcut"
+            :class="!reordering ? 'shortcut-card-sortable' : ''"
             @edit="openEdit"
             @delete="openDelete"
           />

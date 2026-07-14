@@ -624,6 +624,10 @@ p {
     background 150ms ease;
 }
 
+.shortcut-card-sortable {
+  cursor: pointer;
+}
+
 .shortcut-card:hover,
 .shortcut-card:focus-within {
   border-color: var(--color-primary-border);
@@ -642,12 +646,14 @@ p {
   border-color: var(--color-border-strong);
   background: var(--color-control-hover);
   box-shadow: 0 0 0 1px var(--color-border-strong);
+  cursor: pointer;
 }
 
 .shortcut-card.shortcut-sortable-dragging {
   border-color: var(--color-border-strong);
   background: var(--color-control-active);
   box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 20%, transparent);
+  cursor: pointer;
   opacity: 0.96;
 }
 

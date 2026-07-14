@@ -82,6 +82,7 @@
             role="button"
             tabindex="0"
             class="workspace-drag-handle group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border border-transparent px-1 py-0.5 text-left text-[var(--color-text)] hover:border-[var(--color-border)] hover:bg-[var(--color-control-hover)]"
+            :class="!normalizedSearchQuery ? 'cursor-pointer' : ''"
             :style="{ paddingLeft: '6px' }"
             @click="handleWorkspaceClick($event, workspace.value)"
             @keydown.enter="handleWorkspaceKeydown($event, workspace.value)"
@@ -163,7 +164,7 @@
                 isActiveSessionSelection(session.session.id)
                   ? 'border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text-strong)]'
                   : 'border-transparent text-[var(--color-text-muted)] hover:border-[var(--color-border)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)]',
-                normalizedSearchQuery ? 'cursor-pointer' : '',
+                'cursor-pointer',
               ]"
               :style="{ paddingLeft: '24px' }"
               @click="handleSessionClick($event, session.session)"
@@ -773,6 +774,7 @@
     border-color: var(--color-border-strong) !important;
     background: var(--color-control-hover) !important;
     box-shadow: 0 0 0 1px var(--color-border-strong);
+    cursor: pointer;
   }
 
   .workspace-sortable-dragging > .workspace-drag-handle,
@@ -780,6 +782,7 @@
     border-color: var(--color-border-strong) !important;
     background: var(--color-control-active) !important;
     box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 20%, transparent);
+    cursor: pointer;
     opacity: 0.96;
   }
 </style>
