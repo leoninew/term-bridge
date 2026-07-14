@@ -8,14 +8,19 @@
           <h1 class="shortcut-page-title font-semibold text-[var(--color-text-strong)]">
             {{ t('shortcut.title') }}
           </h1>
-          <button
-            type="button"
-            class="button button-primary shortcut-create-button inline-flex shrink-0 items-center gap-1"
-            @click="openCreate"
-          >
-            <Plus class="size-4" aria-hidden="true" />
-            {{ t('common.create') }}
-          </button>
+          <div class="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              class="button button-primary shortcut-create-button inline-flex items-center gap-1"
+              @click="openCreate"
+            >
+              <Plus class="size-4" aria-hidden="true" />
+              {{ t('common.create') }}
+            </button>
+            <button type="button" class="button button-secondary" @click="props.returnToWorkspace">
+              {{ t('common.returnToWorkspace') }}
+            </button>
+          </div>
         </header>
 
         <p v-if="loading" class="shortcut-loading text-center text-[var(--color-text-muted)]">
@@ -87,7 +92,10 @@
   import ShortcutCard from './ShortcutCard.vue'
   import ShortcutEditorDialog from './ShortcutEditorDialog.vue'
 
-  const props = defineProps<{ api: ShortcutRuntimeApi }>()
+  const props = defineProps<{
+    api: ShortcutRuntimeApi
+    returnToWorkspace: () => void | Promise<void>
+  }>()
   const { t } = useI18n()
   const notifications = useNotificationsStore()
   const shortcuts = ref<Shortcut[]>([])

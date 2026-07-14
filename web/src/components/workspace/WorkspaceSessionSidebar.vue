@@ -180,10 +180,14 @@
               }}</span>
               <span
                 v-if="session.session.lifecycle_state === 'running'"
-                class="size-2 shrink-0 rounded-full"
-                :class="lifecycleIndicatorClassName(session.session.lifecycle_state)"
-                aria-hidden="true"
-              />
+                class="flex size-5 shrink-0 items-center justify-center"
+              >
+                <CircleDot
+                  class="size-3.5"
+                  :class="lifecycleStateClassName(session.session.lifecycle_state)"
+                  aria-hidden="true"
+                />
+              </span>
               <span
                 v-if="isEditableSession(session.session)"
                 class="flex size-5 shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
@@ -207,6 +211,29 @@
                 </button>
               </span>
               <button
+                v-if="['stopped', 'failed'].includes(session.session.lifecycle_state)"
+                type="button"
+                :disabled="props.rerunningSessionId === session.session.id"
+                class="flex size-5 shrink-0 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
+                :aria-label="
+                  t('sidebar.rerunSessionAria', {
+                    name: session.session.name || session.session.command,
+                  })
+                "
+                :title="
+                  t('sidebar.rerunSessionAria', {
+                    name: session.session.name || session.session.command,
+                  })
+                "
+                @click.stop="emit('rerunSession', session.session)"
+              >
+                <Loader2
+                  v-if="props.rerunningSessionId === session.session.id"
+                  class="size-3.5 animate-spin"
+                />
+                <RotateCcw v-else class="size-3.5" />
+              </button>
+              <button
                 v-if="session.session.lifecycle_state === 'running'"
                 type="button"
                 :disabled="props.stoppingSessionId === session.session.id"
@@ -228,29 +255,6 @@
                   class="size-3.5 animate-spin"
                 />
                 <CircleStop v-else class="size-3.5" />
-              </button>
-              <button
-                v-if="['stopped', 'failed'].includes(session.session.lifecycle_state)"
-                type="button"
-                :disabled="props.rerunningSessionId === session.session.id"
-                class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
-                :aria-label="
-                  t('sidebar.rerunSessionAria', {
-                    name: session.session.name || session.session.command,
-                  })
-                "
-                :title="
-                  t('sidebar.rerunSessionAria', {
-                    name: session.session.name || session.session.command,
-                  })
-                "
-                @click.stop="emit('rerunSession', session.session)"
-              >
-                <Loader2
-                  v-if="props.rerunningSessionId === session.session.id"
-                  class="size-3.5 animate-spin"
-                />
-                <RotateCcw v-else class="size-3.5" />
               </button>
               <button
                 v-if="['stopped', 'failed'].includes(session.session.lifecycle_state)"
@@ -284,7 +288,7 @@
     <footer
       class="flex h-8 shrink-0 items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-panel-header)] px-2 text-sm text-[var(--color-text-muted)]"
     >
-      <DropdownMenuRoot>
+      <DropdownMenuRoot :modal="false">
         <DropdownMenuTrigger
           class="flex h-6 items-center gap-1.5 rounded px-1.5 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus:bg-[var(--color-control-hover)] focus:text-[var(--color-text)]"
           :aria-label="t('common.settings')"
@@ -420,6 +424,7 @@
   import {
     Check,
     ChevronRight,
+    CircleDot,
     CircleHelp,
     Command,
     CircleStop,
@@ -451,7 +456,7 @@
   } from 'reka-ui'
   import { VueDraggable } from 'vue-draggable-plus'
   import type { SortableEvent } from 'sortablejs'
-  import { lifecycleIndicatorClassName } from '../../features/sessions/lifecycleState'
+  import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import { localeLabels, locales, setLocale, type AppLocale } from '../../i18n'
   import SessionSourceIcon from '../session/SessionSourceIcon.vue'
   import { themes, useThemeStore, type AppTheme } from '../../store/theme'

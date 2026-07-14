@@ -23,4 +23,11 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rolldownOptions: {  // 注意：新版用 rolldownOptions，老版可能是 rollupOptions
+      checks: {
+        invalidAnnotation: false,   // 关闭 INVALID_ANNOTATION 警告
+      },
+    },
+  },
 })

@@ -1,7 +1,7 @@
-<template><ShortcutsPageShell :api="api" /></template>
+<template><ShortcutsPageShell :api="api" :return-to-workspace="returnToWorkspace" /></template>
 <script setup lang="ts">
   import { computed } from 'vue'
-  import { useRoute } from 'vue-router'
+  import { useRoute, useRouter } from 'vue-router'
   import ShortcutsPageShell from '../../components/shortcut/ShortcutsPageShell.vue'
   import {
     createShortcut,
@@ -12,9 +12,11 @@
   } from '../../features/cloud/api'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
   const route = useRoute()
+  const router = useRouter()
+  const deviceId = computed(() => String(route.params.deviceId ?? ''))
   const target = computed<RuntimeTarget>(() => ({
     mode: 'cloud',
-    deviceId: String(route.params.deviceId ?? ''),
+    deviceId: deviceId.value,
   }))
   const api = computed(() => ({
     listShortcuts: () => listShortcuts(target.value),
@@ -26,4 +28,8 @@
       updateShortcutOrder(target.value, request),
     deleteShortcut: (id: string) => deleteShortcut(target.value, id),
   }))
+
+  async function returnToWorkspace() {
+    await router.push({ name: 'cloud-sessions', params: { deviceId: deviceId.value } })
+  }
 </script>
