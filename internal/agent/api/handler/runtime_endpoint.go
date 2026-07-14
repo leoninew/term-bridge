@@ -205,6 +205,7 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 		for {
 			messageType, data, err := conn.Read(r.Context())
 			if err != nil {
+				s.config.Logger.Info("terminal browser stream read ended", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", err)
 				return
 			}
 			switch messageType {
@@ -224,6 +225,7 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 						s.config.Logger.Warn("terminal resize failed", "workspace_id", workspaceId, "session_id", sessionId, "cols", cols, "rows", rows, "error", err)
 					}
 				case terminalproto.TypeDetach:
+					s.config.Logger.Info("terminal browser stream detached", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "reason", "browser_detached")
 					stream.Detach("browser_detached")
 					return
 				case terminalproto.TypePing:
@@ -240,11 +242,14 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 	for {
 		select {
 		case <-r.Context().Done():
+			s.config.Logger.Info("terminal browser stream context ended", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "error", r.Context().Err())
 			return nil
 		case <-done:
+			s.config.Logger.Info("terminal browser stream input ended", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId)
 			return nil
 		case outbound, ok := <-stream.Outbound():
 			if !ok {
+				s.config.Logger.Info("terminal runtime outbound closed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId)
 				_ = conn.Close(websocket.StatusNormalClosure, "terminal closed")
 				return nil
 			}
@@ -252,6 +257,7 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 				err := conn.Write(r.Context(), websocket.MessageBinary, outbound.Binary)
 				stream.MarkSent(outbound)
 				if err != nil {
+					s.config.Logger.Warn("terminal browser stream write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "frame_kind", "binary", "error", err)
 					return err
 				}
 				continue
@@ -264,6 +270,7 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 			err = conn.Write(r.Context(), websocket.MessageText, data)
 			stream.MarkSent(outbound)
 			if err != nil {
+				s.config.Logger.Warn("terminal browser stream write failed", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "frame_kind", "control", "error", err)
 				return err
 			}
 		}

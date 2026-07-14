@@ -147,6 +147,32 @@ func TestCreateSessionPersistsRuntimeRecords(t *testing.T) {
 	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 }
 
+func TestRuntimeNonZeroProcessExitIsStoppedWithoutForcedClose(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+
+	response, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{Name: "Shell", Command: []string{"bash"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	fake.finish(termpty.Result{ExitCode: 1, Err: errors.New("exit status 1")})
+	store := state.NewStore(root)
+	waitExit(t, store, response.WorkspaceId, response.SessionId)
+
+	exit, err := store.LoadExit(response.WorkspaceId, response.SessionId)
+	if err != nil {
+		t.Fatalf("LoadExit() error = %v", err)
+	}
+	if exit.ExitCode != 1 || exit.Forced || exit.Closed {
+		t.Fatalf("exit = %#v, want non-forced exit code 1", exit)
+	}
+	if fake.closed {
+		t.Fatal("PTY Close() was called for non-zero process exit")
+	}
+}
+
 func TestRuntimeInitialSizeMatchesCreatedPTYSize(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()

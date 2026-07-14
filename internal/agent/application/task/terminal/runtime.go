@@ -238,13 +238,24 @@ func (r *SessionRuntime) closeSession(reason string) error {
 	}
 	r.closed = true
 	r.stopMode = process.StopClose
+	mode := r.stopMode
 	clients := r.snapshotClientsLocked()
 	done := r.done
 	r.mu.Unlock()
+	r.registry.logger.Info(
+		"terminal process close requested",
+		"source", "web",
+		"session_id", r.session.Id,
+		"workspace_id", r.session.WorkspaceId,
+		"reason", reason,
+		"stop_mode", mode.String(),
+		"clients", len(clients),
+	)
 	for _, client := range clients {
 		client.enqueue(Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeState, LifecycleState: string(session.StateRunning), AttachmentState: string(AttachmentDetached), Reason: reason}})
 	}
 	if err := r.pty.Close(); err != nil {
+		r.registry.logger.Warn("terminal process close failed", "source", "web", "session_id", r.session.Id, "workspace_id", r.session.WorkspaceId, "reason", reason, "error_kind", apperrors.KindOf(err))
 		return err
 	}
 	<-done
@@ -279,6 +290,23 @@ func (r *SessionRuntime) waitLoop() {
 	r.closed = true
 	r.attachment = AttachmentDetached
 	r.mu.Unlock()
+	startedAt := r.session.CreatedAt
+	if reporter, ok := r.pty.(termpty.ProcessReporter); ok {
+		if record := reporter.ProcessInfo(); !record.StartedAt.IsZero() {
+			startedAt = record.StartedAt
+		}
+	}
+	r.registry.logger.Info(
+		"terminal pty wait completed",
+		"source", "web",
+		"session_id", r.session.Id,
+		"workspace_id", r.session.WorkspaceId,
+		"raw_exit_code", result.ExitCode,
+		"raw_wait_error", result.Err,
+		"raw_wait_error_kind", apperrors.KindOf(result.Err),
+		"stop_mode", mode.String(),
+		"elapsed", endedAt.Sub(startedAt),
+	)
 	exit := process.InterpretExit(result.Err, result.ExitCode, mode)
 	_ = r.history.Close()
 	var sessionUpdate *session.Session
@@ -287,12 +315,6 @@ func (r *SessionRuntime) waitLoop() {
 		sess.History.Truncated = true
 		sess.UpdatedAt = endedAt
 		sessionUpdate = &sess
-	}
-	startedAt := r.session.CreatedAt
-	if reporter, ok := r.pty.(termpty.ProcessReporter); ok {
-		if record := reporter.ProcessInfo(); !record.StartedAt.IsZero() {
-			startedAt = record.StartedAt
-		}
 	}
 	waitErr := ""
 	if exit.WaitErr != nil {
@@ -313,7 +335,20 @@ func (r *SessionRuntime) waitLoop() {
 	if saveErr != nil {
 		r.registry.logger.Warn("save web terminal exit state", "source", "web", "session_id", r.session.Id, "workspace_id", r.session.WorkspaceId, "cwd", r.session.LaunchCwd, "stage", "save_exit_state", "state", finalState, "error_kind", apperrors.KindOf(saveErr))
 	} else {
-		r.registry.logger.Info("terminal process exited", "source", "web", "session_id", r.session.Id, "workspace_id", r.session.WorkspaceId, "cwd", r.session.LaunchCwd, "exit_code", exit.Code, "state", finalState, "forced", exit.Forced, "closed", exit.Closed)
+		r.registry.logger.Info(
+			"terminal process exited",
+			"source", "web",
+			"session_id", r.session.Id,
+			"workspace_id", r.session.WorkspaceId,
+			"cwd", r.session.LaunchCwd,
+			"raw_exit_code", result.ExitCode,
+			"exit_code", exit.Code,
+			"state", finalState,
+			"stop_mode", mode.String(),
+			"forced", exit.Forced,
+			"closed", exit.Closed,
+			"elapsed", endedAt.Sub(startedAt),
+		)
 	}
 	exitCode := int32(exit.Code)
 	r.broadcastText(&agent.ServerControlMessage{Type: terminalproto.TypeExited, ExitCode: &exitCode, State: string(finalState), LifecycleState: string(finalState), AttachmentState: string(AttachmentDetached)})
