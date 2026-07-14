@@ -208,6 +208,9 @@ export const messages = {
     },
     workbench: {
       loadingHistory: '正在加载有限历史…',
+      preparingTerminal: '正在准备终端布局…',
+      connectingTerminal: '正在连接终端…',
+      attachingTerminal: '正在接入会话…',
       noHistory: '此会话没有可用的有限历史。',
       noTabTitle: '没有打开的终端标签页',
       noTabDescription: '从工作区树中选择一个会话，或启动一个新命令。',
@@ -507,6 +510,9 @@ export const messages = {
     },
     workbench: {
       loadingHistory: 'Loading bounded history…',
+      preparingTerminal: 'Preparing terminal layout…',
+      connectingTerminal: 'Connecting terminal…',
+      attachingTerminal: 'Attaching session…',
       noHistory: 'No bounded history is available for this session.',
       noTabTitle: 'No terminal tab is open',
       noTabDescription: 'Select a session from the workspace tree, or start a new command.',

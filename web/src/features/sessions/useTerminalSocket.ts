@@ -4,12 +4,7 @@ import type {
   ClientControlMessage,
   ServerControlMessage,
 } from '../../gen/proto/termbridge/agent/v1/terminal'
-import {
-  diagnosticWebSocketPath,
-  logTerminalDiagnostic,
-  logTerminalDiagnosticError,
-  logTerminalDiagnosticSample,
-} from '../../components/terminal/diagnostics'
+import { terminalDebug } from '../../components/terminal/diagnostics'
 
 export function useTerminalSocket(
   onOutput: (data: Uint8Array) => void,
@@ -30,12 +25,12 @@ export function useTerminalSocket(
     binaryMessageCount = 0
     controlMessageCount = 0
     const wsUrl = new URL(url, window.location.href).toString()
-    logTerminalDiagnostic('socket.connect', { path: diagnosticWebSocketPath(wsUrl) })
+    terminalDebug('socket.connect', { path: wsUrl })
     const next = new WebSocket(wsUrl, terminalSubprotocol)
     next.binaryType = 'arraybuffer'
     next.onopen = () => {
       status.value = 'connected'
-      logTerminalDiagnostic('socket.open', { path: diagnosticWebSocketPath(wsUrl) })
+      terminalDebug('socket.open', { path: wsUrl })
       sendControl({ type: 'hello', cols: 0, rows: 0, nonce: '' })
       if (pendingResize) {
         sendControl(pendingResize)
@@ -46,32 +41,36 @@ export function useTerminalSocket(
         controlMessageCount += 1
         try {
           const message = decodeControl(event.data)
-          logTerminalDiagnostic('socket.control.received', {
-            path: diagnosticWebSocketPath(wsUrl),
+          terminalDebug('socket.control.received', {
+            path: wsUrl,
             type: message.type,
             count: controlMessageCount,
           })
           onControl(message)
         } catch (err) {
           error.value = err instanceof Error ? err.message : String(err)
-          logTerminalDiagnosticError('socket.control.decode-error', {
-            path: diagnosticWebSocketPath(wsUrl),
-            message: error.value,
-          })
+          terminalDebug(
+            'socket.control.decode-error',
+            {
+              path: wsUrl,
+              message: error.value,
+            },
+            { level: 'error' },
+          )
           onError(error.value)
         }
         return
       }
       if (event.data instanceof ArrayBuffer) {
         binaryMessageCount += 1
-        logTerminalDiagnosticSample(
+        terminalDebug(
           'socket.binary.received',
           {
-            path: diagnosticWebSocketPath(wsUrl),
+            path: wsUrl,
             bytes: event.data.byteLength,
             count: binaryMessageCount,
           },
-          binaryMessageCount,
+          { sample: binaryMessageCount },
         )
         onOutput(new Uint8Array(event.data))
       }
@@ -79,13 +78,13 @@ export function useTerminalSocket(
     next.onerror = () => {
       status.value = 'error'
       error.value = 'websocket error'
-      logTerminalDiagnosticError('socket.error', { path: diagnosticWebSocketPath(wsUrl) })
+      terminalDebug('socket.error', { path: wsUrl }, { level: 'error' })
       onError(error.value)
     }
     next.onclose = (event) => {
       status.value = 'closed'
-      logTerminalDiagnostic('socket.close', {
-        path: diagnosticWebSocketPath(wsUrl),
+      terminalDebug('socket.close', {
+        path: wsUrl,
         code: event.code,
         reason: event.reason,
         wasClean: event.wasClean,
@@ -98,7 +97,7 @@ export function useTerminalSocket(
 
   function sendInput(data: string) {
     if (socket.value?.readyState === WebSocket.OPEN) {
-      logTerminalDiagnostic('socket.input.send', {
+      terminalDebug('socket.input.send', {
         bytes: new TextEncoder().encode(data).byteLength,
       })
       socket.value.send(new TextEncoder().encode(data))
@@ -113,7 +112,7 @@ export function useTerminalSocket(
     for (let index = 0; index < data.length; index += 1) {
       bytes[index] = data.charCodeAt(index) & 0xff
     }
-    logTerminalDiagnostic('socket.binary.send', { bytes: bytes.byteLength })
+    terminalDebug('socket.binary.send', { bytes: bytes.byteLength })
     socket.value.send(bytes)
   }
 
@@ -122,7 +121,7 @@ export function useTerminalSocket(
       pendingResize = message
     }
     if (socket.value?.readyState !== WebSocket.OPEN) {
-      logTerminalDiagnostic('socket.control.deferred', {
+      terminalDebug('socket.control.deferred', {
         type: message.type,
         cols: 'cols' in message ? message.cols : undefined,
         rows: 'rows' in message ? message.rows : undefined,
@@ -130,7 +129,7 @@ export function useTerminalSocket(
       })
       return
     }
-    logTerminalDiagnostic('socket.control.send', {
+    terminalDebug('socket.control.send', {
       type: message.type,
       cols: 'cols' in message ? message.cols : undefined,
       rows: 'rows' in message ? message.rows : undefined,
@@ -143,7 +142,7 @@ export function useTerminalSocket(
 
   function close() {
     if (socket.value) {
-      logTerminalDiagnostic('socket.close.requested')
+      terminalDebug('socket.close.requested')
       socket.value.close()
       socket.value = null
     }

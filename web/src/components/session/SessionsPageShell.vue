@@ -139,7 +139,7 @@
   import RemoveWorkspaceDialog from './RemoveWorkspaceDialog.vue'
   import SessionWorkbench from './SessionWorkbench.vue'
   import WorkspaceSessionSidebar from '../workspace/WorkspaceSessionSidebar.vue'
-  import { logTerminalDiagnostic } from '../terminal/diagnostics'
+  import { terminalDebug } from '../terminal/diagnostics'
   import { useCreateSessionDraft } from '../../composable/useCreateSessionDraft'
   import { useSessionDialogs } from '../../composable/useSessionDialogs'
   import { useTerminalSize } from '../../composable/useTerminalSize'
@@ -330,7 +330,7 @@
     creatingSession.value = true
     try {
       const size = measureInitialTerminalSize()
-      logTerminalDiagnostic('session.create.request', {
+      terminalDebug('session.create.request', {
         name: draft.value.name,
         cwd: draft.value.cwd,
         commandLength: draft.value.commandText.length,
@@ -348,13 +348,13 @@
         shortcut_id_snapshot: draft.value.shortcutIdSnapshot,
         shortcut_name_snapshot: draft.value.shortcutNameSnapshot,
       })
-      logTerminalDiagnostic('session.create.response', {
+      terminalDebug('session.create.response', {
         sessionId: created.session_id,
         workspaceId: created.workspace_id,
         state: created.state,
       })
       const session = await props.runtimeApi.getSession(created.workspace_id, created.session_id)
-      logTerminalDiagnostic('session.create.summary', {
+      terminalDebug('session.create.summary', {
         sessionId: session.id,
         lifecycleState: session.lifecycle_state,
         attachmentState: session.attachment_state,
@@ -557,7 +557,7 @@
   }
 
   function openCreateSessionForm(workspace?: WorkspaceSummary) {
-    logTerminalDiagnostic('session.form.open', {
+    terminalDebug('session.form.open', {
       workspaceId: workspace?.id,
       workspacePath: workspace?.path,
       activeSessionId: activeSession.value?.id ?? null,
