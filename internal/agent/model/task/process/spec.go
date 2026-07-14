@@ -44,7 +44,7 @@ func NewSpec(cwd string, commandText string, size TerminalSize) (ProcessSpec, er
 	return ProcessSpec{
 		CommandText: commandText,
 		Cwd:         cwd,
-		Env:         append([]string(nil), os.Environ()...),
+		Env:         SanitizeLaunchEnv(os.Environ()),
 		InitialSize: size.OrDefault(),
 	}, nil
 }

@@ -324,7 +324,6 @@ func (r *Registry) startClaimedSessionRuntime(ctx context.Context, sess session.
 		_ = historyWriter.Close()
 		return apperrors.Runtime("build process spec", err)
 	}
-	spec.Env = os.Environ()
 
 	r.logger.Info("terminal process start requested", "source", "web", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", spec.Cwd, "cols", spec.InitialSize.Cols, "rows", spec.InitialSize.Rows, "command_length", len(spec.CommandText))
 	ptySession, err := r.manager.Start(ctx, spec)

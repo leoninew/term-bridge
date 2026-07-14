@@ -1,6 +1,9 @@
 package process
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNewSpecPreservesCommandText(t *testing.T) {
 	commandText := `ccs list --filter "my project"`
@@ -20,6 +23,31 @@ func TestNewSpecRequiresCommand(t *testing.T) {
 	_, err := NewSpec(`D:\project`, "   ", TerminalSize{})
 	if err == nil {
 		t.Fatal("NewSpec() error = nil, want error")
+	}
+}
+
+func TestNewSpecSanitizesLaunchEnv(t *testing.T) {
+	t.Setenv("SHELLOPTS", "braceexpand:errexit:hashall")
+	t.Setenv("BASHOPTS", "checkwinsize:cmdhist")
+	t.Setenv("TERMBRIDGE_ENV_SANITIZE_TEST", "1")
+
+	spec, err := NewSpec(`D:\project`, "bash", TerminalSize{Cols: 80, Rows: 25})
+	if err != nil {
+		t.Fatalf("NewSpec() error = %v", err)
+	}
+	foundMarker := false
+	for _, entry := range spec.Env {
+		key, _, _ := strings.Cut(entry, "=")
+		switch strings.ToUpper(key) {
+		case "SHELLOPTS", "BASHOPTS":
+			t.Fatalf("NewSpec() Env still contains %q", entry)
+		}
+		if entry == "TERMBRIDGE_ENV_SANITIZE_TEST=1" {
+			foundMarker = true
+		}
+	}
+	if !foundMarker {
+		t.Fatal("NewSpec() Env missing TERMBRIDGE_ENV_SANITIZE_TEST=1")
 	}
 }
 

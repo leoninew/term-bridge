@@ -59,7 +59,11 @@ func (m Manager) Start(ctx context.Context, spec process.ProcessSpec) (termpty.S
 	// The process lifecycle is managed by the session runtime, not the HTTP request.
 	cmd := pt.CommandContext(context.Background(), executable, command.args...)
 	cmd.Dir = spec.Cwd
-	cmd.Env = spec.Env
+	if spec.Env == nil {
+		cmd.Env = process.SanitizeLaunchEnv(os.Environ())
+	} else {
+		cmd.Env = process.SanitizeLaunchEnv(spec.Env)
+	}
 	startedAt := time.Now().UTC()
 	if err := cmd.Start(); err != nil {
 		_ = pt.Close()
