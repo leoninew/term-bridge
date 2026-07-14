@@ -37,7 +37,7 @@ func TestMigrateUpgradesCompleteRuntimeSchema(t *testing.T) {
 	if _, err := db.Exec(`DROP TABLE shortcuts`); err != nil {
 		t.Fatalf("drop shortcuts for upgrade simulation: %v", err)
 	}
-	if _, err := db.Exec(`DELETE FROM goose_agent_db_version WHERE version_id IN (202607100001, 202607120001)`); err != nil {
+	if _, err := db.Exec(`DELETE FROM goose_agent_db_version WHERE version_id IN (202607100001, 202607120001, 202607140001, 202607140002)`); err != nil {
 		t.Fatalf("reset shortcut migration versions: %v", err)
 	}
 
@@ -52,6 +52,7 @@ func TestMigrateUpgradesCompleteRuntimeSchema(t *testing.T) {
 		t.Fatalf("inspect shortcuts columns: %v", err)
 	}
 	defer func() { _ = columns.Close() }()
+	seen := map[string]bool{}
 	for columns.Next() {
 		var position int
 		var name, columnType string
@@ -60,14 +61,16 @@ func TestMigrateUpgradesCompleteRuntimeSchema(t *testing.T) {
 		if err := columns.Scan(&position, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
 			t.Fatalf("scan shortcuts column: %v", err)
 		}
-		if name == "sort_order" {
-			return
-		}
+		seen[name] = true
 	}
 	if err := columns.Err(); err != nil {
 		t.Fatalf("iterate shortcuts columns: %v", err)
 	}
-	t.Fatal("Migrate() did not add persisted shortcut ordering")
+	for _, name := range []string{"sort_order", "icon", "enabled", "tags_json", "last_used_at"} {
+		if !seen[name] {
+			t.Fatalf("Migrate() did not add shortcut column %q", name)
+		}
+	}
 }
 
 func TestMigrateRejectsPartialAgentSchemaState(t *testing.T) {

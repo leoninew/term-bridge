@@ -44,7 +44,20 @@ func (s Service) Create(request *agent.CreateShortcutReq) (*agent.Shortcut, erro
 	if request == nil {
 		return nil, apperrors.Usage("shortcut create request is required")
 	}
-	value := shortcutmodel.Shortcut{Name: request.GetName(), Command: request.GetCommand(), Description: request.Description, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	enabled := true
+	if request.Enabled != nil {
+		enabled = request.GetEnabled()
+	}
+	value := shortcutmodel.Shortcut{
+		Name:        request.GetName(),
+		Command:     request.GetCommand(),
+		Description: request.Description,
+		Icon:        request.Icon,
+		Enabled:     &enabled,
+		Tags:        request.Tags,
+		CreatedAt:   time.Now().UTC(),
+		UpdatedAt:   time.Now().UTC(),
+	}
 	created, err := s.store.CreateShortcut(value)
 	if err != nil {
 		return nil, shortcutError("create shortcut", err)
@@ -57,8 +70,8 @@ func (s Service) Update(shortcutId string, request *agent.UpdateShortcutReq) (*a
 	if shortcutId == "" {
 		return nil, apperrors.Usage("shortcut id is required")
 	}
-	if request == nil || (request.Name == nil && request.Command == nil && request.Description == nil) {
-		return nil, apperrors.Usage("shortcut update requires name, command, or description")
+	if request == nil || (request.Name == nil && request.Command == nil && request.Description == nil && request.Icon == nil && request.Enabled == nil && request.Tags == nil) {
+		return nil, apperrors.Usage("shortcut update requires a field")
 	}
 	updated, err := s.store.UpdateShortcut(shortcutId, func(value *shortcutmodel.Shortcut) error {
 		if request.Name != nil {
@@ -69,6 +82,15 @@ func (s Service) Update(shortcutId string, request *agent.UpdateShortcutReq) (*a
 		}
 		if request.Description != nil {
 			value.Description = request.Description
+		}
+		if request.Icon != nil {
+			value.Icon = request.Icon
+		}
+		if request.Enabled != nil {
+			value.Enabled = request.Enabled
+		}
+		if request.Tags != nil {
+			value.Tags = request.Tags
 		}
 		value.UpdatedAt = time.Now().UTC()
 		return nil
@@ -127,6 +149,10 @@ func protoFromModel(value shortcutmodel.Shortcut) *agent.Shortcut {
 		Name:        value.Name,
 		Command:     value.Command,
 		Description: value.Description,
+		Icon:        value.Icon,
+		Enabled:     value.Enabled,
+		Tags:        value.Tags,
+		LastUsedAt:  prototime.FromTime(value.LastUsedAt),
 		CreatedAt:   prototime.FromTime(value.CreatedAt),
 		UpdatedAt:   prototime.FromTime(value.UpdatedAt),
 	}

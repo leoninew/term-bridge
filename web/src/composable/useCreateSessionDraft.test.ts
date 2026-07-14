@@ -8,6 +8,10 @@ function shortcut(id: string, name: string, command: string): Shortcut {
     name,
     command,
     description: undefined,
+    icon: undefined,
+    enabled: undefined,
+    tags: [],
+    last_used_at: undefined,
     created_at: undefined,
     updated_at: undefined,
   }

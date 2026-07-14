@@ -1,6 +1,9 @@
 package shortcut
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestNormalizePreservesRawCommandAndNormalizesDescription(t *testing.T) {
 	description := "  launch the local shell  "
@@ -25,6 +28,29 @@ func TestNormalizeRejectsBlankRequiredFields(t *testing.T) {
 		if err := value.Normalize(); err == nil {
 			t.Fatalf("Normalize(%#v) error = nil, want required-field error", value)
 		}
+	}
+}
+
+func TestNormalizeTagsRemovesBlankAndDuplicateValues(t *testing.T) {
+	value := Shortcut{Name: "shell", Command: "cmd", Tags: []string{"  build  ", "build", "", "release"}}
+
+	if err := value.Normalize(); err != nil {
+		t.Fatalf("Normalize() error = %v", err)
+	}
+	if len(value.Tags) != 2 || value.Tags[0] != "build" || value.Tags[1] != "release" {
+		t.Fatalf("Tags = %#v, want normalized unique tags", value.Tags)
+	}
+}
+
+func TestNormalizePreservesLastUsedAt(t *testing.T) {
+	lastUsedAt := time.Date(2026, time.July, 14, 12, 30, 0, 0, time.UTC)
+	value := Shortcut{Name: "shell", Command: "cmd", LastUsedAt: lastUsedAt}
+
+	if err := value.Normalize(); err != nil {
+		t.Fatalf("Normalize() error = %v", err)
+	}
+	if !value.LastUsedAt.Equal(lastUsedAt) {
+		t.Fatalf("LastUsedAt = %s, want %s", value.LastUsedAt, lastUsedAt)
 	}
 }
 

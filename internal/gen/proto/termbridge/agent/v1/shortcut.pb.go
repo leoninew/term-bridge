@@ -30,6 +30,10 @@ type Shortcut struct {
 	Description   *string                `protobuf:"bytes,4,opt,name=description,proto3,oneof" json:"description,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Icon          *string                `protobuf:"bytes,7,opt,name=icon,proto3,oneof" json:"icon,omitempty"`
+	Enabled       *bool                  `protobuf:"varint,8,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
+	Tags          []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`
+	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=last_used_at,json=lastUsedAt,proto3" json:"last_used_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -102,6 +106,34 @@ func (x *Shortcut) GetCreatedAt() *timestamppb.Timestamp {
 func (x *Shortcut) GetUpdatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *Shortcut) GetIcon() string {
+	if x != nil && x.Icon != nil {
+		return *x.Icon
+	}
+	return ""
+}
+
+func (x *Shortcut) GetEnabled() bool {
+	if x != nil && x.Enabled != nil {
+		return *x.Enabled
+	}
+	return false
+}
+
+func (x *Shortcut) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *Shortcut) GetLastUsedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastUsedAt
 	}
 	return nil
 }
@@ -191,6 +223,9 @@ type CreateShortcutReq struct {
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Command       string                 `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
 	Description   *string                `protobuf:"bytes,3,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	Icon          *string                `protobuf:"bytes,4,opt,name=icon,proto3,oneof" json:"icon,omitempty"`
+	Enabled       *bool                  `protobuf:"varint,5,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
+	Tags          []string               `protobuf:"bytes,6,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -246,6 +281,27 @@ func (x *CreateShortcutReq) GetDescription() string {
 	return ""
 }
 
+func (x *CreateShortcutReq) GetIcon() string {
+	if x != nil && x.Icon != nil {
+		return *x.Icon
+	}
+	return ""
+}
+
+func (x *CreateShortcutReq) GetEnabled() bool {
+	if x != nil && x.Enabled != nil {
+		return *x.Enabled
+	}
+	return false
+}
+
+func (x *CreateShortcutReq) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 type CreateShortcutResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Shortcut      *Shortcut              `protobuf:"bytes,1,opt,name=shortcut,proto3" json:"shortcut,omitempty"`
@@ -295,6 +351,9 @@ type UpdateShortcutReq struct {
 	Name          *string                `protobuf:"bytes,1,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	Command       *string                `protobuf:"bytes,2,opt,name=command,proto3,oneof" json:"command,omitempty"`
 	Description   *string                `protobuf:"bytes,3,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	Icon          *string                `protobuf:"bytes,4,opt,name=icon,proto3,oneof" json:"icon,omitempty"`
+	Enabled       *bool                  `protobuf:"varint,5,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
+	Tags          []string               `protobuf:"bytes,6,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -348,6 +407,27 @@ func (x *UpdateShortcutReq) GetDescription() string {
 		return *x.Description
 	}
 	return ""
+}
+
+func (x *UpdateShortcutReq) GetIcon() string {
+	if x != nil && x.Icon != nil {
+		return *x.Icon
+	}
+	return ""
+}
+
+func (x *UpdateShortcutReq) GetEnabled() bool {
+	if x != nil && x.Enabled != nil {
+		return *x.Enabled
+	}
+	return false
+}
+
+func (x *UpdateShortcutReq) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
 }
 
 type UpdateShortcutRequest struct {
@@ -618,7 +698,7 @@ var File_termbridge_agent_v1_shortcut_proto protoreflect.FileDescriptor
 
 const file_termbridge_agent_v1_shortcut_proto_rawDesc = "" +
 	"\n" +
-	"\"termbridge/agent/v1/shortcut.proto\x12\x10termbridge.agent\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf5\x01\n" +
+	"\"termbridge/agent/v1/shortcut.proto\x12\x10termbridge.agent\x1a\x1fgoogle/protobuf/timestamp.proto\"\x94\x03\n" +
 	"\bShortcut\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -627,26 +707,47 @@ const file_termbridge_agent_v1_shortcut_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtB\x0e\n" +
-	"\f_description\"\x12\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x17\n" +
+	"\x04icon\x18\a \x01(\tH\x01R\x04icon\x88\x01\x01\x12\x1d\n" +
+	"\aenabled\x18\b \x01(\bH\x02R\aenabled\x88\x01\x01\x12\x12\n" +
+	"\x04tags\x18\t \x03(\tR\x04tags\x12<\n" +
+	"\flast_used_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastUsedAtB\x0e\n" +
+	"\f_descriptionB\a\n" +
+	"\x05_iconB\n" +
+	"\n" +
+	"\b_enabled\"\x12\n" +
 	"\x10ListShortcutsReq\"E\n" +
 	"\x11ListShortcutsResp\x120\n" +
-	"\x05items\x18\x01 \x03(\v2\x1a.termbridge.agent.ShortcutR\x05items\"x\n" +
+	"\x05items\x18\x01 \x03(\v2\x1a.termbridge.agent.ShortcutR\x05items\"\xd9\x01\n" +
 	"\x11CreateShortcutReq\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\acommand\x18\x02 \x01(\tR\acommand\x12%\n" +
-	"\vdescription\x18\x03 \x01(\tH\x00R\vdescription\x88\x01\x01B\x0e\n" +
-	"\f_description\"L\n" +
+	"\vdescription\x18\x03 \x01(\tH\x00R\vdescription\x88\x01\x01\x12\x17\n" +
+	"\x04icon\x18\x04 \x01(\tH\x01R\x04icon\x88\x01\x01\x12\x1d\n" +
+	"\aenabled\x18\x05 \x01(\bH\x02R\aenabled\x88\x01\x01\x12\x12\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tagsB\x0e\n" +
+	"\f_descriptionB\a\n" +
+	"\x05_iconB\n" +
+	"\n" +
+	"\b_enabled\"L\n" +
 	"\x12CreateShortcutResp\x126\n" +
-	"\bshortcut\x18\x01 \x01(\v2\x1a.termbridge.agent.ShortcutR\bshortcut\"\x97\x01\n" +
+	"\bshortcut\x18\x01 \x01(\v2\x1a.termbridge.agent.ShortcutR\bshortcut\"\xf8\x01\n" +
 	"\x11UpdateShortcutReq\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1d\n" +
 	"\acommand\x18\x02 \x01(\tH\x01R\acommand\x88\x01\x01\x12%\n" +
-	"\vdescription\x18\x03 \x01(\tH\x02R\vdescription\x88\x01\x01B\a\n" +
+	"\vdescription\x18\x03 \x01(\tH\x02R\vdescription\x88\x01\x01\x12\x17\n" +
+	"\x04icon\x18\x04 \x01(\tH\x03R\x04icon\x88\x01\x01\x12\x1d\n" +
+	"\aenabled\x18\x05 \x01(\bH\x04R\aenabled\x88\x01\x01\x12\x12\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tagsB\a\n" +
 	"\x05_nameB\n" +
 	"\n" +
 	"\b_commandB\x0e\n" +
-	"\f_description\"w\n" +
+	"\f_descriptionB\a\n" +
+	"\x05_iconB\n" +
+	"\n" +
+	"\b_enabled\"w\n" +
 	"\x15UpdateShortcutRequest\x12\x1f\n" +
 	"\vshortcut_id\x18\x01 \x01(\tR\n" +
 	"shortcutId\x12=\n" +
@@ -694,16 +795,17 @@ var file_termbridge_agent_v1_shortcut_proto_goTypes = []any{
 var file_termbridge_agent_v1_shortcut_proto_depIdxs = []int32{
 	12, // 0: termbridge.agent.Shortcut.created_at:type_name -> google.protobuf.Timestamp
 	12, // 1: termbridge.agent.Shortcut.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 2: termbridge.agent.ListShortcutsResp.items:type_name -> termbridge.agent.Shortcut
-	0,  // 3: termbridge.agent.CreateShortcutResp.shortcut:type_name -> termbridge.agent.Shortcut
-	5,  // 4: termbridge.agent.UpdateShortcutRequest.request:type_name -> termbridge.agent.UpdateShortcutReq
-	0,  // 5: termbridge.agent.UpdateShortcutResp.shortcut:type_name -> termbridge.agent.Shortcut
-	0,  // 6: termbridge.agent.UpdateShortcutOrderResp.items:type_name -> termbridge.agent.Shortcut
-	7,  // [7:7] is the sub-list for method output_type
-	7,  // [7:7] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	12, // 2: termbridge.agent.Shortcut.last_used_at:type_name -> google.protobuf.Timestamp
+	0,  // 3: termbridge.agent.ListShortcutsResp.items:type_name -> termbridge.agent.Shortcut
+	0,  // 4: termbridge.agent.CreateShortcutResp.shortcut:type_name -> termbridge.agent.Shortcut
+	5,  // 5: termbridge.agent.UpdateShortcutRequest.request:type_name -> termbridge.agent.UpdateShortcutReq
+	0,  // 6: termbridge.agent.UpdateShortcutResp.shortcut:type_name -> termbridge.agent.Shortcut
+	0,  // 7: termbridge.agent.UpdateShortcutOrderResp.items:type_name -> termbridge.agent.Shortcut
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_termbridge_agent_v1_shortcut_proto_init() }

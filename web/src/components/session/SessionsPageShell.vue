@@ -81,13 +81,13 @@
     :command-source="createDraft.commandSource"
     :selected-shortcut-id="createDraft.selectedShortcutId"
     :selected-shortcut-name="createDraft.selectedShortcutName"
-    :shortcuts="shortcuts"
+    :shortcuts="enabledShortcuts"
     :creating="creatingSession"
     @update:open="dialogs.createSessionDialogOpen = $event"
     @update:cwd="createDraft.cwd = $event"
     @update:name="createDraft.sessionName = $event"
     @update:command="createDraft.commandText = $event"
-    @update:command-source="createDraft.selectCommandSource($event, shortcuts)"
+    @update:command-source="createDraft.selectCommandSource($event, enabledShortcuts)"
     @update:selected-shortcut-id="selectCreateShortcut"
     @submit="startSession"
   />
@@ -95,7 +95,7 @@
   <EditSessionDialog
     :open="dialogs.editDialogOpen"
     :session="dialogs.selectedSession"
-    :shortcuts="shortcuts"
+    :shortcuts="enabledShortcuts"
     :editing="editingSession"
     @update:open="dialogs.editDialogOpen = $event"
     @submit="editSelectedSession"
@@ -201,6 +201,9 @@
   const creatingSession = ref(false)
   const editingSession = ref(false)
   const shortcuts = ref<Shortcut[]>([])
+  const enabledShortcuts = computed(() =>
+    shortcuts.value.filter((shortcut) => shortcut.enabled !== false),
+  )
   const stoppingSessionId = ref<string | null>(null)
   const rerunningSessionId = ref<string | null>(null)
   const deletingSessionId = ref<string | null>(null)
@@ -276,7 +279,7 @@
   }
 
   function selectCreateShortcut(shortcutId: string | null) {
-    createDraft.selectShortcut(shortcuts.value.find((value) => value.id === shortcutId))
+    createDraft.selectShortcut(enabledShortcuts.value.find((value) => value.id === shortcutId))
   }
 
   function openEditSessionDialog(session: SessionSummary) {
@@ -363,7 +366,7 @@
       if (!workspaceSessions.upsertSession(session)) {
         await refresh()
       }
-      createDraft.reset(undefined, t('dialog.defaultSessionName'), shortcuts.value)
+      createDraft.reset(undefined, t('dialog.defaultSessionName'), enabledShortcuts.value)
       dialogs.createSessionDialogOpen = false
       await openSessionTab(session)
       notifications.pushToast('success', t('toast.sessionCreated'), session.name)
@@ -562,7 +565,7 @@
       workspacePath: workspace?.path,
       activeSessionId: activeSession.value?.id ?? null,
     })
-    createDraft.reset(workspace, t('dialog.defaultSessionName'), shortcuts.value)
+    createDraft.reset(workspace, t('dialog.defaultSessionName'), enabledShortcuts.value)
     dialogs.openCreateSessionDialog()
   }
 

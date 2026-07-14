@@ -16,6 +16,7 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/storage/history"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/session"
+	shortcutmodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/shortcut"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/workspace"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/repository/task/state"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
@@ -74,7 +75,7 @@ func TestCreateSessionAcceptsHomeCwd(t *testing.T) {
 func TestCreateSessionPersistsCommandSourceSnapshot(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()
-	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: newFakeSession()}})
+	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: state.NewStore(root), ShortcutStore: fakeShortcutStore{values: []shortcutmodel.Shortcut{{Id: "shortcut-1", Enabled: boolPointer(true)}}}, LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: newFakeSession()}})
 
 	response, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{
 		Name:                 "Review",
@@ -92,6 +93,38 @@ func TestCreateSessionPersistsCommandSourceSnapshot(t *testing.T) {
 	}
 	if stored.Command.Source != session.CommandSourceShortcut || stored.Command.ShortcutIdSnapshot != "shortcut-1" || stored.Command.ShortcutNameSnapshot != "Review shortcut" {
 		t.Fatalf("stored command source = %#v, want shortcut snapshot", stored.Command)
+	}
+}
+
+func TestCreateSessionRejectsDisabledShortcut(t *testing.T) {
+	cwd := t.TempDir()
+	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: state.NewStore(t.TempDir()), ShortcutStore: fakeShortcutStore{values: []shortcutmodel.Shortcut{{Id: "shortcut-1", Enabled: boolPointer(false)}}}, LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: newFakeSession()}})
+
+	_, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{
+		Name:                 "Disabled",
+		Command:              []string{"go version"},
+		CommandSource:        string(session.CommandSourceShortcut),
+		ShortcutIdSnapshot:   "shortcut-1",
+		ShortcutNameSnapshot: "Disabled shortcut",
+	})
+	if err == nil || apperrors.KindOf(err) != apperrors.KindUsage {
+		t.Fatalf("CreateSession() error = %v, want usage error", err)
+	}
+}
+
+func TestCreateSessionRejectsMissingShortcut(t *testing.T) {
+	cwd := t.TempDir()
+	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: state.NewStore(t.TempDir()), ShortcutStore: fakeShortcutStore{}, LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: newFakeSession()}})
+
+	_, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{
+		Name:                 "Missing",
+		Command:              []string{"go version"},
+		CommandSource:        string(session.CommandSourceShortcut),
+		ShortcutIdSnapshot:   "shortcut-1",
+		ShortcutNameSnapshot: "Missing shortcut",
+	})
+	if err == nil || apperrors.KindOf(err) != apperrors.KindUsage {
+		t.Fatalf("CreateSession() error = %v, want usage error", err)
 	}
 }
 
@@ -483,7 +516,7 @@ func TestUpdateTerminalSessionChangesNameAndPreservesRawCommand(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()
 	fake := newFakeSession()
-	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: state.NewStore(root), LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: state.NewStore(root), ShortcutStore: fakeShortcutStore{values: []shortcutmodel.Shortcut{{Id: "shortcut-1", Enabled: boolPointer(true)}}}, LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
 	response, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{Name: "Old name", Command: []string{"go version"}})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
@@ -516,6 +549,34 @@ func TestUpdateTerminalSessionChangesNameAndPreservesRawCommand(t *testing.T) {
 	}
 }
 
+func TestUpdateSessionRejectsDisabledShortcut(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{Logger: slog.Default(), Cwd: cwd, Store: state.NewStore(root), ShortcutStore: fakeShortcutStore{values: []shortcutmodel.Shortcut{{Id: "shortcut-1", Enabled: boolPointer(false)}}}, LogDir: filepath.Join(cwd, "logs"), History: history.Config{MaxLines: 10, MaxBytes: 1024, MaxLineBytes: 256}, Manager: &fakeManager{session: fake}})
+	created, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{Name: "Shell", Command: []string{"go version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), created.WorkspaceId, created.SessionId)
+
+	command := "go test ./..."
+	commandSource := string(session.CommandSourceShortcut)
+	shortcutId := "shortcut-1"
+	_, err = registry.UpdateSession(created.WorkspaceId, created.SessionId, &agent.UpdateSessionReq{Command: &command, CommandSource: &commandSource, ShortcutIdSnapshot: &shortcutId})
+	if err == nil || apperrors.KindOf(err) != apperrors.KindUsage {
+		t.Fatalf("UpdateSession() error = %v, want usage error", err)
+	}
+	stored, err := state.NewStore(root).LoadSession(created.WorkspaceId, created.SessionId)
+	if err != nil {
+		t.Fatalf("LoadSession() error = %v", err)
+	}
+	if stored.Command.Command != "go version" || stored.Command.Source != "" || stored.Command.ShortcutIdSnapshot != "" {
+		t.Fatalf("stored command = %#v, want original direct command", stored.Command)
+	}
+}
+
 func TestUpdateSessionAllowsFailedSessionAndRejectsEmptyPatch(t *testing.T) {
 	root := t.TempDir()
 	cwd := t.TempDir()
@@ -542,6 +603,19 @@ func TestUpdateSessionAllowsFailedSessionAndRejectsEmptyPatch(t *testing.T) {
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
 	waitExit(t, store, response.WorkspaceId, response.SessionId)
+}
+
+func boolPointer(value bool) *bool {
+	return &value
+}
+
+type fakeShortcutStore struct {
+	values []shortcutmodel.Shortcut
+	err    error
+}
+
+func (s fakeShortcutStore) ListShortcuts() ([]shortcutmodel.Shortcut, error) {
+	return s.values, s.err
 }
 
 func stringPointer(value string) *string {

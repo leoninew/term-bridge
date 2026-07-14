@@ -13,6 +13,10 @@ message Shortcut {
   optional string description = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
+  optional string icon = 7;
+  optional bool enabled = 8;
+  repeated string tags = 9;
+  google.protobuf.Timestamp last_used_at = 10;
 }
 
 message ListShortcutsReq {}
@@ -25,6 +29,9 @@ message CreateShortcutReq {
   string name = 1;
   string command = 2;
   optional string description = 3;
+  optional string icon = 4;
+  optional bool enabled = 5;
+  repeated string tags = 6;
 }
 
 message CreateShortcutResp {
@@ -35,6 +42,9 @@ message UpdateShortcutReq {
   optional string name = 1;
   optional string command = 2;
   optional string description = 3;
+  optional string icon = 4;
+  optional bool enabled = 5;
+  repeated string tags = 6;
 }
 
 message UpdateShortcutRequest {

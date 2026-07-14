@@ -15,6 +15,7 @@ import (
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestBrowserAPIRelay(t *testing.T) {
@@ -39,7 +40,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 				return responseFrame(frame, &shared.TunnelFrame_ReadHistoryResp{ReadHistoryResp: &agent.ReadHistoryResp{Text: strings.Repeat("h", 64*1024)}})
 			case *shared.TunnelFrame_ListShortcutsReq:
 				description := "launch shell"
-				return responseFrame(frame, &shared.TunnelFrame_ListShortcutsResp{ListShortcutsResp: &agent.ListShortcutsResp{Items: []*agent.Shortcut{{Id: "shortcut-1", Name: "Shell", Command: `cmd /c "echo hello" && dir`, Description: &description}}}})
+				return responseFrame(frame, &shared.TunnelFrame_ListShortcutsResp{ListShortcutsResp: &agent.ListShortcutsResp{Items: []*agent.Shortcut{{Id: "shortcut-1", Name: "Shell", Command: `cmd /c "echo hello" && dir`, Description: &description, LastUsedAt: timestamppb.New(time.Date(2026, time.July, 14, 12, 30, 0, 0, time.UTC))}}}})
 			case *shared.TunnelFrame_CreateShortcutReq:
 				return responseFrame(frame, &shared.TunnelFrame_CreateShortcutResp{CreateShortcutResp: &agent.CreateShortcutResp{Shortcut: &agent.Shortcut{Id: "shortcut-created", Name: payload.CreateShortcutReq.GetName(), Command: payload.CreateShortcutReq.GetCommand(), Description: payload.CreateShortcutReq.Description}}})
 			case *shared.TunnelFrame_UpdateShortcutReq:
@@ -87,6 +88,7 @@ func TestBrowserAPIRelay(t *testing.T) {
 		status int
 		want   string
 	}{
+		{http.MethodGet, "/api/devices/dev-1/shortcuts", "", http.StatusOK, "2026-07-14T12:30:00Z"},
 		{http.MethodPost, "/api/devices/dev-1/shortcuts", `{"name":"Created shell","command":"cmd /c \"echo created\""}`, http.StatusCreated, "Created shell"},
 		{http.MethodPatch, "/api/devices/dev-1/shortcuts/shortcut-1", `{"name":"Updated shell"}`, http.StatusOK, "Updated shell"},
 		{http.MethodPatch, "/api/devices/dev-1/shortcuts/order", `{"shortcut_ids":["shortcut-2","shortcut-1"]}`, http.StatusOK, "shortcut-2"},

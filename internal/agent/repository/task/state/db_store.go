@@ -342,7 +342,11 @@ func (s DbStore) CreateShortcut(value shortcut.Shortcut) (shortcut.Shortcut, err
 	if err != nil {
 		return shortcut.Shortcut{}, err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO shortcuts (id,device_id,name,command,description,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`, value.Id, s.deviceId, value.Name, value.Command, value.Description, sortOrder, s.storeTime(value.CreatedAt), s.storeTime(value.UpdatedAt))
+	tagsJSON, err := marshalJSON(value.Tags)
+	if err != nil {
+		return shortcut.Shortcut{}, fmt.Errorf("marshal shortcut tags: %w", err)
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO shortcuts (id,device_id,name,command,description,icon,enabled,tags_json,last_used_at,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, value.Id, s.deviceId, value.Name, value.Command, value.Description, value.Icon, shortcutEnabled(value.Enabled), tagsJSON, s.storeNullableTime(value.LastUsedAt), sortOrder, s.storeTime(value.CreatedAt), s.storeTime(value.UpdatedAt))
 	if err != nil {
 		return shortcut.Shortcut{}, err
 	}
@@ -357,7 +361,7 @@ func (s DbStore) ListShortcuts() ([]shortcut.Shortcut, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(context.Background(), `SELECT id,name,command,description,created_at,updated_at FROM shortcuts WHERE device_id=? ORDER BY sort_order ASC, id ASC`, s.deviceId)
+	rows, err := s.db.QueryContext(context.Background(), `SELECT id,name,command,description,icon,enabled,tags_json,last_used_at,created_at,updated_at FROM shortcuts WHERE device_id=? ORDER BY sort_order ASC, id ASC`, s.deviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +418,7 @@ func (s DbStore) UpdateShortcutOrder(shortcutIds []string) ([]shortcut.Shortcut,
 }
 
 func (s DbStore) listShortcutsTx(ctx context.Context, tx *sql.Tx) ([]shortcut.Shortcut, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT id,name,command,description,created_at,updated_at FROM shortcuts WHERE device_id=? ORDER BY sort_order ASC, id ASC`, s.deviceId)
+	rows, err := tx.QueryContext(ctx, `SELECT id,name,command,description,icon,enabled,tags_json,last_used_at,created_at,updated_at FROM shortcuts WHERE device_id=? ORDER BY sort_order ASC, id ASC`, s.deviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -465,7 +469,7 @@ func (s DbStore) UpdateShortcut(shortcutId string, update func(*shortcut.Shortcu
 		return shortcut.Shortcut{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	value, err := scanShortcut(tx.QueryRowContext(ctx, `SELECT id,name,command,description,created_at,updated_at FROM shortcuts WHERE id=? AND device_id=?`, shortcutId, s.deviceId))
+	value, err := scanShortcut(tx.QueryRowContext(ctx, `SELECT id,name,command,description,icon,enabled,tags_json,last_used_at,created_at,updated_at FROM shortcuts WHERE id=? AND device_id=?`, shortcutId, s.deviceId))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return shortcut.Shortcut{}, os.ErrNotExist
@@ -485,7 +489,11 @@ func (s DbStore) UpdateShortcut(shortcutId string, update func(*shortcut.Shortcu
 	if value.UpdatedAt.IsZero() || value.UpdatedAt.Equal(originalUpdatedAt) {
 		value.UpdatedAt = time.Now().UTC()
 	}
-	result, err := tx.ExecContext(ctx, `UPDATE shortcuts SET name=?, command=?, description=?, updated_at=? WHERE id=? AND device_id=? AND updated_at=?`, value.Name, value.Command, value.Description, s.storeTime(value.UpdatedAt), value.Id, s.deviceId, s.storeTime(originalUpdatedAt))
+	tagsJSON, err := marshalJSON(value.Tags)
+	if err != nil {
+		return shortcut.Shortcut{}, fmt.Errorf("marshal shortcut tags: %w", err)
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE shortcuts SET name=?, command=?, description=?, icon=?, enabled=?, tags_json=?, updated_at=? WHERE id=? AND device_id=? AND updated_at=?`, value.Name, value.Command, value.Description, value.Icon, shortcutEnabled(value.Enabled), tagsJSON, s.storeTime(value.UpdatedAt), value.Id, s.deviceId, s.storeTime(originalUpdatedAt))
 	if err != nil {
 		return shortcut.Shortcut{}, err
 	}
@@ -512,17 +520,37 @@ func (s DbStore) DeleteShortcut(shortcutId string) error {
 	return nil
 }
 
+func shortcutEnabled(value *bool) bool {
+	return value == nil || *value
+}
+
 func scanShortcut(scanner interface{ Scan(dest ...any) error }) (shortcut.Shortcut, error) {
 	var value shortcut.Shortcut
-	var description sql.NullString
-	var createdAt, updatedAt any
-	if err := scanner.Scan(&value.Id, &value.Name, &value.Command, &description, &createdAt, &updatedAt); err != nil {
+	var description, icon sql.NullString
+	var enabled bool
+	var tagsJSON string
+	var lastUsedAt, createdAt, updatedAt any
+	if err := scanner.Scan(&value.Id, &value.Name, &value.Command, &description, &icon, &enabled, &tagsJSON, &lastUsedAt, &createdAt, &updatedAt); err != nil {
 		return shortcut.Shortcut{}, err
 	}
 	if description.Valid {
 		value.Description = &description.String
 	}
+	if icon.Valid {
+		value.Icon = &icon.String
+	}
+	value.Enabled = &enabled
+	if err := json.Unmarshal([]byte(tagsJSON), &value.Tags); err != nil {
+		return shortcut.Shortcut{}, fmt.Errorf("decode shortcut tags: %w", err)
+	}
+	if err := value.Normalize(); err != nil {
+		return shortcut.Shortcut{}, err
+	}
 	var err error
+	value.LastUsedAt, err = dbScanTime(lastUsedAt)
+	if err != nil {
+		return shortcut.Shortcut{}, err
+	}
 	value.CreatedAt, err = dbScanTime(createdAt)
 	if err != nil {
 		return shortcut.Shortcut{}, err

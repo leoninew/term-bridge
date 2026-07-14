@@ -229,10 +229,11 @@ func cloudConnectorConfigured(cfg Config) bool {
 	return cfg.Cloud.ApiBaseUrl != ""
 }
 
-func newWebTerminalRegistry(cfg Config, logger *slog.Logger, store terminalapp.RuntimeStore) *terminalapp.Registry {
+func newWebTerminalRegistry(cfg Config, logger *slog.Logger, store state.DbStore) *terminalapp.Registry {
 	return terminalapp.NewRegistry(terminalapp.Config{
 		Cwd:              cfg.Cwd,
 		Store:            store,
+		ShortcutStore:    store,
 		LogDir:           cfg.LogDir,
 		History:          cfg.History,
 		Manager:          gopty.NewManager(),

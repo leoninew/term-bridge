@@ -20,6 +20,7 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/storage/history"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/session"
+	shortcutmodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/shortcut"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/workspace"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/repository/task/state"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
@@ -71,6 +72,10 @@ type RuntimeStore interface {
 	UpdateSessionOrder(workspaceId string, sessionIds []string, now time.Time) ([]session.View, []state.Warning, error)
 }
 
+type ShortcutStore interface {
+	ListShortcuts() ([]shortcutmodel.Shortcut, error)
+}
+
 type sessionRunStarter interface {
 	BeginSessionRun(workspaceId string, sessionId string, size process.TerminalSize) error
 }
@@ -78,6 +83,7 @@ type sessionRunStarter interface {
 type Config struct {
 	Cwd              string
 	Store            RuntimeStore
+	ShortcutStore    ShortcutStore
 	LogDir           string
 	History          history.Config
 	Manager          termpty.Manager
@@ -91,6 +97,7 @@ type Config struct {
 type Registry struct {
 	cwd              string
 	store            RuntimeStore
+	shortcutStore    ShortcutStore
 	logDir           string
 	historyConfig    history.Config
 	manager          termpty.Manager
@@ -149,6 +156,7 @@ func NewRegistry(config Config) *Registry {
 	return &Registry{
 		cwd:              config.Cwd,
 		store:            config.Store,
+		shortcutStore:    config.ShortcutStore,
 		logDir:           config.LogDir,
 		historyConfig:    config.History,
 		manager:          config.Manager,
@@ -230,6 +238,9 @@ func (r *Registry) CreateSession(ctx context.Context, request *agent.CreateSessi
 	}
 	if !commandRecord.ValidSource() {
 		return nil, apperrors.Usage("invalid session command source")
+	}
+	if err := r.validateShortcutCommand(commandRecord); err != nil {
+		return nil, err
 	}
 	manager := sessionapp.Manager{Store: r.store}
 	sess, err := manager.Create(sessionapp.CreateOptions{
@@ -603,6 +614,14 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 	if !session.Terminal(view.State.State) {
 		return nil, apperrors.Usage("only stopped or failed sessions can be edited")
 	}
+	if request.Command != nil && commandSourceProvided {
+		if err := r.validateShortcutCommand(session.CommandRecord{
+			Source:             session.CommandSource(request.GetCommandSource()),
+			ShortcutIdSnapshot: request.GetShortcutIdSnapshot(),
+		}); err != nil {
+			return nil, err
+		}
+	}
 	updated, err := r.store.UpdateTerminalSession(workspaceId, sessionId, func(value *session.Session) error {
 		if request.Name != nil {
 			value.Name = name
@@ -630,6 +649,33 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 	view.Session = updated
 	view.CommandText = commandTextFromSession(updated)
 	return r.summaryFromView(view), nil
+}
+
+func (r *Registry) validateShortcutCommand(command session.CommandRecord) error {
+	if command.Source != session.CommandSourceShortcut {
+		return nil
+	}
+	shortcutId := strings.TrimSpace(command.ShortcutIdSnapshot)
+	if shortcutId == "" {
+		return apperrors.Usage("shortcut id is required")
+	}
+	if r.shortcutStore == nil {
+		return apperrors.Runtime("list shortcuts", errors.New("shortcut store is required"))
+	}
+	shortcuts, err := r.shortcutStore.ListShortcuts()
+	if err != nil {
+		return apperrors.Runtime("list shortcuts", err)
+	}
+	for _, shortcut := range shortcuts {
+		if shortcut.Id != shortcutId {
+			continue
+		}
+		if shortcut.Enabled == nil || *shortcut.Enabled {
+			return nil
+		}
+		return apperrors.Usage("shortcut is disabled")
+	}
+	return apperrors.Usage("shortcut not found")
 }
 
 func (r *Registry) DeleteSession(workspaceId string, sessionId string) error {

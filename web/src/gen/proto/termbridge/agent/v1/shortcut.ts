@@ -15,6 +15,10 @@ export interface Shortcut {
   description?: string | undefined;
   created_at: string | undefined;
   updated_at: string | undefined;
+  icon?: string | undefined;
+  enabled?: boolean | undefined;
+  tags: string[];
+  last_used_at: string | undefined;
 }
 
 export interface ListShortcutsReq {
@@ -28,6 +32,9 @@ export interface CreateShortcutReq {
   name: string;
   command: string;
   description?: string | undefined;
+  icon?: string | undefined;
+  enabled?: boolean | undefined;
+  tags: string[];
 }
 
 export interface CreateShortcutResp {
@@ -38,6 +45,9 @@ export interface UpdateShortcutReq {
   name?: string | undefined;
   command?: string | undefined;
   description?: string | undefined;
+  icon?: string | undefined;
+  enabled?: boolean | undefined;
+  tags: string[];
 }
 
 export interface UpdateShortcutRequest {

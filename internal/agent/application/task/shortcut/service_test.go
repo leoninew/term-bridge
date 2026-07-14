@@ -16,13 +16,14 @@ func TestServiceCreatesAndUpdatesRawCommandShortcut(t *testing.T) {
 	service := NewService(store)
 	description := "review changes"
 	commandText := `codex --dangerously-bypass-approvals-and-sandbox -c "review changes"`
+	disabled := false
 
-	created, err := service.Create(&agent.CreateShortcutReq{Name: "review", Command: commandText, Description: &description})
+	created, err := service.Create(&agent.CreateShortcutReq{Name: "review", Command: commandText, Description: &description, Enabled: &disabled, Tags: []string{"review", "release"}})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if created.Command != commandText || created.Description == nil || *created.Description != description {
-		t.Fatalf("Create() = %#v, want raw command and description", created)
+	if created.Command != commandText || created.Description == nil || *created.Description != description || created.Enabled == nil || *created.Enabled || len(created.Tags) != 2 {
+		t.Fatalf("Create() = %#v, want raw command and shortcut metadata", created)
 	}
 	if store.value.Command != commandText {
 		t.Fatalf("stored command = %q, want %q", store.value.Command, commandText)
@@ -35,6 +36,44 @@ func TestServiceCreatesAndUpdatesRawCommandShortcut(t *testing.T) {
 	}
 	if updated.Command != commandText || updated.Description != nil {
 		t.Fatalf("Update() = %#v, want preserved raw command and cleared description", updated)
+	}
+}
+
+func TestServiceDefaultsEnabledAndUpdatesMetadata(t *testing.T) {
+	store := &fakeStore{}
+	service := NewService(store)
+
+	created, err := service.Create(&agent.CreateShortcutReq{Name: "build", Command: "go test ./...", Tags: []string{"build"}})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if created.Enabled == nil || !*created.Enabled {
+		t.Fatalf("Create() enabled = %#v, want enabled by default", created.Enabled)
+	}
+	if created.LastUsedAt != nil {
+		t.Fatalf("Create() LastUsedAt = %#v, want nil for unused shortcut", created.LastUsedAt)
+	}
+
+	disabled := false
+	icon := "terminal"
+	updated, err := service.Update(created.Id, &agent.UpdateShortcutReq{Icon: &icon, Enabled: &disabled, Tags: []string{}})
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if updated.Icon == nil || *updated.Icon != icon || updated.Enabled == nil || *updated.Enabled || len(updated.Tags) != 0 {
+		t.Fatalf("Update() = %#v, want icon, disabled state, and cleared tags", updated)
+	}
+}
+
+func TestProtoFromModelMapsLastUsedAt(t *testing.T) {
+	lastUsedAt := time.Date(2026, time.July, 14, 12, 30, 0, 0, time.UTC)
+
+	mapped := protoFromModel(shortcutmodel.Shortcut{Id: "shortcut-1", Name: "shell", Command: "cmd", LastUsedAt: lastUsedAt})
+	if mapped.LastUsedAt == nil || !mapped.LastUsedAt.AsTime().Equal(lastUsedAt) {
+		t.Fatalf("LastUsedAt = %#v, want %s", mapped.LastUsedAt, lastUsedAt)
+	}
+	if protoFromModel(shortcutmodel.Shortcut{}).LastUsedAt != nil {
+		t.Fatal("zero LastUsedAt must map to nil")
 	}
 }
 

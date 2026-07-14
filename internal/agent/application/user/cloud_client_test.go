@@ -3,14 +3,17 @@ package application
 import (
 	"context"
 	"testing"
+	"time"
 
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	tunnel "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestHandleRuntimeRequestDispatchesShortcutCRUD(t *testing.T) {
-	runtime := &shortcutRuntime{value: &agent.Shortcut{Id: "shortcut-1", Name: "shell", Command: `cmd /c "echo hello"`}}
+	lastUsedAt := time.Date(2026, time.July, 14, 12, 30, 0, 0, time.UTC)
+	runtime := &shortcutRuntime{value: &agent.Shortcut{Id: "shortcut-1", Name: "shell", Command: `cmd /c "echo hello"`, LastUsedAt: timestamppb.New(lastUsedAt)}}
 	description := "launch shell"
 	updateName := "updated shell"
 	cases := []struct {
@@ -23,7 +26,7 @@ func TestHandleRuntimeRequestDispatchesShortcutCRUD(t *testing.T) {
 			request: &shared.TunnelFrame{StreamId: "list", RequestId: "request-1", Payload: &shared.TunnelFrame_ListShortcutsReq{ListShortcutsReq: &agent.ListShortcutsReq{}}},
 			assert: func(t *testing.T, response *shared.TunnelFrame) {
 				items := response.GetListShortcutsResp().GetItems()
-				if len(items) != 1 || items[0].GetCommand() != `cmd /c "echo hello"` {
+				if len(items) != 1 || items[0].GetCommand() != `cmd /c "echo hello"` || items[0].GetLastUsedAt() == nil || !items[0].GetLastUsedAt().AsTime().Equal(lastUsedAt) {
 					t.Fatalf("list response = %#v, want raw shortcut command", response)
 				}
 			},

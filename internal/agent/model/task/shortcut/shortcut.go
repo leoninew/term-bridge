@@ -14,6 +14,10 @@ type Shortcut struct {
 	Name          string    `json:"name"`
 	Command       string    `json:"command"`
 	Description   *string   `json:"description,omitempty"`
+	Icon          *string   `json:"icon,omitempty"`
+	Enabled       *bool     `json:"enabled,omitempty"`
+	Tags          []string  `json:"tags,omitempty"`
+	LastUsedAt    time.Time `json:"last_used_at,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
@@ -27,13 +31,36 @@ func (value *Shortcut) Normalize() error {
 	if strings.TrimSpace(value.Command) == "" {
 		return errors.New("shortcut command is required")
 	}
-	if value.Description != nil {
-		description := strings.TrimSpace(*value.Description)
-		if description == "" {
-			value.Description = nil
-		} else {
-			value.Description = &description
-		}
-	}
+	value.Description = normalizeOptionalText(value.Description)
+	value.Icon = normalizeOptionalText(value.Icon)
+	value.Tags = normalizeTags(value.Tags)
 	return nil
+}
+
+func normalizeTags(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	tags := make([]string, 0, len(values))
+	for _, value := range values {
+		tag := strings.TrimSpace(value)
+		if tag == "" {
+			continue
+		}
+		if _, exists := seen[tag]; exists {
+			continue
+		}
+		seen[tag] = struct{}{}
+		tags = append(tags, tag)
+	}
+	return tags
+}
+
+func normalizeOptionalText(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	text := strings.TrimSpace(*value)
+	if text == "" {
+		return nil
+	}
+	return &text
 }

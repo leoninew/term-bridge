@@ -247,30 +247,36 @@ func TestDBStorePersistsDeviceScopedShortcuts(t *testing.T) {
 	store, db := newTestDBStore(t)
 	commandText := `codex --dangerously-bypass-approvals-and-sandbox -c "review changes"`
 	description := "  review workflow  "
-	created, err := store.CreateShortcut(shortcut.Shortcut{Id: "shortcut-1", Name: "  Review  ", Command: commandText, Description: &description})
+	icon := "terminal"
+	disabled := false
+	lastUsedAt := time.Date(2026, time.July, 14, 12, 30, 0, 0, time.UTC)
+	created, err := store.CreateShortcut(shortcut.Shortcut{Id: "shortcut-1", Name: "  Review  ", Command: commandText, Description: &description, Icon: &icon, Enabled: &disabled, Tags: []string{"  review  ", "release", "review"}, LastUsedAt: lastUsedAt})
 	if err != nil {
 		t.Fatalf("CreateShortcut() error = %v", err)
 	}
-	if created.Name != "Review" || created.Command != commandText || created.Description == nil || *created.Description != "review workflow" {
+	if created.Name != "Review" || created.Command != commandText || created.Description == nil || *created.Description != "review workflow" || created.Icon == nil || *created.Icon != icon || created.Enabled == nil || *created.Enabled || len(created.Tags) != 2 || created.Tags[0] != "review" || created.Tags[1] != "release" || !created.LastUsedAt.Equal(lastUsedAt) {
 		t.Fatalf("CreateShortcut() = %#v, want normalized metadata with raw command", created)
 	}
 	listed, err := store.ListShortcuts()
 	if err != nil {
 		t.Fatalf("ListShortcuts() error = %v", err)
 	}
-	if len(listed) != 1 || listed[0].Id != created.Id || listed[0].Command != commandText {
-		t.Fatalf("ListShortcuts() = %#v, want saved shortcut", listed)
+	if len(listed) != 1 || listed[0].Id != created.Id || listed[0].Command != commandText || listed[0].Icon == nil || *listed[0].Icon != icon || listed[0].Enabled == nil || *listed[0].Enabled || len(listed[0].Tags) != 2 || !listed[0].LastUsedAt.Equal(lastUsedAt) {
+		t.Fatalf("ListShortcuts() = %#v, want saved shortcut metadata", listed)
 	}
+	enabled := true
 	updated, err := store.UpdateShortcut(created.Id, func(value *shortcut.Shortcut) error {
 		value.Command = "cmd"
 		value.Description = nil
+		value.Enabled = &enabled
+		value.Tags = []string{"maintenance"}
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("UpdateShortcut() error = %v", err)
 	}
-	if updated.Command != "cmd" || updated.Description != nil {
-		t.Fatalf("UpdateShortcut() = %#v, want updated command and cleared description", updated)
+	if updated.Command != "cmd" || updated.Description != nil || updated.Enabled == nil || !*updated.Enabled || len(updated.Tags) != 1 || updated.Tags[0] != "maintenance" || !updated.LastUsedAt.Equal(lastUsedAt) {
+		t.Fatalf("UpdateShortcut() = %#v, want updated command and metadata", updated)
 	}
 	otherDeviceStore := NewDbStore(db, "sqlite", t.TempDir(), "device-2")
 	otherDeviceShortcuts, err := otherDeviceStore.ListShortcuts()
@@ -502,7 +508,7 @@ func newTestDBStore(t *testing.T) (DbStore, *sql.DB) {
 		`CREATE INDEX idx_sessions_device_deleted ON sessions(device_id, deleted_at)`,
 		`CREATE TABLE session_runs (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, workspace_id TEXT NOT NULL, device_id TEXT NOT NULL, sequence INTEGER NOT NULL, command_json TEXT NOT NULL, terminal_size_json TEXT NOT NULL DEFAULT '{}', process_json TEXT NOT NULL DEFAULT '{}', exit_json TEXT NOT NULL DEFAULT '{}', state TEXT NOT NULL, state_reason TEXT NOT NULL DEFAULT '', started_at TEXT NULL, ended_at TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT NULL, FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`,
 		`CREATE INDEX idx_session_runs_session_sequence ON session_runs(session_id, sequence)`,
-		`CREATE TABLE shortcuts (id TEXT PRIMARY KEY, device_id TEXT NOT NULL, name TEXT NOT NULL, command TEXT NOT NULL, description TEXT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
+		`CREATE TABLE shortcuts (id TEXT PRIMARY KEY, device_id TEXT NOT NULL, name TEXT NOT NULL, command TEXT NOT NULL, description TEXT NULL, icon TEXT NULL, enabled INTEGER NOT NULL DEFAULT 1, tags_json TEXT NOT NULL DEFAULT '[]', last_used_at TEXT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
 		`CREATE INDEX idx_shortcuts_device_updated ON shortcuts(device_id, updated_at)`,
 		`CREATE INDEX idx_shortcuts_device_order ON shortcuts(device_id, sort_order)`,
 	}
