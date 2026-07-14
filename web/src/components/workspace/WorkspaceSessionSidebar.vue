@@ -603,7 +603,10 @@
   }
 
   function itemsHaveSameValues<T extends { value: string }>(left: T[], right: T[]) {
-    return left.length === right.length && left.every((item, index) => item.value === right[index]?.value)
+    return (
+      left.length === right.length &&
+      left.every((item, index) => item.value === right[index]?.value)
+    )
   }
 
   function dragPositionChanged(event: SortableEvent) {

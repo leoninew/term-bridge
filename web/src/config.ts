@@ -19,6 +19,7 @@ export interface RuntimeCloudConfig {
 }
 
 export interface RuntimeConfig {
+  version: string
   local: RuntimeLocalConfig
   cloud: RuntimeCloudConfig
 }
@@ -33,6 +34,7 @@ export type BrowserRuntimeLocalConfig = Partial<{
 export type BrowserRuntimeCloudConfig = Partial<RuntimeCloudConfig>
 
 export type BrowserRuntimeConfig = Partial<{
+  version: string
   local: BrowserRuntimeLocalConfig
   cloud: BrowserRuntimeCloudConfig
 }>

@@ -1,131 +1,130 @@
 <template>
   <section
-      v-if="!authInitialized"
-      class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
+    v-if="!authInitialized"
+    class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
+  >
+    {{ t('cloud.checkingAuth') }}
+  </section>
+
+  <SplitterGroup
+    v-else-if="isLocalMode || authenticated"
+    direction="horizontal"
+    class="flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
+  >
+    <SplitterPanel id="workspace-sidebar" :default-size="20" :min-size="18" :max-size="24">
+      <WorkspaceSessionSidebar
+        :workspace-tree="workspaceSessions.workspaceTree"
+        :active-session-id="workbench.activeSessionId"
+        :stopping-session-id="stoppingSessionId"
+        :rerunning-session-id="rerunningSessionId"
+        :deleting-session-id="deletingSessionId"
+        :removing-workspace-id="removingWorkspaceId"
+        :help-href="helpHref"
+        :home-route-name="props.homeRouteName"
+        @select="openSessionTab"
+        @refresh="refresh"
+        @new-session="openCreateSessionForm"
+        @edit-session="openEditSessionDialog"
+        @stop-session="stopSessionFromSidebar"
+        @rerun-session="rerunSessionFromSidebar"
+        @delete-session="openDeleteSessionDialog"
+        @remove-workspace="dialogs.openRemoveWorkspaceDialog"
+        @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
+        @reorder-workspaces="reorderWorkspaces"
+        @reorder-sessions="reorderSessions"
+        @logout="handleLogout"
+        @open-dashboard="openDashboard"
+        @open-shortcuts="openShortcuts"
+      />
+    </SplitterPanel>
+
+    <SplitterResizeHandle
+      class="group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[var(--color-app-bg)] outline-none"
     >
-      {{ t('cloud.checkingAuth') }}
-    </section>
+      <span
+        class="w-px bg-[var(--color-border)] transition group-hover:bg-[var(--color-border-strong)]"
+      />
+    </SplitterResizeHandle>
 
-    <SplitterGroup
-      v-else-if="isLocalMode || authenticated"
-      direction="horizontal"
-      class="flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
-    >
-      <SplitterPanel id="workspace-sidebar" :default-size="20" :min-size="15" :max-size="25">
-        <WorkspaceSessionSidebar
-          :workspace-tree="workspaceSessions.workspaceTree"
-          :active-session-id="workbench.activeSessionId"
-          :stopping-session-id="stoppingSessionId"
-          :rerunning-session-id="rerunningSessionId"
-          :deleting-session-id="deletingSessionId"
-          :removing-workspace-id="removingWorkspaceId"
-          :help-href="helpHref"
-          :home-route-name="props.homeRouteName"
-          @select="openSessionTab"
-          @refresh="refresh"
-          @new-session="openCreateSessionForm"
-          @edit-session="openEditSessionDialog"
-          @stop-session="stopSessionFromSidebar"
-          @rerun-session="rerunSessionFromSidebar"
-          @delete-session="openDeleteSessionDialog"
-          @remove-workspace="dialogs.openRemoveWorkspaceDialog"
-          @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
-          @reorder-workspaces="reorderWorkspaces"
-          @reorder-sessions="reorderSessions"
-          @logout="handleLogout"
-          @open-dashboard="openDashboard"
-          @open-shortcuts="openShortcuts"
-        />
-      </SplitterPanel>
+    <SplitterPanel id="terminal-workbench" :min-size="55">
+      <SessionWorkbench
+        :opened-tabs="workbench.openedTabs"
+        :active-session-id="workbench.activeSessionId"
+        :active-tab="workbench.activeTab"
+        :active-session="activeSession"
+        :current-device="workbenchDevice"
+        :terminal-ws-url="activeTerminalWsUrl"
+        :has-terminal-tabs="terminalTabs.length > 0"
+        :has-background-running-sessions="hasRunningSessions"
+        :session-title="sessionTitle"
+        :session-lifecycle-state="sessionLifecycleState"
+        :session-command-source="sessionCommandSource"
+        :session-source-label="sessionSourceLabel"
+        @activate-tab="activateOpenedTab"
+        @close-tab="closeTab"
+        @close-terminal-tabs="closeTerminalTabs"
+        @open-close-background-sessions-drawer="openCloseBackgroundSessionsDrawer"
+        @reorder-tabs="workbench.openedTabs = $event"
+        @open-create="() => openCreateSessionForm()"
+        @workbench="terminalWorkbench = $event"
+        @terminal-state="handleTerminalState"
+        @terminal-error="handleTerminalError"
+      />
+    </SplitterPanel>
+  </SplitterGroup>
 
-      <SplitterResizeHandle
-        class="group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[var(--color-app-bg)] outline-none"
-      >
-        <span
-          class="w-px bg-[var(--color-border)] transition group-hover:bg-[var(--color-border-strong)]"
-        />
-      </SplitterResizeHandle>
+  <CreateSessionDialog
+    :open="dialogs.createSessionDialogOpen"
+    :cwd="createDraft.cwd"
+    :name="createDraft.sessionName"
+    :command="createDraft.commandText"
+    :command-source="createDraft.commandSource"
+    :selected-shortcut-id="createDraft.selectedShortcutId"
+    :selected-shortcut-name="createDraft.selectedShortcutName"
+    :shortcuts="shortcuts"
+    :creating="creatingSession"
+    @update:open="dialogs.createSessionDialogOpen = $event"
+    @update:cwd="createDraft.cwd = $event"
+    @update:name="createDraft.sessionName = $event"
+    @update:command="createDraft.commandText = $event"
+    @update:command-source="createDraft.selectCommandSource($event, shortcuts)"
+    @update:selected-shortcut-id="selectCreateShortcut"
+    @submit="startSession"
+  />
 
-      <SplitterPanel id="terminal-workbench" :min-size="55">
-        <SessionWorkbench
-          :opened-tabs="workbench.openedTabs"
-          :active-session-id="workbench.activeSessionId"
-          :active-tab="workbench.activeTab"
-          :active-session="activeSession"
-          :current-device="workbenchDevice"
-          :terminal-ws-url="activeTerminalWsUrl"
-          :has-terminal-tabs="terminalTabs.length > 0"
-          :has-background-running-sessions="hasRunningSessions"
-          :session-title="sessionTitle"
-          :session-lifecycle-state="sessionLifecycleState"
-          :session-command-source="sessionCommandSource"
-          :session-source-label="sessionSourceLabel"
-          @activate-tab="activateOpenedTab"
-          @close-tab="closeTab"
-          @close-terminal-tabs="closeTerminalTabs"
-          @open-close-background-sessions-drawer="openCloseBackgroundSessionsDrawer"
-          @reorder-tabs="workbench.openedTabs = $event"
-          @open-create="() => openCreateSessionForm()"
-          @workbench="terminalWorkbench = $event"
-          @terminal-state="handleTerminalState"
-          @terminal-error="handleTerminalError"
-        />
-      </SplitterPanel>
-    </SplitterGroup>
+  <EditSessionDialog
+    :open="dialogs.editDialogOpen"
+    :session="dialogs.selectedSession"
+    :shortcuts="shortcuts"
+    :editing="editingSession"
+    @update:open="dialogs.editDialogOpen = $event"
+    @submit="editSelectedSession"
+  />
 
-    <CreateSessionDialog
-      :open="dialogs.createSessionDialogOpen"
-      :cwd="createDraft.cwd"
-      :name="createDraft.sessionName"
-      :command="createDraft.commandText"
-      :command-source="createDraft.commandSource"
-      :selected-shortcut-id="createDraft.selectedShortcutId"
-      :selected-shortcut-name="createDraft.selectedShortcutName"
-      :shortcuts="shortcuts"
-      :creating="creatingSession"
-      @update:open="dialogs.createSessionDialogOpen = $event"
-      @update:cwd="createDraft.cwd = $event"
-      @update:name="createDraft.sessionName = $event"
-      @update:command="createDraft.commandText = $event"
-      @update:command-source="createDraft.selectCommandSource($event, shortcuts)"
-      @update:selected-shortcut-id="selectCreateShortcut"
-      @submit="startSession"
-    />
+  <DeleteSessionDialog
+    :open="dialogs.deleteSessionDialogOpen"
+    :session="dialogs.selectedSession"
+    :deleting="!!deletingSessionId"
+    @update:open="dialogs.deleteSessionDialogOpen = $event"
+    @confirm="deleteSelectedSession"
+  />
 
-    <EditSessionDialog
-      :open="dialogs.editDialogOpen"
-      :session="dialogs.selectedSession"
-      :shortcuts="shortcuts"
-      :editing="editingSession"
-      @update:open="dialogs.editDialogOpen = $event"
-      @submit="editSelectedSession"
-    />
+  <RemoveWorkspaceDialog
+    :open="dialogs.removeWorkspaceDialogOpen"
+    :workspace="dialogs.selectedWorkspace"
+    :removing="!!removingWorkspaceId"
+    @update:open="dialogs.removeWorkspaceDialogOpen = $event"
+    @confirm="removeSelectedWorkspace"
+  />
 
-    <DeleteSessionDialog
-      :open="dialogs.deleteSessionDialogOpen"
-      :session="dialogs.selectedSession"
-      :deleting="!!deletingSessionId"
-      @update:open="dialogs.deleteSessionDialogOpen = $event"
-      @confirm="deleteSelectedSession"
-    />
-
-    <RemoveWorkspaceDialog
-      :open="dialogs.removeWorkspaceDialogOpen"
-      :workspace="dialogs.selectedWorkspace"
-      :removing="!!removingWorkspaceId"
-      @update:open="dialogs.removeWorkspaceDialogOpen = $event"
-      @confirm="removeSelectedWorkspace"
-    />
-
-    <CloseBackgroundSessionsDrawer
-      :open="closeBackgroundSessionsDrawerOpen"
-      :workspace-tree="sessionWorkspaceTree"
-      :opened-tabs="workbench.openedTabs"
-      :closing="closingBackgroundSessions"
-      @update:open="closeBackgroundSessionsDrawerOpen = $event"
-      @confirm="closeBackgroundSessions"
-    />
-
+  <CloseBackgroundSessionsDrawer
+    :open="closeBackgroundSessionsDrawerOpen"
+    :workspace-tree="sessionWorkspaceTree"
+    :opened-tabs="workbench.openedTabs"
+    :closing="closingBackgroundSessions"
+    @update:open="closeBackgroundSessionsDrawerOpen = $event"
+    @confirm="closeBackgroundSessions"
+  />
 </template>
 
 <script setup lang="ts">

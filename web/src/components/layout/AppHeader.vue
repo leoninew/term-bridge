@@ -1,6 +1,6 @@
 <template>
   <header
-    class="flex h-16 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-6"
+    class="flex h-16 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-8 2xl:px-12"
   >
     <RouterLink to="/" class="flex items-center gap-3">
       <img :src="logoDataUrl" alt="TermBridge" class="size-10 rounded-xl shadow-lg" />

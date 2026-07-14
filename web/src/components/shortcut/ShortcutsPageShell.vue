@@ -1,76 +1,76 @@
 <template>
   <section class="shortcut-page min-h-screen bg-[var(--color-app-bg)] text-[var(--color-text)]">
-      <AppHeader />
+    <AppHeader />
 
-      <main class="shortcut-page-main min-h-[calc(100vh-4rem)]">
-        <section class="shortcut-page-content mx-auto flex w-full max-w-[1200px] flex-col">
-          <header class="shortcut-page-header flex items-center justify-between">
-            <h1 class="shortcut-page-title font-semibold text-[var(--color-text-strong)]">
-              {{ t('shortcut.title') }}
-            </h1>
-            <button
-              type="button"
-              class="button button-primary shortcut-create-button inline-flex shrink-0 items-center gap-1"
-              @click="openCreate"
-            >
-              <Plus class="size-4" aria-hidden="true" />
-              {{ t('common.create') }}
-            </button>
-          </header>
-
-          <p v-if="loading" class="shortcut-loading text-center text-[var(--color-text-muted)]">
-            {{ t('shortcut.loading') }}
-          </p>
-
-          <VueDraggable
-            v-else-if="shortcuts.length"
-            v-model="shortcuts"
-            tag="div"
-            class="shortcut-grid grid sm:grid-cols-2 lg:grid-cols-4"
-            item-key="id"
-            :animation="150"
-            :disabled="reordering"
-            :filter="'button'"
-            :prevent-on-filter="false"
-            ghost-class="shortcut-sortable-ghost"
-            chosen-class="shortcut-sortable-chosen"
-            drag-class="shortcut-sortable-dragging"
-            @start="rememberOrder"
-            @end="persistOrder"
+    <main class="shortcut-page-main min-h-[calc(100vh-4rem)]">
+      <section class="shortcut-page-content mx-auto flex w-full max-w-[1440px] flex-col">
+        <header class="shortcut-page-header flex items-center justify-between">
+          <h1 class="shortcut-page-title font-semibold text-[var(--color-text-strong)]">
+            {{ t('shortcut.title') }}
+          </h1>
+          <button
+            type="button"
+            class="button button-primary shortcut-create-button inline-flex shrink-0 items-center gap-1"
+            @click="openCreate"
           >
-            <ShortcutCard
-              v-for="shortcut in shortcuts"
-              :key="shortcut.id"
-              :shortcut="shortcut"
-              @edit="openEdit"
-              @delete="openDelete"
-            />
-          </VueDraggable>
+            <Plus class="size-4" aria-hidden="true" />
+            {{ t('common.create') }}
+          </button>
+        </header>
 
-          <section
-            v-else
-            class="shortcut-empty border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] text-center text-[var(--color-text-muted)]"
-          >
-            {{ t('shortcut.empty') }}
-          </section>
+        <p v-if="loading" class="shortcut-loading text-center text-[var(--color-text-muted)]">
+          {{ t('shortcut.loading') }}
+        </p>
+
+        <VueDraggable
+          v-else-if="shortcuts.length"
+          v-model="shortcuts"
+          tag="div"
+          class="shortcut-grid grid sm:grid-cols-2 lg:grid-cols-4"
+          item-key="id"
+          :animation="150"
+          :disabled="reordering"
+          :filter="'button'"
+          :prevent-on-filter="false"
+          ghost-class="shortcut-sortable-ghost"
+          chosen-class="shortcut-sortable-chosen"
+          drag-class="shortcut-sortable-dragging"
+          @start="rememberOrder"
+          @end="persistOrder"
+        >
+          <ShortcutCard
+            v-for="shortcut in shortcuts"
+            :key="shortcut.id"
+            :shortcut="shortcut"
+            @edit="openEdit"
+            @delete="openDelete"
+          />
+        </VueDraggable>
+
+        <section
+          v-else
+          class="shortcut-empty border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] text-center text-[var(--color-text-muted)]"
+        >
+          {{ t('shortcut.empty') }}
         </section>
-      </main>
-    </section>
+      </section>
+    </main>
+  </section>
 
-    <ShortcutEditorDialog
-      :open="editorOpen"
-      :shortcut="selected"
-      :saving="saving"
-      @update:open="editorOpen = $event"
-      @submit="save"
-    />
-    <DeleteShortcutDialog
-      :open="deleteOpen"
-      :shortcut="selected"
-      :deleting="deleting"
-      @update:open="deleteOpen = $event"
-      @confirm="remove"
-    />
+  <ShortcutEditorDialog
+    :open="editorOpen"
+    :shortcut="selected"
+    :saving="saving"
+    @update:open="editorOpen = $event"
+    @submit="save"
+  />
+  <DeleteShortcutDialog
+    :open="deleteOpen"
+    :shortcut="selected"
+    :deleting="deleting"
+    @update:open="deleteOpen = $event"
+    @confirm="remove"
+  />
 </template>
 
 <script setup lang="ts">

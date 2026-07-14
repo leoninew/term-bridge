@@ -1,137 +1,136 @@
 <template>
   <section class="min-h-screen bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]">
-      <AppHeader>
-        <template #actions>
-          <CloudAccountMenu
-            :authenticated="cloudAuth.authenticated"
-            :user-display-name="userDisplayName"
-            :user-email="cloudAuth.user?.email ?? ''"
-            @login="openCloudLogin"
-            @logout="logoutCloud"
-            @change-password="changePasswordDialogOpen = true"
-          />
-        </template>
-      </AppHeader>
+    <AppHeader>
+      <template #actions>
+        <CloudAccountMenu
+          :authenticated="cloudAuth.authenticated"
+          :user-display-name="userDisplayName"
+          :user-email="cloudAuth.user?.email ?? ''"
+          @login="openCloudLogin"
+          @logout="logoutCloud"
+          @change-password="changePasswordDialogOpen = true"
+        />
+      </template>
+    </AppHeader>
 
-      <main class="flex min-h-[calc(100vh-4rem)] items-center justify-center p-6">
-        <div class="flex w-full max-w-4xl flex-col gap-5">
-          <section
-            class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+    <main class="flex min-h-[calc(100vh-4rem)] items-center justify-center px-8 py-8 2xl:px-12">
+      <div class="flex w-full max-w-[1200px] flex-col gap-5">
+        <section
+          class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+        >
+          <div
+            class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
           >
-            <div
-              class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
-            >
-              <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
-                {{ t('dashboard.devicesTitle') }}
-              </h1>
-              <div class="flex items-center gap-2">
-                <RouterLink
-                  :to="{ name: 'home' }"
-                  class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
-                >
-                  {{ t('dashboard.home') }}
-                </RouterLink>
-                <button
-                  type="button"
-                  class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]"
-                  :disabled="loading"
-                  @click="refreshDevices"
-                >
-                  <RefreshCw class="size-3.5" :class="loading ? 'animate-spin' : ''" />
-                  {{ loading ? t('dashboard.refreshing') : t('dashboard.refreshDevices') }}
-                </button>
-              </div>
-            </div>
-
-            <div v-if="loading" class="p-5 text-sm text-[var(--color-text-muted)]">
-              {{ t('dashboard.loadingDevices') }}
-            </div>
-            <div v-else-if="deviceError" class="p-5 text-sm text-[var(--color-danger-text)]">
-              {{ deviceError }}
-            </div>
-            <div
-              v-else-if="cloudDevices.devices.length === 0"
-              class="p-5 text-sm text-[var(--color-text-muted)]"
-            >
-              {{ t('dashboard.emptyTitle') }}
-            </div>
-            <ul v-else class="divide-y divide-[var(--color-border)]">
-              <li
-                v-for="device in cloudDevices.devices"
-                :key="device.id"
-                class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
+            <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
+              {{ t('dashboard.devicesTitle') }}
+            </h1>
+            <div class="flex items-center gap-2">
+              <RouterLink
+                :to="{ name: 'home' }"
+                class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
               >
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-2">
-                    <span
-                      class="size-2 shrink-0 rounded-full"
-                      :class="device.online ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
-                    />
-                    <Monitor class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
-                    <span class="truncate text-sm text-[var(--color-text-strong)]">
-                      {{ device.name }}
-                    </span>
-                    <span class="shrink-0 text-sm text-[var(--color-text-muted)]">
-                      {{ device.online ? t('cloud.online') : t('cloud.offline') }}
-                    </span>
-                  </div>
-                  <p class="mt-1 truncate pl-8 text-sm text-[var(--color-text-muted)]">
-                    {{ deviceActivity(device) }}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  class="inline-flex size-8 shrink-0 items-center justify-center rounded-md outline-none disabled:cursor-not-allowed"
-                  :disabled="!device.online"
-                  :aria-label="t('dashboard.openWorkbench')"
-                  @click="openCloudSessions(device.id)"
-                >
-                  <ArrowRight
-                    class="size-5"
-                    :class="
-                      device.online
-                        ? 'text-[var(--color-text-subtle)]'
-                        : 'text-[var(--color-text-muted)]'
-                    "
-                  />
-                </button>
-              </li>
-            </ul>
-          </section>
-        </div>
-      </main>
-    </section>
-
-    <DialogRoot :open="changePasswordDialogOpen" @update:open="changePasswordDialogOpen = $event">
-      <DialogPortal>
-        <DialogOverlay class="dialog-overlay" />
-        <DialogContent class="dialog-content">
-          <DialogTitle class="dialog-title">{{ t('cloud.changePassword') }}</DialogTitle>
-          <form class="dialog-form" @submit.prevent="submitChangePassword">
-            <input
-              v-model="currentPassword"
-              type="password"
-              :placeholder="t('cloud.currentPassword')"
-            />
-            <input v-model="newPassword" type="password" :placeholder="t('cloud.newPassword')" />
-            <div class="dialog-actions">
-              <DialogClose as-child>
-                <button
-                  type="button"
-                  class="button button-secondary bg-[var(--color-surface-raised)]"
-                >
-                  {{ t('common.cancel') }}
-                </button>
-              </DialogClose>
-              <button type="submit" class="button button-primary" :disabled="changingPassword">
-                {{ changingPassword ? t('cloud.changingPassword') : t('cloud.changePassword') }}
+                {{ t('dashboard.home') }}
+              </RouterLink>
+              <button
+                type="button"
+                class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]"
+                :disabled="loading"
+                @click="refreshDevices"
+              >
+                <RefreshCw class="size-3.5" :class="loading ? 'animate-spin' : ''" />
+                {{ loading ? t('dashboard.refreshing') : t('dashboard.refreshDevices') }}
               </button>
             </div>
-          </form>
-        </DialogContent>
-      </DialogPortal>
-    </DialogRoot>
+          </div>
 
+          <div v-if="loading" class="p-5 text-sm text-[var(--color-text-muted)]">
+            {{ t('dashboard.loadingDevices') }}
+          </div>
+          <div v-else-if="deviceError" class="p-5 text-sm text-[var(--color-danger-text)]">
+            {{ deviceError }}
+          </div>
+          <div
+            v-else-if="cloudDevices.devices.length === 0"
+            class="p-5 text-sm text-[var(--color-text-muted)]"
+          >
+            {{ t('dashboard.emptyTitle') }}
+          </div>
+          <ul v-else class="divide-y divide-[var(--color-border)]">
+            <li
+              v-for="device in cloudDevices.devices"
+              :key="device.id"
+              class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
+            >
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span
+                    class="size-2 shrink-0 rounded-full"
+                    :class="device.online ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
+                  />
+                  <Monitor class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
+                  <span class="truncate text-sm text-[var(--color-text-strong)]">
+                    {{ device.name }}
+                  </span>
+                  <span class="shrink-0 text-sm text-[var(--color-text-muted)]">
+                    {{ device.online ? t('cloud.online') : t('cloud.offline') }}
+                  </span>
+                </div>
+                <p class="mt-1 truncate pl-8 text-sm text-[var(--color-text-muted)]">
+                  {{ deviceActivity(device) }}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="inline-flex size-8 shrink-0 items-center justify-center rounded-md outline-none disabled:cursor-not-allowed"
+                :disabled="!device.online"
+                :aria-label="t('dashboard.openWorkbench')"
+                @click="openCloudSessions(device.id)"
+              >
+                <ArrowRight
+                  class="size-5"
+                  :class="
+                    device.online
+                      ? 'text-[var(--color-text-subtle)]'
+                      : 'text-[var(--color-text-muted)]'
+                  "
+                />
+              </button>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  </section>
+
+  <DialogRoot :open="changePasswordDialogOpen" @update:open="changePasswordDialogOpen = $event">
+    <DialogPortal>
+      <DialogOverlay class="dialog-overlay" />
+      <DialogContent class="dialog-content">
+        <DialogTitle class="dialog-title">{{ t('cloud.changePassword') }}</DialogTitle>
+        <form class="dialog-form" @submit.prevent="submitChangePassword">
+          <input
+            v-model="currentPassword"
+            type="password"
+            :placeholder="t('cloud.currentPassword')"
+          />
+          <input v-model="newPassword" type="password" :placeholder="t('cloud.newPassword')" />
+          <div class="dialog-actions">
+            <DialogClose as-child>
+              <button
+                type="button"
+                class="button button-secondary bg-[var(--color-surface-raised)]"
+              >
+                {{ t('common.cancel') }}
+              </button>
+            </DialogClose>
+            <button type="submit" class="button button-primary" :disabled="changingPassword">
+              {{ changingPassword ? t('cloud.changingPassword') : t('cloud.changePassword') }}
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 </template>
 
 <script setup lang="ts">

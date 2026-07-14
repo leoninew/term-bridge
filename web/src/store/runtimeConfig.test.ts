@@ -19,6 +19,7 @@ function storageMock(): Storage {
 
 function runtimeConfig(overrides: BrowserRuntimeConfig = {}): BrowserRuntimeConfig {
   return {
+    version: 'server-version',
     local: {
       mode: 'hybrid',
       publicUrl: 'http://localhost:9030',
@@ -57,12 +58,14 @@ describe('runtime config store', () => {
   })
 
   it('parses nested runtime config injected by the server', () => {
+    vi.stubEnv('TERMBRIDGE_LOCAL__VERSION', 'vite-version')
     stubWindowConfig(
       runtimeConfig({ local: { mode: 'cloud', apiBaseUrl: 'https://local.example.com/' } }),
     )
 
     const store = useRuntimeConfigStore()
 
+    expect(store.config.version).toBe('server-version')
     expect(store.config.local.mode).toBe('cloud')
     expect(store.config.local.apiBaseUrl).toBe('https://local.example.com')
     expect(store.config.cloud.publicUrl).toBe('http://termbridge.lvh.me')
@@ -75,6 +78,7 @@ describe('runtime config store', () => {
       localStorage: storageMock(),
       sessionStorage: storageMock(),
     })
+    vi.stubEnv('TERMBRIDGE_LOCAL__VERSION', 'vite-version')
     vi.stubEnv('TERMBRIDGE_LOCAL__MODE', 'hybrid')
     vi.stubEnv('TERMBRIDGE_LOCAL__PUBLIC_URL', 'http://localhost:9030')
     vi.stubEnv('TERMBRIDGE_LOCAL__API_BASE_URL', '/local-api')
@@ -87,6 +91,7 @@ describe('runtime config store', () => {
     const store = useRuntimeConfigStore()
 
     expect(store.config).toEqual({
+      version: 'vite-version',
       local: {
         mode: 'hybrid',
         publicUrl: 'http://localhost:9030',
@@ -121,6 +126,7 @@ describe('runtime config store', () => {
 
     const store = useRuntimeConfigStore()
 
+    expect(store.config.version).toBe('')
     expect(store.config.local.mode).toBe('cloud')
     expect(store.view.mode).toBe('cloud')
   })

@@ -6,8 +6,8 @@
       </template>
     </AppHeader>
 
-    <main class="flex min-h-[calc(100vh-4rem)] items-center justify-center p-6">
-      <div class="mx-auto flex w-full max-w-4xl flex-col gap-5">
+    <main class="flex min-h-[calc(100vh-4rem)] items-center justify-center px-8 py-8 2xl:px-12">
+      <div class="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
         <section
           class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
         >
@@ -41,7 +41,7 @@
             </div>
           </div>
 
-          <div class="grid gap-3 p-5 sm:grid-cols-3">
+          <div class="grid gap-4 p-5 lg:grid-cols-3">
             <div
               class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4"
             >
@@ -281,7 +281,7 @@
       : t('dashboard.cloudConnectionNotConfigured'),
   )
   const localUserLabel = computed(() => localUser.value || t('dashboard.todoLocalUser'))
-  const projectVersionLabel = computed(() => t('dashboard.todoProjectVersion'))
+  const projectVersionLabel = computed(() => runtimeConfig.config.version)
   const deviceName = computed(() => localDevice.value?.name || localDevice.value?.id || '')
 
   async function loadLocalHome() {
@@ -307,7 +307,8 @@
       return
     }
 
-    await Promise.all([loadWorkspaces(), loadShortcuts()])
+    await loadWorkspaces()
+    await loadShortcuts()
   }
 
   async function loadWorkspaces() {
@@ -315,7 +316,7 @@
     workspaceError.value = ''
     try {
       const workspaceResponse = await listWorkspaces()
-      workspaces.value = workspaceResponse.data.slice(0, 5)
+      workspaces.value = workspaceResponse.data.slice(0, 4)
     } catch (err) {
       workspaceError.value = t('dashboard.loadWorkspacesFailed')
       notifications.notifyError(t('dashboard.loadWorkspacesFailed'), err)

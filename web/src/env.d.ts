@@ -3,6 +3,7 @@
 declare module '*.css'
 
 interface ImportMetaEnv {
+  readonly TERMBRIDGE_LOCAL__VERSION?: string
   readonly TERMBRIDGE_LOCAL__API_BASE_URL?: string
   readonly TERMBRIDGE_LOCAL__PUBLIC_URL?: string
   readonly TERMBRIDGE_LOCAL__MODE?: string

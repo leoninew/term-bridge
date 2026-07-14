@@ -45,6 +45,7 @@ function runtimeConfigSource(): RuntimeConfigSource {
   return {
     name: 'import.meta.env',
     value: {
+      version: import.meta.env.DEV ? import.meta.env.TERMBRIDGE_LOCAL__VERSION : undefined,
       local: {
         mode: import.meta.env.TERMBRIDGE_LOCAL__MODE as LocalMode | undefined,
         publicUrl: import.meta.env.TERMBRIDGE_LOCAL__PUBLIC_URL,
@@ -82,6 +83,7 @@ function parseRuntimeConfig(source: RuntimeConfigSource): RuntimeConfig {
   }
 
   const config = {
+    version: optionalString(source.value.version),
     local: {
       mode: parseLocalMode(local?.mode, errors),
       publicUrl: requiredHTTPURL('local.publicUrl', local?.publicUrl, errors),
@@ -127,8 +129,12 @@ function parseCloudOAuth(
   return { clientId, redirectUrl, scopes }
 }
 
+function optionalString(value: string | undefined): string {
+  return value?.trim() ?? ''
+}
+
 function requiredString(key: string, value: string | undefined, errors: string[]): string {
-  const trimmed = value?.trim() ?? ''
+  const trimmed = optionalString(value)
   if (!trimmed) {
     errors.push(`${key} is required`)
   }

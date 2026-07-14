@@ -13,10 +13,10 @@
       </template>
     </AppHeader>
 
-    <main class="min-h-[calc(100vh-4rem)] p-6 pt-10">
-      <div class="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
+    <main class="min-h-[calc(100vh-4rem)] px-8 py-8 2xl:px-12">
+      <div class="mx-auto flex w-full max-w-[1440px] flex-col gap-5">
         <section
-          class="grid min-h-[680px] content-center gap-10 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]"
+          class="grid min-h-[min(680px,calc(100vh-8rem))] items-center gap-12 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] 2xl:gap-16"
         >
           <div class="flex flex-col justify-center gap-6">
             <div>
@@ -59,13 +59,13 @@
           </div>
 
           <div
-            class="flex min-h-[520px] items-center"
+            class="flex min-h-[480px] items-center 2xl:min-h-[540px]"
             :aria-label="t('dashboard.cloudHeroImageAlt')"
           >
             <img
               :src="cloudHomeHeroUrl"
               :alt="t('dashboard.cloudHeroImageAlt')"
-              class="w-full rounded-2xl object-cover shadow-2xl shadow-blue-950/30"
+              class="h-auto max-h-[calc(100vh-9rem)] w-full rounded-2xl object-cover shadow-2xl shadow-blue-950/30"
             />
           </div>
         </section>
