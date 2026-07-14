@@ -2,6 +2,18 @@ version: '3'
 
 silent: false
 
+vars:
+  BUILD_VERSION:
+    sh: sh ./scripts/build-version.sh
+  BUILD_COMMIT:
+    sh: 'git rev-parse --short=12 HEAD'
+  BUILD_TIME:
+    sh: 'if [ -n "$TERMBRIDGE_BUILD_TIME" ]; then printf "%s" "$TERMBRIDGE_BUILD_TIME"; else date -u +%Y%m%d-%H%M%S; fi'
+  GO_LDFLAGS: >-
+    -X gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version.Version={{.BUILD_VERSION}}
+    -X gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version.Commit={{.BUILD_COMMIT}}
+    -X gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version.BuildTime={{.BUILD_TIME}}
+
 tasks:
   default:
     desc: Show available tasks
@@ -41,6 +53,7 @@ tasks:
   test:
     desc: Run frontend and backend unit tests
     cmds:
+      - sh scripts/build-version_test.sh
       - cd web && yarn test
       - go test ./cmd/... ./internal/...
 
@@ -82,12 +95,12 @@ tasks:
     desc: Build web frontend and termbridge image
     cmds:
       - mkdir -p bin
-      - go build -o bin/termbridge ./cmd/termbridge
+      - go build -trimpath -ldflags "{{.GO_LDFLAGS}}" -o bin/termbridge ./cmd/termbridge
 
   docker:
     desc: Build web frontend and termbridge image
     cmds:
-      - docker build -f Dockerfile.cn -t termbridge .
+      - docker build -f Dockerfile.cn -t termbridge --build-arg VERSION={{.BUILD_VERSION}} --build-arg COMMIT={{.BUILD_COMMIT}} --build-arg BUILD_TIME={{.BUILD_TIME}} .
 
   package:
     desc: Build Windows, Linux, and macOS x64 portable zip packages
@@ -99,9 +112,9 @@ tasks:
       - rm -rf bin/package bin/TermBridge-windows-x64.zip bin/TermBridge-linux-x64.zip bin/TermBridge-macos-x64.zip
       - mkdir -p {{.WINDOWS_ROOT}}/web {{.WINDOWS_ROOT}}/configs {{.LINUX_ROOT}}/web {{.LINUX_ROOT}}/configs {{.MACOS_ROOT}}/web {{.MACOS_ROOT}}/configs
       - cd web && yarn build
-      - env GOOS=windows GOARCH=amd64 go build -o {{.WINDOWS_ROOT}}/termbridge.exe ./cmd/termbridge
-      - env GOOS=linux GOARCH=amd64 go build -o {{.LINUX_ROOT}}/termbridge ./cmd/termbridge
-      - env GOOS=darwin GOARCH=amd64 go build -o {{.MACOS_ROOT}}/termbridge ./cmd/termbridge
+      - env GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "{{.GO_LDFLAGS}}" -o {{.WINDOWS_ROOT}}/termbridge.exe ./cmd/termbridge
+      - env GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "{{.GO_LDFLAGS}}" -o {{.LINUX_ROOT}}/termbridge ./cmd/termbridge
+      - env GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "{{.GO_LDFLAGS}}" -o {{.MACOS_ROOT}}/termbridge ./cmd/termbridge
       - cp -R web/dist/. {{.WINDOWS_ROOT}}/web/
       - cp -R web/dist/. {{.LINUX_ROOT}}/web/
       - cp -R web/dist/. {{.MACOS_ROOT}}/web/
@@ -112,6 +125,7 @@ tasks:
       - cp scripts/package/.env.prod scripts/package/.env.test {{.LINUX_ROOT}}/
       - cp scripts/package/.env.prod scripts/package/.env.test {{.MACOS_ROOT}}/
       - cp scripts/package/start.cmd {{.WINDOWS_ROOT}}/start.cmd
+      - cp scripts/package/start.sh {{.WINDOWS_ROOT}}/start.sh
       - cp scripts/package/start.sh {{.LINUX_ROOT}}/start.sh
       - cp scripts/package/start.sh {{.MACOS_ROOT}}/start.sh
       - chmod +x {{.LINUX_ROOT}}/termbridge {{.LINUX_ROOT}}/start.sh {{.MACOS_ROOT}}/termbridge {{.MACOS_ROOT}}/start.sh

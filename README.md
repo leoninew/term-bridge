@@ -73,7 +73,21 @@ Vite dev proxy：
 ```bash
 task test    # 运行测试
 task check   # 运行完整检查
-task build   # 构建本地二进制和镜像
+task build   # 构建本地二进制
+```
+
+## 构建版本
+
+`task build`、`task package` 与 `task docker` 会把同一组构建元数据写入二进制；通过 `termbridge version` 查看。
+
+- 正式发布使用不可变的 SemVer Git tag，例如 `v1.2.3` 或 `v1.2.3-rc.1`。
+- tag 对应提交使用 tag 本身；tag 后提交使用 `v1.2.3-N-g<短hash>`；没有可达 release tag 时使用 `dev-N-g<短hash>`。
+- 工作区有未提交变更时版本会追加 `-dirty`，不能将其视为正式发布产物。
+- Commit 固定为当前 Git HEAD 的 12 位短 hash，构建时间为 UTC `YYYYMMDD-HHMMSS`。
+- 只有 CI 或源码归档无法读取 Git 元数据时才设置 `TERMBRIDGE_BUILD_VERSION`；它是编译期覆盖，不是运行时配置。
+
+```bash
+termbridge version
 ```
 
 ## 配置

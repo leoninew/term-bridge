@@ -3,6 +3,8 @@ package config
 import (
 	"reflect"
 	"testing"
+
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version"
 )
 
 func TestBuildBrowserRuntimeConfigProjectsPublicConfiguration(t *testing.T) {
@@ -30,6 +32,9 @@ func TestBuildBrowserRuntimeConfigProjectsPublicConfiguration(t *testing.T) {
 		t.Fatalf("BuildBrowserRuntimeConfig() error = %v", err)
 	}
 
+	if runtimeConfig.Version != version.Version {
+		t.Fatalf("Version = %q, want %q", runtimeConfig.Version, version.Version)
+	}
 	if runtimeConfig.Local.Mode != "cloud" {
 		t.Fatalf("Local.Mode = %q, want cloud", runtimeConfig.Local.Mode)
 	}

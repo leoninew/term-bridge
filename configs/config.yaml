@@ -5,6 +5,7 @@
 # 设置 TERMBRIDGE_ENV=<env> 后，优先级为：
 # configs/config.yaml < configs/config.<env>.yaml < .env.<env> < OS env。
 # TERMBRIDGE_ENV 只从 OS env 读取，不从 .env / .env.<env> 读取。
+# TERMBRIDGE_BUILD_VERSION 是 Taskfile/CI 编译元数据，不是 YAML 或 Viper 运行时配置键；不要添加 build_version。
 
 # JWT 认证密钥（必填）。必须是 base64 编码的 32 字节随机 key，普通明文 secret 会被拒绝。
 # python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"

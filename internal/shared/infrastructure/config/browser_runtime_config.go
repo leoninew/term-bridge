@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version"
 	browserdto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/browser"
 )
 
@@ -31,6 +32,7 @@ func BuildBrowserRuntimeConfig(cfg Config, mode string) (browserdto.RuntimeConfi
 	}
 
 	return browserdto.RuntimeConfig{
+		Version: version.Version,
 		Local: browserdto.RuntimeLocalConfig{
 			Mode:       mode,
 			PublicUrl:  cfg.Local.PublicUrl,

@@ -1,8 +1,9 @@
 package browser
 
 type RuntimeConfig struct {
-	Local RuntimeLocalConfig `json:"local"`
-	Cloud RuntimeCloudConfig `json:"cloud"`
+	Version string             `json:"version"`
+	Local   RuntimeLocalConfig `json:"local"`
+	Cloud   RuntimeCloudConfig `json:"cloud"`
 }
 
 type RuntimeLocalConfig struct {

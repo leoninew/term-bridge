@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version"
 )
 
 func TestParseExecCommandWithDefaultCwd(t *testing.T) {
@@ -194,13 +195,13 @@ func TestParseExecRequiresCommandAfterSeparator(t *testing.T) {
 	}
 }
 
-func TestParseVersionWithoutCommand(t *testing.T) {
-	cfg, err := Parse([]string{"--version"}, &bytes.Buffer{})
+func TestParseVersionCommand(t *testing.T) {
+	cfg, err := Parse([]string{"version"}, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
-	if !cfg.ShowVersion {
-		t.Fatal("ShowVersion = false, want true")
+	if cfg.Kind != CommandVersion {
+		t.Fatalf("Kind = %q, want version", cfg.Kind)
 	}
 }
 
@@ -232,6 +233,7 @@ func TestRunHelpWritesStdoutOnly(t *testing.T) {
 		"workspace",
 		"session",
 		"migrate",
+		"version",
 		"termbridge agent",
 		"termbridge cloud",
 		"termbridge migrate agent",
@@ -257,16 +259,26 @@ func TestRunHelpWritesStdoutOnly(t *testing.T) {
 }
 
 func TestRunVersionWritesStdoutOnly(t *testing.T) {
+	originalVersion, originalCommit, originalBuildTime := version.Version, version.Commit, version.BuildTime
+	version.Version = "v1.2.3"
+	version.Commit = "0123456789ab"
+	version.BuildTime = "2026-07-14T12:34:56Z"
+	t.Cleanup(func() {
+		version.Version, version.Commit, version.BuildTime = originalVersion, originalCommit, originalBuildTime
+	})
+
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"--version"}, bytes.NewReader(nil), &stdout, &stderr)
+	code := Run([]string{"version"}, bytes.NewReader(nil), &stdout, &stderr)
 
 	if code != apperrors.ExitSuccess {
 		t.Fatalf("Run() code = %d, want %d", code, apperrors.ExitSuccess)
 	}
-	if !strings.Contains(stdout.String(), "termbridge") {
-		t.Fatalf("stdout missing version: %s", stdout.String())
+	for _, want := range []string{"termbridge v1.2.3", "commit=0123456789ab", "built=2026-07-14T12:34:56Z"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout missing %q: %s", want, stdout.String())
+		}
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())

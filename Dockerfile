@@ -12,7 +12,12 @@ RUN go mod download
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 COPY migrations/ ./migrations/
-RUN CGO_ENABLED=0 go build -o /out/termbridge ./cmd/termbridge
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+RUN CGO_ENABLED=0 go build -trimpath \
+    -ldflags="-X gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version.Version=${VERSION} -X gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version.Commit=${COMMIT} -X gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version.BuildTime=${BUILD_TIME}" \
+    -o /out/termbridge ./cmd/termbridge
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update \

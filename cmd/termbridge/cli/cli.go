@@ -21,6 +21,7 @@ const (
 	CommandAgent     CommandKind = "agent"
 	CommandCloud     CommandKind = "cloud"
 	CommandMigrate   CommandKind = "migrate"
+	CommandVersion   CommandKind = "version"
 )
 
 type ExecOptions struct {
@@ -38,13 +39,12 @@ type MigrateOptions struct {
 }
 
 type Options struct {
-	Cwd         string
-	Kind        CommandKind
-	Exec        ExecOptions
-	Role        RoleOptions
-	Migrate     MigrateOptions
-	ShowHelp    bool
-	ShowVersion bool
+	Cwd      string
+	Kind     CommandKind
+	Exec     ExecOptions
+	Role     RoleOptions
+	Migrate  MigrateOptions
+	ShowHelp bool
 }
 
 func Run(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
@@ -60,7 +60,7 @@ func Run(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int
 		return apperrors.ExitSuccess
 	}
 
-	if options.ShowVersion {
+	if options.Kind == CommandVersion {
 		_, _ = fmt.Fprintln(stdout, version.String())
 		return apperrors.ExitSuccess
 	}
@@ -111,7 +111,6 @@ func Parse(args []string, output io.Writer) (Options, error) {
 	flags := flag.NewFlagSet("termbridge", flag.ContinueOnError)
 	flags.SetOutput(output)
 	flags.BoolVar(&options.ShowHelp, "help", false, "show help")
-	flags.BoolVar(&options.ShowVersion, "version", false, "show version")
 	flags.StringVar(&options.Cwd, "cwd", "", "working directory for TermBridge")
 
 	if len(args) > 0 && args[0] == "--" {
@@ -129,7 +128,7 @@ func Parse(args []string, output io.Writer) (Options, error) {
 		if err := flags.Parse(args); err != nil {
 			return Options{}, apperrors.Usage(err.Error())
 		}
-		if options.ShowHelp || options.ShowVersion {
+		if options.ShowHelp {
 			return options, nil
 		}
 		if len(flags.Args()) > 0 {
@@ -172,6 +171,12 @@ func Parse(args []string, output io.Writer) (Options, error) {
 	case "migrate":
 		options.Kind = CommandMigrate
 		return parseMigrate(options, rest, output)
+	case "version":
+		options.Kind = CommandVersion
+		if len(rest) > 0 {
+			return Options{}, apperrors.Usage("version does not accept arguments")
+		}
+		return options, nil
 	default:
 		return Options{}, apperrors.Usage("unknown command: " + command)
 	}
@@ -259,7 +264,7 @@ func parseExec(options Options, args []string, output io.Writer) (Options, error
 
 func isCommand(arg string) bool {
 	switch arg {
-	case "exec", "workspace", "session", "agent", "cloud", "migrate":
+	case "exec", "workspace", "session", "agent", "cloud", "migrate", "version":
 		return true
 	default:
 		return false
@@ -277,10 +282,10 @@ func PrintUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  workspace  list workspaces")
 	_, _ = fmt.Fprintln(w, "  session    list sessions")
 	_, _ = fmt.Fprintln(w, "  migrate    run role-specific database migrations")
+	_, _ = fmt.Fprintln(w, "  version    show build version")
 	_, _ = fmt.Fprintln(w)
 	_, _ = fmt.Fprintln(w, "Options:")
 	_, _ = fmt.Fprintln(w, "  --cwd <dir>     working directory for TermBridge; defaults to current directory")
-	_, _ = fmt.Fprintln(w, "  --version       show version")
 	_, _ = fmt.Fprintln(w, "  --help          show help")
 	_, _ = fmt.Fprintln(w)
 	_, _ = fmt.Fprintln(w, "Config files:")
