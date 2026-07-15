@@ -113,8 +113,8 @@ describe('api client', () => {
     )
 
     expect(err).toBeInstanceOf(ApiClientError)
-    expect(err.message).toContain('503 device_offline')
-    expect(err.message).toContain('req_123')
+    expect(err.message).toBe('Device is offline.')
+    expect(err).toMatchObject({ status: 503, code: 'device_offline', requestId: 'req_123' })
   })
 
   it('rejects legacy error responses as contract mismatch', () => {

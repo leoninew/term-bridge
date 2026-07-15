@@ -10,13 +10,14 @@
     v-else
     :username="cloudAuth.usernameInput"
     :password="cloudAuth.passwordInput"
-    :logging-in="cloudAuth.loggingIn"
-    :google-logging-in="googleLoggingIn"
+    :logging-in="cloudAuth.loggingIn || loginSubmitting"
+    :external-logging-in="externalLoggingIn"
+    :external-auth-provider-ids="runtimeConfig.config.cloud.externalAuthProviderIds"
     :turnstile-ready="!!turnstileToken"
     @update:username="cloudAuth.usernameInput = $event"
     @update:password="cloudAuth.passwordInput = $event"
     @submit="login"
-    @google="loginWithGoogle"
+    @external="loginWithExternalProvider"
   >
     <TurnstileChallenge
       v-if="turnstileSiteKey"
@@ -34,20 +35,27 @@
   import { useRoute, useRouter } from 'vue-router'
   import LoginPanel from '../../components/session/LoginPanel.vue'
   import TurnstileChallenge from '../../components/cloud/TurnstileChallenge.vue'
-  import { authGoogleUrl, authLoginCSRFToken, authTurnstileSiteKey } from '../../features/cloud/api'
+  import {
+    authExternalUrl,
+    authLoginCSRFToken,
+    authTurnstileSiteKey,
+  } from '../../features/cloud/api'
   import {
     authenticatedCloudLoginRedirect,
     storeCloudLoginRedirect,
   } from '../../features/cloud/loginRedirect'
   import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useNotificationsStore } from '../../store/notifications'
+  import { useRuntimeConfigStore } from '../../store/runtimeConfig'
 
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
   const cloudAuth = useCloudAuthStore()
   const notifications = useNotificationsStore()
-  const googleLoggingIn = ref(false)
+  const runtimeConfig = useRuntimeConfigStore()
+  const externalLoggingIn = ref(false)
+  const loginSubmitting = ref(false)
   const turnstileSiteKey = ref('')
   const turnstileToken = ref('')
   const turnstile = ref<InstanceType<typeof TurnstileChallenge> | null>(null)
@@ -67,6 +75,17 @@
   })
 
   async function login() {
+    if (loginSubmitting.value || cloudAuth.loggingIn) {
+      return
+    }
+    if (!cloudAuth.usernameInput) {
+      notifications.pushToast('error', t('cloud.loginFailed'), t('message.emailRequired'))
+      return
+    }
+    if (!cloudAuth.passwordInput) {
+      notifications.pushToast('error', t('cloud.loginFailed'), t('message.passwordRequired'))
+      return
+    }
     if (!turnstileToken.value) {
       notifications.notifyError(
         t('cloud.loginFailed'),
@@ -74,6 +93,7 @@
       )
       return
     }
+    loginSubmitting.value = true
     try {
       const csrfToken = await authLoginCSRFToken()
       await cloudAuth.login(turnstileToken.value, csrfToken)
@@ -84,6 +104,7 @@
     } catch (err) {
       notifications.notifyError(t('cloud.loginFailed'), err)
     } finally {
+      loginSubmitting.value = false
       turnstileToken.value = ''
       turnstile.value?.reset()
     }
@@ -97,17 +118,17 @@
     return redirect || { name: 'cloud-dashboard' }
   }
 
-  async function loginWithGoogle() {
-    if (googleLoggingIn.value) {
+  async function loginWithExternalProvider(providerId: string) {
+    if (externalLoggingIn.value) {
       return
     }
-    googleLoggingIn.value = true
+    externalLoggingIn.value = true
     try {
       storeCloudLoginRedirect(typeof route.query.redirect === 'string' ? route.query.redirect : '')
-      window.location.href = await authGoogleUrl()
+      window.location.href = await authExternalUrl(providerId)
     } catch (err) {
-      googleLoggingIn.value = false
-      notifications.notifyError(t('cloud.googleLoginFailed'), err)
+      externalLoggingIn.value = false
+      notifications.notifyError(t('cloud.externalLoginFailed'), err)
     }
   }
 </script>

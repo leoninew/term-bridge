@@ -19,9 +19,7 @@ export class ApiClientError extends Error {
 
   constructor(status: number, response: ErrorResp) {
     const requestId = response.request_id || ''
-    super(
-      `API request failed (${status} ${response.code}, requestId: ${requestId}): ${response.error}`,
-    )
+    super(response.error)
     this.name = 'ApiClientError'
     this.status = status
     this.code = response.code

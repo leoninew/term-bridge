@@ -1,217 +1,212 @@
 <template>
-  <section class="min-h-screen bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]">
-    <AppHeader>
-      <template #actions>
-        <CloudAccountConnectionMenu :connection="cloudSession" />
-      </template>
-    </AppHeader>
-
-    <main class="flex min-h-[calc(100vh-4rem)] items-center justify-center px-8 py-8 2xl:px-12">
-      <div class="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
-        <section
-          class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+  <AppPageShell main-class="flex items-center justify-center px-8 py-8 text-sm 2xl:px-12">
+    <template #actions>
+      <CloudAccountMenu
+        :authenticated="cloudAuth.authenticated"
+        :user-display-name="cloudUserDisplayName"
+        :user-email="cloudAuth.user?.email ?? ''"
+        @login="openCloudLogin"
+        @logout="logoutCloud"
+      />
+    </template>
+    <div class="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
+      <section
+        class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+      >
+        <div
+          class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
         >
-          <div
-            class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
-          >
-            <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
-              {{ t('dashboard.localHomeTitle') }}
-            </h1>
-            <div class="flex items-center gap-2">
-              <button
-                type="button"
-                class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-subtle)]"
-                :disabled="
-                  connectingCloud || (!cloudSession && !tokens.cloudToken && !cloudConnectEnabled)
-                "
-                :title="cloudConnectionActionTitle"
-                @click="toggleCloudConnection"
-              >
-                <Unplug v-if="cloudSession" class="size-3.5 text-[var(--color-text-subtle)]" />
-                <Plug v-else class="size-3.5 text-[var(--color-text-subtle)]" />
-                {{ cloudConnectionActionLabel }}
-              </button>
-              <button
-                type="button"
-                class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
-                @click="openCloudPage"
-              >
-                {{ t('dashboard.openCloudPage') }}
-              </button>
-            </div>
-          </div>
-
-          <div class="grid gap-4 p-5 lg:grid-cols-3">
-            <div
-              class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4"
+          <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
+            {{ t('dashboard.localHomeTitle') }}
+          </h1>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-subtle)]"
+              :disabled="
+                connectingCloud || (!cloudSession && !tokens.cloudToken && !cloudConnectEnabled)
+              "
+              :title="cloudConnectionActionTitle"
+              @click="cloudSession ? disconnectLocalDeviceFromCloud() : connectLocalDeviceToCloud()"
             >
-              <div class="flex items-center gap-3">
-                <span
-                  class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
-                >
-                  <Monitor class="size-5" />
-                </span>
-                <div class="min-w-0">
-                  <p class="text-sm text-[var(--color-text-strong)]">
-                    {{ t('dashboard.cloudConnectionDevice') }}
-                  </p>
-                  <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
-                    {{ deviceName || t('dashboard.localDeviceUnavailable') }}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div
-              class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4"
-            >
-              <div class="flex items-center gap-3">
-                <span
-                  class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
-                >
-                  <User class="size-5" />
-                </span>
-                <div class="min-w-0">
-                  <p class="text-sm text-[var(--color-text-strong)]">
-                    {{ t('dashboard.localUser') }}
-                  </p>
-                  <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
-                    {{ localUserLabel }}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div
-              class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4"
-            >
-              <div class="flex items-center gap-3">
-                <span
-                  class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
-                >
-                  <Package class="size-5" />
-                </span>
-                <div class="min-w-0">
-                  <p class="text-sm text-[var(--color-text-strong)]">
-                    {{ t('dashboard.projectVersion') }}
-                  </p>
-                  <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
-                    {{ projectVersionLabel }}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section
-          class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
-        >
-          <div
-            class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
-          >
-            <h2 class="text-lg font-semibold text-[var(--color-text-strong)]">
-              {{ t('dashboard.localWorkspaceListTitle') }}
-            </h2>
-            <RouterLink
-              :to="{ name: 'local-sessions' }"
+              <Unplug v-if="cloudSession" class="size-3.5 text-[var(--color-text-subtle)]" />
+              <Plug v-else class="size-3.5 text-[var(--color-text-subtle)]" />
+              {{ cloudConnectionActionLabel }}
+            </button>
+            <button
+              type="button"
               class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
+              @click="openCloudPage"
             >
-              <FolderOpen class="size-3.5" />
-              {{ t('dashboard.openWorkspaceList') }}
-            </RouterLink>
+              {{ t('dashboard.openCloudPage') }}
+            </button>
           </div>
+        </div>
 
-          <div v-if="workspacesLoading" class="p-5 text-sm text-[var(--color-text-muted)]">
-            {{ t('dashboard.loadingWorkspaces') }}
-          </div>
-          <div v-else-if="workspaceError" class="p-5 text-sm text-[var(--color-danger-text)]">
-            {{ workspaceError }}
-          </div>
+        <div class="grid gap-4 p-5 lg:grid-cols-3">
           <div
-            v-else-if="workspaces.length === 0"
-            class="p-5 text-sm text-[var(--color-text-muted)]"
+            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4"
           >
-            {{ t('dashboard.emptyWorkspaces') }}
-          </div>
-          <ul v-else class="divide-y divide-[var(--color-border)]">
-            <li
-              v-for="workspace in workspaces"
-              :key="workspace.id"
-              class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
-            >
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                  <Folder class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
-                  <span class="truncate text-sm text-[var(--color-text-strong)]">
-                    {{ workspace.name }}
-                  </span>
-                </div>
-                <div
-                  class="mt-1 flex min-w-0 items-center gap-3 pl-6 text-sm text-[var(--color-text-muted)]"
-                >
-                  <span class="truncate">{{ workspace.path }}</span>
-                  <span class="shrink-0">
-                    {{ workspaceUpdatedAt(workspace.updated_at) }}
-                  </span>
-                </div>
+            <div class="flex items-center gap-3">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
+              >
+                <Monitor class="size-5" />
+              </span>
+              <div class="min-w-0">
+                <p class="text-sm text-[var(--color-text-strong)]">
+                  {{ t('dashboard.cloudConnectionDevice') }}
+                </p>
+                <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
+                  {{ deviceName || t('dashboard.localDeviceUnavailable') }}
+                </p>
               </div>
-              <ArrowRight
-                class="size-5 shrink-0 text-[var(--color-text-subtle)]"
-                aria-hidden="true"
-              />
-            </li>
-          </ul>
-        </section>
+            </div>
+          </div>
 
-        <section
-          class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+          <div
+            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4"
+          >
+            <div class="flex items-center gap-3">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
+              >
+                <User class="size-5" />
+              </span>
+              <div class="min-w-0">
+                <p class="text-sm text-[var(--color-text-strong)]">
+                  {{ t('dashboard.localUser') }}
+                </p>
+                <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
+                  {{ localUserLabel }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4"
+          >
+            <div class="flex items-center gap-3">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
+              >
+                <Package class="size-5" />
+              </span>
+              <div class="min-w-0">
+                <p class="text-sm text-[var(--color-text-strong)]">
+                  {{ t('dashboard.projectVersion') }}
+                </p>
+                <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
+                  {{ projectVersionLabel }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+      >
+        <div
+          class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
         >
-          <div
-            class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
+          <h2 class="text-lg font-semibold text-[var(--color-text-strong)]">
+            {{ t('dashboard.localWorkspaceListTitle') }}
+          </h2>
+          <RouterLink
+            :to="{ name: 'local-sessions' }"
+            class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
           >
-            <h2 class="text-lg font-semibold text-[var(--color-text-strong)]">
-              {{ t('shortcut.title') }}
-            </h2>
-            <RouterLink
-              :to="{ name: 'local-shortcuts' }"
-              class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
-            >
-              <Command class="size-3.5" />
-              {{ t('common.more') }}
-            </RouterLink>
-          </div>
+            <FolderOpen class="size-3.5" />
+            {{ t('dashboard.openWorkspaceList') }}
+          </RouterLink>
+        </div>
 
-          <div v-if="shortcutsLoading" class="p-5 text-sm text-[var(--color-text-muted)]">
-            {{ t('shortcut.loading') }}
-          </div>
-          <div v-else-if="shortcutError" class="p-5 text-sm text-[var(--color-danger-text)]">
-            {{ shortcutError }}
-          </div>
-          <div
-            v-else-if="shortcuts.length === 0"
-            class="p-5 text-sm text-[var(--color-text-muted)]"
+        <div v-if="workspacesLoading" class="p-5 text-sm text-[var(--color-text-muted)]">
+          {{ t('dashboard.loadingWorkspaces') }}
+        </div>
+        <div v-else-if="workspaceError" class="p-5 text-sm text-[var(--color-danger-text)]">
+          {{ workspaceError }}
+        </div>
+        <div v-else-if="workspaces.length === 0" class="p-5 text-sm text-[var(--color-text-muted)]">
+          {{ t('dashboard.emptyWorkspaces') }}
+        </div>
+        <ul v-else class="divide-y divide-[var(--color-border)]">
+          <li
+            v-for="workspace in workspaces"
+            :key="workspace.id"
+            class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
           >
-            {{ t('shortcut.empty') }}
-          </div>
-          <ul v-else class="grid gap-px bg-[var(--color-border)] sm:grid-cols-2 lg:grid-cols-4">
-            <li
-              v-for="shortcut in shortcuts"
-              :key="shortcut.id"
-              class="min-w-0 bg-[var(--color-surface)] px-4 py-3 text-center"
-            >
-              <p class="truncate text-sm font-semibold text-[var(--color-text-strong)]">
-                {{ shortcut.name }}
-              </p>
-              <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
-                {{ shortcut.command }}
-              </p>
-            </li>
-          </ul>
-        </section>
-      </div>
-    </main>
-  </section>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <Folder class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
+                <span class="truncate text-sm text-[var(--color-text-strong)]">
+                  {{ workspace.name }}
+                </span>
+              </div>
+              <div
+                class="mt-1 flex min-w-0 items-center gap-3 pl-6 text-sm text-[var(--color-text-muted)]"
+              >
+                <span class="truncate">{{ workspace.path }}</span>
+                <span class="shrink-0">
+                  {{ workspaceUpdatedAt(workspace.updated_at) }}
+                </span>
+              </div>
+            </div>
+            <ArrowRight
+              class="size-5 shrink-0 text-[var(--color-text-subtle)]"
+              aria-hidden="true"
+            />
+          </li>
+        </ul>
+      </section>
+
+      <section
+        class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+      >
+        <div
+          class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
+        >
+          <h2 class="text-lg font-semibold text-[var(--color-text-strong)]">
+            {{ t('shortcut.title') }}
+          </h2>
+          <RouterLink
+            :to="{ name: 'local-shortcuts' }"
+            class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
+          >
+            <Command class="size-3.5" />
+            {{ t('common.more') }}
+          </RouterLink>
+        </div>
+
+        <div v-if="shortcutsLoading" class="p-5 text-sm text-[var(--color-text-muted)]">
+          {{ t('shortcut.loading') }}
+        </div>
+        <div v-else-if="shortcutError" class="p-5 text-sm text-[var(--color-danger-text)]">
+          {{ shortcutError }}
+        </div>
+        <div v-else-if="shortcuts.length === 0" class="p-5 text-sm text-[var(--color-text-muted)]">
+          {{ t('shortcut.empty') }}
+        </div>
+        <ul v-else class="grid gap-px bg-[var(--color-border)] sm:grid-cols-2 lg:grid-cols-4">
+          <li
+            v-for="shortcut in shortcuts"
+            :key="shortcut.id"
+            class="min-w-0 bg-[var(--color-surface)] px-4 py-3 text-center"
+          >
+            <p class="truncate text-sm font-semibold text-[var(--color-text-strong)]">
+              {{ shortcut.name }}
+            </p>
+            <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
+              {{ shortcut.command }}
+            </p>
+          </li>
+        </ul>
+      </section>
+    </div>
+  </AppPageShell>
 </template>
 
 <script setup lang="ts">
@@ -229,8 +224,9 @@
     User,
   } from '@lucide/vue'
   import { RouterLink } from 'vue-router'
-  import AppHeader from '../layout/AppHeader.vue'
-  import CloudAccountConnectionMenu from './CloudAccountConnectionMenu.vue'
+  import AppPageShell from '../layout/AppPageShell.vue'
+  import CloudAccountMenu from './CloudAccountMenu.vue'
+  import { authLogout } from '../../features/cloud/api'
   import {
     authMe,
     connectCloudWithToken,
@@ -251,6 +247,7 @@
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
   import { useAuthTokensStore } from '../../store/authTokens'
+  import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useLocalAuthStore } from '../../store/localAuth'
   import { useRuntimeConfigStore } from '../../store/runtimeConfig'
   import { useNotificationsStore } from '../../store/notifications'
@@ -258,6 +255,7 @@
   const { t } = useI18n()
   const runtimeConfig = useRuntimeConfigStore()
   const tokens = useAuthTokensStore()
+  const cloudAuth = useCloudAuthStore()
   const localAuth = useLocalAuthStore()
   const notifications = useNotificationsStore()
   const connectingCloud = ref(false)
@@ -280,6 +278,9 @@
       ? ''
       : t('dashboard.cloudConnectionNotConfigured'),
   )
+  const cloudUserDisplayName = computed(
+    () => cloudAuth.user?.display_name || cloudAuth.user?.email || t('dashboard.signedIn'),
+  )
   const localUserLabel = computed(() => localUser.value || t('dashboard.todoLocalUser'))
   const projectVersionLabel = computed(() => runtimeConfig.config.version)
   const deviceName = computed(() => localDevice.value?.name || localDevice.value?.id || '')
@@ -299,6 +300,7 @@
       } catch (err) {
         notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
       }
+      await cloudAuth.initializeAuth({ force: true })
     } catch (err) {
       workspaceError.value = t('dashboard.loadWorkspacesFailed')
       notifications.notifyError(t('dashboard.loadWorkspacesFailed'), err)
@@ -377,21 +379,38 @@
     localAuth.setCloudSession(summary)
   }
 
-  async function toggleCloudConnection() {
+  function openCloudLogin() {
+    startCloudOAuth('/')
+  }
+
+  async function logoutCloud() {
+    await disconnectLocalCloudSession()
+    await authLogout()
+    cloudAuth.clearToken()
+  }
+
+  async function disconnectLocalCloudSession() {
+    await disconnectCloud()
+    clearCloudConnectionTime()
+    setCloudConnection(null)
+  }
+
+  async function disconnectLocalDeviceFromCloud() {
     if (connectingCloud.value) {
       return
     }
-    if (cloudSession.value) {
-      connectingCloud.value = true
-      try {
-        await disconnectCloud()
-        clearCloudConnectionTime()
-        setCloudConnection(null)
-      } catch (err) {
-        notifications.notifyError(t('dashboard.cloudDisconnectionFailed'), err)
-      } finally {
-        connectingCloud.value = false
-      }
+    connectingCloud.value = true
+    try {
+      await disconnectLocalCloudSession()
+    } catch (err) {
+      notifications.notifyError(t('dashboard.cloudDisconnectionFailed'), err)
+    } finally {
+      connectingCloud.value = false
+    }
+  }
+
+  async function connectLocalDeviceToCloud() {
+    if (connectingCloud.value) {
       return
     }
     if (tokens.cloudToken) {
@@ -409,11 +428,9 @@
       )
       return
     }
-    connectingCloud.value = true
     try {
       startCloudOAuth('/')
     } catch (err) {
-      connectingCloud.value = false
       notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
     }
   }

@@ -2,11 +2,12 @@
   <button
     v-if="!authenticated"
     type="button"
-    class="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
+    class="inline-flex size-9 items-center justify-center rounded-md text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
+    :title="t('cloud.signIn')"
+    :aria-label="t('cloud.signIn')"
     @click="emit('login')"
   >
     <LogIn class="size-4 text-[var(--color-text-subtle)]" />
-    {{ t('cloud.signIn') }}
   </button>
 
   <DropdownMenuRoot v-else>
@@ -26,6 +27,7 @@
         class="z-50 min-w-40 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
       >
         <DropdownMenuItem
+          v-if="showChangePassword"
           class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
           @select="emit('changePassword')"
         >
@@ -60,6 +62,7 @@
     authenticated: boolean
     userDisplayName: string
     userEmail: string
+    showChangePassword?: boolean
   }>()
 
   const emit = defineEmits<{

@@ -10,32 +10,20 @@
         <h1
           class="mb-6 text-center text-2xl font-semibold leading-8 tracking-tight text-[var(--color-text-strong)] sm:text-[1.75rem]"
         >
-          {{ t('cloud.resetPassword') }}
+          {{ t('cloud.changePassword') }}
         </h1>
         <div class="space-y-5">
           <label class="flex flex-col gap-2">
-            <span class="text-sm font-medium text-[var(--color-text)]">{{ t('cloud.email') }}</span>
+            <span class="text-sm font-medium text-[var(--color-text)]">
+              {{ t('cloud.currentPassword') }}
+            </span>
             <input
-              v-model="email"
-              type="email"
-              autocomplete="email"
+              v-model="currentPassword"
+              type="password"
+              autocomplete="current-password"
               required
               :disabled="submitting"
               class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
-            />
-          </label>
-          <label class="flex flex-col gap-2">
-            <span class="text-sm font-medium text-[var(--color-text)]">{{ t('cloud.code') }}</span>
-            <input
-              v-model="code"
-              maxlength="6"
-              autocomplete="one-time-code"
-              inputmode="text"
-              pattern="[A-Za-z0-9]{6}"
-              required
-              :disabled="submitting"
-              placeholder="ABC123"
-              class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm uppercase text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
             />
           </label>
           <label class="flex flex-col gap-2">
@@ -43,7 +31,7 @@
               {{ t('cloud.newPassword') }}
             </span>
             <input
-              v-model="password"
+              v-model="newPassword"
               type="password"
               autocomplete="new-password"
               required
@@ -56,7 +44,7 @@
             class="button button-primary h-10 w-full text-sm"
             :disabled="submitting"
           >
-            {{ t('cloud.resetPassword') }}
+            {{ submitting ? t('cloud.changingPassword') : t('cloud.changePassword') }}
           </button>
         </div>
       </form>
@@ -67,63 +55,44 @@
 <script setup lang="ts">
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { useRoute, useRouter } from 'vue-router'
   import AppPageShell from '../../components/layout/AppPageShell.vue'
-  import { authPasswordResetConfirm } from '../../features/cloud/api'
+  import { authChangePassword } from '../../features/cloud/api'
   import { useNotificationsStore } from '../../store/notifications'
 
   const { t } = useI18n()
-  const route = useRoute()
-  const router = useRouter()
   const notifications = useNotificationsStore()
-  const email = ref(String(route.query.email ?? ''))
-  const code = ref('')
-  const password = ref('')
+  const currentPassword = ref('')
+  const newPassword = ref('')
   const submitting = ref(false)
 
   async function submit() {
     if (submitting.value) {
       return
     }
-    if (!email.value) {
-      notifications.pushToast('error', t('cloud.resetPasswordFailed'), t('message.emailRequired'))
-      return
-    }
-    if (!code.value) {
+    if (!currentPassword.value) {
       notifications.pushToast(
         'error',
-        t('cloud.resetPasswordFailed'),
-        t('message.verificationCodeRequired'),
+        t('cloud.changePasswordFailed'),
+        t('message.currentPasswordRequired'),
       )
       return
     }
-    if (code.value.length !== 6) {
+    if (!newPassword.value) {
       notifications.pushToast(
         'error',
-        t('cloud.resetPasswordFailed'),
-        t('message.verificationCodeInvalid'),
-      )
-      return
-    }
-    if (!password.value) {
-      notifications.pushToast(
-        'error',
-        t('cloud.resetPasswordFailed'),
+        t('cloud.changePasswordFailed'),
         t('message.newPasswordRequired'),
       )
       return
     }
     submitting.value = true
     try {
-      await authPasswordResetConfirm(email.value, code.value, password.value)
-      notifications.pushToast(
-        'success',
-        t('cloud.resetPassword'),
-        t('cloud.resetPasswordSucceeded'),
-      )
-      await router.push({ name: 'cloud-login' })
+      await authChangePassword(currentPassword.value, newPassword.value)
+      currentPassword.value = ''
+      newPassword.value = ''
+      notifications.pushToast('success', t('cloud.changePasswordSucceeded'), '')
     } catch (err) {
-      notifications.notifyError(t('cloud.resetPasswordFailed'), err)
+      notifications.notifyError(t('cloud.changePasswordFailed'), err)
     } finally {
       submitting.value = false
     }
