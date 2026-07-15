@@ -182,6 +182,28 @@
                 v-if="session.session.lifecycle_state === 'running'"
                 class="flex size-5 shrink-0 items-center justify-center"
               >
+                <button
+                  type="button"
+                  class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
+                  :aria-label="
+                    t('sidebar.copySessionAria', {
+                      name: session.session.name || session.session.command,
+                    })
+                  "
+                  :title="
+                    t('sidebar.copySessionAria', {
+                      name: session.session.name || session.session.command,
+                    })
+                  "
+                  @click.stop="emit('copySession', session.session)"
+                >
+                  <Copy class="size-3.5" />
+                </button>
+              </span>
+              <span
+                v-if="session.session.lifecycle_state === 'running'"
+                class="flex size-5 shrink-0 items-center justify-center"
+              >
                 <CircleDot
                   class="size-3.5"
                   :class="lifecycleStateClassName(session.session.lifecycle_state)"
@@ -428,6 +450,7 @@
     CircleHelp,
     Command,
     CircleStop,
+    Copy,
     Folder,
     FolderOpen,
     Languages,
@@ -506,6 +529,7 @@
     select: [session: SessionSummary]
     refresh: []
     newSession: [workspace?: WorkspaceSummary]
+    copySession: [session: SessionSummary]
     editSession: [session: SessionSummary]
     stopSession: [session: SessionSummary]
     rerunSession: [session: SessionSummary]

@@ -1,6 +1,9 @@
 import { proxyRefs, ref } from 'vue'
 import type { Shortcut } from '../gen/proto/termbridge/agent/v1/shortcut'
-import type { Workspace as WorkspaceSummary } from '../gen/proto/termbridge/agent/v1/workspace'
+import type {
+  SessionSummary,
+  Workspace as WorkspaceSummary,
+} from '../gen/proto/termbridge/agent/v1/workspace'
 
 export type CommandSource = 'shortcut' | 'command'
 
@@ -38,6 +41,36 @@ export function useCreateSessionDraft() {
     selectedShortcutId.value = null
     selectedShortcutName.value = null
     selectShortcut(shortcuts[0])
+  }
+
+  function populateFromSession(
+    session: SessionSummary,
+    nextWorkspace: WorkspaceSummary,
+    existingSessionNames: Iterable<string>,
+    shortcuts: Shortcut[],
+  ) {
+    workspace.value = nextWorkspace
+    sessionName.value = nextCopiedSessionName(session.name, existingSessionNames)
+    cwd.value = session.cwd
+    commandText.value = session.command
+
+    const matchingShortcut = shortcuts.find(
+      (shortcut) => shortcut.id === session.shortcut_id_snapshot,
+    )
+    if (
+      session.command_source === 'shortcut' &&
+      matchingShortcut &&
+      session.shortcut_name_snapshot
+    ) {
+      commandSource.value = 'shortcut'
+      selectedShortcutId.value = matchingShortcut.id
+      selectedShortcutName.value = session.shortcut_name_snapshot
+      return
+    }
+
+    commandSource.value = 'command'
+    selectedShortcutId.value = null
+    selectedShortcutName.value = null
   }
 
   function selectCommandSource(source: CommandSource, shortcuts: Shortcut[]) {
@@ -102,8 +135,18 @@ export function useCreateSessionDraft() {
     selectedShortcutId,
     selectedShortcutName,
     reset,
+    populateFromSession,
     selectCommandSource,
     selectShortcut,
     validate,
   })
+}
+
+function nextCopiedSessionName(name: string, existingSessionNames: Iterable<string>) {
+  const existingNames = new Set(existingSessionNames)
+  let sequence = 1
+  while (existingNames.has(`${name}_${sequence}`)) {
+    sequence += 1
+  }
+  return `${name}_${sequence}`
 }

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Shortcut } from '../gen/proto/termbridge/agent/v1/shortcut'
+import type {
+  SessionSummary,
+  Workspace as WorkspaceSummary,
+} from '../gen/proto/termbridge/agent/v1/workspace'
 import { useCreateSessionDraft } from './useCreateSessionDraft'
 
 function shortcut(id: string, name: string, command: string): Shortcut {
@@ -14,6 +18,30 @@ function shortcut(id: string, name: string, command: string): Shortcut {
     last_used_at: undefined,
     created_at: undefined,
     updated_at: undefined,
+  }
+}
+
+const workspace: WorkspaceSummary = {
+  id: 'workspace-1',
+  name: 'Workspace One',
+  path: '/work/one',
+  updated_at: undefined,
+}
+
+function session(overrides: Partial<SessionSummary> = {}): SessionSummary {
+  return {
+    id: 'session-1',
+    workspace_id: workspace.id,
+    name: 'Build',
+    command: 'npm run build',
+    cwd: workspace.path,
+    lifecycle_state: 'running',
+    attachment_state: '',
+    updated_at: undefined,
+    command_source: 'command',
+    shortcut_id_snapshot: '',
+    shortcut_name_snapshot: '',
+    ...overrides,
   }
 }
 
@@ -121,6 +149,75 @@ describe('useCreateSessionDraft', () => {
     expect(draft.commandSource).toBe('shortcut')
     expect(draft.selectedShortcutId).toBeNull()
     expect(draft.commandText).toBe('ccs run c1')
+  })
+
+  it('prefills a copied direct-command session with the first available name suffix', () => {
+    const draft = useCreateSessionDraft()
+
+    draft.populateFromSession(
+      session(),
+      workspace,
+      ['Build', 'Build_2', 'Build_3'],
+      [shortcut('shortcut-1', 'Review', 'codex review')],
+    )
+
+    expect(draft.workspace?.id).toBe(workspace.id)
+    expect(draft.sessionName).toBe('Build_1')
+    expect(draft.cwd).toBe(workspace.path)
+    expect(draft.commandSource).toBe('command')
+    expect(draft.commandText).toBe('npm run build')
+    expect(draft.selectedShortcutId).toBeNull()
+  })
+
+  it('prefills a copied shortcut session from its current shortcut', () => {
+    const draft = useCreateSessionDraft()
+    const copiedShortcut = shortcut('shortcut-1', 'Review', 'codex review')
+
+    draft.populateFromSession(
+      session({
+        name: 'Review',
+        command: 'codex review --saved',
+        command_source: 'shortcut',
+        shortcut_id_snapshot: copiedShortcut.id,
+        shortcut_name_snapshot: copiedShortcut.name,
+      }),
+      workspace,
+      ['Review', 'Review_1'],
+      [copiedShortcut],
+    )
+
+    expect(draft.sessionName).toBe('Review_2')
+    expect(draft.commandSource).toBe('shortcut')
+    expect(draft.commandText).toBe('codex review --saved')
+    expect(draft.selectedShortcutId).toBe(copiedShortcut.id)
+    expect(draft.selectedShortcutName).toBe(copiedShortcut.name)
+    expect(draft.validate()).toMatchObject({
+      value: {
+        commandSource: 'shortcut',
+        shortcutIdSnapshot: copiedShortcut.id,
+        shortcutNameSnapshot: copiedShortcut.name,
+      },
+      error: null,
+    })
+  })
+
+  it('falls back to a direct command when the copied shortcut is unavailable', () => {
+    const draft = useCreateSessionDraft()
+
+    draft.populateFromSession(
+      session({
+        command_source: 'shortcut',
+        shortcut_id_snapshot: 'removed-shortcut',
+        shortcut_name_snapshot: 'Removed',
+      }),
+      workspace,
+      [],
+      [],
+    )
+
+    expect(draft.commandSource).toBe('command')
+    expect(draft.commandText).toBe('npm run build')
+    expect(draft.selectedShortcutId).toBeNull()
   })
 
   it('returns specific validation errors', () => {

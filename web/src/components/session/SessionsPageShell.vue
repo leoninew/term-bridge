@@ -24,6 +24,7 @@
         @select="openSessionTab"
         @refresh="refresh"
         @new-session="openCreateSessionForm"
+        @copy-session="openCopiedSessionForm"
         @edit-session="openEditSessionDialog"
         @stop-session="stopSessionFromSidebar"
         @rerun-session="rerunSessionFromSidebar"
@@ -566,6 +567,24 @@
       activeSessionId: activeSession.value?.id ?? null,
     })
     createDraft.reset(workspace, t('dialog.defaultSessionName'), enabledShortcuts.value)
+    dialogs.openCreateSessionDialog()
+  }
+
+  function openCopiedSessionForm(session: SessionSummary) {
+    const workspace = workspaceSessions.workspaceById(session.workspace_id)
+    if (!workspace) {
+      return
+    }
+    terminalDebug('session.form.copy', {
+      sessionId: session.id,
+      workspaceId: workspace.id,
+    })
+    createDraft.populateFromSession(
+      session,
+      workspace,
+      workspaceSessions.sessions.map((existingSession) => existingSession.name),
+      enabledShortcuts.value,
+    )
     dialogs.openCreateSessionDialog()
   }
 

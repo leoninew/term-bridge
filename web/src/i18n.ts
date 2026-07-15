@@ -52,6 +52,7 @@ export const messages = {
       removeWorkspaceAria: '移除 {name} 工作区',
       removeWorkspaceDisabledAria: '{name} 工作区内有运行中的会话，暂时不能移除',
       editSessionAria: '编辑 {name} 会话',
+      copySessionAria: '复制 {name} 会话',
       stopSessionAria: '停止 {name} 会话',
       rerunSessionAria: '重新运行 {name} 会话',
       deleteSessionAria: '删除 {name} 会话',
@@ -355,6 +356,7 @@ export const messages = {
       removeWorkspaceDisabledAria:
         '{name} workspace has running sessions and cannot be removed yet',
       editSessionAria: 'Edit {name} session',
+      copySessionAria: 'Copy {name} session',
       stopSessionAria: 'Stop {name} session',
       rerunSessionAria: 'Rerun {name} session',
       deleteSessionAria: 'Delete {name} session',
