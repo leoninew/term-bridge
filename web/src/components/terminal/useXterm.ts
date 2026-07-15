@@ -160,7 +160,6 @@ function captureElementGeometry(element: HTMLElement | null | undefined) {
   }
 }
 
-
 function describeUnsettledLayout(
   element: HTMLElement | null | undefined,
   cols: number,
@@ -271,24 +270,30 @@ export function createXterm(
   function scheduleInvalidSizeRetry(reason: FitReason) {
     if (disposed || invalidRetryCount >= maxInvalidSizeRetries || invalidRetryTimer !== undefined) {
       if (invalidRetryCount >= maxInvalidSizeRetries) {
-        terminalDebug('xterm.fit.invalid-size.give-up', diagnosticDetails({
-          reason,
-          attempt: invalidRetryCount,
-          geometry: captureElementGeometry(hostElement),
-          terminalCols: terminal.cols,
-          terminalRows: terminal.rows,
-        }))
+        terminalDebug(
+          'xterm.fit.invalid-size.give-up',
+          diagnosticDetails({
+            reason,
+            attempt: invalidRetryCount,
+            geometry: captureElementGeometry(hostElement),
+            terminalCols: terminal.cols,
+            terminalRows: terminal.rows,
+          }),
+        )
       }
       return
     }
     const delay = invalidSizeRetryBaseMs * 2 ** Math.min(invalidRetryCount, 4)
     invalidRetryCount += 1
-    terminalDebug('xterm.fit.invalid-size.retry', diagnosticDetails({
-      reason,
-      attempt: invalidRetryCount,
-      delayMs: delay,
-      geometry: captureElementGeometry(hostElement),
-    }))
+    terminalDebug(
+      'xterm.fit.invalid-size.retry',
+      diagnosticDetails({
+        reason,
+        attempt: invalidRetryCount,
+        delayMs: delay,
+        geometry: captureElementGeometry(hostElement),
+      }),
+    )
     invalidRetryTimer = window.setTimeout(() => {
       invalidRetryTimer = undefined
       if (!disposed) {
@@ -308,29 +313,33 @@ export function createXterm(
     const geometryBefore = captureElementGeometry(hostElement)
     const dimensions = fitAddon.proposeDimensions()
 
-    terminalDebug('xterm.fit.attempt', diagnosticDetails({
-      reason,
-      seq,
-      beforeCols,
-      beforeRows,
-      lastCols,
-      lastRows,
-      proposed: dimensions
-        ? { cols: dimensions.cols, rows: dimensions.rows }
-        : null,
-      geometry: geometryBefore,
-    }))
-
-    if (!dimensions || dimensions.cols < 1 || dimensions.rows < 1) {
-      terminalDebug('xterm.fit.invalid-size', diagnosticDetails({
+    terminalDebug(
+      'xterm.fit.attempt',
+      diagnosticDetails({
         reason,
         seq,
-        attempt: invalidRetryCount,
-        proposed: dimensions ?? null,
+        beforeCols,
+        beforeRows,
+        lastCols,
+        lastRows,
+        proposed: dimensions ? { cols: dimensions.cols, rows: dimensions.rows } : null,
         geometry: geometryBefore,
-        terminalCols: beforeCols,
-        terminalRows: beforeRows,
-      }))
+      }),
+    )
+
+    if (!dimensions || dimensions.cols < 1 || dimensions.rows < 1) {
+      terminalDebug(
+        'xterm.fit.invalid-size',
+        diagnosticDetails({
+          reason,
+          seq,
+          attempt: invalidRetryCount,
+          proposed: dimensions ?? null,
+          geometry: geometryBefore,
+          terminalCols: beforeCols,
+          terminalRows: beforeRows,
+        }),
+      )
       scheduleInvalidSizeRetry(reason)
       return
     }
@@ -338,17 +347,20 @@ export function createXterm(
     const measuredRows = dimensions.rows
     const unsettled = describeUnsettledLayout(hostElement, measuredCols, measuredRows)
     if (unsettled) {
-      terminalDebug('xterm.fit.unsettled', diagnosticDetails({
-        reason,
-        seq,
-        unsettled,
-        proposed: { cols: measuredCols, rows: measuredRows },
-        geometry: geometryBefore,
-        terminalCols: beforeCols,
-        terminalRows: beforeRows,
-        lastCols,
-        lastRows,
-      }))
+      terminalDebug(
+        'xterm.fit.unsettled',
+        diagnosticDetails({
+          reason,
+          seq,
+          unsettled,
+          proposed: { cols: measuredCols, rows: measuredRows },
+          geometry: geometryBefore,
+          terminalCols: beforeCols,
+          terminalRows: beforeRows,
+          lastCols,
+          lastRows,
+        }),
+      )
       scheduleInvalidSizeRetry(reason)
       return
     }
@@ -366,36 +378,42 @@ export function createXterm(
     const notified = size.cols !== lastCols || size.rows !== lastRows
 
     if (notified) {
-      terminalDebug('xterm.resize', diagnosticDetails({
-        reason,
-        seq,
-        previousCols: lastCols,
-        previousRows: lastRows,
-        measuredCols,
-        measuredRows,
-        cols: size.cols,
-        rows: size.rows,
-        terminalResized,
-        geometryAfter,
-      }))
+      terminalDebug(
+        'xterm.resize',
+        diagnosticDetails({
+          reason,
+          seq,
+          previousCols: lastCols,
+          previousRows: lastRows,
+          measuredCols,
+          measuredRows,
+          cols: size.cols,
+          rows: size.rows,
+          terminalResized,
+          geometryAfter,
+        }),
+      )
       lastCols = size.cols
       lastRows = size.rows
       onResize(size.cols, size.rows)
       return
     }
 
-    terminalDebug('xterm.fit.unchanged', diagnosticDetails({
-      reason,
-      seq,
-      measuredCols,
-      measuredRows,
-      cols: size.cols,
-      rows: size.rows,
-      terminalResized,
-      terminalCols: terminal.cols,
-      terminalRows: terminal.rows,
-      geometryAfter,
-    }))
+    terminalDebug(
+      'xterm.fit.unchanged',
+      diagnosticDetails({
+        reason,
+        seq,
+        measuredCols,
+        measuredRows,
+        cols: size.cols,
+        rows: size.rows,
+        terminalResized,
+        terminalCols: terminal.cols,
+        terminalRows: terminal.rows,
+        geometryAfter,
+      }),
+    )
   }
 
   function scheduleResize(reason: FitReason = 'resize-observer') {
@@ -440,23 +458,32 @@ export function createXterm(
       terminalDebug('xterm.fit.fonts-ready.unavailable', diagnosticDetails())
       return
     }
-    terminalDebug('xterm.fit.fonts-ready.wait', diagnosticDetails({
-      status: fonts.status,
-    }))
+    terminalDebug(
+      'xterm.fit.fonts-ready.wait',
+      diagnosticDetails({
+        status: fonts.status,
+      }),
+    )
     void fonts.ready
       .then(() => {
         if (!disposed) {
-          terminalDebug('xterm.fit.fonts-ready', diagnosticDetails({
-            status: fonts.status,
-            geometry: captureElementGeometry(hostElement),
-          }))
+          terminalDebug(
+            'xterm.fit.fonts-ready',
+            diagnosticDetails({
+              status: fonts.status,
+              geometry: captureElementGeometry(hostElement),
+            }),
+          )
           emitResize('fonts-ready')
         }
       })
       .catch((error: unknown) => {
-        terminalDebug('xterm.fit.fonts-ready.error', diagnosticDetails({
-          error: error instanceof Error ? error.message : String(error),
-        }))
+        terminalDebug(
+          'xterm.fit.fonts-ready.error',
+          diagnosticDetails({
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        )
       })
   }
 
@@ -481,7 +508,8 @@ export function createXterm(
           pendingBytes: pending,
           queuedChunks: writeQueue.length,
         },
-        { sample: drainCount })
+        { sample: drainCount },
+      )
       drainWrites()
     })
   }
@@ -490,38 +518,47 @@ export function createXterm(
     terminal,
     open(element: HTMLElement) {
       hostElement = element
-      terminalDebug('xterm.open', diagnosticDetails({
-        geometry: captureElementGeometry(element),
-        terminalCols: terminal.cols,
-        terminalRows: terminal.rows,
-      }))
+      terminalDebug(
+        'xterm.open',
+        diagnosticDetails({
+          geometry: captureElementGeometry(element),
+          terminalCols: terminal.cols,
+          terminalRows: terminal.rows,
+        }),
+      )
       terminal.open(element)
-      terminalDebug('xterm.open.after-dom', diagnosticDetails({
-        geometry: captureElementGeometry(element),
-        terminalCols: terminal.cols,
-        terminalRows: terminal.rows,
-      }))
+      terminalDebug(
+        'xterm.open.after-dom',
+        diagnosticDetails({
+          geometry: captureElementGeometry(element),
+          terminalCols: terminal.cols,
+          terminalRows: terminal.rows,
+        }),
+      )
       emitResize('open')
       scheduleOpenSettleFits()
       scheduleFontsReadyFit()
       observer = new ResizeObserver((entries) => {
         const entry = entries[0]
         const contentRect = entry?.contentRect
-        terminalDebug('xterm.resize-observer', diagnosticDetails({
-          contentRect: contentRect
-            ? {
-                width: Number(contentRect.width.toFixed(2)),
-                height: Number(contentRect.height.toFixed(2)),
-                top: Number(contentRect.top.toFixed(2)),
-                left: Number(contentRect.left.toFixed(2)),
-              }
-            : null,
-          geometry: captureElementGeometry(hostElement),
-          lastCols,
-          lastRows,
-          terminalCols: terminal.cols,
-          terminalRows: terminal.rows,
-        }))
+        terminalDebug(
+          'xterm.resize-observer',
+          diagnosticDetails({
+            contentRect: contentRect
+              ? {
+                  width: Number(contentRect.width.toFixed(2)),
+                  height: Number(contentRect.height.toFixed(2)),
+                  top: Number(contentRect.top.toFixed(2)),
+                  left: Number(contentRect.left.toFixed(2)),
+                }
+              : null,
+            geometry: captureElementGeometry(hostElement),
+            lastCols,
+            lastRows,
+            terminalCols: terminal.cols,
+            terminalRows: terminal.rows,
+          }),
+        )
         scheduleResize('resize-observer')
       })
       observer.observe(element)
@@ -553,7 +590,8 @@ export function createXterm(
           pendingBytes: pending,
           queuedChunks: writeQueue.length,
         },
-        { sample: writeCount })
+        { sample: writeCount },
+      )
       drainWrites()
     },
     pendingBytes() {
@@ -564,15 +602,18 @@ export function createXterm(
     },
     dispose() {
       disposed = true
-      terminalDebug('xterm.dispose', diagnosticDetails({
-        pendingBytes: pending,
-        queuedChunks: writeQueue.length,
-        lastCols,
-        lastRows,
-        terminalCols: terminal.cols,
-        terminalRows: terminal.rows,
-        geometry: captureElementGeometry(hostElement),
-      }))
+      terminalDebug(
+        'xterm.dispose',
+        diagnosticDetails({
+          pendingBytes: pending,
+          queuedChunks: writeQueue.length,
+          lastCols,
+          lastRows,
+          terminalCols: terminal.cols,
+          terminalRows: terminal.rows,
+          geometry: captureElementGeometry(hostElement),
+        }),
+      )
       if (resizeTimer !== undefined) {
         window.clearTimeout(resizeTimer)
         resizeTimer = undefined

@@ -1,8 +1,6 @@
 <template>
-  <section class="shortcut-page min-h-screen bg-[var(--color-app-bg)] text-[var(--color-text)]">
-    <AppHeader />
-
-    <main class="shortcut-page-main min-h-[calc(100vh-4rem)]">
+  <AppPageShell main-class="shortcut-page-main">
+    <section class="shortcut-page min-h-full bg-[var(--color-app-bg)] text-[var(--color-text)]">
       <section class="shortcut-page-content mx-auto flex w-full max-w-[1440px] flex-col">
         <header class="shortcut-page-header">
           <div class="shortcut-toolbar-left">
@@ -136,8 +134,8 @@
           {{ t('shortcut.noFilterMatches') }}
         </section>
       </section>
-    </main>
-  </section>
+    </section>
+  </AppPageShell>
 
   <ShortcutEditorDialog
     :open="editorOpen"
@@ -165,7 +163,7 @@
   import type { ShortcutRuntimeApi } from '../../features/sessions/runtime'
   import { useNotificationsStore } from '../../store/notifications'
   import { useShortcutTagsStore } from '../../store/shortcutTags'
-  import AppHeader from '../layout/AppHeader.vue'
+  import AppPageShell from '../layout/AppPageShell.vue'
   import DeleteShortcutDialog from './DeleteShortcutDialog.vue'
   import ShortcutCard from './ShortcutCard.vue'
   import ShortcutEditorDialog from './ShortcutEditorDialog.vue'

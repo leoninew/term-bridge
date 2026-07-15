@@ -1,5 +1,15 @@
 <template>
   <label class="flex flex-col gap-1.5 text-sm text-[var(--color-text)]">
+    <span>{{ t('dialog.name') }}</span>
+    <input
+      :value="name"
+      class="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)] disabled:opacity-70"
+      :placeholder="t('dialog.sessionNamePlaceholder')"
+      :disabled="disabled"
+      @input="emit('update:name', ($event.target as HTMLInputElement).value)"
+    />
+  </label>
+  <label class="flex flex-col gap-1.5 text-sm text-[var(--color-text)]">
     <span>{{ t('dialog.cwd') }}</span>
     <input
       :value="cwd"
@@ -8,16 +18,6 @@
       :readonly="cwdReadonly"
       :disabled="disabled"
       @input="emit('update:cwd', ($event.target as HTMLInputElement).value)"
-    />
-  </label>
-  <label class="flex flex-col gap-1.5 text-sm text-[var(--color-text)]">
-    <span>{{ t('dialog.name') }}</span>
-    <input
-      :value="name"
-      class="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)]"
-      :placeholder="t('dialog.sessionNamePlaceholder')"
-      :disabled="disabled"
-      @input="emit('update:name', ($event.target as HTMLInputElement).value)"
     />
   </label>
   <SessionCommandInput

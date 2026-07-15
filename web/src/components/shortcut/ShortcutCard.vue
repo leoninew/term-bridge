@@ -7,19 +7,9 @@
     @keydown.enter.prevent="emit('edit', shortcut)"
   >
     <div class="shortcut-card-top">
-      <div class="shortcut-card-tags">
-        <span
-          v-for="tag in visibleTags"
-          :key="tag"
-          class="shortcut-type-tag"
-          :style="tagStyle(tag)"
-        >
-          {{ tag }}
-        </span>
-        <span v-if="hiddenTagCount > 0" class="shortcut-type-tag shortcut-type-tag-more">
-          +{{ hiddenTagCount }}
-        </span>
-      </div>
+      <h3 class="shortcut-card-name" :title="shortcut.name">
+        {{ shortcut.name }}
+      </h3>
 
       <DropdownMenuRoot>
         <DropdownMenuTrigger
@@ -64,14 +54,7 @@
     </div>
 
     <div class="shortcut-card-body">
-      <h3 class="shortcut-card-name" :title="shortcut.name">
-        {{ shortcut.name }}
-      </h3>
-      <p
-        v-if="shortcut.description"
-        class="shortcut-card-secondary"
-        :title="shortcut.description"
-      >
+      <p v-if="shortcut.description" class="shortcut-card-secondary" :title="shortcut.description">
         {{ shortcut.description }}
       </p>
       <div class="shortcut-command-row" data-no-drag>
@@ -91,6 +74,20 @@
     </div>
 
     <div class="shortcut-card-footer">
+      <div class="shortcut-card-tags">
+        <span
+          v-for="tag in visibleTags"
+          :key="tag"
+          class="shortcut-type-tag"
+          :style="tagStyle(tag)"
+        >
+          {{ tag }}
+        </span>
+        <span v-if="hiddenTagCount > 0" class="shortcut-type-tag shortcut-type-tag-more">
+          +{{ hiddenTagCount }}
+        </span>
+      </div>
+
       <span
         v-if="shortcut.enabled === false"
         class="shortcut-card-status shortcut-card-status-disabled"

@@ -22,10 +22,7 @@
           />
           <div class="dialog-actions">
             <DialogClose as-child
-              ><button
-                type="button"
-                class="button button-secondary bg-[var(--color-surface-raised)]"
-              >
+              ><button type="button" class="button button-secondary">
                 {{ t('common.cancel') }}
               </button></DialogClose
             ><button type="submit" class="button button-primary" :disabled="editing">

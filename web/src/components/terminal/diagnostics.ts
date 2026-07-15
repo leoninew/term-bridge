@@ -24,7 +24,10 @@ function normalizeDetails(details: DiagnosticDetails): DiagnosticDetails {
   if (typeof out.url === 'string') {
     out.path = webSocketPath(out.url)
     delete out.url
-  } else if (typeof out.path === 'string' && (/^https?:\/\//.test(out.path) || out.path.includes('://'))) {
+  } else if (
+    typeof out.path === 'string' &&
+    (/^https?:\/\//.test(out.path) || out.path.includes('://'))
+  ) {
     out.path = webSocketPath(out.path)
   }
   return out

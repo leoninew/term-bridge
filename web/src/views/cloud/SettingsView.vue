@@ -1,3 +1,7 @@
 <template>
-  <main class="min-h-screen bg-[var(--color-app-bg)] text-[var(--color-text)]" />
+  <AppPageShell />
 </template>
+
+<script setup lang="ts">
+  import AppPageShell from '../../components/layout/AppPageShell.vue'
+</script>

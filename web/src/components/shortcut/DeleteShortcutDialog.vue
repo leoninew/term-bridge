@@ -11,10 +11,7 @@
         </div>
 
         <div class="dialog-actions">
-          <AlertDialogCancel
-            class="button button-secondary bg-[var(--color-surface-raised)]"
-            :disabled="deleting"
-          >
+          <AlertDialogCancel class="button button-secondary" :disabled="deleting">
             {{ t('common.cancel') }}
           </AlertDialogCancel>
           <AlertDialogAction

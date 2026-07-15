@@ -186,6 +186,23 @@ p {
 }
 
 .button-secondary {
+  border-color: var(--color-border-strong);
+  background: var(--color-control-hover);
+  color: var(--color-text);
+}
+
+.button-secondary:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-control-active);
+}
+
+.button-secondary:focus-visible {
+  border-color: var(--color-border-strong);
+  background: var(--color-control-active);
+  box-shadow: 0 0 0 3px var(--color-surface-muted);
+}
+
+.button-provider {
   border-color: var(--color-border);
   background: var(--color-control-bg);
   color: var(--color-text);
@@ -619,7 +636,6 @@ p {
   color: var(--color-text-strong);
 }
 
-
 .shortcut-toolbar-filters {
   display: flex;
   min-width: 0;
@@ -675,7 +691,6 @@ p {
   color: var(--color-text-muted);
   cursor: pointer;
   font-size: 13px;
-  font-weight: 500;
   line-height: 1;
   outline: none;
   padding: 0 12px;
@@ -699,7 +714,6 @@ p {
 .shortcut-tag-segment-active {
   background: color-mix(in srgb, var(--color-primary-border) 26%, var(--color-control-bg));
   color: var(--color-text-strong);
-  font-weight: 600;
 }
 
 .shortcut-tag-segment-active:hover,
@@ -844,7 +858,6 @@ p {
   align-items: center;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 600;
   line-height: 1;
   overflow: hidden;
   padding: 0 7px;
@@ -907,10 +920,11 @@ p {
 }
 
 .shortcut-card-name {
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   color: var(--color-text-strong);
   font-size: 16px;
-  font-weight: 500;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -946,14 +960,8 @@ p {
   background: transparent;
   color: var(--color-text-muted);
   font-family:
-    'JetBrains Mono',
-    'Cascadia Code',
-    'Fira Code',
-    ui-monospace,
-    SFMono-Regular,
-    Consolas,
-    'Liberation Mono',
-    monospace;
+    'JetBrains Mono', 'Cascadia Code', 'Fira Code', ui-monospace, SFMono-Regular, Consolas,
+    'Liberation Mono', monospace;
   font-size: 12px;
   line-height: 18px;
   padding: 2px 0;
@@ -985,7 +993,7 @@ p {
   display: flex;
   min-width: 0;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 8px;
   margin-top: auto;
 }
@@ -993,6 +1001,7 @@ p {
 .shortcut-card-status {
   display: inline-flex;
   min-width: 0;
+  flex-shrink: 0;
   align-items: center;
   gap: 4px;
   overflow: hidden;

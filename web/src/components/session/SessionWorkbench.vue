@@ -162,7 +162,7 @@
         <p>{{ t('workbench.noTabDescription') }}</p>
         <button
           type="button"
-          class="rounded-md border border-[var(--color-border-strong)] bg-[var(--color-control-active)] px-2.5 py-1.5 text-[var(--color-text-strong)] hover:bg-[var(--color-control-hover)]"
+          class="button button-secondary min-h-8 px-2.5 py-1.5 text-sm"
           @click="emit('openCreate')"
         >
           {{ t('workbench.newSession') }}
