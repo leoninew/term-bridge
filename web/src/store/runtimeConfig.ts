@@ -59,6 +59,9 @@ function runtimeConfigSource(): RuntimeConfigSource {
       cloud: {
         publicUrl: import.meta.env.TERMBRIDGE_CLOUD__PUBLIC_URL,
         apiBaseUrl: import.meta.env.TERMBRIDGE_CLOUD__API_BASE_URL,
+        externalAuthProviderIds: splitScopes(
+          import.meta.env.TERMBRIDGE_CLOUD__EXTERNAL_AUTH_PROVIDER_IDS,
+        ),
       },
     },
   }
@@ -93,6 +96,7 @@ function parseRuntimeConfig(source: RuntimeConfigSource): RuntimeConfig {
     cloud: {
       publicUrl: requiredHTTPURL('cloud.publicUrl', cloud?.publicUrl, errors),
       apiBaseUrl: requiredApiBaseUrl('cloud.apiBaseUrl', cloud?.apiBaseUrl, errors),
+      externalAuthProviderIds: parseExternalAuthProviderIds(cloud?.externalAuthProviderIds),
     },
   }
 
@@ -110,6 +114,13 @@ function parseLocalMode(value: string | undefined, errors: string[]): LocalMode 
   }
   errors.push('local.mode must be local, cloud, or hybrid')
   return 'local'
+}
+
+function parseExternalAuthProviderIds(value: string[] | undefined): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.filter((providerId) => providerId === 'google' || providerId === 'github')
 }
 
 function parseCloudOAuth(

@@ -573,7 +573,7 @@ func (x *AuthPasswordResetConfirmReq) GetNewPassword() string {
 	return ""
 }
 
-type AuthGoogleCallbackReq struct {
+type AuthExternalCallbackReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
 	State         string                 `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
@@ -581,20 +581,20 @@ type AuthGoogleCallbackReq struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *AuthGoogleCallbackReq) Reset() {
-	*x = AuthGoogleCallbackReq{}
+func (x *AuthExternalCallbackReq) Reset() {
+	*x = AuthExternalCallbackReq{}
 	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AuthGoogleCallbackReq) String() string {
+func (x *AuthExternalCallbackReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AuthGoogleCallbackReq) ProtoMessage() {}
+func (*AuthExternalCallbackReq) ProtoMessage() {}
 
-func (x *AuthGoogleCallbackReq) ProtoReflect() protoreflect.Message {
+func (x *AuthExternalCallbackReq) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -606,19 +606,19 @@ func (x *AuthGoogleCallbackReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AuthGoogleCallbackReq.ProtoReflect.Descriptor instead.
-func (*AuthGoogleCallbackReq) Descriptor() ([]byte, []int) {
+// Deprecated: Use AuthExternalCallbackReq.ProtoReflect.Descriptor instead.
+func (*AuthExternalCallbackReq) Descriptor() ([]byte, []int) {
 	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *AuthGoogleCallbackReq) GetCode() string {
+func (x *AuthExternalCallbackReq) GetCode() string {
 	if x != nil {
 		return x.Code
 	}
 	return ""
 }
 
-func (x *AuthGoogleCallbackReq) GetState() string {
+func (x *AuthExternalCallbackReq) GetState() string {
 	if x != nil {
 		return x.State
 	}
@@ -773,7 +773,7 @@ func (x *AuthLoginResp) GetTokenType() string {
 	return ""
 }
 
-type AuthGoogleCallbackResp struct {
+type AuthExternalCallbackResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
 	TokenType     string                 `protobuf:"bytes,2,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"`
@@ -781,20 +781,20 @@ type AuthGoogleCallbackResp struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *AuthGoogleCallbackResp) Reset() {
-	*x = AuthGoogleCallbackResp{}
+func (x *AuthExternalCallbackResp) Reset() {
+	*x = AuthExternalCallbackResp{}
 	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AuthGoogleCallbackResp) String() string {
+func (x *AuthExternalCallbackResp) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AuthGoogleCallbackResp) ProtoMessage() {}
+func (*AuthExternalCallbackResp) ProtoMessage() {}
 
-func (x *AuthGoogleCallbackResp) ProtoReflect() protoreflect.Message {
+func (x *AuthExternalCallbackResp) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -806,19 +806,19 @@ func (x *AuthGoogleCallbackResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AuthGoogleCallbackResp.ProtoReflect.Descriptor instead.
-func (*AuthGoogleCallbackResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use AuthExternalCallbackResp.ProtoReflect.Descriptor instead.
+func (*AuthExternalCallbackResp) Descriptor() ([]byte, []int) {
 	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *AuthGoogleCallbackResp) GetAccessToken() string {
+func (x *AuthExternalCallbackResp) GetAccessToken() string {
 	if x != nil {
 		return x.AccessToken
 	}
 	return ""
 }
 
-func (x *AuthGoogleCallbackResp) GetTokenType() string {
+func (x *AuthExternalCallbackResp) GetTokenType() string {
 	if x != nil {
 		return x.TokenType
 	}
@@ -929,27 +929,27 @@ func (x *CloudOAuthTokenResp) GetTokenType() string {
 	return ""
 }
 
-type GoogleAuthUrlResp struct {
+type ExternalAuthUrlResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AuthUrl       string                 `protobuf:"bytes,1,opt,name=auth_url,json=authUrl,proto3" json:"auth_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GoogleAuthUrlResp) Reset() {
-	*x = GoogleAuthUrlResp{}
+func (x *ExternalAuthUrlResp) Reset() {
+	*x = ExternalAuthUrlResp{}
 	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GoogleAuthUrlResp) String() string {
+func (x *ExternalAuthUrlResp) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GoogleAuthUrlResp) ProtoMessage() {}
+func (*ExternalAuthUrlResp) ProtoMessage() {}
 
-func (x *GoogleAuthUrlResp) ProtoReflect() protoreflect.Message {
+func (x *ExternalAuthUrlResp) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -961,12 +961,12 @@ func (x *GoogleAuthUrlResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GoogleAuthUrlResp.ProtoReflect.Descriptor instead.
-func (*GoogleAuthUrlResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use ExternalAuthUrlResp.ProtoReflect.Descriptor instead.
+func (*ExternalAuthUrlResp) Descriptor() ([]byte, []int) {
 	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{17}
 }
 
-func (x *GoogleAuthUrlResp) GetAuthUrl() string {
+func (x *ExternalAuthUrlResp) GetAuthUrl() string {
 	if x != nil {
 		return x.AuthUrl
 	}
@@ -1088,8 +1088,8 @@ const file_termbridge_cloud_v1_auth_proto_rawDesc = "" +
 	"\x1bAuthPasswordResetConfirmReq\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12!\n" +
-	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\"A\n" +
-	"\x15AuthGoogleCallbackReq\x12\x12\n" +
+	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\"C\n" +
+	"\x17AuthExternalCallbackReq\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05state\x18\x02 \x01(\tR\x05state\"+\n" +
 	"\x15CloudOAuthExchangeReq\x12\x12\n" +
@@ -1101,8 +1101,8 @@ const file_termbridge_cloud_v1_auth_proto_rawDesc = "" +
 	"\rAuthLoginResp\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
 	"\n" +
-	"token_type\x18\x02 \x01(\tR\ttokenType\"Z\n" +
-	"\x16AuthGoogleCallbackResp\x12!\n" +
+	"token_type\x18\x02 \x01(\tR\ttokenType\"\\\n" +
+	"\x18AuthExternalCallbackResp\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
 	"\n" +
 	"token_type\x18\x02 \x01(\tR\ttokenType\"V\n" +
@@ -1113,8 +1113,8 @@ const file_termbridge_cloud_v1_auth_proto_rawDesc = "" +
 	"\x13CloudOAuthTokenResp\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
 	"\n" +
-	"token_type\x18\x02 \x01(\tR\ttokenType\".\n" +
-	"\x11GoogleAuthUrlResp\x12\x19\n" +
+	"token_type\x18\x02 \x01(\tR\ttokenType\"0\n" +
+	"\x13ExternalAuthUrlResp\x12\x19\n" +
 	"\bauth_url\x18\x01 \x01(\tR\aauthUrl\"\xff\x01\n" +
 	"\n" +
 	"AuthMeResp\x12$\n" +
@@ -1149,14 +1149,14 @@ var file_termbridge_cloud_v1_auth_proto_goTypes = []any{
 	(*AuthChangePasswordReq)(nil),       // 7: termbridge.cloud.AuthChangePasswordReq
 	(*AuthPasswordResetRequestReq)(nil), // 8: termbridge.cloud.AuthPasswordResetRequestReq
 	(*AuthPasswordResetConfirmReq)(nil), // 9: termbridge.cloud.AuthPasswordResetConfirmReq
-	(*AuthGoogleCallbackReq)(nil),       // 10: termbridge.cloud.AuthGoogleCallbackReq
+	(*AuthExternalCallbackReq)(nil),     // 10: termbridge.cloud.AuthExternalCallbackReq
 	(*CloudOAuthExchangeReq)(nil),       // 11: termbridge.cloud.CloudOAuthExchangeReq
 	(*CloudOAuthExchangeResp)(nil),      // 12: termbridge.cloud.CloudOAuthExchangeResp
 	(*AuthLoginResp)(nil),               // 13: termbridge.cloud.AuthLoginResp
-	(*AuthGoogleCallbackResp)(nil),      // 14: termbridge.cloud.AuthGoogleCallbackResp
+	(*AuthExternalCallbackResp)(nil),    // 14: termbridge.cloud.AuthExternalCallbackResp
 	(*LocalAuthLoginResp)(nil),          // 15: termbridge.cloud.LocalAuthLoginResp
 	(*CloudOAuthTokenResp)(nil),         // 16: termbridge.cloud.CloudOAuthTokenResp
-	(*GoogleAuthUrlResp)(nil),           // 17: termbridge.cloud.GoogleAuthUrlResp
+	(*ExternalAuthUrlResp)(nil),         // 17: termbridge.cloud.ExternalAuthUrlResp
 	(*AuthMeResp)(nil),                  // 18: termbridge.cloud.AuthMeResp
 	(*CloudSessionSummary)(nil),         // 19: termbridge.cloud.CloudSessionSummary
 	(*DeviceSummary)(nil),               // 20: termbridge.cloud.DeviceSummary

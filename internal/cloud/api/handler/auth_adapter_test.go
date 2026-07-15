@@ -9,66 +9,91 @@ import (
 )
 
 type testAuthService struct {
-	tokens sharedauth.TokenService
+	tokens                  sharedauth.TokenService
+	loginErr                error
+	registerErr             error
+	verifyEmailErr          error
+	resendVerificationErr   error
+	changePasswordErr       error
+	requestPasswordResetErr error
+	confirmPasswordResetErr error
 }
 
 func newTestAuthService(tokens sharedauth.TokenService) AuthService {
-	return testAuthService{tokens: tokens}
+	return &testAuthService{tokens: tokens}
 }
 
-func (s testAuthService) Login(ctx context.Context, email, password string) (*cloud.AuthLoginResp, error) {
+func (s *testAuthService) Login(ctx context.Context, email, password string) (*cloud.AuthLoginResp, error) {
+	if s.loginErr != nil {
+		return nil, s.loginErr
+	}
 	return nil, cloudauth.ErrInvalidCredentials
 }
 
-func (s testAuthService) UserFromClaims(ctx context.Context, claims sharedauth.Claims) (*cloud.User, error) {
+func (s *testAuthService) UserFromClaims(ctx context.Context, claims sharedauth.Claims) (*cloud.User, error) {
 	return &cloud.User{Id: claims.Sub, Email: claims.Email, DisplayName: claims.Email, Provider: claims.Provider, EmailVerified: true}, nil
 }
 
-func (s testAuthService) Register(ctx context.Context, email, password string) error {
+func (s *testAuthService) Register(ctx context.Context, email, password string) error {
+	if s.registerErr != nil {
+		return s.registerErr
+	}
 	return cloudauth.ErrProviderUnsupported
 }
 
-func (s testAuthService) VerifyEmail(ctx context.Context, email, code string) error {
+func (s *testAuthService) VerifyEmail(ctx context.Context, email, code string) error {
+	if s.verifyEmailErr != nil {
+		return s.verifyEmailErr
+	}
 	return cloudauth.ErrProviderUnsupported
 }
 
-func (s testAuthService) ResendVerification(ctx context.Context, email string) error {
+func (s *testAuthService) ResendVerification(ctx context.Context, email string) error {
+	if s.resendVerificationErr != nil {
+		return s.resendVerificationErr
+	}
 	return cloudauth.ErrProviderUnsupported
 }
 
-func (s testAuthService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+func (s *testAuthService) ChangePassword(ctx context.Context, userId, currentPassword, newPassword string) error {
+	if s.changePasswordErr != nil {
+		return s.changePasswordErr
+	}
 	return cloudauth.ErrProviderUnsupported
 }
 
-func (s testAuthService) RequestPasswordReset(ctx context.Context, email string) error {
-	return nil
+func (s *testAuthService) RequestPasswordReset(ctx context.Context, email string) error {
+	return s.requestPasswordResetErr
 }
 
-func (s testAuthService) ConfirmPasswordReset(ctx context.Context, email, code, newPassword string) error {
+func (s *testAuthService) ConfirmPasswordReset(ctx context.Context, email, code, newPassword string) error {
+	if s.confirmPasswordResetErr != nil {
+		return s.confirmPasswordResetErr
+	}
 	return cloudauth.ErrProviderUnsupported
 }
 
-func (s testAuthService) GoogleAuthURL(ctx context.Context) (string, error) {
-	return "", cloudauth.ErrProviderUnsupported
+func (s *testAuthService) ExternalAuthURL(ctx context.Context, providerId string) (string, error) {
+	return "https://auth.example/" + providerId, nil
 }
 
-func (s testAuthService) GoogleCallback(ctx context.Context, code, state string) (*cloud.AuthGoogleCallbackResp, error) {
+func (s *testAuthService) ExternalCallback(ctx context.Context, providerId, code, state string) (*cloud.AuthLoginResp, error) {
 	return nil, cloudauth.ErrProviderUnsupported
 }
 
-func (s testAuthService) IssueUserToken(ctx context.Context, userID string) (*cloud.CloudOAuthTokenResp, error) {
-	email := userID + "@example.test"
-	token, err := s.tokens.Sign(sharedauth.Claims{Sub: userID, Email: email, Provider: "email"})
+func (s *testAuthService) IssueUserToken(ctx context.Context, userId string) (*cloud.CloudOAuthTokenResp, error) {
+	email := userId + "@example.test"
+	token, err := s.tokens.Sign(sharedauth.Claims{Sub: userId, Email: email, Provider: "email"})
 	if err != nil {
 		return nil, err
 	}
 	return &cloud.CloudOAuthTokenResp{AccessToken: token, TokenType: "bearer"}, nil
 }
 
-func (s testAuthService) VerifyToken(token string) (sharedauth.Claims, error) {
+func (s *testAuthService) VerifyToken(token string) (sharedauth.Claims, error) {
 	return s.tokens.Verify(token)
 }
 
-func (s testAuthService) VerifyBasic(ctx context.Context, username, password string) bool {
+func (s *testAuthService) VerifyBasic(ctx context.Context, username, password string) bool {
 	return false
 }

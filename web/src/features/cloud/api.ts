@@ -1,8 +1,8 @@
 import type { AxiosResponse } from 'axios'
 import type {
   AuthChangePasswordReq,
-  AuthGoogleCallbackReq,
-  AuthGoogleCallbackResp,
+  AuthExternalCallbackReq,
+  AuthExternalCallbackResp,
   AuthLoginReq,
   AuthLoginResp,
   AuthMeResp,
@@ -13,7 +13,7 @@ import type {
   AuthRegisterReq,
   AuthResendVerificationReq,
   AuthVerifyEmailReq,
-  GoogleAuthUrlResp,
+  ExternalAuthUrlResp,
 } from '../../gen/proto/termbridge/cloud/v1/auth'
 import type { DeviceSummary, ListDevicesResp } from '../../gen/proto/termbridge/cloud/v1/device'
 import type {
@@ -137,18 +137,21 @@ export async function authChangePassword(
   await cloudApiClient.post('/auth/password/change', request)
 }
 
-export async function authGoogleUrl(): Promise<string> {
-  const response = await cloudApiClient.get<GoogleAuthUrlResp>('/auth/google')
+export async function authExternalUrl(providerId: string): Promise<string> {
+  const response = await cloudApiClient.get<ExternalAuthUrlResp>(
+    `/oauth2/${encodeURIComponent(providerId)}`,
+  )
   return response.data.auth_url
 }
 
-export async function authGoogleCallback(
+export async function authExternalCallback(
+  providerId: string,
   code: string,
   state: string,
-): Promise<AuthGoogleCallbackResp> {
-  const request: AuthGoogleCallbackReq = { code, state }
-  const response = await cloudApiClient.post<AuthGoogleCallbackResp>(
-    '/auth/google/callback',
+): Promise<AuthExternalCallbackResp> {
+  const request: AuthExternalCallbackReq = { code, state }
+  const response = await cloudApiClient.post<AuthExternalCallbackResp>(
+    `/oauth2/${encodeURIComponent(providerId)}/callback`,
     request,
   )
   return response.data

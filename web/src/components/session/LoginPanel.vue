@@ -1,77 +1,117 @@
 <template>
-  <section class="min-h-screen bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]">
-    <AppHeader />
-    <div class="flex min-h-[calc(100vh-4rem)] items-center justify-center p-6">
+  <AppPageShell
+    main-class="flex min-h-0 items-center justify-center px-4 py-10 text-sm sm:px-6 sm:py-12"
+  >
+    <div class="w-full max-w-[26rem] text-center">
       <form
-        class="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl"
+        class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-left shadow-[0_12px_40px_rgb(0_0_0_/_0.18)] sm:p-8"
         @submit.prevent="emit('submit')"
       >
-        <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
+        <h1
+          class="mb-6 text-center text-2xl font-semibold leading-8 tracking-tight text-[var(--color-text-strong)] sm:text-[1.75rem]"
+        >
           {{ t('cloud.loginTitle') }}
         </h1>
-        <p class="mt-1 text-[var(--color-text-muted)]">{{ t('cloud.loginDescription') }}</p>
-        <label class="mt-4 block">
-          <span class="text-[var(--color-text)]">{{ t('cloud.username') }}</span>
-          <input
-            :value="username"
-            class="mt-1 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-[var(--color-text)] outline-none"
-            autocomplete="username"
-            type="email"
-            @input="emit('update:username', ($event.target as HTMLInputElement).value)"
-          />
-        </label>
-        <label class="mt-3 block">
-          <span class="text-[var(--color-text)]">{{ t('cloud.password') }}</span>
-          <input
-            :value="password"
-            type="password"
-            class="mt-1 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-[var(--color-text)] outline-none"
-            autocomplete="current-password"
-            @input="emit('update:password', ($event.target as HTMLInputElement).value)"
-          />
-        </label>
-        <slot />
-        <button
-          type="submit"
-          class="mt-4 h-9 w-full rounded-md border border-blue-700 bg-blue-600 text-slate-50 hover:bg-blue-500 disabled:opacity-60"
-          :disabled="loggingIn || googleLoggingIn || !turnstileReady"
-        >
-          {{ loggingIn ? t('cloud.signingIn') : t('cloud.signIn') }}
-        </button>
-        <button
-          type="button"
-          class="mt-2 h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-text)] hover:bg-[var(--color-control-hover)] disabled:opacity-60"
-          :disabled="loggingIn || googleLoggingIn"
-          @click="emit('google')"
-        >
-          {{ googleLoggingIn ? t('cloud.signingIn') : t('cloud.continueWithGoogle') }}
-        </button>
-        <div class="mt-3 flex justify-between text-xs text-[var(--color-text-muted)]">
-          <RouterLink class="hover:text-[var(--color-text)]" :to="{ name: 'cloud-register' }">
-            {{ t('cloud.register') }}
-          </RouterLink>
-          <RouterLink
-            class="hover:text-[var(--color-text)]"
-            :to="{ name: 'cloud-forgot-password' }"
+        <div class="space-y-5">
+          <label class="flex flex-col gap-2">
+            <span class="block text-sm font-medium text-[var(--color-text)]">{{
+              t('cloud.username')
+            }}</span>
+            <input
+              :value="username"
+              class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
+              autocomplete="username"
+              type="email"
+              required
+              @input="emit('update:username', ($event.target as HTMLInputElement).value)"
+            />
+          </label>
+          <label class="flex flex-col gap-2">
+            <span
+              class="flex items-center justify-between gap-3 text-sm font-medium text-[var(--color-text)]"
+            >
+              {{ t('cloud.password') }}
+              <RouterLink
+                class="font-normal text-[var(--color-primary-border)] outline-none transition-opacity hover:opacity-80 focus-visible:rounded focus-visible:ring-2 focus-visible:ring-[var(--color-primary-border)]/40"
+                :to="{ name: 'cloud-forgot-password' }"
+              >
+                {{ t('cloud.forgotPassword') }}
+              </RouterLink>
+            </span>
+            <input
+              :value="password"
+              type="password"
+              class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
+              autocomplete="current-password"
+              required
+              @input="emit('update:password', ($event.target as HTMLInputElement).value)"
+            />
+          </label>
+          <slot />
+          <button
+            type="submit"
+            class="button button-primary h-10 w-full text-sm"
+            :disabled="loggingIn || externalLoggingIn || !turnstileReady"
           >
-            {{ t('cloud.forgotPassword') }}
-          </RouterLink>
+            {{ loggingIn ? t('cloud.signingIn') : t('cloud.signIn') }}
+          </button>
         </div>
+
+        <template v-if="externalAuthProviderIds.length">
+          <div class="my-6 flex items-center gap-3 text-xs text-[var(--color-text-muted)]">
+            <div class="h-px flex-1 bg-[var(--color-border)]" />
+            <span class="font-medium uppercase tracking-wide">{{ t('cloud.or') }}</span>
+            <div class="h-px flex-1 bg-[var(--color-border)]" />
+          </div>
+          <div class="space-y-3">
+            <button
+              v-for="providerId in externalAuthProviderIds"
+              :key="providerId"
+              type="button"
+              class="button button-provider h-10 w-full gap-2 text-sm"
+              :disabled="loggingIn || externalLoggingIn"
+              @click="emit('external', providerId)"
+            >
+              <img
+                v-if="!externalLoggingIn"
+                :src="providerIcon(providerId)"
+                class="size-4 shrink-0"
+                aria-hidden="true"
+              />
+              <span>{{
+                externalLoggingIn ? t('cloud.signingIn') : providerLabel(providerId)
+              }}</span>
+            </button>
+          </div>
+        </template>
       </form>
+
+      <p class="mt-6 text-sm leading-6 text-[var(--color-text-muted)]">
+        {{ t('cloud.newToTermBridge') }}
+        <RouterLink
+          class="text-[var(--color-primary-border)] outline-none transition-opacity hover:opacity-80 focus-visible:rounded focus-visible:ring-2 focus-visible:ring-[var(--color-primary-border)]/40"
+          :to="{ name: 'cloud-register' }"
+        >
+          {{ t('cloud.createAccount') }}
+        </RouterLink>
+      </p>
     </div>
-  </section>
+  </AppPageShell>
 </template>
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n'
   import { RouterLink } from 'vue-router'
-  import AppHeader from '../layout/AppHeader.vue'
+  import githubProviderIcon from '../../assets/github-provider.svg'
+  import googleProviderIcon from '../../assets/google-provider.svg'
+  import AppPageShell from '../layout/AppPageShell.vue'
 
   defineProps<{
     username: string
     password: string
     loggingIn: boolean
-    googleLoggingIn: boolean
+    externalLoggingIn: boolean
+    externalAuthProviderIds: string[]
     turnstileReady: boolean
   }>()
 
@@ -79,8 +119,16 @@
     'update:username': [value: string]
     'update:password': [value: string]
     submit: []
-    google: []
+    external: [providerId: string]
   }>()
 
   const { t } = useI18n()
+
+  function providerIcon(providerId: string) {
+    return providerId === 'github' ? githubProviderIcon : googleProviderIcon
+  }
+
+  function providerLabel(providerId: string) {
+    return providerId === 'github' ? t('cloud.continueWithGitHub') : t('cloud.continueWithGoogle')
+  }
 </script>

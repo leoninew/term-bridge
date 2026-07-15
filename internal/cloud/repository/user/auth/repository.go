@@ -14,6 +14,7 @@ import (
 const (
 	ProviderEmail  = "email"
 	ProviderGoogle = "google"
+	ProviderGitHub = "github"
 	StatusPending  = "pending_verification"
 	StatusEnabled  = "enabled"
 )
@@ -35,6 +36,7 @@ type TxRepository struct {
 
 type User struct {
 	Id              string
+	Provider        string
 	EmailNormalized string
 	DisplayName     string
 	Status          string
@@ -122,15 +124,15 @@ func (r *Repository) CreateEmailUser(ctx context.Context, email, passwordHash st
 	if err != nil {
 		return User{}, err
 	}
-	user := User{Id: userID, EmailNormalized: email, DisplayName: email, Status: StatusPending}
-	identity := Identity{Id: identityID, UserId: user.Id, Provider: ProviderEmail, ProviderSubject: email, PasswordHash: sql.NullString{String: passwordHash, Valid: true}}
+	user := User{Id: userID, Provider: ProviderEmail, EmailNormalized: email, DisplayName: email, Status: StatusPending}
+	identity := Identity{Id: identityID, UserId: user.Id, Provider: user.Provider, ProviderSubject: email, PasswordHash: sql.NullString{String: passwordHash, Valid: true}}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return User{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 	storedNow := storeTime(r.driver, now)
-	if _, err := tx.ExecContext(ctx, `INSERT INTO users (id,email_normalized,display_name,status,created_at,updated_at) VALUES (?,?,?,?,?,?)`, user.Id, user.EmailNormalized, user.DisplayName, user.Status, storedNow, storedNow); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO users (id,provider,email_normalized,display_name,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`, user.Id, user.Provider, user.EmailNormalized, user.DisplayName, user.Status, storedNow, storedNow); err != nil {
 		return User{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO user_identities (id,user_id,provider,provider_subject,password_hash,oauth_email,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`, identity.Id, identity.UserId, identity.Provider, identity.ProviderSubject, identity.PasswordHash, sql.NullString{}, storedNow, storedNow); err != nil {
@@ -139,7 +141,8 @@ func (r *Repository) CreateEmailUser(ctx context.Context, email, passwordHash st
 	return user, tx.Commit()
 }
 
-func (r *Repository) CreateGoogleUser(ctx context.Context, email, sub string) (User, error) {
+func (r *Repository) CreateExternalUser(ctx context.Context, provider, email, subject string) (User, error) {
+	provider = strings.TrimSpace(provider)
 	email = NormalizeEmail(email)
 	now := time.Now().UTC()
 	userID, err := idgen.New()
@@ -150,15 +153,15 @@ func (r *Repository) CreateGoogleUser(ctx context.Context, email, sub string) (U
 	if err != nil {
 		return User{}, err
 	}
-	user := User{Id: userID, EmailNormalized: email, DisplayName: email, Status: StatusEnabled, EmailVerifiedAt: sql.NullTime{Time: now, Valid: true}}
-	identity := Identity{Id: identityID, UserId: user.Id, Provider: ProviderGoogle, ProviderSubject: sub, OAuthEmail: sql.NullString{String: email, Valid: true}}
+	user := User{Id: userID, Provider: provider, EmailNormalized: email, DisplayName: email, Status: StatusEnabled, EmailVerifiedAt: sql.NullTime{Time: now, Valid: true}}
+	identity := Identity{Id: identityID, UserId: user.Id, Provider: user.Provider, ProviderSubject: subject, OAuthEmail: sql.NullString{String: email, Valid: true}}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return User{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 	storedNow := storeTime(r.driver, now)
-	if _, err := tx.ExecContext(ctx, `INSERT INTO users (id,email_normalized,display_name,status,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`, user.Id, user.EmailNormalized, user.DisplayName, user.Status, storeNullTime(r.driver, user.EmailVerifiedAt), storedNow, storedNow); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO users (id,provider,email_normalized,display_name,status,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`, user.Id, user.Provider, user.EmailNormalized, user.DisplayName, user.Status, storeNullTime(r.driver, user.EmailVerifiedAt), storedNow, storedNow); err != nil {
 		return User{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO user_identities (id,user_id,provider,provider_subject,password_hash,oauth_email,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`, identity.Id, identity.UserId, identity.Provider, identity.ProviderSubject, sql.NullString{}, identity.OAuthEmail, storedNow, storedNow); err != nil {
@@ -168,7 +171,11 @@ func (r *Repository) CreateGoogleUser(ctx context.Context, email, sub string) (U
 }
 
 func (r *Repository) FindUserByEmail(ctx context.Context, email string) (User, error) {
-	return findUserByEmail(ctx, r.db, email)
+	return r.FindUserByProviderEmail(ctx, ProviderEmail, email)
+}
+
+func (r *Repository) FindUserByProviderEmail(ctx context.Context, provider, email string) (User, error) {
+	return findUserByProviderEmail(ctx, r.db, provider, email)
 }
 
 func (r *Repository) FindUserByID(ctx context.Context, id string) (User, error) {
@@ -225,16 +232,16 @@ func (r *Repository) SaveEmailLog(ctx context.Context, log EmailLog) error {
 	return saveEmailLog(ctx, r.db, r.driver, log)
 }
 
-func (r *Repository) CreateOAuthState(ctx context.Context, state string, expiresAt time.Time) error {
+func (r *Repository) CreateOAuthState(ctx context.Context, provider, state string, expiresAt time.Time) error {
 	now := time.Now().UTC()
-	_, err := r.db.ExecContext(ctx, `INSERT INTO oauth_states (state,expires_at,created_at) VALUES (?,?,?)`, state, storeTime(r.driver, expiresAt), storeTime(r.driver, now))
+	_, err := r.db.ExecContext(ctx, `INSERT INTO oauth_states (state,provider,expires_at,created_at) VALUES (?,?,?,?)`, state, strings.TrimSpace(provider), storeTime(r.driver, expiresAt), storeTime(r.driver, now))
 	return err
 }
 
-func (r *Repository) UseOAuthState(ctx context.Context, state string) (bool, error) {
+func (r *Repository) UseOAuthState(ctx context.Context, provider, state string) (bool, error) {
 	now := time.Now().UTC()
 	storedNow := storeTime(r.driver, now)
-	res, err := r.db.ExecContext(ctx, `UPDATE oauth_states SET used_at=? WHERE state=? AND used_at IS NULL AND expires_at>?`, storedNow, state, storedNow)
+	res, err := r.db.ExecContext(ctx, `UPDATE oauth_states SET used_at=? WHERE state=? AND provider=? AND used_at IS NULL AND expires_at>?`, storedNow, state, strings.TrimSpace(provider), storedNow)
 	if err != nil {
 		return false, err
 	}
@@ -243,7 +250,11 @@ func (r *Repository) UseOAuthState(ctx context.Context, state string) (bool, err
 }
 
 func (r *TxRepository) FindUserByEmail(ctx context.Context, email string) (User, error) {
-	return findUserByEmail(ctx, r.tx, email)
+	return findUserByProviderEmail(ctx, r.tx, ProviderEmail, email)
+}
+
+func (r *TxRepository) FindUserByProviderEmail(ctx context.Context, provider, email string) (User, error) {
+	return findUserByProviderEmail(ctx, r.tx, provider, email)
 }
 
 func (r *TxRepository) FindUserByID(ctx context.Context, id string) (User, error) {
@@ -294,13 +305,13 @@ func (r *TxRepository) SaveEmailLog(ctx context.Context, log EmailLog) error {
 	return saveEmailLog(ctx, r.tx, r.driver, log)
 }
 
-func findUserByEmail(ctx context.Context, exec sqlExecutor, email string) (User, error) {
-	row := exec.QueryRowContext(ctx, `SELECT id,email_normalized,display_name,status,email_verified_at,last_login_at FROM users WHERE email_normalized=?`, NormalizeEmail(email))
+func findUserByProviderEmail(ctx context.Context, exec sqlExecutor, provider, email string) (User, error) {
+	row := exec.QueryRowContext(ctx, `SELECT id,provider,email_normalized,display_name,status,email_verified_at,last_login_at FROM users WHERE provider=? AND email_normalized=?`, strings.TrimSpace(provider), NormalizeEmail(email))
 	return scanUser(row)
 }
 
 func findUserByID(ctx context.Context, exec sqlExecutor, id string) (User, error) {
-	row := exec.QueryRowContext(ctx, `SELECT id,email_normalized,display_name,status,email_verified_at,last_login_at FROM users WHERE id=?`, id)
+	row := exec.QueryRowContext(ctx, `SELECT id,provider,email_normalized,display_name,status,email_verified_at,last_login_at FROM users WHERE id=?`, id)
 	return scanUser(row)
 }
 
@@ -425,7 +436,7 @@ func scanUser(row scanner) (User, error) {
 	var user User
 	var emailVerifiedAt any
 	var lastLoginAt any
-	if err := row.Scan(&user.Id, &user.EmailNormalized, &user.DisplayName, &user.Status, &emailVerifiedAt, &lastLoginAt); err != nil {
+	if err := row.Scan(&user.Id, &user.Provider, &user.EmailNormalized, &user.DisplayName, &user.Status, &emailVerifiedAt, &lastLoginAt); err != nil {
 		return User{}, err
 	}
 	var err error

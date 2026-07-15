@@ -45,8 +45,10 @@ func (s *countingAuthService) RequestPasswordReset(context.Context, string) erro
 func (s *countingAuthService) ConfirmPasswordReset(context.Context, string, string, string) error {
 	return nil
 }
-func (s *countingAuthService) GoogleAuthURL(context.Context) (string, error) { return "", nil }
-func (s *countingAuthService) GoogleCallback(context.Context, string, string) (*cloud.AuthGoogleCallbackResp, error) {
+func (s *countingAuthService) ExternalAuthURL(context.Context, string) (string, error) {
+	return "", nil
+}
+func (s *countingAuthService) ExternalCallback(context.Context, string, string, string) (*cloud.AuthLoginResp, error) {
 	return nil, nil
 }
 func (s *countingAuthService) IssueUserToken(context.Context, string) (*cloud.CloudOAuthTokenResp, error) {

@@ -53,6 +53,7 @@ type AuthConfig struct {
 	PasswordPolicy PasswordPolicy
 	Code           CodePolicy
 	Google         GoogleConfig
+	GitHub         GitHubConfig
 }
 
 type PasswordPolicy struct {
@@ -68,7 +69,13 @@ type CodePolicy struct {
 }
 
 type GoogleConfig struct {
-	ClientID     string
+	ClientId     string
+	ClientSecret string
+	RedirectUrl  string
+}
+
+type GitHubConfig struct {
+	ClientId     string
 	ClientSecret string
 	RedirectUrl  string
 }

@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	cloudauth "gitee.com/leoninew/TermBridge-go/internal/cloud/model/user/auth"
+	authmodel "gitee.com/leoninew/TermBridge-go/internal/cloud/model/user/auth"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	cloudproto "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
@@ -86,8 +86,8 @@ type AuthService interface {
 	ChangePassword(ctx context.Context, userId, currentPassword, newPassword string) error
 	RequestPasswordReset(ctx context.Context, email string) error
 	ConfirmPasswordReset(ctx context.Context, email, code, newPassword string) error
-	GoogleAuthURL(ctx context.Context) (string, error)
-	GoogleCallback(ctx context.Context, code, state string) (*cloudproto.AuthGoogleCallbackResp, error)
+	ExternalAuthURL(ctx context.Context, providerId string) (string, error)
+	ExternalCallback(ctx context.Context, providerId, code, state string) (*cloudproto.AuthLoginResp, error)
 	IssueUserToken(ctx context.Context, userId string) (*cloudproto.CloudOAuthTokenResp, error)
 	VerifyToken(token string) (auth.Claims, error)
 	VerifyBasic(ctx context.Context, username, password string) bool
@@ -231,8 +231,9 @@ func (h *Handler) registerCloudRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/auth/password/change", h.authMiddleware(http.HandlerFunc(h.handleChangePassword)).ServeHTTP)
 	mux.HandleFunc("/api/auth/password-reset/request", h.handlePasswordResetRequest)
 	mux.HandleFunc("/api/auth/password-reset/confirm", h.handlePasswordResetConfirm)
-	mux.HandleFunc("/api/auth/google", h.handleGoogleAuth)
-	mux.HandleFunc("/api/auth/google/callback", h.handleGoogleCallback)
+	mux.HandleFunc("/api/oauth2/", h.handleExternalOAuthCallback)
+	mux.HandleFunc("/api/oauth2/google", h.handleGoogleExternalOAuth)
+	mux.HandleFunc("/api/oauth2/github", h.handleGitHubExternalOAuth)
 	mux.HandleFunc("/api/oauth2/authorize", h.authMiddleware(http.HandlerFunc(h.handleOAuthAuthorize)).ServeHTTP)
 	mux.HandleFunc("/api/oauth2/token", h.handleOAuthToken)
 	mux.HandleFunc("/api/devices", h.authMiddleware(http.HandlerFunc(h.handleDevices)).ServeHTTP)
@@ -442,6 +443,10 @@ func (s *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
+	if s.authService == nil {
+		s.writeNotFound(w, r)
+		return
+	}
 	claims, _ := s.claimsFromRequest(r)
 	if err := s.authService.ChangePassword(r.Context(), claims.Sub, req.CurrentPassword, req.NewPassword); err != nil {
 		s.writeAuthError(w, r, err)
@@ -488,7 +493,15 @@ func (s *Handler) handlePasswordResetConfirm(w http.ResponseWriter, r *http.Requ
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-func (s *Handler) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleGoogleExternalOAuth(w http.ResponseWriter, r *http.Request) {
+	s.handleExternalAuthURL(w, r, "google")
+}
+
+func (s *Handler) handleGitHubExternalOAuth(w http.ResponseWriter, r *http.Request) {
+	s.handleExternalAuthURL(w, r, "github")
+}
+
+func (s *Handler) handleExternalAuthURL(w http.ResponseWriter, r *http.Request, providerId string) {
 	if r.Method != http.MethodGet {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
@@ -500,14 +513,22 @@ func (s *Handler) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 		s.writeNotFound(w, r)
 		return
 	}
-	url, err := s.authService.GoogleAuthURL(r.Context())
+	authUrl, err := s.authService.ExternalAuthURL(r.Context(), providerId)
 	if err != nil {
 		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, &cloudproto.GoogleAuthUrlResp{AuthUrl: url})
+	writeJSONObject(w, http.StatusOK, map[string]string{"auth_url": authUrl})
 }
-func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
+
+func (s *Handler) handleExternalOAuthCallback(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/oauth2/")
+	parts := strings.Split(path, "/")
+	providerId := strings.TrimSpace(parts[0])
+	if providerId == "" || len(parts) != 2 || parts[1] != "callback" {
+		s.writeNotFound(w, r)
+		return
+	}
 	if r.Method != http.MethodPost {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
@@ -515,15 +536,15 @@ func (s *Handler) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if !s.requireCloudEndpoint(w, r) {
 		return
 	}
-	var req cloudproto.AuthGoogleCallbackReq
-	if !s.decodeJSONRequest(w, r, &req) {
-		return
-	}
 	if s.authService == nil {
 		s.writeNotFound(w, r)
 		return
 	}
-	result, err := s.authService.GoogleCallback(r.Context(), req.Code, req.State)
+	var req cloudproto.AuthExternalCallbackReq
+	if !s.decodeJSONRequest(w, r, &req) {
+		return
+	}
+	result, err := s.authService.ExternalCallback(r.Context(), providerId, req.Code, req.State)
 	if err != nil {
 		s.writeAuthError(w, r, err)
 		return
@@ -693,18 +714,24 @@ func (s *Handler) claimsFromRequest(r *http.Request) (auth.Claims, bool) {
 }
 func (s *Handler) writeAuthError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
-	case errors.Is(err, cloudauth.ErrInvalidCredentials):
+	case errors.Is(err, authmodel.ErrInvalidCredentials):
 		s.writeUnauthorized(w, r)
-	case errors.Is(err, cloudauth.ErrEmailNotVerified):
+	case errors.Is(err, authmodel.ErrEmailNotVerified):
 		s.writeAPIError(w, r, http.StatusForbidden, "email_not_verified", "Email is not verified.", nil)
-	case errors.Is(err, cloudauth.ErrEmailAlreadyUsed):
+	case errors.Is(err, authmodel.ErrEmailAlreadyUsed):
 		s.writeAPIError(w, r, http.StatusConflict, "email_already_used", "Email is already used.", nil)
-	case errors.Is(err, cloudauth.ErrCodeInvalid):
+	case errors.Is(err, authmodel.ErrCodeInvalid):
 		s.writeAPIError(w, r, http.StatusBadRequest, "code_invalid", "Code is invalid or expired.", nil)
-	case errors.Is(err, cloudauth.ErrCodeCooldown):
+	case errors.Is(err, authmodel.ErrCodeCooldown):
 		s.writeAPIError(w, r, http.StatusTooManyRequests, "code_cooldown", "Please wait before requesting another code.", nil)
-	case errors.Is(err, cloudauth.ErrProviderUnsupported):
+	case errors.Is(err, authmodel.ErrPasswordInvalid):
+		s.writeAPIError(w, r, http.StatusBadRequest, "password_invalid", "Password does not meet the required policy.", nil)
+	case errors.Is(err, authmodel.ErrProviderUnsupported):
 		s.writeAPIError(w, r, http.StatusBadRequest, "provider_unsupported", "Provider is unsupported for this operation.", nil)
+	case errors.Is(err, authmodel.ErrOAuthDisabled):
+		s.writeAPIError(w, r, http.StatusBadRequest, "provider_disabled", "This sign-in provider is unavailable.", nil)
+	case errors.Is(err, authmodel.ErrOAuthEmailUnavailable):
+		s.writeAPIError(w, r, http.StatusBadRequest, "oauth_email_unavailable", "GitHub did not provide a usable verified email.", nil)
 	default:
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
 	}

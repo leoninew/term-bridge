@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
-	"gitee.com/leoninew/TermBridge-go/internal/shared/common/security"
 )
 
 func TestLoadDefaults(t *testing.T) {
@@ -505,97 +504,30 @@ func TestLoadNormalizesZeroOrNegativeLogBodyLimit(t *testing.T) {
 	}
 }
 
-func TestLoadGeneratesMissingJWTSecretKey(t *testing.T) {
+func TestLoadRejectsMissingJWTSecretKey(t *testing.T) {
 	isolateHome(t)
-	if err := os.Unsetenv("TERMBRIDGE_JWT__SECRET_KEY"); err != nil {
-		t.Fatalf("Unsetenv(TERMBRIDGE_JWT__SECRET_KEY) error = %v", err)
-	}
-	cwd := t.TempDir()
-	writeDefaultConfig(t, cwd)
-
-	cfg, err := Load(Options{Cwd: cwd})
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if _, err := security.ParseBase64Key(cfg.Jwt.SecretKey, 32); err != nil {
-		t.Fatalf("Jwt.SecretKey = %q, want generated fernet key: %v", cfg.Jwt.SecretKey, err)
-	}
-	data, err := os.ReadFile(filepath.Join(cwd, EnvFileName))
-	if err != nil {
-		t.Fatalf("ReadFile(.env) error = %v", err)
-	}
-	if !strings.Contains(string(data), "TERMBRIDGE_JWT__SECRET_KEY="+quoteEnvValue(cfg.Jwt.SecretKey)) {
-		t.Fatalf("env file missing generated jwt secret key: %s", string(data))
-	}
-}
-
-func TestLoadGeneratesMissingJWTSecretKeyIntoEnvironmentConfig(t *testing.T) {
-	isolateHome(t)
-	if err := os.Unsetenv("TERMBRIDGE_JWT__SECRET_KEY"); err != nil {
-		t.Fatalf("Unsetenv(TERMBRIDGE_JWT__SECRET_KEY) error = %v", err)
-	}
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
 	t.Setenv(EnvNameVariable, "develop")
+	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "")
 
-	cfg, err := Load(Options{Cwd: cwd})
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
+	_, err := Load(Options{Cwd: cwd})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
 	}
-	if _, err := security.ParseBase64Key(cfg.Jwt.SecretKey, 32); err != nil {
-		t.Fatalf("Jwt.SecretKey = %q, want generated fernet key: %v", cfg.Jwt.SecretKey, err)
+	if !apperrors.IsConfig(err) {
+		t.Fatalf("Load() error = %T, want config error", err)
 	}
-	if _, err := os.Stat(filepath.Join(cwd, EnvFileName+".develop")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("environment .env file exists err = %v, want not exist", err)
+	if !strings.Contains(err.Error(), "invalid jwt.secret_key") {
+		t.Fatalf("Load() error = %v, want jwt secret key error", err)
 	}
-	path := filepath.Join(cwd, ConfigDirName, envConfigFileName("develop"))
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile(config.develop.yaml) error = %v", err)
-	}
-	if !strings.Contains(string(data), "secret_key: "+cfg.Jwt.SecretKey) {
-		t.Fatalf("env config file missing generated jwt secret key: %s", string(data))
-	}
-}
-
-func TestLoadUpsertsGeneratedValuesIntoExistingEnvironmentConfig(t *testing.T) {
-	isolateHome(t)
-	if err := os.Unsetenv("TERMBRIDGE_JWT__SECRET_KEY"); err != nil {
-		t.Fatalf("Unsetenv(TERMBRIDGE_JWT__SECRET_KEY) error = %v", err)
-	}
-	cwd := t.TempDir()
-	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\nlocal:\n  listen_url: http://127.0.0.1:9040\n")
-	t.Setenv(EnvNameVariable, "develop")
-
-	loadedFiles := []string{}
-	cfg, err := Load(Options{Cwd: cwd, LoadedConfigFile: func(path string) {
-		loadedFiles = append(loadedFiles, path)
-	}})
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	path := filepath.Join(cwd, ConfigDirName, envConfigFileName("develop"))
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile(config.develop.yaml) error = %v", err)
-	}
-	content := string(data)
-	for _, want := range []string{
-		"level: debug",
-		"listen_url: http://127.0.0.1:9040",
-		"secret_key: " + cfg.Jwt.SecretKey,
+	for _, path := range []string{
+		filepath.Join(cwd, EnvFileName+".develop"),
+		filepath.Join(cwd, ConfigDirName, envConfigFileName("develop")),
 	} {
-		if !strings.Contains(content, want) {
-			t.Fatalf("env config file missing %q: %s", want, content)
+		if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("runtime-generated config %q stat error = %v, want not exist", path, statErr)
 		}
-	}
-	wantLoadedFiles := []string{
-		filepath.Join(cwd, ConfigDirName, DefaultFileName),
-		path,
-	}
-	if !reflect.DeepEqual(loadedFiles, wantLoadedFiles) {
-		t.Fatalf("loaded files = %#v, want %#v", loadedFiles, wantLoadedFiles)
 	}
 }
 

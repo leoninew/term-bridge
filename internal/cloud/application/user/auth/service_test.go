@@ -4,12 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	clouddb "gitee.com/leoninew/TermBridge-go/internal/cloud/infrastructure/database"
+	authmodel "gitee.com/leoninew/TermBridge-go/internal/cloud/model/user/auth"
 	repository "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/auth"
 	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
 
@@ -177,7 +179,7 @@ func TestLoginReturnsLastLoginUpdateError(t *testing.T) {
 
 func newAuthServiceForTest(db *sql.DB, sender EmailSender) *Service {
 	repo := repository.New(db, "sqlite")
-	return New(repo, sharedauth.NewTokenService([]byte("0123456789abcdef0123456789abcdef")), Config{PasswordPolicy: PasswordPolicy{MinLength: 8, MaxLength: 128}, Code: CodePolicy{Length: 6, Ttl: 2 * time.Minute, ResendCooldown: 0, MaxAttempts: 5}}, sender, nil)
+	return New(repo, sharedauth.NewTokenService([]byte("0123456789abcdef0123456789abcdef")), Config{PasswordPolicy: PasswordPolicy{MinLength: 8, MaxLength: 128}, Code: CodePolicy{Length: 6, Ttl: 2 * time.Minute, ResendCooldown: 0, MaxAttempts: 5}}, sender, NewProviderRegistry())
 }
 
 func openAuthServiceTestDB(t *testing.T) *sql.DB {
@@ -238,4 +240,99 @@ func codeFromLatestEmail(t *testing.T, sender *recordingSender) string {
 		t.Fatalf("sent email HTML %q does not contain code", sender.sent[len(sender.sent)-1].HTML)
 	}
 	return matches[1]
+}
+
+type testExternalProvider struct {
+	id       string
+	identity ExternalIdentity
+}
+
+func (p testExternalProvider) Id() string { return p.id }
+
+func (p testExternalProvider) AuthCodeURL(state string) string {
+	return "https://provider.example.test/authorize?state=" + state
+}
+
+func (p testExternalProvider) ExchangeIdentity(context.Context, string) (ExternalIdentity, error) {
+	return p.identity, nil
+}
+
+func TestExternalLoginAllowsSameEmailAcrossProviders(t *testing.T) {
+	db := openAuthServiceTestDB(t)
+	repo := repository.New(db, "sqlite")
+	github := testExternalProvider{id: repository.ProviderGitHub, identity: ExternalIdentity{Provider: repository.ProviderGitHub, Subject: "1001", Email: "same@example.test", EmailVerified: true}}
+	google := testExternalProvider{id: repository.ProviderGoogle, identity: ExternalIdentity{Provider: repository.ProviderGoogle, Subject: "google-subject", Email: "same@example.test", EmailVerified: true}}
+	service := New(repo, sharedauth.NewTokenService([]byte("0123456789abcdef0123456789abcdef")), Config{PasswordPolicy: PasswordPolicy{MinLength: 8, MaxLength: 128}, Code: CodePolicy{Length: 6, Ttl: 2 * time.Minute, MaxAttempts: 5}}, nil, NewProviderRegistry(github, google))
+
+	githubState := externalProviderState(t, service, repository.ProviderGitHub)
+	githubLogin, err := service.ExternalCallback(context.Background(), repository.ProviderGitHub, "github-code", githubState)
+	if err != nil || githubLogin.AccessToken == "" {
+		t.Fatalf("GitHub ExternalCallback() = %#v, %v", githubLogin, err)
+	}
+	googleState := externalProviderState(t, service, repository.ProviderGoogle)
+	googleLogin, err := service.ExternalCallback(context.Background(), repository.ProviderGoogle, "google-code", googleState)
+	if err != nil || googleLogin.AccessToken == "" {
+		t.Fatalf("Google ExternalCallback() = %#v, %v", googleLogin, err)
+	}
+
+	var users int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM users WHERE email_normalized=?`, "same@example.test").Scan(&users); err != nil {
+		t.Fatalf("count provider-scoped users: %v", err)
+	}
+	if users != 2 {
+		t.Fatalf("provider-scoped users = %d, want 2", users)
+	}
+}
+
+func TestExternalLoginRejectsStateFromAnotherProvider(t *testing.T) {
+	db := openAuthServiceTestDB(t)
+	github := testExternalProvider{id: repository.ProviderGitHub, identity: ExternalIdentity{Provider: repository.ProviderGitHub, Subject: "1001", Email: "github@example.test", EmailVerified: true}}
+	google := testExternalProvider{id: repository.ProviderGoogle, identity: ExternalIdentity{Provider: repository.ProviderGoogle, Subject: "google-subject", Email: "google@example.test", EmailVerified: true}}
+	service := New(repository.New(db, "sqlite"), sharedauth.NewTokenService([]byte("0123456789abcdef0123456789abcdef")), Config{}, nil, NewProviderRegistry(github, google))
+
+	githubState := externalProviderState(t, service, repository.ProviderGitHub)
+	_, err := service.ExternalCallback(context.Background(), repository.ProviderGoogle, "google-code", githubState)
+	if !errors.Is(err, authmodel.ErrInvalidCredentials) {
+		t.Fatalf("cross-provider ExternalCallback() error = %v, want invalid credentials", err)
+	}
+}
+
+func TestIssueUserTokenPreservesAccountProvider(t *testing.T) {
+	db := openAuthServiceTestDB(t)
+	repo := repository.New(db, "sqlite")
+	user, err := repo.CreateExternalUser(context.Background(), repository.ProviderGitHub, "github@example.test", "1001")
+	if err != nil {
+		t.Fatalf("CreateExternalUser() error = %v", err)
+	}
+	tokens := sharedauth.NewTokenService([]byte("0123456789abcdef0123456789abcdef"))
+	service := New(repo, tokens, Config{}, nil, NewProviderRegistry())
+
+	result, err := service.IssueUserToken(context.Background(), user.Id)
+	if err != nil {
+		t.Fatalf("IssueUserToken() error = %v", err)
+	}
+	claims, err := tokens.Verify(result.AccessToken)
+	if err != nil {
+		t.Fatalf("verify issued token: %v", err)
+	}
+	if claims.Provider != repository.ProviderGitHub {
+		t.Fatalf("issued token provider = %q, want %q", claims.Provider, repository.ProviderGitHub)
+	}
+}
+
+func externalProviderState(t *testing.T, service *Service, providerId string) string {
+	t.Helper()
+	authUrl, err := service.ExternalAuthURL(context.Background(), providerId)
+	if err != nil {
+		t.Fatalf("ExternalAuthURL(%q) error = %v", providerId, err)
+	}
+	parsed, err := url.Parse(authUrl)
+	if err != nil {
+		t.Fatalf("parse auth URL: %v", err)
+	}
+	state := parsed.Query().Get("state")
+	if state == "" {
+		t.Fatal("external auth URL did not include state")
+	}
+	return state
 }

@@ -9,7 +9,8 @@ const cloudAccountAuthRoutes = [
   'cloud-register',
   'cloud-verify-email',
   'cloud-forgot-password',
-  'cloud-google-callback',
+  'cloud-external-oauth-callback',
+  'cloud-external-github-callback',
   'cloud-oauth-authorize',
   'cloud-reset-password',
 ]
@@ -54,9 +55,17 @@ export const router = createRouter({
       meta: { mode: 'cloud' },
     },
     {
-      path: '/auth/google/callback',
-      name: 'cloud-google-callback',
-      component: () => import('../views/cloud/GoogleCallbackView.vue'),
+      path: '/oauth2/google/callback',
+      name: 'cloud-external-oauth-callback',
+      component: () => import('../views/cloud/ExternalOAuthCallbackView.vue'),
+      props: { provider: 'google' },
+      meta: { mode: 'cloud' },
+    },
+    {
+      path: '/oauth2/github/callback',
+      name: 'cloud-external-github-callback',
+      component: () => import('../views/cloud/ExternalOAuthCallbackView.vue'),
+      props: { provider: 'github' },
       meta: { mode: 'cloud' },
     },
     {
@@ -69,6 +78,12 @@ export const router = createRouter({
       path: '/reset-password',
       name: 'cloud-reset-password',
       component: () => import('../views/cloud/ResetPasswordView.vue'),
+      meta: { mode: 'cloud' },
+    },
+    {
+      path: '/change-password',
+      name: 'cloud-change-password',
+      component: () => import('../views/cloud/ChangePasswordView.vue'),
       meta: { mode: 'cloud' },
     },
     {

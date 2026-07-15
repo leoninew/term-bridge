@@ -29,6 +29,12 @@ func TestMigrateCreatesCloudIdentitySchemaOnly(t *testing.T) {
 	if !testColumnExists(t, db, "devices", "public_key") {
 		t.Fatal("devices.public_key does not exist")
 	}
+	if !testColumnExists(t, db, "users", "provider") {
+		t.Fatal("users.provider does not exist")
+	}
+	if !testColumnExists(t, db, "oauth_states", "provider") {
+		t.Fatal("oauth_states.provider does not exist")
+	}
 }
 
 func TestMigrateRejectsPartialCloudSchemaState(t *testing.T) {

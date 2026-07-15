@@ -1,8 +1,6 @@
 package config
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -13,7 +11,6 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/subosito/gotenv"
-	"go.yaml.in/yaml/v3"
 
 	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/security"
@@ -83,6 +80,7 @@ type AuthConfig struct {
 	PasswordPolicy PasswordPolicy
 	Code           CodePolicy
 	Google         GoogleConfig
+	GitHub         GitHubConfig
 }
 
 type LocalAdminConfig struct {
@@ -103,7 +101,13 @@ type CodePolicy struct {
 }
 
 type GoogleConfig struct {
-	ClientID     string
+	ClientId     string
+	ClientSecret string
+	RedirectUrl  string
+}
+
+type GitHubConfig struct {
+	ClientId     string
 	ClientSecret string
 	RedirectUrl  string
 }
@@ -344,9 +348,14 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 				MaxAttempts:    v.GetInt("auth.code.max_attempts"),
 			},
 			Google: GoogleConfig{
-				ClientID:     strings.TrimSpace(v.GetString("auth.google.client_id")),
+				ClientId:     strings.TrimSpace(v.GetString("auth.google.client_id")),
 				ClientSecret: strings.TrimSpace(v.GetString("auth.google.client_secret")),
 				RedirectUrl:  strings.TrimSpace(v.GetString("auth.google.redirect_url")),
+			},
+			GitHub: GitHubConfig{
+				ClientId:     strings.TrimSpace(v.GetString("auth.github.client_id")),
+				ClientSecret: strings.TrimSpace(v.GetString("auth.github.client_secret")),
+				RedirectUrl:  strings.TrimSpace(v.GetString("auth.github.redirect_url")),
 			},
 		},
 		Jwt: JwtConfig{
@@ -365,13 +374,6 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	normalizeTerminalConfig(&cfg)
 	normalizeLocalConfig(&cfg)
 	normalizeCloudConfig(&cfg)
-	if ensureDirs {
-		var err error
-		cfg, err = ensureJWTSecretKey(cfg)
-		if err != nil {
-			return Config{}, err
-		}
-	}
 	if !ensureDirs {
 		return cfg, nil
 	}
@@ -411,19 +413,11 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 }
 
 func IsGoogleAuthEnabled(cfg GoogleConfig) bool {
-	return strings.TrimSpace(cfg.ClientID) != ""
+	return strings.TrimSpace(cfg.ClientId) != ""
 }
 
 func IsResendEnabled(cfg ResendConfig) bool {
 	return strings.TrimSpace(cfg.ApiKey) != ""
-}
-
-func GenerateFernetKey() (string, error) {
-	key := make([]byte, 32)
-	if _, err := rand.Read(key); err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(key), nil
 }
 
 func loadCloudOAuthConfig(v *viper.Viper) CloudOAuthConfig {
@@ -465,22 +459,6 @@ func loadDatabaseConfig(cwd string, v *viper.Viper, prefix string) (DatabaseConf
 	return cfg, nil
 }
 
-func ensureJWTSecretKey(cfg Config) (Config, error) {
-	if strings.TrimSpace(cfg.Jwt.SecretKey) != "" {
-		return cfg, nil
-	}
-	secretKey, err := GenerateFernetKey()
-	if err != nil {
-		return Config{}, apperrors.Config("generate jwt.secret_key", err)
-	}
-	cfg.Jwt.SecretKey = secretKey
-	cfg, err = upsertGeneratedConfigValues(cfg, map[string]string{"jwt.secret_key": secretKey})
-	if err != nil {
-		return Config{}, apperrors.Config("save jwt.secret_key", err)
-	}
-	return cfg, nil
-}
-
 func validateJwt(cfg JwtConfig) error {
 	if _, err := security.ParseBase64Key(cfg.SecretKey, 32); err != nil {
 		return apperrors.Config("invalid jwt.secret_key", err)
@@ -504,21 +482,32 @@ func validateAuth(cfg AuthConfig) error {
 	return nil
 }
 
+func validateOAuthProviderConfig(provider, clientId, clientSecret, redirectUrl string) error {
+	if clientId == "" && clientSecret == "" && redirectUrl == "" {
+		return nil
+	}
+	missing := []string{}
+	if clientId == "" {
+		missing = append(missing, envNameForKey("auth."+provider+".client_id"))
+	}
+	if clientSecret == "" {
+		missing = append(missing, envNameForKey("auth."+provider+".client_secret"))
+	}
+	if redirectUrl == "" {
+		missing = append(missing, envNameForKey("auth."+provider+".redirect_url"))
+	}
+	if len(missing) > 0 {
+		return apperrors.Config("incomplete "+provider+" auth configuration", errors.New(strings.Join(missing, ", ")))
+	}
+	return nil
+}
+
 func validateIntegrationConfig(cfg Config) error {
-	if cfg.Auth.Google.ClientID != "" || cfg.Auth.Google.ClientSecret != "" || cfg.Auth.Google.RedirectUrl != "" {
-		missing := []string{}
-		if cfg.Auth.Google.ClientID == "" {
-			missing = append(missing, envNameForKey("auth.google.client_id"))
-		}
-		if cfg.Auth.Google.ClientSecret == "" {
-			missing = append(missing, envNameForKey("auth.google.client_secret"))
-		}
-		if cfg.Auth.Google.RedirectUrl == "" {
-			missing = append(missing, envNameForKey("auth.google.redirect_url"))
-		}
-		if len(missing) > 0 {
-			return apperrors.Config("incomplete google auth configuration", errors.New(strings.Join(missing, ", ")))
-		}
+	if err := validateOAuthProviderConfig("google", cfg.Auth.Google.ClientId, cfg.Auth.Google.ClientSecret, cfg.Auth.Google.RedirectUrl); err != nil {
+		return err
+	}
+	if err := validateOAuthProviderConfig("github", cfg.Auth.GitHub.ClientId, cfg.Auth.GitHub.ClientSecret, cfg.Auth.GitHub.RedirectUrl); err != nil {
+		return err
 	}
 	if cfg.Resend.ApiKey != "" || cfg.Resend.FromEmail != "" {
 		missing := []string{}
@@ -533,154 +522,6 @@ func validateIntegrationConfig(cfg Config) error {
 		}
 	}
 	return nil
-}
-
-func upsertGeneratedConfigValues(cfg Config, updates map[string]string) (Config, error) {
-	if cfg.Environment == "" {
-		envUpdates := make(map[string]string, len(updates))
-		for key, value := range updates {
-			envUpdates[envNameForKey(key)] = value
-		}
-		return cfg, upsertEnvFileValues(cfg.EnvFile, envUpdates)
-	}
-	path := envConfigWritePath(cfg)
-	if err := upsertYAMLConfigValues(path, updates); err != nil {
-		return Config{}, err
-	}
-	return cfg, nil
-}
-
-func envConfigWritePath(cfg Config) string {
-	if strings.TrimSpace(cfg.EnvConfigFile) != "" {
-		return cfg.EnvConfigFile
-	}
-	return filepath.Join(cfg.Cwd, ConfigDirName, envConfigFileName(cfg.Environment))
-}
-
-func upsertYAMLConfigValues(path string, updates map[string]string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	root := map[string]any{}
-	if exists, err := fileExists(path); err != nil {
-		return err
-	} else if exists {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		if strings.TrimSpace(string(data)) != "" {
-			if err := yaml.Unmarshal(data, &root); err != nil {
-				return err
-			}
-		}
-	}
-	for key, value := range updates {
-		setNestedYAMLValue(root, strings.Split(key, "."), value)
-	}
-	data, err := yaml.Marshal(root)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o600)
-}
-
-func setNestedYAMLValue(root map[string]any, path []string, value string) {
-	if len(path) == 0 {
-		return
-	}
-	if len(path) == 1 {
-		root[path[0]] = value
-		return
-	}
-	child, ok := root[path[0]].(map[string]any)
-	if !ok {
-		child = map[string]any{}
-		root[path[0]] = child
-	}
-	setNestedYAMLValue(child, path[1:], value)
-}
-
-func upsertEnvFileValues(path string, updates map[string]string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	var lines []string
-	if exists, err := fileExists(path); err != nil {
-		return err
-	} else if exists {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		lines = strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
-		if len(lines) > 0 && lines[len(lines)-1] == "" {
-			lines = lines[:len(lines)-1]
-		}
-	}
-	seen := map[string]struct{}{}
-	for index, line := range lines {
-		key, ok := envLineKey(line)
-		if !ok {
-			continue
-		}
-		value, exists := updates[key]
-		if !exists {
-			continue
-		}
-		lines[index] = key + "=" + quoteEnvValue(value)
-		seen[key] = struct{}{}
-	}
-	for _, key := range envUpdateKeys(updates) {
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		lines = append(lines, key+"="+quoteEnvValue(updates[key]))
-	}
-	return os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600)
-}
-
-func envUpdateKeys(updates map[string]string) []string {
-	preferred := []string{envNameForKey("jwt.secret_key")}
-	keys := make([]string, 0, len(updates))
-	seen := map[string]struct{}{}
-	for _, key := range preferred {
-		if _, ok := updates[key]; ok {
-			keys = append(keys, key)
-			seen[key] = struct{}{}
-		}
-	}
-	for key := range updates {
-		if _, ok := seen[key]; !ok {
-			keys = append(keys, key)
-		}
-	}
-	return keys
-}
-
-func envLineKey(line string) (string, bool) {
-	trimmed := strings.TrimSpace(line)
-	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-		return "", false
-	}
-	if value, ok := strings.CutPrefix(trimmed, "export "); ok {
-		trimmed = strings.TrimSpace(value)
-	}
-	index := strings.Index(trimmed, "=")
-	if index <= 0 {
-		return "", false
-	}
-	key := strings.TrimSpace(trimmed[:index])
-	if key == "" {
-		return "", false
-	}
-	return key, true
-}
-
-func quoteEnvValue(value string) string {
-	escaped := strings.ReplaceAll(value, `\`, `\\`)
-	escaped = strings.ReplaceAll(escaped, `"`, `\"`)
-	return `"` + escaped + `"`
 }
 
 func resolveCwd(path string) (string, error) {
@@ -858,6 +699,9 @@ func configKeys() []string {
 		"auth.google.client_id",
 		"auth.google.client_secret",
 		"auth.google.redirect_url",
+		"auth.github.client_id",
+		"auth.github.client_secret",
+		"auth.github.redirect_url",
 		"jwt.secret_key",
 		"resend.api_key",
 		"resend.from_email",

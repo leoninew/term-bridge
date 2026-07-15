@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	authmodel "gitee.com/leoninew/TermBridge-go/internal/cloud/model/user/auth"
 	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
@@ -116,6 +118,57 @@ func TestAuthEndpoints(t *testing.T) {
 	}
 }
 
+func TestExternalOAuthInitiationRoutes(t *testing.T) {
+	server := New(Config{
+		JWTSecret:   testJWTKey,
+		Logger:      slog.Default(),
+		AuthService: newTestAuthService(sharedauth.NewTokenService(testJWTKey)),
+	})
+
+	for _, providerId := range []string{"google", "github"} {
+		t.Run(providerId, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/oauth2/"+providerId, nil))
+			if response.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200; body=%s", response.Code, response.Body.String())
+			}
+			var body struct {
+				AuthUrl string `json:"auth_url"`
+			}
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.AuthUrl != "https://auth.example/"+providerId {
+				t.Fatalf("auth_url = %q, want provider URL", body.AuthUrl)
+			}
+		})
+	}
+
+	wrongMethodResponse := httptest.NewRecorder()
+	server.ServeHTTP(wrongMethodResponse, httptest.NewRequest(http.MethodPost, "/api/oauth2/google", nil))
+	if wrongMethodResponse.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("wrong method status = %d, want 405", wrongMethodResponse.Code)
+	}
+
+	callbackResponse := httptest.NewRecorder()
+	server.ServeHTTP(callbackResponse, httptest.NewRequest(http.MethodPost, "/api/oauth2/google/callback", nil))
+	if callbackResponse.Code != http.StatusBadRequest {
+		t.Fatalf("callback status = %d, want 400", callbackResponse.Code)
+	}
+
+	oldRouteResponse := httptest.NewRecorder()
+	server.ServeHTTP(oldRouteResponse, httptest.NewRequest(http.MethodGet, "/api/auth/oauth/google", nil))
+	if oldRouteResponse.Code != http.StatusNotFound {
+		t.Fatalf("old initiation route status = %d, want 404", oldRouteResponse.Code)
+	}
+
+	oldCallbackRouteResponse := httptest.NewRecorder()
+	server.ServeHTTP(oldCallbackRouteResponse, httptest.NewRequest(http.MethodPost, "/api/auth/oauth/google/callback", nil))
+	if oldCallbackRouteResponse.Code != http.StatusNotFound {
+		t.Fatalf("old callback route status = %d, want 404", oldCallbackRouteResponse.Code)
+	}
+}
+
 func TestOAuthAuthorizationCodeCanBeExchangedOnce(t *testing.T) {
 	tokens := sharedauth.NewTokenService(testJWTKey)
 	server := New(Config{
@@ -209,6 +262,164 @@ func TestLoginRejectsInvalidJSON(t *testing.T) {
 	assertAPIError(t, response, http.StatusBadRequest, errorCodeBadRequest)
 }
 
+func TestCloudAuthEndpointsReturnStructuredErrors(t *testing.T) {
+	service := newTestAuthService(sharedauth.NewTokenService(testJWTKey)).(*testAuthService)
+	service.loginErr = authmodel.ErrEmailNotVerified
+	service.registerErr = authmodel.ErrEmailAlreadyUsed
+	service.verifyEmailErr = authmodel.ErrCodeInvalid
+	service.resendVerificationErr = authmodel.ErrCodeCooldown
+	service.changePasswordErr = authmodel.ErrPasswordInvalid
+	service.confirmPasswordResetErr = authmodel.ErrCodeInvalid
+	turnstile, csrf := testAuthSecurityConfig()
+	server := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
+	token, err := service.tokens.Sign(sharedauth.Claims{Sub: "user-1", Email: "user@example.test", Provider: "email"})
+	if err != nil {
+		t.Fatalf("sign test token: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		path       string
+		body       string
+		status     int
+		code       string
+		authorized bool
+	}{
+		{name: "login", path: "/api/auth/login", body: testLoginRequestBody(t, server, "user@example.test", "password"), status: http.StatusForbidden, code: "email_not_verified"},
+		{name: "register", path: "/api/auth/register", body: `{"email":"user@example.test","password":"password","turnstile_token":"turnstile-test-token"}`, status: http.StatusConflict, code: "email_already_used"},
+		{name: "verify email", path: "/api/auth/email/verify", body: `{"email":"user@example.test","code":"ABC123"}`, status: http.StatusBadRequest, code: "code_invalid"},
+		{name: "resend verification", path: "/api/auth/email/verification/resend", body: `{"email":"user@example.test"}`, status: http.StatusTooManyRequests, code: "code_cooldown"},
+		{name: "change password", path: "/api/auth/password/change", body: `{"current_password":"current-password","new_password":"short"}`, status: http.StatusBadRequest, code: "password_invalid", authorized: true},
+		{name: "confirm password reset", path: "/api/auth/password-reset/confirm", body: `{"email":"user@example.test","code":"ABC123","new_password":"password"}`, status: http.StatusBadRequest, code: "code_invalid"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, test.path, bytes.NewBufferString(test.body))
+			request.Header.Set(requestIdHeader, "req_auth_contract")
+			if test.authorized {
+				request.Header.Set("Authorization", "Bearer "+token)
+			}
+			response := httptest.NewRecorder()
+			server.ServeHTTP(response, request)
+			body := assertAPIError(t, response, test.status, test.code)
+			if body.RequestId != "req_auth_contract" {
+				t.Fatalf("request_id = %q, want preserved inbound value", body.RequestId)
+			}
+		})
+	}
+}
+
+func TestCloudAuthEndpointsRejectWrongMethodWithStructuredErrors(t *testing.T) {
+	service := newTestAuthService(sharedauth.NewTokenService(testJWTKey)).(*testAuthService)
+	turnstile, csrf := testAuthSecurityConfig()
+	server := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
+	token, err := service.tokens.Sign(sharedauth.Claims{Sub: "user-1", Email: "user@example.test", Provider: "email"})
+	if err != nil {
+		t.Fatalf("sign test token: %v", err)
+	}
+
+	for _, test := range []struct {
+		path       string
+		authorized bool
+	}{
+		{path: "/api/auth/login"},
+		{path: "/api/auth/register"},
+		{path: "/api/auth/email/verify"},
+		{path: "/api/auth/email/verification/resend"},
+		{path: "/api/auth/password/change", authorized: true},
+		{path: "/api/auth/password-reset/request"},
+		{path: "/api/auth/password-reset/confirm"},
+	} {
+		t.Run(test.path, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, test.path, nil)
+			if test.authorized {
+				request.Header.Set("Authorization", "Bearer "+token)
+			}
+			response := httptest.NewRecorder()
+			server.ServeHTTP(response, request)
+			assertAPIError(t, response, http.StatusMethodNotAllowed, errorCodeMethodNotAllowed)
+		})
+	}
+}
+
+func TestCloudAuthEndpointsRejectMalformedJSONWithStructuredErrors(t *testing.T) {
+	turnstile, csrf := testAuthSecurityConfig()
+	server := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: newTestAuthService(sharedauth.NewTokenService(testJWTKey)), Turnstile: turnstile, CSRF: csrf})
+
+	for _, path := range []string{
+		"/api/auth/login",
+		"/api/auth/register",
+		"/api/auth/email/verify",
+		"/api/auth/email/verification/resend",
+		"/api/auth/password-reset/request",
+		"/api/auth/password-reset/confirm",
+	} {
+		t.Run(path, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(`{"email"`)))
+			assertAPIError(t, response, http.StatusBadRequest, errorCodeBadRequest)
+		})
+	}
+}
+
+func TestPasswordChangeWithoutAuthServiceReturnsStructuredNotFound(t *testing.T) {
+	server := New(testCloudConfig())
+	loginResponse := httptest.NewRecorder()
+	server.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(testLoginRequestBody(t, server, "admin", "admin"))))
+	if loginResponse.Code != http.StatusOK {
+		t.Fatalf("login status = %d, want 200; body=%s", loginResponse.Code, loginResponse.Body.String())
+	}
+	var loginBody struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.Unmarshal(loginResponse.Body.Bytes(), &loginBody); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/password/change", bytes.NewBufferString(`{"current_password":"admin","new_password":"password"}`))
+	request.Header.Set("Authorization", "Bearer "+loginBody.AccessToken)
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, request)
+	assertAPIError(t, response, http.StatusNotFound, errorCodeNotFound)
+}
+
+func TestPasswordResetRequestSuppressesServiceOutcomes(t *testing.T) {
+	service := newTestAuthService(sharedauth.NewTokenService(testJWTKey)).(*testAuthService)
+	server := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: service})
+
+	outcomes := []error{nil, errors.New("smtp credential secret failed")}
+	for _, outcome := range outcomes {
+		service.requestPasswordResetErr = outcome
+		response := httptest.NewRecorder()
+		server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/password-reset/request", bytes.NewBufferString(`{"email":"user@example.test"}`)))
+		if response.Code != http.StatusNoContent {
+			t.Fatalf("status = %d, want 204; body=%s", response.Code, response.Body.String())
+		}
+		if response.Body.Len() != 0 {
+			t.Fatalf("body = %q, want empty", response.Body.String())
+		}
+		if response.Header().Get("Content-Type") != "" {
+			t.Fatalf("Content-Type = %q, want empty", response.Header().Get("Content-Type"))
+		}
+	}
+}
+
+func TestCloudAuthUnknownCausesDoNotLeak(t *testing.T) {
+	service := newTestAuthService(sharedauth.NewTokenService(testJWTKey)).(*testAuthService)
+	service.registerErr = errors.New("database password=super-secret failed")
+	turnstile, csrf := testAuthSecurityConfig()
+	server := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"user@example.test","password":"password","turnstile_token":"turnstile-test-token"}`)))
+	body := assertAPIError(t, response, http.StatusInternalServerError, errorCodeInternal)
+	if body.Error != errorMessageInternal {
+		t.Fatalf("error = %q, want generic internal message", body.Error)
+	}
+	if strings.Contains(response.Body.String(), "super-secret") {
+		t.Fatalf("response leaked service cause: %s", response.Body.String())
+	}
+}
+
 func TestLegacyCloudApiPathIsRejected(t *testing.T) {
 	server := New(testCloudConfig())
 	response := httptest.NewRecorder()
@@ -237,6 +448,9 @@ func assertAPIError(t *testing.T, response *httptest.ResponseRecorder, status in
 	if response.Code != status {
 		t.Fatalf("status = %d, want %d; body=%s", response.Code, status, response.Body.String())
 	}
+	if contentType := response.Header().Get("Content-Type"); contentType != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", contentType)
+	}
 	var body testErrorResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode error response: %v; body=%s", err, response.Body.String())
@@ -249,6 +463,9 @@ func assertAPIError(t *testing.T, response *httptest.ResponseRecorder, status in
 	}
 	if body.RequestId == "" {
 		t.Fatalf("requestId is empty; body=%s", response.Body.String())
+	}
+	if headerRequestId := response.Header().Get(requestIdHeader); headerRequestId != body.RequestId {
+		t.Fatalf("X-Request-ID = %q, want envelope request_id %q", headerRequestId, body.RequestId)
 	}
 	var raw map[string]any
 	if err := json.Unmarshal(response.Body.Bytes(), &raw); err != nil {

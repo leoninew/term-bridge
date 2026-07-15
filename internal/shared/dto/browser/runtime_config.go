@@ -20,6 +20,7 @@ type CloudOAuthConfig struct {
 }
 
 type RuntimeCloudConfig struct {
-	PublicUrl  string `json:"publicUrl"`
-	ApiBaseUrl string `json:"apiBaseUrl"`
+	PublicUrl               string   `json:"publicUrl"`
+	ApiBaseUrl              string   `json:"apiBaseUrl"`
+	ExternalAuthProviderIds []string `json:"externalAuthProviderIds"`
 }

@@ -16,6 +16,7 @@ export interface RuntimeLocalConfig {
 export interface RuntimeCloudConfig {
   publicUrl: string
   apiBaseUrl: string
+  externalAuthProviderIds: string[]
 }
 
 export interface RuntimeConfig {

@@ -1,14 +1,14 @@
 <template>
-  <section class="mt-3">
-    <label class="block" for="turnstile-widget">
-      <span class="text-[var(--color-text)]">{{ t('cloud.humanVerification') }}</span>
+  <section class="space-y-2">
+    <label class="block text-xs font-semibold text-[var(--color-text)]" for="turnstile-widget">
+      {{ t('cloud.humanVerification') }}
     </label>
     <div
       id="turnstile-widget"
       ref="widget"
-      class="mt-1 flex min-h-[65px] w-full justify-center overflow-hidden"
+      class="flex min-h-[65px] w-full justify-center overflow-hidden"
     />
-    <p v-if="error" class="mt-2 text-xs text-[var(--color-danger-text)]" role="alert">
+    <p v-if="error" class="text-xs text-[var(--color-danger-text)]" role="alert">
       {{ error }}
     </p>
   </section>

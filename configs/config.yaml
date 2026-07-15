@@ -153,6 +153,10 @@ auth:
     client_id: ""
     client_secret: ""
     redirect_url: ""
+  github:
+    client_id: ""
+    client_secret: ""
+    redirect_url: ""
 
 # Resend
 resend:

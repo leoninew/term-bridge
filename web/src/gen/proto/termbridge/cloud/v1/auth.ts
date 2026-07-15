@@ -64,7 +64,7 @@ export interface AuthPasswordResetConfirmReq {
   new_password: string;
 }
 
-export interface AuthGoogleCallbackReq {
+export interface AuthExternalCallbackReq {
   code: string;
   state: string;
 }
@@ -83,7 +83,7 @@ export interface AuthLoginResp {
   token_type: string;
 }
 
-export interface AuthGoogleCallbackResp {
+export interface AuthExternalCallbackResp {
   access_token: string;
   token_type: string;
 }
@@ -98,7 +98,7 @@ export interface CloudOAuthTokenResp {
   token_type: string;
 }
 
-export interface GoogleAuthUrlResp {
+export interface ExternalAuthUrlResp {
   auth_url: string;
 }
 

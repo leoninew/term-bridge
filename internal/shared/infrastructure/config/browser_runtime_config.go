@@ -44,10 +44,22 @@ func BuildBrowserRuntimeConfig(cfg Config, mode string) (browserdto.RuntimeConfi
 			},
 		},
 		Cloud: browserdto.RuntimeCloudConfig{
-			PublicUrl:  cfg.Cloud.PublicUrl,
-			ApiBaseUrl: browserApiBaseUrl,
+			PublicUrl:               cfg.Cloud.PublicUrl,
+			ApiBaseUrl:              browserApiBaseUrl,
+			ExternalAuthProviderIds: enabledExternalAuthProviderIds(cfg.Auth),
 		},
 	}, nil
+}
+
+func enabledExternalAuthProviderIds(cfg AuthConfig) []string {
+	providerIds := make([]string, 0, 2)
+	if IsGoogleAuthEnabled(cfg.Google) {
+		providerIds = append(providerIds, "google")
+	}
+	if strings.TrimSpace(cfg.GitHub.ClientId) != "" {
+		providerIds = append(providerIds, "github")
+	}
+	return providerIds
 }
 
 func validateBrowserPublicUrl(key string, value string) error {

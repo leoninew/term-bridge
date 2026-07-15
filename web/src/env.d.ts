@@ -12,4 +12,5 @@ interface ImportMetaEnv {
   readonly TERMBRIDGE_LOCAL__OAUTH__SCOPES?: string
   readonly TERMBRIDGE_CLOUD__PUBLIC_URL?: string
   readonly TERMBRIDGE_CLOUD__API_BASE_URL?: string
+  readonly TERMBRIDGE_CLOUD__EXTERNAL_AUTH_PROVIDER_IDS?: string
 }

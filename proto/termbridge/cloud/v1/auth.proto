@@ -61,7 +61,7 @@ message AuthPasswordResetConfirmReq {
   string new_password = 3;
 }
 
-message AuthGoogleCallbackReq {
+message AuthExternalCallbackReq {
   string code = 1;
   string state = 2;
 }
@@ -80,7 +80,7 @@ message AuthLoginResp {
   string token_type = 2;
 }
 
-message AuthGoogleCallbackResp {
+message AuthExternalCallbackResp {
   string access_token = 1;
   string token_type = 2;
 }
@@ -95,7 +95,7 @@ message CloudOAuthTokenResp {
   string token_type = 2;
 }
 
-message GoogleAuthUrlResp {
+message ExternalAuthUrlResp {
   string auth_url = 1;
 }
 

@@ -24,6 +24,10 @@ func TestBuildBrowserRuntimeConfigProjectsPublicConfiguration(t *testing.T) {
 				SecretKey: "must-not-be-exposed",
 			},
 		},
+		Auth: AuthConfig{
+			Google: GoogleConfig{ClientId: "google-client", ClientSecret: "must-not-be-exposed", RedirectUrl: "https://example.test/oauth2/google/callback"},
+			GitHub: GitHubConfig{ClientId: "github-client", ClientSecret: "must-not-be-exposed", RedirectUrl: "https://example.test/oauth2/github/callback"},
+		},
 		Jwt: JwtConfig{SecretKey: "must-not-be-exposed"},
 	}
 
@@ -49,6 +53,9 @@ func TestBuildBrowserRuntimeConfigProjectsPublicConfiguration(t *testing.T) {
 	}
 	if !reflect.DeepEqual(runtimeConfig.Local.CloudOAuth.Scopes, []string{"openid", "email"}) {
 		t.Fatalf("CloudOAuth.Scopes = %#v", runtimeConfig.Local.CloudOAuth.Scopes)
+	}
+	if !reflect.DeepEqual(runtimeConfig.Cloud.ExternalAuthProviderIds, []string{"google", "github"}) {
+		t.Fatalf("ExternalAuthProviderIds = %#v", runtimeConfig.Cloud.ExternalAuthProviderIds)
 	}
 
 	cfg.Local.OAuth.Scopes[0] = "changed"

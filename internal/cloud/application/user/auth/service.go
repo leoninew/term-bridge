@@ -33,8 +33,7 @@ const (
 )
 
 var (
-	ErrMailDisabled  = errors.New("mail sender is not configured")
-	ErrOAuthDisabled = errors.New("google oauth is not configured")
+	ErrMailDisabled = errors.New("mail sender is not configured")
 )
 
 type EmailSender interface {
@@ -45,18 +44,6 @@ type EmailResult struct {
 	MessageId    string
 	Success      bool
 	ResponseBody string
-}
-
-type GoogleUser struct {
-	Subject       string
-	Email         string
-	EmailVerified bool
-	Name          string
-}
-
-type GoogleClient interface {
-	AuthCodeURL(state string) string
-	ExchangeUser(ctx context.Context, code string) (GoogleUser, error)
 }
 
 type Config struct {
@@ -77,15 +64,15 @@ type CodePolicy struct {
 }
 
 type Service struct {
-	repo   *repository.Repository
-	tokens sharedauth.TokenService
-	cfg    Config
-	sender EmailSender
-	google GoogleClient
+	repo      *repository.Repository
+	tokens    sharedauth.TokenService
+	cfg       Config
+	sender    EmailSender
+	providers ProviderRegistry
 }
 
-func New(repo *repository.Repository, tokens sharedauth.TokenService, cfg Config, sender EmailSender, google GoogleClient) *Service {
-	return &Service{repo: repo, tokens: tokens, cfg: cfg, sender: sender, google: google}
+func New(repo *repository.Repository, tokens sharedauth.TokenService, cfg Config, sender EmailSender, providers ProviderRegistry) *Service {
+	return &Service{repo: repo, tokens: tokens, cfg: cfg, sender: sender, providers: providers}
 }
 
 func (s *Service) Register(ctx context.Context, email, password string) error {
@@ -169,12 +156,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (*cloud.Aut
 	if err := s.repo.UpdateLastLogin(ctx, user.Id); err != nil {
 		return nil, err
 	}
-	userProto := userView(user, repository.ProviderEmail)
-	token, err := s.tokens.Sign(sharedauth.Claims{Sub: userProto.GetId(), Email: userProto.GetEmail(), Provider: userProto.GetProvider()})
-	if err != nil {
-		return nil, err
-	}
-	return &cloud.AuthLoginResp{AccessToken: token, TokenType: "bearer"}, nil
+	return s.loginResponse(user)
 }
 
 func (s *Service) VerifyBasic(ctx context.Context, username, password string) bool {
@@ -246,77 +228,71 @@ func (s *Service) ConfirmPasswordReset(ctx context.Context, email, code, newPass
 	})
 }
 
-func (s *Service) GoogleAuthURL(ctx context.Context) (string, error) {
+func (s *Service) ExternalAuthURL(ctx context.Context, providerId string) (string, error) {
 	if err := s.requireRepository(); err != nil {
 		return "", err
 	}
-	if s.google == nil {
-		return "", ErrOAuthDisabled
+	provider, ok := s.providers.Get(providerId)
+	if !ok {
+		return "", authmodel.ErrOAuthDisabled
 	}
 	state, err := randomURLToken(32)
 	if err != nil {
 		return "", err
 	}
-	if err := s.repo.CreateOAuthState(ctx, state, time.Now().UTC().Add(10*time.Minute)); err != nil {
+	if err := s.repo.CreateOAuthState(ctx, provider.Id(), state, time.Now().UTC().Add(10*time.Minute)); err != nil {
 		return "", err
 	}
-	return s.google.AuthCodeURL(state), nil
+	return provider.AuthCodeURL(state), nil
 }
 
-func (s *Service) GoogleCallback(ctx context.Context, code, state string) (*cloud.AuthGoogleCallbackResp, error) {
+func (s *Service) ExternalCallback(ctx context.Context, providerId, code, state string) (*cloud.AuthLoginResp, error) {
 	if err := s.requireRepository(); err != nil {
 		return nil, err
 	}
-	if s.google == nil {
-		return nil, ErrOAuthDisabled
-	}
-	ok, err := s.repo.UseOAuthState(ctx, state)
-	if err != nil {
-		return nil, err
-	}
+	provider, ok := s.providers.Get(providerId)
 	if !ok {
-		return nil, authmodel.ErrInvalidCredentials
+		return nil, authmodel.ErrOAuthDisabled
 	}
-	googleUser, err := s.google.ExchangeUser(ctx, code)
+	used, err := s.repo.UseOAuthState(ctx, provider.Id(), state)
 	if err != nil {
 		return nil, err
 	}
-	if !googleUser.EmailVerified {
+	if !used {
 		return nil, authmodel.ErrInvalidCredentials
 	}
-	if strings.TrimSpace(googleUser.Subject) == "" || repository.NormalizeEmail(googleUser.Email) == "" {
+	identity, err := provider.ExchangeIdentity(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+	if identity.Provider != provider.Id() || !identity.EmailVerified || strings.TrimSpace(identity.Subject) == "" || repository.NormalizeEmail(identity.Email) == "" {
 		return nil, authmodel.ErrInvalidCredentials
 	}
-	if ident, err := s.repo.FindIdentity(ctx, repository.ProviderGoogle, googleUser.Subject); err == nil {
-		user, err := s.repo.FindUserByID(ctx, ident.UserId)
+	if existing, err := s.repo.FindIdentity(ctx, provider.Id(), identity.Subject); err == nil {
+		user, err := s.repo.FindUserByID(ctx, existing.UserId)
 		if err != nil {
 			return nil, err
 		}
-		_ = s.repo.UpdateLastLogin(ctx, user.Id)
-		userProto := userView(user, repository.ProviderGoogle)
-		token, err := s.tokens.Sign(sharedauth.Claims{Sub: userProto.GetId(), Email: userProto.GetEmail(), Provider: userProto.GetProvider()})
-		if err != nil {
+		if user.Provider != provider.Id() || user.EmailNormalized != repository.NormalizeEmail(identity.Email) {
+			return nil, authmodel.ErrInvalidCredentials
+		}
+		if err := s.repo.UpdateLastLogin(ctx, user.Id); err != nil {
 			return nil, err
 		}
-		return &cloud.AuthGoogleCallbackResp{AccessToken: token, TokenType: "bearer"}, nil
+		return s.externalLoginResponse(user)
 	} else if !repository.IsNotFound(err) {
 		return nil, err
 	}
-	if _, err := s.repo.FindUserByEmail(ctx, googleUser.Email); err == nil {
+	if _, err := s.repo.FindUserByProviderEmail(ctx, provider.Id(), identity.Email); err == nil {
 		return nil, authmodel.ErrEmailAlreadyUsed
 	} else if !repository.IsNotFound(err) {
 		return nil, err
 	}
-	user, err := s.repo.CreateGoogleUser(ctx, googleUser.Email, googleUser.Subject)
+	user, err := s.repo.CreateExternalUser(ctx, provider.Id(), identity.Email, identity.Subject)
 	if err != nil {
 		return nil, err
 	}
-	userProto := userView(user, repository.ProviderGoogle)
-	token, err := s.tokens.Sign(sharedauth.Claims{Sub: userProto.GetId(), Email: userProto.GetEmail(), Provider: userProto.GetProvider()})
-	if err != nil {
-		return nil, err
-	}
-	return &cloud.AuthGoogleCallbackResp{AccessToken: token, TokenType: "bearer"}, nil
+	return s.loginResponse(user)
 }
 
 func (s *Service) IssueUserToken(ctx context.Context, userId string) (*cloud.CloudOAuthTokenResp, error) {
@@ -327,7 +303,7 @@ func (s *Service) IssueUserToken(ctx context.Context, userId string) (*cloud.Clo
 	if err != nil {
 		return nil, err
 	}
-	userProto := userView(user, repository.ProviderEmail)
+	userProto := userView(user)
 	token, err := s.tokens.Sign(sharedauth.Claims{Sub: userProto.GetId(), Email: userProto.GetEmail(), Provider: userProto.GetProvider()})
 	if err != nil {
 		return nil, err
@@ -343,7 +319,7 @@ func (s *Service) UserFromClaims(ctx context.Context, claims sharedauth.Claims) 
 	if err != nil {
 		return nil, err
 	}
-	return userView(user, claims.Provider), nil
+	return userView(user), nil
 }
 
 func (s *Service) VerifyToken(token string) (sharedauth.Claims, error) {
@@ -359,7 +335,7 @@ func (s *Service) requireRepository() error {
 
 func (s *Service) validatePassword(password string) error {
 	if len(password) < s.cfg.PasswordPolicy.MinLength || len(password) > s.cfg.PasswordPolicy.MaxLength {
-		return fmt.Errorf("password length must be between %d and %d", s.cfg.PasswordPolicy.MinLength, s.cfg.PasswordPolicy.MaxLength)
+		return authmodel.ErrPasswordInvalid
 	}
 	return nil
 }
@@ -435,8 +411,21 @@ func (s *Service) verifyCodeWithRepo(ctx context.Context, repo codeRepository, e
 	return row, nil
 }
 
-func userView(user repository.User, provider string) *cloud.User {
-	return &cloud.User{Id: user.Id, Email: user.EmailNormalized, DisplayName: user.DisplayName, Provider: provider, EmailVerified: user.EmailVerifiedAt.Valid}
+func (s *Service) externalLoginResponse(user repository.User) (*cloud.AuthLoginResp, error) {
+	return s.loginResponse(user)
+}
+
+func (s *Service) loginResponse(user repository.User) (*cloud.AuthLoginResp, error) {
+	userProto := userView(user)
+	token, err := s.tokens.Sign(sharedauth.Claims{Sub: userProto.GetId(), Email: userProto.GetEmail(), Provider: userProto.GetProvider()})
+	if err != nil {
+		return nil, err
+	}
+	return &cloud.AuthLoginResp{AccessToken: token, TokenType: "bearer"}, nil
+}
+
+func userView(user repository.User) *cloud.User {
+	return &cloud.User{Id: user.Id, Email: user.EmailNormalized, DisplayName: user.DisplayName, Provider: user.Provider, EmailVerified: user.EmailVerifiedAt.Valid}
 }
 
 func hashPassword(password string) (string, error) {
@@ -477,39 +466,41 @@ func randomURLToken(size int) (string, error) {
 type OAuthGoogleClient struct{ cfg *oauth2.Config }
 
 type GoogleConfig struct {
-	ClientID     string
+	ClientId     string
 	ClientSecret string
 	RedirectUrl  string
 }
 
-func NewOAuthGoogleClient(cfg GoogleConfig) GoogleClient {
-	if strings.TrimSpace(cfg.ClientID) == "" {
+func NewOAuthGoogleClient(cfg GoogleConfig) ExternalProvider {
+	if strings.TrimSpace(cfg.ClientId) == "" {
 		return nil
 	}
-	return &OAuthGoogleClient{cfg: &oauth2.Config{ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret, RedirectURL: cfg.RedirectUrl, Scopes: []string{"openid", "email", "profile"}, Endpoint: google.Endpoint}}
+	return &OAuthGoogleClient{cfg: &oauth2.Config{ClientID: cfg.ClientId, ClientSecret: cfg.ClientSecret, RedirectURL: cfg.RedirectUrl, Scopes: []string{"openid", "email", "profile"}, Endpoint: google.Endpoint}}
 }
+
+func (g *OAuthGoogleClient) Id() string { return repository.ProviderGoogle }
 
 func (g *OAuthGoogleClient) AuthCodeURL(state string) string {
 	return g.cfg.AuthCodeURL(state, oauth2.AccessTypeOnline)
 }
 
-func (g *OAuthGoogleClient) ExchangeUser(ctx context.Context, code string) (GoogleUser, error) {
+func (g *OAuthGoogleClient) ExchangeIdentity(ctx context.Context, code string) (ExternalIdentity, error) {
 	token, err := g.cfg.Exchange(ctx, code)
 	if err != nil {
-		return GoogleUser{}, err
+		return ExternalIdentity{}, err
 	}
 	client := g.cfg.Client(ctx, token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
-		return GoogleUser{}, err
+		return ExternalIdentity{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return GoogleUser{}, fmt.Errorf("google userinfo status %d", resp.StatusCode)
+		return ExternalIdentity{}, fmt.Errorf("google userinfo status %d", resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return GoogleUser{}, err
+		return ExternalIdentity{}, err
 	}
 	var payload struct {
 		Sub           string `json:"sub"`
@@ -518,9 +509,9 @@ func (g *OAuthGoogleClient) ExchangeUser(ctx context.Context, code string) (Goog
 		Name          string `json:"name"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return GoogleUser{}, err
+		return ExternalIdentity{}, err
 	}
-	return GoogleUser{Subject: payload.Sub, Email: payload.Email, EmailVerified: payload.EmailVerified, Name: payload.Name}, nil
+	return ExternalIdentity{Provider: g.Id(), Subject: payload.Sub, Email: payload.Email, EmailVerified: payload.EmailVerified}, nil
 }
 
 func AuthURLFromBase(base string, params map[string]string) string {

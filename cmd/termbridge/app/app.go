@@ -297,9 +297,14 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 				MaxAttempts:    cfg.Auth.Code.MaxAttempts,
 			},
 			Google: cloudserver.GoogleConfig{
-				ClientID:     cfg.Auth.Google.ClientID,
+				ClientId:     cfg.Auth.Google.ClientId,
 				ClientSecret: cfg.Auth.Google.ClientSecret,
 				RedirectUrl:  cfg.Auth.Google.RedirectUrl,
+			},
+			GitHub: cloudserver.GitHubConfig{
+				ClientId:     cfg.Auth.GitHub.ClientId,
+				ClientSecret: cfg.Auth.GitHub.ClientSecret,
+				RedirectUrl:  cfg.Auth.GitHub.RedirectUrl,
 			},
 		},
 		Jwt: cloudserver.JwtConfig{SecretKey: cfg.Jwt.SecretKey},
