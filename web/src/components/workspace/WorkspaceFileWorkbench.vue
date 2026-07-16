@@ -1,20 +1,15 @@
 <template>
   <section
-    class="file-workbench-drawer"
-    :class="{ 'file-workbench-drawer--open': open }"
-    :aria-hidden="open ? undefined : 'true'"
-    :inert="!open"
+    class="file-workbench-page"
     role="region"
     :aria-label="t('files.drawerTitle', { name: workspace.name })"
-    @keydown.esc="close"
-    @transitionend="handleTransitionEnd"
   >
     <div class="file-workbench-layout">
       <WorkspaceFileTree
         :api="api"
         :workspace-name="workspace.name"
         @action="openAction"
-        @back="close"
+        @back="goBack"
       />
       <main class="file-workbench-editor-panel">
         <WorkspaceEditorTabs
@@ -22,6 +17,8 @@
           :active-document="store.activeDocument"
           @activate="store.setActiveDocument"
           @close="requestCloseDocument"
+          @close-all="requestCloseAllDocuments"
+          @close-others="requestCloseOtherDocuments"
         >
           <WorkspaceTextEditor
             :target="store.target"
@@ -69,6 +66,7 @@
         action?.type === 'delete' ||
         action?.type === 'delete-recursive' ||
         action?.type === 'overwrite-file' ||
+        action?.type === 'close-document' ||
         action?.type === 'force-save'
       "
       :initial-value="actionInitialValue"
@@ -99,30 +97,28 @@
   import WorkspaceFileTree, { type FileTreeAction } from './WorkspaceFileTree.vue'
   import WorkspaceTextEditor from './WorkspaceTextEditor.vue'
 
-  type DrawerAction =
+  type WorkbenchAction =
     | FileTreeAction
     | { type: 'overwrite-file'; entry: FileEntry }
     | { type: 'delete-recursive'; entry: FileEntry }
-    | { type: 'close-document'; path: string }
+    | { type: 'close-document'; paths: string[] }
     | { type: 'reload'; path: string }
     | { type: 'force-save'; path: string }
 
   const props = defineProps<{
-    open: boolean
     workspace: WorkspaceSummary
     target: RuntimeTarget
     api: FileGitRuntimeApi
   }>()
 
   const emit = defineEmits<{
-    close: []
-    closed: []
+    back: []
   }>()
 
   const { t } = useI18n()
   const store = useFileWorkbenchStore()
   const notifications = useNotificationsStore()
-  const action = ref<DrawerAction | null>(null)
+  const action = ref<WorkbenchAction | null>(null)
 
   const actionTitle = computed(() => {
     if (!action.value) return ''
@@ -133,7 +129,11 @@
     if (action.value.type === 'delete' || action.value.type === 'delete-recursive')
       return t('files.delete')
     if (action.value.type === 'overwrite-file') return t('files.overwriteFile')
-    if (action.value.type === 'close-document') return t('files.closeDirtyDocument')
+    if (action.value.type === 'close-document') {
+      return action.value.paths.length === 1
+        ? t('files.closeDirtyDocument')
+        : t('files.closeDirtyDocuments')
+    }
     if (action.value.type === 'reload') return t('files.reloadDiscard')
     return t('files.forceSave')
   })
@@ -143,6 +143,11 @@
       return t('files.overwriteDescription', { path: action.value.entry.path })
     if (action.value.type === 'delete-recursive')
       return t('files.recursiveDeleteDescription', { path: action.value.entry.path })
+    if (action.value.type === 'close-document') {
+      return action.value.paths.length === 1
+        ? action.value.paths[0]!
+        : t('files.closeDirtyDocumentsDescription', { count: action.value.paths.length })
+    }
     if ('entry' in action.value) return action.value.entry.path
     if ('path' in action.value) return action.value.path
     return ''
@@ -184,25 +189,18 @@
   })
 
   watch(
-    () => [props.open, props.workspace.id, props.target] as const,
-    async ([open]) => {
-      if (!open) return
+    () => [props.workspace.id, props.target] as const,
+    async () => {
       store.openWorkspace(props.target, props.workspace.id)
       await store.ensureDirectoryLoaded(props.api, '')
     },
-    { immediate: true, deep: false },
+    { immediate: true, deep: true },
   )
 
-  function close() {
+  function goBack() {
     if (action.value) return
     store.cancelReadonlyRequests()
-    emit('close')
-  }
-
-  function handleTransitionEnd(event: TransitionEvent) {
-    if (!props.open && event.target === event.currentTarget && event.propertyName === 'transform') {
-      emit('closed')
-    }
+    emit('back')
   }
 
   function closeAction(open: boolean) {
@@ -214,12 +212,35 @@
   }
 
   function requestCloseDocument(path: string) {
-    const document = store.documentFor(path)
-    if (!document || (!document.dirty && !document.saving)) {
-      store.closeDocument(path)
+    requestCloseDocuments([path])
+  }
+
+  function requestCloseAllDocuments() {
+    requestCloseDocuments(store.documents.map((document) => document.path))
+  }
+
+  function requestCloseOtherDocuments() {
+    const activeDocument = store.activeDocument
+    if (!activeDocument) return
+    requestCloseDocuments(
+      store.documents
+        .filter((document) => document.path !== activeDocument.path)
+        .map((document) => document.path),
+    )
+  }
+
+  function requestCloseDocuments(paths: string[]) {
+    const targetDocuments = store.documents.filter((document) => paths.includes(document.path))
+    if (targetDocuments.length === 0) return
+    if (targetDocuments.some((document) => document.saving)) {
+      notifications.pushToast('info', t('files.closeDocumentsSaving'))
       return
     }
-    action.value = { type: 'close-document', path }
+    if (targetDocuments.some((document) => document.dirty || document.conflict)) {
+      action.value = { type: 'close-document', paths: targetDocuments.map((document) => document.path) }
+      return
+    }
+    store.closeDocuments(targetDocuments.map((document) => document.path))
   }
 
   function requestReload(path: string) {
@@ -283,7 +304,7 @@
     if (action.value === next) action.value = null
   }
 
-  async function applyAction(next: DrawerAction, value: string): Promise<string | null> {
+  async function applyAction(next: WorkbenchAction, value: string): Promise<string | null> {
     let message: string | null = null
     if (next.type === 'create-file' || next.type === 'create-directory') {
       const path = entryPath(next.path, value.trim())
@@ -390,8 +411,13 @@
         }
       }
     } else if (next.type === 'close-document') {
-      store.discardDocumentDraft(next.path)
-      store.closeDocument(next.path)
+      const targetDocuments = store.documents.filter((document) => next.paths.includes(document.path))
+      if (targetDocuments.length !== next.paths.length || targetDocuments.some((document) => document.saving)) {
+        return t('files.closeDocumentsSaving')
+      }
+      if (!store.discardDocumentDrafts(next.paths) || !store.closeDocuments(next.paths)) {
+        return t('files.closeDocumentsSaving')
+      }
     } else if (next.type === 'reload') {
       await reloadDocument(next.path)
     } else if (next.type === 'force-save') {

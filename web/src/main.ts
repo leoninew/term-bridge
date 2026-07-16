@@ -5,6 +5,7 @@ import { i18n } from './i18n'
 import { router } from './router'
 import { applyDocumentTheme, resolveInitialTheme, useThemeStore } from './store/theme'
 import './styles.css'
+import '@vscode/codicons/dist/codicon.css'
 
 applyDocumentTheme(resolveInitialTheme())
 

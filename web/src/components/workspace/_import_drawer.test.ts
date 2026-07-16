@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from 'vitest'
-import WorkspaceFileDrawer from './WorkspaceFileDrawer.vue'
+import { describe, expect, it } from 'vitest'
+import WorkspaceFileWorkbench from './WorkspaceFileWorkbench.vue'
 
-describe('import drawer', () => {
-  it('loads', () => {
-    expect(WorkspaceFileDrawer).toBeTruthy()
+describe('workspace workbench module', () => {
+  it('exports the page workbench component', () => {
+    expect(WorkspaceFileWorkbench).toBeTruthy()
   })
 })

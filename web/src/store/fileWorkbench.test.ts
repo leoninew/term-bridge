@@ -140,7 +140,6 @@ describe('useFileWorkbenchStore', () => {
     expect(store.workspaceId).toBe('workspace-1')
   })
 
-
   it('clears document loading reactively after content loads', async () => {
     const store = useFileWorkbenchStore()
     const runtimeApi = api()
@@ -432,5 +431,64 @@ describe('useFileWorkbenchStore', () => {
     await expect(loading).resolves.toBeNull()
     expect(store.gitSelection).toEqual({ path: 'notes.txt', layer: GitLayer.GIT_LAYER_UNSTAGED })
     expect(store.gitDiff).toBeNull()
+  })
+
+  it('closes multiple documents atomically and chooses the next surviving document', async () => {
+    const store = useFileWorkbenchStore()
+    const runtimeApi = api()
+    vi.mocked(runtimeApi.readFile).mockImplementation(async (_workspaceId, path) => ({
+      entry: entry(path),
+      text: path,
+    }))
+    store.openWorkspace({ mode: 'local' }, 'workspace-1')
+    await store.openDocument(runtimeApi, 'first.txt')
+    await store.openDocument(runtimeApi, 'second.txt')
+    await store.openDocument(runtimeApi, 'third.txt')
+    store.setActiveDocument('second.txt')
+
+    expect(store.closeDocuments(['second.txt', 'third.txt'])).toBe(true)
+    expect(store.documents.map((document) => document.path)).toEqual(['first.txt'])
+    expect(store.activeDocument?.path).toBe('first.txt')
+
+    expect(store.closeDocuments(['first.txt'])).toBe(true)
+    expect(store.documents).toEqual([])
+    expect(store.activeDocument).toBeNull()
+  })
+
+  it('preserves the active document when Close Others targets background documents', async () => {
+    const store = useFileWorkbenchStore()
+    const runtimeApi = api()
+    vi.mocked(runtimeApi.readFile).mockImplementation(async (_workspaceId, path) => ({
+      entry: entry(path),
+      text: path,
+    }))
+    store.openWorkspace({ mode: 'local' }, 'workspace-1')
+    await store.openDocument(runtimeApi, 'first.txt')
+    await store.openDocument(runtimeApi, 'second.txt')
+    await store.openDocument(runtimeApi, 'third.txt')
+    store.setActiveDocument('second.txt')
+
+    expect(store.closeDocuments(['first.txt', 'third.txt'])).toBe(true)
+    expect(store.documents.map((document) => document.path)).toEqual(['second.txt'])
+    expect(store.activeDocument?.path).toBe('second.txt')
+  })
+
+  it('refuses bulk close and discard when any target is saving', async () => {
+    const store = useFileWorkbenchStore()
+    const runtimeApi = api()
+    vi.mocked(runtimeApi.readFile).mockImplementation(async (_workspaceId, path) => ({
+      entry: entry(path),
+      text: path,
+    }))
+    store.openWorkspace({ mode: 'local' }, 'workspace-1')
+    await store.openDocument(runtimeApi, 'clean.txt')
+    await store.openDocument(runtimeApi, 'saving.txt')
+    store.setDocumentDraft('clean.txt', 'draft')
+    store.documentFor('saving.txt')!.saving = true
+
+    expect(store.discardDocumentDrafts(['clean.txt', 'saving.txt'])).toBe(false)
+    expect(store.documentFor('clean.txt')).toMatchObject({ draftText: 'draft', dirty: true })
+    expect(store.closeDocuments(['clean.txt', 'saving.txt'])).toBe(false)
+    expect(store.documents.map((document) => document.path)).toEqual(['clean.txt', 'saving.txt'])
   })
 })

@@ -9,7 +9,7 @@
           :title="t('files.backToSessions')"
           @click="emit('back')"
         >
-          <ArrowLeft class="size-3.5" aria-hidden="true" />
+          <WorkbenchCodicon name="arrow-left" class-name="file-workbench-codicon" />
         </button>
         <h3 class="truncate">{{ workspaceName }}</h3>
       </div>
@@ -21,7 +21,7 @@
           :title="t('files.newDirectory')"
           @click="emit('action', { type: 'create-directory', path: '' })"
         >
-          <FolderPlus class="size-3.5" aria-hidden="true" />
+          <WorkbenchCodicon name="new-folder" class-name="file-workbench-codicon" />
         </button>
         <button
           type="button"
@@ -30,7 +30,7 @@
           :title="t('files.newFile')"
           @click="emit('action', { type: 'create-file', path: '' })"
         >
-          <FilePlus2 class="size-3.5" aria-hidden="true" />
+          <WorkbenchCodicon name="new-file" class-name="file-workbench-codicon" />
         </button>
         <button
           type="button"
@@ -40,10 +40,10 @@
           :title="t('files.refreshTree')"
           @click="refreshRoot"
         >
-          <RefreshCw
-            class="size-3.5"
-            :class="{ 'animate-spin': root?.loading }"
-            aria-hidden="true"
+          <WorkbenchCodicon
+            :name="root?.loading ? 'loading' : 'refresh'"
+            :spin="Boolean(root?.loading)"
+            class-name="file-workbench-codicon"
           />
         </button>
       </span>
@@ -61,27 +61,29 @@
         :key="item.entry.path"
         role="treeitem"
         :aria-expanded="item.directory ? item.expanded : undefined"
+        :aria-selected="!item.directory && isActiveFile(item.entry.path) ? true : undefined"
       >
         <div
           class="file-workbench-tree-row"
+          :class="{
+            'file-workbench-tree-row--active': !item.directory && isActiveFile(item.entry.path),
+          }"
           :style="{ paddingLeft: `${8 + item.depth * 16}px` }"
           tabindex="0"
           @click="activate(item.entry)"
           @keydown.enter.prevent="activate(item.entry)"
           @keydown.space.prevent="activate(item.entry)"
         >
-          <component
-            :is="item.loading ? Loader2 : item.expanded ? ChevronDown : ChevronRight"
+          <WorkbenchCodicon
             v-if="item.directory"
-            class="size-3.5"
-            :class="{ 'animate-spin': item.loading }"
-            aria-hidden="true"
+            :name="item.loading ? 'loading' : item.expanded ? 'chevron-down' : 'chevron-right'"
+            :spin="item.loading"
+            class-name="file-workbench-codicon file-workbench-tree-twistie"
           />
-          <span v-else class="w-3.5" />
-          <component
-            :is="item.directory ? (item.expanded ? FolderOpen : Folder) : File"
-            class="size-4 shrink-0"
-            aria-hidden="true"
+          <span v-else class="file-workbench-tree-twistie-spacer" />
+          <WorkbenchCodicon
+            :name="item.directory ? (item.expanded ? 'folder-opened' : 'folder') : 'file'"
+            class-name="file-workbench-codicon file-workbench-tree-icon"
           />
           <span class="min-w-0 flex-1 truncate">{{ item.entry.name }}</span>
           <span class="file-workbench-tree-menu" @click.stop>
@@ -93,7 +95,7 @@
               :title="t('files.newFile')"
               @click="emit('action', { type: 'create-file', path: item.entry.path })"
             >
-              <FilePlus2 class="size-3.5" aria-hidden="true" />
+              <WorkbenchCodicon name="new-file" class-name="file-workbench-codicon" />
             </button>
             <button
               v-if="item.directory"
@@ -103,7 +105,7 @@
               :title="t('files.newDirectory')"
               @click="emit('action', { type: 'create-directory', path: item.entry.path })"
             >
-              <FolderPlus class="size-3.5" aria-hidden="true" />
+              <WorkbenchCodicon name="new-folder" class-name="file-workbench-codicon" />
             </button>
             <button
               type="button"
@@ -112,7 +114,7 @@
               :title="t('files.rename')"
               @click="emit('action', { type: 'rename', entry: item.entry })"
             >
-              <Pencil class="size-3.5" aria-hidden="true" />
+              <WorkbenchCodicon name="edit" class-name="file-workbench-codicon" />
             </button>
             <button
               type="button"
@@ -121,7 +123,7 @@
               :title="t('files.move')"
               @click="emit('action', { type: 'move', entry: item.entry })"
             >
-              <FolderInput class="size-3.5" aria-hidden="true" />
+              <WorkbenchCodicon name="files" class-name="file-workbench-codicon" />
             </button>
             <button
               type="button"
@@ -130,7 +132,7 @@
               :title="t('files.delete')"
               @click="emit('action', { type: 'delete', entry: item.entry })"
             >
-              <Trash2 class="size-3.5" aria-hidden="true" />
+              <WorkbenchCodicon name="trash" class-name="file-workbench-codicon" />
             </button>
           </span>
         </div>
@@ -148,25 +150,11 @@
 <script setup lang="ts">
   import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import {
-    ArrowLeft,
-    ChevronDown,
-    ChevronRight,
-    File,
-    FilePlus2,
-    Folder,
-    FolderInput,
-    FolderOpen,
-    FolderPlus,
-    Loader2,
-    Pencil,
-    RefreshCw,
-    Trash2,
-  } from '@lucide/vue'
   import type { FileEntry } from '../../gen/proto/termbridge/agent/v1/file'
   import type { FileGitRuntimeApi } from '../../features/files/runtime'
   import { isDirectory } from '../../features/files/workbenchUi'
   import { useFileWorkbenchStore } from '../../store/fileWorkbench'
+  import WorkbenchCodicon from './WorkbenchCodicon.vue'
 
   export type FileTreeAction =
     | { type: 'create-file'; path: string }
@@ -218,6 +206,10 @@
     appendChildren('', 0, items)
     return items
   })
+
+  function isActiveFile(path: string) {
+    return store.activeDocument?.path === path
+  }
 
   function appendChildren(path: string, depth: number, items: VisibleTreeItem[]) {
     const directory = store.directoryFor(path)

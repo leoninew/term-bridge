@@ -4,7 +4,11 @@
       {{ t('files.revisionConflict') }}
     </p>
     <p v-if="document?.error" class="file-workbench-error" role="status">{{ document.error }}</p>
-    <div v-if="document?.loading" class="file-workbench-empty file-workbench-empty-center" role="status">
+    <div
+      v-if="document?.loading"
+      class="file-workbench-empty file-workbench-empty-center"
+      role="status"
+    >
       {{ t('files.loadingFile') }}
     </div>
     <div v-else-if="!document" class="file-workbench-empty file-workbench-empty-center">

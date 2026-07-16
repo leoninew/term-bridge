@@ -3,16 +3,14 @@
     v-if="isLocalMode || cloudAuth.authenticated"
     direction="horizontal"
     class="sessions-shell flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
-    :class="{ 'sessions-shell--files-open': fileDrawerOpen }"
   >
     <SplitterPanel
       id="workspace-sidebar"
-      ref="sidebarPanelRef"
       class="workspace-sidebar-panel"
       collapsible
       :collapsed-size="0"
       :default-size="20"
-      :min-size="fileDrawerOpen ? 0 : 18"
+      :min-size="18"
       :max-size="24"
     >
       <WorkspaceSessionSidebar
@@ -45,8 +43,6 @@
 
     <SplitterResizeHandle
       class="sessions-resize-handle group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[var(--color-app-bg)] outline-none"
-      :class="{ 'sessions-resize-handle--hidden': fileDrawerOpen }"
-      :disabled="fileDrawerOpen"
     >
       <span
         class="w-px bg-[var(--color-border)] transition group-hover:bg-[var(--color-border-strong)]"
@@ -57,8 +53,6 @@
       <div class="relative h-full min-h-0 min-w-0">
         <SessionWorkbench
           class="session-workbench-stage"
-          :class="{ 'session-workbench-stage--files-open': fileDrawerOpen }"
-          :inert="fileViewActive"
           :opened-tabs="workbench.openedTabs"
           :active-session-id="workbench.activeSessionId"
           :active-tab="workbench.activeTab"
@@ -80,15 +74,6 @@
           @workbench="terminalWorkbench = $event"
           @terminal-state="handleTerminalState"
           @terminal-error="handleTerminalError"
-        />
-        <WorkspaceFileDrawer
-          v-if="fileDrawerWorkspace"
-          :open="fileDrawerOpen"
-          :workspace="fileDrawerWorkspace"
-          :target="props.runtimeTarget"
-          :api="fileRuntimeApi"
-          @close="closeWorkspaceFiles"
-          @closed="finishClosingWorkspaceFiles"
         />
       </div>
     </SplitterPanel>
@@ -149,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, onMounted, ref, watch } from 'vue'
+  import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRouter } from 'vue-router'
   import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
@@ -160,7 +145,6 @@
   import RemoveWorkspaceDialog from './RemoveWorkspaceDialog.vue'
   import SessionWorkbench from './SessionWorkbench.vue'
   import WorkspaceSessionSidebar from '../workspace/WorkspaceSessionSidebar.vue'
-  import WorkspaceFileDrawer from '../workspace/WorkspaceFileDrawer.vue'
   import { terminalDebug } from '../terminal/diagnostics'
   import { useCreateSessionDraft } from '../../composable/useCreateSessionDraft'
   import { useSessionDialogs } from '../../composable/useSessionDialogs'
@@ -181,7 +165,6 @@
     type SessionRuntimeApi,
     type ShortcutRuntimeApi,
   } from '../../features/sessions/runtime'
-  import { createFileGitRuntimeApi } from '../../features/files/runtime'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
@@ -233,22 +216,6 @@
   const removingWorkspaceId = ref<string | null>(null)
   const closeBackgroundSessionsDrawerOpen = ref(false)
   const closingBackgroundSessions = ref(false)
-  const fileDrawerOpen = ref(false)
-  const fileViewActive = ref(false)
-  const fileDrawerWorkspace = ref<WorkspaceSummary | null>(null)
-  const sidebarPanelRef = ref<{ collapse: () => void; expand: () => void } | null>(null)
-  let fileDrawerTrigger: HTMLElement | null = null
-
-  watch(fileDrawerOpen, async (open) => {
-    await nextTick()
-    if (open) {
-      sidebarPanelRef.value?.collapse()
-    } else {
-      sidebarPanelRef.value?.expand()
-    }
-  })
-
-  const fileRuntimeApi = computed(() => createFileGitRuntimeApi(props.runtimeTarget))
   const isLocalMode = computed(() => props.runtimeTarget.mode === 'local')
   const workbenchDevice = computed(() => props.currentDevice ?? cloudSession.cloudSession)
   const helpHref = computed(() =>
@@ -300,30 +267,21 @@
     }
   }
 
-  async function openWorkspaceFiles(workspace: WorkspaceSummary, trigger: EventTarget | null) {
-    const alreadyOpen = fileDrawerOpen.value
-    fileDrawerWorkspace.value = workspace
-    fileWorkbench.openWorkspace(props.runtimeTarget, workspace.id)
-    fileDrawerTrigger = trigger instanceof HTMLElement ? trigger : null
-    fileViewActive.value = true
-    if (alreadyOpen) {
+  async function openWorkspaceFiles(workspace: WorkspaceSummary) {
+    if (props.runtimeTarget.mode === 'local') {
+      await router.push({
+        name: 'local-workspace-files',
+        params: { workspaceId: workspace.id },
+      })
       return
     }
-    await nextTick()
-    requestAnimationFrame(() => {
-      fileDrawerOpen.value = true
+    await router.push({
+      name: 'cloud-workspace-files',
+      params: {
+        deviceId: props.runtimeTarget.deviceId,
+        workspaceId: workspace.id,
+      },
     })
-  }
-
-  function closeWorkspaceFiles() {
-    fileDrawerOpen.value = false
-  }
-
-  function finishClosingWorkspaceFiles() {
-    if (fileDrawerOpen.value) return
-    fileViewActive.value = false
-    fileDrawerTrigger?.focus()
-    fileDrawerTrigger = null
   }
 
   async function openDashboard() {
@@ -374,9 +332,6 @@
     dialogs.clearSelectedWorkspace()
     closeBackgroundSessionsDrawerOpen.value = false
     closingBackgroundSessions.value = false
-    fileDrawerOpen.value = false
-    fileViewActive.value = false
-    fileDrawerWorkspace.value = null
     fileWorkbench.resetForSourceChange()
     workbench.resetForSourceChange()
     await router.replace(
@@ -512,11 +467,6 @@
       const removedSessions = workspaceSessions.removeWorkspace(workspace.id)
       workbench.closeRemovedSessions(removedSessions)
       fileWorkbench.removeWorkspace(workspace.id)
-      if (fileDrawerWorkspace.value?.id === workspace.id) {
-        fileDrawerOpen.value = false
-        fileViewActive.value = false
-        fileDrawerWorkspace.value = null
-      }
       dialogs.clearSelectedWorkspace()
       dialogs.removeWorkspaceDialogOpen = false
       notifications.pushToast(

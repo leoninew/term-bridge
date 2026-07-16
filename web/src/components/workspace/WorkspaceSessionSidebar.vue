@@ -81,7 +81,7 @@
           <div
             role="button"
             tabindex="0"
-            class="workspace-drag-handle group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border border-transparent px-1 py-0.5 text-left text-[var(--color-text)] hover:border-[var(--color-border)] hover:bg-[var(--color-control-hover)]"
+            class="workspace-drag-handle group flex h-7 w-full min-w-0 items-center gap-1 border-0 bg-transparent px-1 py-0.5 text-left text-[var(--color-text)] hover:bg-[var(--color-control-hover)]"
             :class="!normalizedSearchQuery ? 'cursor-pointer' : ''"
             :style="{ paddingLeft: '6px' }"
             @click="handleWorkspaceClick($event, workspace.value)"
@@ -168,11 +168,11 @@
               :key="session.value"
               role="button"
               tabindex="0"
-              class="session-sortable-item group flex h-7 w-full min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-left transition"
+              class="session-sortable-item group flex h-7 w-full min-w-0 items-center gap-1 border-0 px-1 py-0.5 text-left transition"
               :class="[
                 isActiveSessionSelection(session.session.id)
-                  ? 'border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text-strong)]'
-                  : 'border-transparent text-[var(--color-text-muted)] hover:border-[var(--color-border)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)]',
+                  ? 'bg-[var(--color-control-active)] text-[var(--color-text-strong)]'
+                  : 'bg-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)]',
                 'cursor-pointer',
               ]"
               :style="{ paddingLeft: '24px' }"
@@ -802,8 +802,6 @@
 <style scoped>
   .workspace-sortable-ghost > .workspace-drag-handle,
   .session-sortable-ghost {
-    border-color: var(--color-border-strong) !important;
-    border-style: dashed;
     background: var(--color-surface-muted) !important;
     color: var(--color-text-subtle) !important;
     opacity: 0.72;
@@ -811,17 +809,14 @@
 
   .workspace-sortable-chosen > .workspace-drag-handle,
   .session-sortable-chosen {
-    border-color: var(--color-border-strong) !important;
     background: var(--color-control-hover) !important;
-    box-shadow: 0 0 0 1px var(--color-border-strong);
     cursor: pointer;
   }
 
   .workspace-sortable-dragging > .workspace-drag-handle,
   .session-sortable-dragging {
-    border-color: var(--color-border-strong) !important;
     background: var(--color-control-active) !important;
-    box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 20%, transparent);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--color-text) 12%, transparent);
     cursor: pointer;
     opacity: 0.96;
   }

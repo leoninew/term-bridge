@@ -132,6 +132,11 @@ export const useFileWorkbenchStore = defineStore('fileWorkbench', () => {
     return documents.value.filter((document) => pathContains(path, document.path))
   }
 
+  function documentsForPaths(paths: string[]): FileDocumentState[] {
+    const targetPaths = new Set(paths)
+    return documents.value.filter((document) => targetPaths.has(document.path))
+  }
+
   function hasDirtyDocumentUnderPath(path: string): boolean {
     return documentsUnderPath(path).some((document) => document.dirty)
   }
@@ -232,14 +237,23 @@ export const useFileWorkbenchStore = defineStore('fileWorkbench', () => {
   }
 
   function discardDocumentDraft(path: string): boolean {
-    const document = documentFor(path)
-    if (!document || document.loading || document.saving) {
+    return discardDocumentDrafts([path])
+  }
+
+  function discardDocumentDrafts(paths: string[]): boolean {
+    const targetDocuments = documentsForPaths(paths)
+    if (
+      targetDocuments.length === 0 ||
+      targetDocuments.some((document) => document.loading || document.saving)
+    ) {
       return false
     }
-    document.draftText = document.originalText
-    document.dirty = false
-    document.conflict = null
-    document.error = null
+    for (const document of targetDocuments) {
+      document.draftText = document.originalText
+      document.dirty = false
+      document.conflict = null
+      document.error = null
+    }
     return true
   }
 
@@ -323,16 +337,38 @@ export const useFileWorkbenchStore = defineStore('fileWorkbench', () => {
   }
 
   function closeDocument(path: string): boolean {
-    const index = documents.value.findIndex((document) => document.key === documentKey(path))
-    if (index === -1) {
+    return closeDocuments([path])
+  }
+
+  function closeDocuments(paths: string[]): boolean {
+    const targetDocuments = documentsForPaths(paths)
+    if (targetDocuments.length === 0 || targetDocuments.some((document) => document.saving)) {
       return false
     }
-    const document = documents.value[index]
-    abortRequest(`document:${document.key}`)
-    documents.value = documents.value.filter((candidate) => candidate.key !== document.key)
-    if (activeDocumentKey.value === document.key) {
-      activeDocumentKey.value =
-        documents.value[index]?.key ?? documents.value[index - 1]?.key ?? null
+
+    const closingKeys = new Set(targetDocuments.map((document) => document.key))
+    const activeIndex = documents.value.findIndex(
+      (document) => document.key === activeDocumentKey.value,
+    )
+    const activeDocumentIsClosing =
+      activeIndex !== -1 && closingKeys.has(documents.value[activeIndex]!.key)
+    const nextDocument = activeDocumentIsClosing
+      ? (documents.value
+          .slice(activeIndex + 1)
+          .find((document) => !closingKeys.has(document.key)) ??
+        documents.value
+          .slice(0, activeIndex)
+          .reverse()
+          .find((document) => !closingKeys.has(document.key)) ??
+        null)
+      : null
+
+    for (const document of targetDocuments) {
+      abortRequest(`document:${document.key}`)
+    }
+    documents.value = documents.value.filter((document) => !closingKeys.has(document.key))
+    if (activeDocumentIsClosing) {
+      activeDocumentKey.value = nextDocument?.key ?? null
     }
     return true
   }
@@ -813,6 +849,7 @@ export const useFileWorkbenchStore = defineStore('fileWorkbench', () => {
     directoryFor,
     documentFor,
     documentsUnderPath,
+    discardDocumentDrafts,
     hasDirtyDocumentUnderPath,
     setDirectoryExpanded,
     toggleDirectoryExpanded,
@@ -826,6 +863,7 @@ export const useFileWorkbenchStore = defineStore('fileWorkbench', () => {
     reloadDocumentDiscardingDraft,
     saveDocument,
     closeDocument,
+    closeDocuments,
     createFile,
     createDirectory,
     renameEntry,

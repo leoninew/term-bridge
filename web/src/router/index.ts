@@ -102,6 +102,12 @@ export const router = createRouter({
       meta: { mode: 'local' },
     },
     {
+      path: '/workspaces/:workspaceId/files',
+      name: 'local-workspace-files',
+      component: () => import('../views/local/WorkspaceFilesView.vue'),
+      meta: { mode: 'local' },
+    },
+    {
       path: '/shortcuts',
       name: 'local-shortcuts',
       component: () => import('../views/local/ShortcutsView.vue'),
@@ -117,6 +123,12 @@ export const router = createRouter({
       path: '/devices/:deviceId/sessions',
       name: 'cloud-sessions',
       component: () => import('../views/cloud/SessionsView.vue'),
+      meta: { mode: 'cloud' },
+    },
+    {
+      path: '/devices/:deviceId/workspaces/:workspaceId/files',
+      name: 'cloud-workspace-files',
+      component: () => import('../views/cloud/WorkspaceFilesView.vue'),
       meta: { mode: 'cloud' },
     },
     {
