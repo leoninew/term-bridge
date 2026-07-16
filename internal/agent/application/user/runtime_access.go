@@ -3,6 +3,8 @@ package application
 import (
 	"context"
 
+	fileapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/file"
+	gitapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/git"
 	shortcutapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/shortcut"
 	terminalapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/terminal"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
@@ -24,6 +26,16 @@ type RuntimeAccess interface {
 	UpdateShortcut(ctx context.Context, shortcutId string, request *agent.UpdateShortcutReq) (*agent.Shortcut, error)
 	UpdateShortcutOrder(ctx context.Context, shortcutIds []string) ([]*agent.Shortcut, error)
 	DeleteShortcut(ctx context.Context, shortcutId string) error
+	ListFiles(ctx context.Context, request *agent.ListFilesReq) (*agent.ListFilesResp, error)
+	ReadFile(ctx context.Context, request *agent.ReadFileReq) (*agent.ReadFileResp, error)
+	CreateFile(ctx context.Context, request *agent.CreateFileReq) (*agent.CreateFileResp, error)
+	CreateDirectory(ctx context.Context, request *agent.CreateDirectoryReq) (*agent.CreateDirectoryResp, error)
+	WriteFile(ctx context.Context, request *agent.WriteFileReq) (*agent.WriteFileResp, error)
+	RenameEntry(ctx context.Context, request *agent.RenameEntryReq) (*agent.RenameEntryResp, error)
+	MoveEntry(ctx context.Context, request *agent.MoveEntryReq) (*agent.MoveEntryResp, error)
+	DeleteEntry(ctx context.Context, request *agent.DeleteEntryReq) (*agent.DeleteEntryResp, error)
+	GitStatus(ctx context.Context, workspaceId string) (*agent.GitStatusResp, error)
+	GitDiff(ctx context.Context, request *agent.GitDiffReq) (*agent.GitDiffResp, error)
 	DeleteSession(ctx context.Context, workspaceId string, sessionId string) error
 	CloseSession(ctx context.Context, workspaceId string, sessionId string) (*agent.SessionSummary, error)
 	ReadHistory(ctx context.Context, workspaceId string, sessionId string) ([]byte, error)
@@ -41,6 +53,8 @@ type TerminalStream interface {
 type WebTerminalAccess struct {
 	Registry  *terminalapp.Registry
 	Shortcuts shortcutapp.Service
+	Files     *fileapp.Service
+	Git       *gitapp.Service
 }
 
 func (a WebTerminalAccess) ListWorkspaces(ctx context.Context) ([]*agent.Workspace, error) {

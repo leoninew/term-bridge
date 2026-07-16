@@ -154,6 +154,66 @@ func runtimeRequestFrame(method string, params any, requestId string) (*shared.T
 			return nil, fmt.Errorf("delete_shortcut params have type %T", params)
 		}
 		frame.Payload = &shared.TunnelFrame_DeleteShortcutReq{DeleteShortcutReq: req}
+	case "list_files":
+		req, ok := params.(*agent.ListFilesReq)
+		if !ok {
+			return nil, fmt.Errorf("list_files params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_ListFilesReq{ListFilesReq: req}
+	case "read_file":
+		req, ok := params.(*agent.ReadFileReq)
+		if !ok {
+			return nil, fmt.Errorf("read_file params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_ReadFileReq{ReadFileReq: req}
+	case "create_file":
+		req, ok := params.(*agent.CreateFileReq)
+		if !ok {
+			return nil, fmt.Errorf("create_file params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_CreateFileReq{CreateFileReq: req}
+	case "create_directory":
+		req, ok := params.(*agent.CreateDirectoryReq)
+		if !ok {
+			return nil, fmt.Errorf("create_directory params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_CreateDirectoryReq{CreateDirectoryReq: req}
+	case "write_file":
+		req, ok := params.(*agent.WriteFileReq)
+		if !ok {
+			return nil, fmt.Errorf("write_file params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_WriteFileReq{WriteFileReq: req}
+	case "rename_entry":
+		req, ok := params.(*agent.RenameEntryReq)
+		if !ok {
+			return nil, fmt.Errorf("rename_entry params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_RenameEntryReq{RenameEntryReq: req}
+	case "move_entry":
+		req, ok := params.(*agent.MoveEntryReq)
+		if !ok {
+			return nil, fmt.Errorf("move_entry params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_MoveEntryReq{MoveEntryReq: req}
+	case "delete_entry":
+		req, ok := params.(*agent.DeleteEntryReq)
+		if !ok {
+			return nil, fmt.Errorf("delete_entry params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_DeleteEntryReq{DeleteEntryReq: req}
+	case "git_status":
+		req, ok := params.(*agent.GitStatusReq)
+		if !ok {
+			return nil, fmt.Errorf("git_status params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_GitStatusReq{GitStatusReq: req}
+	case "git_diff":
+		req, ok := params.(*agent.GitDiffReq)
+		if !ok {
+			return nil, fmt.Errorf("git_diff params have type %T", params)
+		}
+		frame.Payload = &shared.TunnelFrame_GitDiffReq{GitDiffReq: req}
 	default:
 		return nil, fmt.Errorf("unknown runtime method %q", method)
 	}

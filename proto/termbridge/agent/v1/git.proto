@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package termbridge.agent;
+
+option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1/git";
+
+enum GitState {
+  GIT_STATE_UNSPECIFIED = 0;
+  GIT_STATE_AVAILABLE = 1;
+  GIT_STATE_NOT_REPOSITORY = 2;
+  GIT_STATE_EXECUTABLE_UNAVAILABLE = 3;
+  GIT_STATE_BINARY = 4;
+  GIT_STATE_TOO_LARGE = 5;
+  GIT_STATE_UNMERGED = 6;
+  GIT_STATE_SUBMODULE = 7;
+  GIT_STATE_LAYER_UNAVAILABLE = 8;
+  GIT_STATE_UNAVAILABLE = 9;
+}
+
+enum GitLayer {
+  GIT_LAYER_UNSPECIFIED = 0;
+  GIT_LAYER_STAGED = 1;
+  GIT_LAYER_UNSTAGED = 2;
+  GIT_LAYER_UNTRACKED = 3;
+}
+
+message GitChange {
+  string path = 1;
+  string original_path = 2;
+  string index_status = 3;
+  string worktree_status = 4;
+  bool untracked = 5;
+  bool unmerged = 6;
+  repeated GitLayer available_layers = 7;
+}
+
+message GitStatusReq {
+  string workspace_id = 1;
+}
+
+message GitStatusResp {
+  GitState state = 1;
+  repeated GitChange changes = 2;
+  string message = 3;
+}
+
+message GitDiffReq {
+  string workspace_id = 1;
+  string path = 2;
+  GitLayer layer = 3;
+}
+
+message GitDiffResp {
+  GitState state = 1;
+  string original_path = 2;
+  string modified_path = 3;
+  string original_text = 4;
+  string modified_text = 5;
+  string message = 6;
+}

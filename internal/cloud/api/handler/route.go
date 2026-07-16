@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -60,8 +59,8 @@ func (r *agentRoute) request(ctx context.Context, frame *shared.TunnelFrame) (*s
 	case <-waitCtx.Done():
 		return nil, waitCtx.Err()
 	case responseFrame := <-ch:
-		if responseFrame.GetError() != nil {
-			return nil, errors.New(tunnel.ErrorMessage(responseFrame))
+		if remoteErr, ok := tunnel.RemoteErrorFromFrame(responseFrame); ok {
+			return nil, remoteErr
 		}
 		return responseFrame, nil
 	}
@@ -165,7 +164,17 @@ func isRuntimeResponse(frame *shared.TunnelFrame) bool {
 		*shared.TunnelFrame_CreateShortcutResp,
 		*shared.TunnelFrame_UpdateShortcutResp,
 		*shared.TunnelFrame_UpdateShortcutOrderResp,
-		*shared.TunnelFrame_DeleteShortcutResp:
+		*shared.TunnelFrame_DeleteShortcutResp,
+		*shared.TunnelFrame_ListFilesResp,
+		*shared.TunnelFrame_ReadFileResp,
+		*shared.TunnelFrame_CreateFileResp,
+		*shared.TunnelFrame_CreateDirectoryResp,
+		*shared.TunnelFrame_WriteFileResp,
+		*shared.TunnelFrame_RenameEntryResp,
+		*shared.TunnelFrame_MoveEntryResp,
+		*shared.TunnelFrame_DeleteEntryResp,
+		*shared.TunnelFrame_GitStatusResp,
+		*shared.TunnelFrame_GitDiffResp:
 		return true
 	default:
 		return false

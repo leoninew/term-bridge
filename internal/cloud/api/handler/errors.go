@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -15,8 +16,10 @@ import (
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
+	tunnel "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const requestIdHeader = "X-Request-ID"
@@ -59,9 +62,13 @@ func (h *Handler) requestIdFor(w http.ResponseWriter, r *http.Request) string {
 }
 
 func (h *Handler) writeAPIError(w http.ResponseWriter, r *http.Request, status int, code string, safeError string, cause error) {
+	h.writeAPIErrorWithDetails(w, r, status, code, safeError, cause, nil)
+}
+
+func (h *Handler) writeAPIErrorWithDetails(w http.ResponseWriter, r *http.Request, status int, code string, safeError string, cause error, details *structpb.Struct) {
 	requestId := h.requestIdFor(w, r)
 	h.logAPIError(r, status, code, requestId, cause)
-	body := &shared.ErrorResp{Code: code, Error: h.responseErrorText(safeError, cause), RequestId: requestId}
+	body := &shared.ErrorResp{Code: code, Error: h.responseErrorText(safeError, cause), RequestId: requestId, Details: details}
 	data, err := codec.MarshalProtoJSON(body)
 	if err != nil {
 		h.logAPIError(r, http.StatusInternalServerError, errorCodeInternal, requestId, err)
@@ -70,6 +77,34 @@ func (h *Handler) writeAPIError(w http.ResponseWriter, r *http.Request, status i
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = w.Write(data)
+}
+
+func (h *Handler) writeRuntimeError(w http.ResponseWriter, r *http.Request, err error) {
+	var remote *tunnel.RemoteError
+	if errors.As(err, &remote) && remote.Response != nil {
+		status, code, message := fileErrorResponse(remote.Response.GetCode(), remote.Response.GetError())
+		h.writeAPIErrorWithDetails(w, r, status, code, message, err, remote.Response.GetDetails())
+		return
+	}
+	h.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+}
+
+func fileErrorResponse(code string, message string) (int, string, string) {
+	if message == "" {
+		message = errorMessageInternal
+	}
+	switch code {
+	case "invalid_file_path", "invalid_git_layer", "invalid_operation", "root_protected":
+		return http.StatusBadRequest, code, message
+	case "workspace_not_found", "file_not_found":
+		return http.StatusNotFound, code, message
+	case "revision_conflict", "already_exists", "directory_not_empty":
+		return http.StatusConflict, code, message
+	case "workspace_root_unavailable", "file_not_text", "file_too_large", "type_mismatch", "symlink_unsupported":
+		return http.StatusUnprocessableEntity, code, message
+	default:
+		return http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream
+	}
 }
 
 func (h *Handler) writeUnauthorized(w http.ResponseWriter, r *http.Request) {

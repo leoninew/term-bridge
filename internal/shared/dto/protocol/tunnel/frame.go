@@ -2,7 +2,6 @@ package tunnel
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
@@ -11,7 +10,7 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 )
 
-const ProtocolVersion = 2
+const ProtocolVersion = 3
 
 const MaxFrameBytes = 32 * 1024 * 1024
 
@@ -70,12 +69,30 @@ func ErrorMessage(frame *shared.TunnelFrame) string {
 	return frame.GetError().GetError()
 }
 
+type RemoteError struct {
+	Response *shared.ErrorResp
+}
+
+func (e *RemoteError) Error() string {
+	if e == nil || e.Response == nil || e.Response.GetError() == "" {
+		return "tunnel frame error"
+	}
+	return e.Response.GetError()
+}
+
+func RemoteErrorFromFrame(frame *shared.TunnelFrame) (*RemoteError, bool) {
+	if frame == nil || frame.GetError() == nil {
+		return nil, false
+	}
+	return &RemoteError{Response: frame.GetError()}, true
+}
+
 func ResponseJSON(frame *shared.TunnelFrame) (json.RawMessage, error) {
 	if frame == nil {
 		return nil, fmt.Errorf("tunnel response is nil")
 	}
-	if errResp := frame.GetError(); errResp != nil {
-		return nil, errors.New(errResp.GetError())
+	if remoteErr, ok := RemoteErrorFromFrame(frame); ok {
+		return nil, remoteErr
 	}
 	message := responseMessage(frame)
 	if message == nil {
@@ -126,6 +143,26 @@ func responseMessage(frame *shared.TunnelFrame) proto.Message {
 		return payload.DeleteShortcutResp
 	case *shared.TunnelFrame_UpdateShortcutOrderResp:
 		return payload.UpdateShortcutOrderResp
+	case *shared.TunnelFrame_ListFilesResp:
+		return payload.ListFilesResp
+	case *shared.TunnelFrame_ReadFileResp:
+		return payload.ReadFileResp
+	case *shared.TunnelFrame_CreateFileResp:
+		return payload.CreateFileResp
+	case *shared.TunnelFrame_CreateDirectoryResp:
+		return payload.CreateDirectoryResp
+	case *shared.TunnelFrame_WriteFileResp:
+		return payload.WriteFileResp
+	case *shared.TunnelFrame_RenameEntryResp:
+		return payload.RenameEntryResp
+	case *shared.TunnelFrame_MoveEntryResp:
+		return payload.MoveEntryResp
+	case *shared.TunnelFrame_DeleteEntryResp:
+		return payload.DeleteEntryResp
+	case *shared.TunnelFrame_GitStatusResp:
+		return payload.GitStatusResp
+	case *shared.TunnelFrame_GitDiffResp:
+		return payload.GitDiffResp
 	default:
 		return nil
 	}

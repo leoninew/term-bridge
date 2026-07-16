@@ -7,6 +7,42 @@ import (
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 )
 
+func TestLocalRuntimeRequestFrameBuildsFileGitFrames(t *testing.T) {
+	cases := []struct {
+		method string
+		params any
+		assert func(*testing.T, *shared.TunnelFrame)
+	}{
+		{method: "list_files", params: &agent.ListFilesReq{WorkspaceId: "workspace-1", Path: "directory"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetListFilesReq(); request == nil || request.GetPath() != "directory" {
+				t.Fatalf("list files request = %#v", request)
+			}
+		}},
+		{method: "write_file", params: &agent.WriteFileReq{WorkspaceId: "workspace-1", Path: "notes.txt", Text: "updated"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetWriteFileReq(); request == nil || request.GetText() != "updated" {
+				t.Fatalf("write file request = %#v", request)
+			}
+		}},
+		{method: "git_diff", params: &agent.GitDiffReq{WorkspaceId: "workspace-1", Path: "notes.txt", Layer: agent.GitLayer_GIT_LAYER_UNSTAGED}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetGitDiffReq(); request == nil || request.GetLayer() != agent.GitLayer_GIT_LAYER_UNSTAGED {
+				t.Fatalf("Git diff request = %#v", request)
+			}
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.method, func(t *testing.T) {
+			frame, err := localRuntimeRequestFrame(tc.method, tc.params, "request-1")
+			if err != nil {
+				t.Fatalf("localRuntimeRequestFrame() error = %v", err)
+			}
+			if frame.GetRequestId() != "request-1" {
+				t.Fatalf("RequestId = %q, want request-1", frame.GetRequestId())
+			}
+			tc.assert(t, frame)
+		})
+	}
+}
+
 func TestLocalRuntimeRequestFrameBuildsShortcutFrames(t *testing.T) {
 	name := "updated shell"
 	cases := []struct {

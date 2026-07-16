@@ -50,6 +50,16 @@ type TunnelFrame struct {
 	//	*TunnelFrame_UpdateShortcutReq
 	//	*TunnelFrame_DeleteShortcutReq
 	//	*TunnelFrame_UpdateShortcutOrderReq
+	//	*TunnelFrame_ListFilesReq
+	//	*TunnelFrame_ReadFileReq
+	//	*TunnelFrame_CreateFileReq
+	//	*TunnelFrame_CreateDirectoryReq
+	//	*TunnelFrame_WriteFileReq
+	//	*TunnelFrame_RenameEntryReq
+	//	*TunnelFrame_MoveEntryReq
+	//	*TunnelFrame_DeleteEntryReq
+	//	*TunnelFrame_GitStatusReq
+	//	*TunnelFrame_GitDiffReq
 	//	*TunnelFrame_ListWorkspacesResp
 	//	*TunnelFrame_WorkspaceTreeResp
 	//	*TunnelFrame_WorkspaceSessionsResp
@@ -68,6 +78,16 @@ type TunnelFrame struct {
 	//	*TunnelFrame_UpdateShortcutResp
 	//	*TunnelFrame_DeleteShortcutResp
 	//	*TunnelFrame_UpdateShortcutOrderResp
+	//	*TunnelFrame_ListFilesResp
+	//	*TunnelFrame_ReadFileResp
+	//	*TunnelFrame_CreateFileResp
+	//	*TunnelFrame_CreateDirectoryResp
+	//	*TunnelFrame_WriteFileResp
+	//	*TunnelFrame_RenameEntryResp
+	//	*TunnelFrame_MoveEntryResp
+	//	*TunnelFrame_DeleteEntryResp
+	//	*TunnelFrame_GitStatusResp
+	//	*TunnelFrame_GitDiffResp
 	//	*TunnelFrame_TerminalAttach
 	//	*TunnelFrame_TerminalInput
 	//	*TunnelFrame_TerminalOutput
@@ -329,6 +349,96 @@ func (x *TunnelFrame) GetUpdateShortcutOrderReq() *v1.UpdateShortcutOrderReq {
 	return nil
 }
 
+func (x *TunnelFrame) GetListFilesReq() *v1.ListFilesReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_ListFilesReq); ok {
+			return x.ListFilesReq
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetReadFileReq() *v1.ReadFileReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_ReadFileReq); ok {
+			return x.ReadFileReq
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetCreateFileReq() *v1.CreateFileReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_CreateFileReq); ok {
+			return x.CreateFileReq
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetCreateDirectoryReq() *v1.CreateDirectoryReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_CreateDirectoryReq); ok {
+			return x.CreateDirectoryReq
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetWriteFileReq() *v1.WriteFileReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_WriteFileReq); ok {
+			return x.WriteFileReq
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetRenameEntryReq() *v1.RenameEntryReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_RenameEntryReq); ok {
+			return x.RenameEntryReq
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetMoveEntryReq() *v1.MoveEntryReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_MoveEntryReq); ok {
+			return x.MoveEntryReq
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetDeleteEntryReq() *v1.DeleteEntryReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_DeleteEntryReq); ok {
+			return x.DeleteEntryReq
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetGitStatusReq() *v1.GitStatusReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_GitStatusReq); ok {
+			return x.GitStatusReq
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetGitDiffReq() *v1.GitDiffReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_GitDiffReq); ok {
+			return x.GitDiffReq
+		}
+	}
+	return nil
+}
+
 func (x *TunnelFrame) GetListWorkspacesResp() *v1.ListWorkspacesResp {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_ListWorkspacesResp); ok {
@@ -491,6 +601,96 @@ func (x *TunnelFrame) GetUpdateShortcutOrderResp() *v1.UpdateShortcutOrderResp {
 	return nil
 }
 
+func (x *TunnelFrame) GetListFilesResp() *v1.ListFilesResp {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_ListFilesResp); ok {
+			return x.ListFilesResp
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetReadFileResp() *v1.ReadFileResp {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_ReadFileResp); ok {
+			return x.ReadFileResp
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetCreateFileResp() *v1.CreateFileResp {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_CreateFileResp); ok {
+			return x.CreateFileResp
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetCreateDirectoryResp() *v1.CreateDirectoryResp {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_CreateDirectoryResp); ok {
+			return x.CreateDirectoryResp
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetWriteFileResp() *v1.WriteFileResp {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_WriteFileResp); ok {
+			return x.WriteFileResp
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetRenameEntryResp() *v1.RenameEntryResp {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_RenameEntryResp); ok {
+			return x.RenameEntryResp
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetMoveEntryResp() *v1.MoveEntryResp {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_MoveEntryResp); ok {
+			return x.MoveEntryResp
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetDeleteEntryResp() *v1.DeleteEntryResp {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_DeleteEntryResp); ok {
+			return x.DeleteEntryResp
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetGitStatusResp() *v1.GitStatusResp {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_GitStatusResp); ok {
+			return x.GitStatusResp
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetGitDiffResp() *v1.GitDiffResp {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_GitDiffResp); ok {
+			return x.GitDiffResp
+		}
+	}
+	return nil
+}
+
 func (x *TunnelFrame) GetTerminalAttach() *TerminalAttachReq {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_TerminalAttach); ok {
@@ -646,6 +846,46 @@ type TunnelFrame_UpdateShortcutOrderReq struct {
 	UpdateShortcutOrderReq *v1.UpdateShortcutOrderReq `protobuf:"bytes,117,opt,name=update_shortcut_order_req,json=updateShortcutOrderReq,proto3,oneof"`
 }
 
+type TunnelFrame_ListFilesReq struct {
+	ListFilesReq *v1.ListFilesReq `protobuf:"bytes,118,opt,name=list_files_req,json=listFilesReq,proto3,oneof"`
+}
+
+type TunnelFrame_ReadFileReq struct {
+	ReadFileReq *v1.ReadFileReq `protobuf:"bytes,119,opt,name=read_file_req,json=readFileReq,proto3,oneof"`
+}
+
+type TunnelFrame_CreateFileReq struct {
+	CreateFileReq *v1.CreateFileReq `protobuf:"bytes,120,opt,name=create_file_req,json=createFileReq,proto3,oneof"`
+}
+
+type TunnelFrame_CreateDirectoryReq struct {
+	CreateDirectoryReq *v1.CreateDirectoryReq `protobuf:"bytes,121,opt,name=create_directory_req,json=createDirectoryReq,proto3,oneof"`
+}
+
+type TunnelFrame_WriteFileReq struct {
+	WriteFileReq *v1.WriteFileReq `protobuf:"bytes,122,opt,name=write_file_req,json=writeFileReq,proto3,oneof"`
+}
+
+type TunnelFrame_RenameEntryReq struct {
+	RenameEntryReq *v1.RenameEntryReq `protobuf:"bytes,123,opt,name=rename_entry_req,json=renameEntryReq,proto3,oneof"`
+}
+
+type TunnelFrame_MoveEntryReq struct {
+	MoveEntryReq *v1.MoveEntryReq `protobuf:"bytes,124,opt,name=move_entry_req,json=moveEntryReq,proto3,oneof"`
+}
+
+type TunnelFrame_DeleteEntryReq struct {
+	DeleteEntryReq *v1.DeleteEntryReq `protobuf:"bytes,125,opt,name=delete_entry_req,json=deleteEntryReq,proto3,oneof"`
+}
+
+type TunnelFrame_GitStatusReq struct {
+	GitStatusReq *v1.GitStatusReq `protobuf:"bytes,126,opt,name=git_status_req,json=gitStatusReq,proto3,oneof"`
+}
+
+type TunnelFrame_GitDiffReq struct {
+	GitDiffReq *v1.GitDiffReq `protobuf:"bytes,127,opt,name=git_diff_req,json=gitDiffReq,proto3,oneof"`
+}
+
 type TunnelFrame_ListWorkspacesResp struct {
 	ListWorkspacesResp *v1.ListWorkspacesResp `protobuf:"bytes,200,opt,name=list_workspaces_resp,json=listWorkspacesResp,proto3,oneof"`
 }
@@ -716,6 +956,46 @@ type TunnelFrame_DeleteShortcutResp struct {
 
 type TunnelFrame_UpdateShortcutOrderResp struct {
 	UpdateShortcutOrderResp *v1.UpdateShortcutOrderResp `protobuf:"bytes,217,opt,name=update_shortcut_order_resp,json=updateShortcutOrderResp,proto3,oneof"`
+}
+
+type TunnelFrame_ListFilesResp struct {
+	ListFilesResp *v1.ListFilesResp `protobuf:"bytes,218,opt,name=list_files_resp,json=listFilesResp,proto3,oneof"`
+}
+
+type TunnelFrame_ReadFileResp struct {
+	ReadFileResp *v1.ReadFileResp `protobuf:"bytes,219,opt,name=read_file_resp,json=readFileResp,proto3,oneof"`
+}
+
+type TunnelFrame_CreateFileResp struct {
+	CreateFileResp *v1.CreateFileResp `protobuf:"bytes,220,opt,name=create_file_resp,json=createFileResp,proto3,oneof"`
+}
+
+type TunnelFrame_CreateDirectoryResp struct {
+	CreateDirectoryResp *v1.CreateDirectoryResp `protobuf:"bytes,221,opt,name=create_directory_resp,json=createDirectoryResp,proto3,oneof"`
+}
+
+type TunnelFrame_WriteFileResp struct {
+	WriteFileResp *v1.WriteFileResp `protobuf:"bytes,222,opt,name=write_file_resp,json=writeFileResp,proto3,oneof"`
+}
+
+type TunnelFrame_RenameEntryResp struct {
+	RenameEntryResp *v1.RenameEntryResp `protobuf:"bytes,223,opt,name=rename_entry_resp,json=renameEntryResp,proto3,oneof"`
+}
+
+type TunnelFrame_MoveEntryResp struct {
+	MoveEntryResp *v1.MoveEntryResp `protobuf:"bytes,224,opt,name=move_entry_resp,json=moveEntryResp,proto3,oneof"`
+}
+
+type TunnelFrame_DeleteEntryResp struct {
+	DeleteEntryResp *v1.DeleteEntryResp `protobuf:"bytes,225,opt,name=delete_entry_resp,json=deleteEntryResp,proto3,oneof"`
+}
+
+type TunnelFrame_GitStatusResp struct {
+	GitStatusResp *v1.GitStatusResp `protobuf:"bytes,226,opt,name=git_status_resp,json=gitStatusResp,proto3,oneof"`
+}
+
+type TunnelFrame_GitDiffResp struct {
+	GitDiffResp *v1.GitDiffResp `protobuf:"bytes,227,opt,name=git_diff_resp,json=gitDiffResp,proto3,oneof"`
 }
 
 type TunnelFrame_TerminalAttach struct {
@@ -790,6 +1070,26 @@ func (*TunnelFrame_DeleteShortcutReq) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_UpdateShortcutOrderReq) isTunnelFrame_Payload() {}
 
+func (*TunnelFrame_ListFilesReq) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_ReadFileReq) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_CreateFileReq) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_CreateDirectoryReq) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_WriteFileReq) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_RenameEntryReq) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_MoveEntryReq) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_DeleteEntryReq) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_GitStatusReq) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_GitDiffReq) isTunnelFrame_Payload() {}
+
 func (*TunnelFrame_ListWorkspacesResp) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_WorkspaceTreeResp) isTunnelFrame_Payload() {}
@@ -825,6 +1125,26 @@ func (*TunnelFrame_UpdateShortcutResp) isTunnelFrame_Payload() {}
 func (*TunnelFrame_DeleteShortcutResp) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_UpdateShortcutOrderResp) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_ListFilesResp) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_ReadFileResp) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_CreateFileResp) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_CreateDirectoryResp) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_WriteFileResp) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_RenameEntryResp) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_MoveEntryResp) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_DeleteEntryResp) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_GitStatusResp) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_GitDiffResp) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_TerminalAttach) isTunnelFrame_Payload() {}
 
@@ -1332,7 +1652,7 @@ var File_termbridge_shared_v1_tunnel_proto protoreflect.FileDescriptor
 
 const file_termbridge_shared_v1_tunnel_proto_rawDesc = "" +
 	"\n" +
-	"!termbridge/shared/v1/tunnel.proto\x12\x11termbridge.shared\x1a#termbridge/agent/v1/workspace.proto\x1a!termbridge/agent/v1/session.proto\x1a!termbridge/agent/v1/history.proto\x1a\"termbridge/agent/v1/shortcut.proto\x1a!termbridge/shared/v1/common.proto\"\xe8\x1f\n" +
+	"!termbridge/shared/v1/tunnel.proto\x12\x11termbridge.shared\x1a\x1etermbridge/agent/v1/file.proto\x1a\x1dtermbridge/agent/v1/git.proto\x1a#termbridge/agent/v1/workspace.proto\x1a!termbridge/agent/v1/session.proto\x1a!termbridge/agent/v1/history.proto\x1a\"termbridge/agent/v1/shortcut.proto\x1a!termbridge/shared/v1/common.proto\"\xe0+\n" +
 	"\vTunnelFrame\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12\x1d\n" +
 	"\n" +
@@ -1359,7 +1679,18 @@ const file_termbridge_shared_v1_tunnel_proto_rawDesc = "" +
 	"\x13create_shortcut_req\x18r \x01(\v2#.termbridge.agent.CreateShortcutReqH\x00R\x11createShortcutReq\x12Y\n" +
 	"\x13update_shortcut_req\x18s \x01(\v2'.termbridge.agent.UpdateShortcutRequestH\x00R\x11updateShortcutReq\x12U\n" +
 	"\x13delete_shortcut_req\x18t \x01(\v2#.termbridge.agent.DeleteShortcutReqH\x00R\x11deleteShortcutReq\x12e\n" +
-	"\x19update_shortcut_order_req\x18u \x01(\v2(.termbridge.agent.UpdateShortcutOrderReqH\x00R\x16updateShortcutOrderReq\x12Y\n" +
+	"\x19update_shortcut_order_req\x18u \x01(\v2(.termbridge.agent.UpdateShortcutOrderReqH\x00R\x16updateShortcutOrderReq\x12F\n" +
+	"\x0elist_files_req\x18v \x01(\v2\x1e.termbridge.agent.ListFilesReqH\x00R\flistFilesReq\x12C\n" +
+	"\rread_file_req\x18w \x01(\v2\x1d.termbridge.agent.ReadFileReqH\x00R\vreadFileReq\x12I\n" +
+	"\x0fcreate_file_req\x18x \x01(\v2\x1f.termbridge.agent.CreateFileReqH\x00R\rcreateFileReq\x12X\n" +
+	"\x14create_directory_req\x18y \x01(\v2$.termbridge.agent.CreateDirectoryReqH\x00R\x12createDirectoryReq\x12F\n" +
+	"\x0ewrite_file_req\x18z \x01(\v2\x1e.termbridge.agent.WriteFileReqH\x00R\fwriteFileReq\x12L\n" +
+	"\x10rename_entry_req\x18{ \x01(\v2 .termbridge.agent.RenameEntryReqH\x00R\x0erenameEntryReq\x12F\n" +
+	"\x0emove_entry_req\x18| \x01(\v2\x1e.termbridge.agent.MoveEntryReqH\x00R\fmoveEntryReq\x12L\n" +
+	"\x10delete_entry_req\x18} \x01(\v2 .termbridge.agent.DeleteEntryReqH\x00R\x0edeleteEntryReq\x12F\n" +
+	"\x0egit_status_req\x18~ \x01(\v2\x1e.termbridge.agent.GitStatusReqH\x00R\fgitStatusReq\x12@\n" +
+	"\fgit_diff_req\x18\x7f \x01(\v2\x1c.termbridge.agent.GitDiffReqH\x00R\n" +
+	"gitDiffReq\x12Y\n" +
 	"\x14list_workspaces_resp\x18\xc8\x01 \x01(\v2$.termbridge.agent.ListWorkspacesRespH\x00R\x12listWorkspacesResp\x12V\n" +
 	"\x13workspace_tree_resp\x18\xc9\x01 \x01(\v2#.termbridge.agent.WorkspaceTreeRespH\x00R\x11workspaceTreeResp\x12b\n" +
 	"\x17workspace_sessions_resp\x18\xca\x01 \x01(\v2'.termbridge.agent.WorkspaceSessionsRespH\x00R\x15workspaceSessionsResp\x12V\n" +
@@ -1377,7 +1708,17 @@ const file_termbridge_shared_v1_tunnel_proto_rawDesc = "" +
 	"\x14create_shortcut_resp\x18\xd6\x01 \x01(\v2$.termbridge.agent.CreateShortcutRespH\x00R\x12createShortcutResp\x12Y\n" +
 	"\x14update_shortcut_resp\x18\xd7\x01 \x01(\v2$.termbridge.agent.UpdateShortcutRespH\x00R\x12updateShortcutResp\x12Y\n" +
 	"\x14delete_shortcut_resp\x18\xd8\x01 \x01(\v2$.termbridge.agent.DeleteShortcutRespH\x00R\x12deleteShortcutResp\x12i\n" +
-	"\x1aupdate_shortcut_order_resp\x18\xd9\x01 \x01(\v2).termbridge.agent.UpdateShortcutOrderRespH\x00R\x17updateShortcutOrderResp\x12P\n" +
+	"\x1aupdate_shortcut_order_resp\x18\xd9\x01 \x01(\v2).termbridge.agent.UpdateShortcutOrderRespH\x00R\x17updateShortcutOrderResp\x12J\n" +
+	"\x0flist_files_resp\x18\xda\x01 \x01(\v2\x1f.termbridge.agent.ListFilesRespH\x00R\rlistFilesResp\x12G\n" +
+	"\x0eread_file_resp\x18\xdb\x01 \x01(\v2\x1e.termbridge.agent.ReadFileRespH\x00R\freadFileResp\x12M\n" +
+	"\x10create_file_resp\x18\xdc\x01 \x01(\v2 .termbridge.agent.CreateFileRespH\x00R\x0ecreateFileResp\x12\\\n" +
+	"\x15create_directory_resp\x18\xdd\x01 \x01(\v2%.termbridge.agent.CreateDirectoryRespH\x00R\x13createDirectoryResp\x12J\n" +
+	"\x0fwrite_file_resp\x18\xde\x01 \x01(\v2\x1f.termbridge.agent.WriteFileRespH\x00R\rwriteFileResp\x12P\n" +
+	"\x11rename_entry_resp\x18\xdf\x01 \x01(\v2!.termbridge.agent.RenameEntryRespH\x00R\x0frenameEntryResp\x12J\n" +
+	"\x0fmove_entry_resp\x18\xe0\x01 \x01(\v2\x1f.termbridge.agent.MoveEntryRespH\x00R\rmoveEntryResp\x12P\n" +
+	"\x11delete_entry_resp\x18\xe1\x01 \x01(\v2!.termbridge.agent.DeleteEntryRespH\x00R\x0fdeleteEntryResp\x12J\n" +
+	"\x0fgit_status_resp\x18\xe2\x01 \x01(\v2\x1f.termbridge.agent.GitStatusRespH\x00R\rgitStatusResp\x12D\n" +
+	"\rgit_diff_resp\x18\xe3\x01 \x01(\v2\x1d.termbridge.agent.GitDiffRespH\x00R\vgitDiffResp\x12P\n" +
 	"\x0fterminal_attach\x18\xac\x02 \x01(\v2$.termbridge.shared.TerminalAttachReqH\x00R\x0eterminalAttach\x12J\n" +
 	"\x0eterminal_input\x18\xad\x02 \x01(\v2 .termbridge.shared.TerminalInputH\x00R\rterminalInput\x12M\n" +
 	"\x0fterminal_output\x18\xae\x02 \x01(\v2!.termbridge.shared.TerminalOutputH\x00R\x0eterminalOutput\x12M\n" +
@@ -1457,24 +1798,44 @@ var file_termbridge_shared_v1_tunnel_proto_goTypes = []any{
 	(*v1.UpdateShortcutRequest)(nil),          // 24: termbridge.agent.UpdateShortcutRequest
 	(*v1.DeleteShortcutReq)(nil),              // 25: termbridge.agent.DeleteShortcutReq
 	(*v1.UpdateShortcutOrderReq)(nil),         // 26: termbridge.agent.UpdateShortcutOrderReq
-	(*v1.ListWorkspacesResp)(nil),             // 27: termbridge.agent.ListWorkspacesResp
-	(*v1.WorkspaceTreeResp)(nil),              // 28: termbridge.agent.WorkspaceTreeResp
-	(*v1.WorkspaceSessionsResp)(nil),          // 29: termbridge.agent.WorkspaceSessionsResp
-	(*v1.CreateSessionResp)(nil),              // 30: termbridge.agent.CreateSessionResp
-	(*v1.GetSessionResp)(nil),                 // 31: termbridge.agent.GetSessionResp
-	(*v1.UpdateSessionResp)(nil),              // 32: termbridge.agent.UpdateSessionResp
-	(*v1.CloseSessionResp)(nil),               // 33: termbridge.agent.CloseSessionResp
-	(*v1.DeleteSessionResp)(nil),              // 34: termbridge.agent.DeleteSessionResp
-	(*v1.ReadHistoryResp)(nil),                // 35: termbridge.agent.ReadHistoryResp
-	(*v1.UpdateWorkspaceOrderResp)(nil),       // 36: termbridge.agent.UpdateWorkspaceOrderResp
-	(*v1.UpdateSessionOrderResp)(nil),         // 37: termbridge.agent.UpdateSessionOrderResp
-	(*v1.DeleteWorkspaceResp)(nil),            // 38: termbridge.agent.DeleteWorkspaceResp
-	(*v1.ListShortcutsResp)(nil),              // 39: termbridge.agent.ListShortcutsResp
-	(*v1.CreateShortcutResp)(nil),             // 40: termbridge.agent.CreateShortcutResp
-	(*v1.UpdateShortcutResp)(nil),             // 41: termbridge.agent.UpdateShortcutResp
-	(*v1.DeleteShortcutResp)(nil),             // 42: termbridge.agent.DeleteShortcutResp
-	(*v1.UpdateShortcutOrderResp)(nil),        // 43: termbridge.agent.UpdateShortcutOrderResp
-	(*ErrorResp)(nil),                         // 44: termbridge.shared.ErrorResp
+	(*v1.ListFilesReq)(nil),                   // 27: termbridge.agent.ListFilesReq
+	(*v1.ReadFileReq)(nil),                    // 28: termbridge.agent.ReadFileReq
+	(*v1.CreateFileReq)(nil),                  // 29: termbridge.agent.CreateFileReq
+	(*v1.CreateDirectoryReq)(nil),             // 30: termbridge.agent.CreateDirectoryReq
+	(*v1.WriteFileReq)(nil),                   // 31: termbridge.agent.WriteFileReq
+	(*v1.RenameEntryReq)(nil),                 // 32: termbridge.agent.RenameEntryReq
+	(*v1.MoveEntryReq)(nil),                   // 33: termbridge.agent.MoveEntryReq
+	(*v1.DeleteEntryReq)(nil),                 // 34: termbridge.agent.DeleteEntryReq
+	(*v1.GitStatusReq)(nil),                   // 35: termbridge.agent.GitStatusReq
+	(*v1.GitDiffReq)(nil),                     // 36: termbridge.agent.GitDiffReq
+	(*v1.ListWorkspacesResp)(nil),             // 37: termbridge.agent.ListWorkspacesResp
+	(*v1.WorkspaceTreeResp)(nil),              // 38: termbridge.agent.WorkspaceTreeResp
+	(*v1.WorkspaceSessionsResp)(nil),          // 39: termbridge.agent.WorkspaceSessionsResp
+	(*v1.CreateSessionResp)(nil),              // 40: termbridge.agent.CreateSessionResp
+	(*v1.GetSessionResp)(nil),                 // 41: termbridge.agent.GetSessionResp
+	(*v1.UpdateSessionResp)(nil),              // 42: termbridge.agent.UpdateSessionResp
+	(*v1.CloseSessionResp)(nil),               // 43: termbridge.agent.CloseSessionResp
+	(*v1.DeleteSessionResp)(nil),              // 44: termbridge.agent.DeleteSessionResp
+	(*v1.ReadHistoryResp)(nil),                // 45: termbridge.agent.ReadHistoryResp
+	(*v1.UpdateWorkspaceOrderResp)(nil),       // 46: termbridge.agent.UpdateWorkspaceOrderResp
+	(*v1.UpdateSessionOrderResp)(nil),         // 47: termbridge.agent.UpdateSessionOrderResp
+	(*v1.DeleteWorkspaceResp)(nil),            // 48: termbridge.agent.DeleteWorkspaceResp
+	(*v1.ListShortcutsResp)(nil),              // 49: termbridge.agent.ListShortcutsResp
+	(*v1.CreateShortcutResp)(nil),             // 50: termbridge.agent.CreateShortcutResp
+	(*v1.UpdateShortcutResp)(nil),             // 51: termbridge.agent.UpdateShortcutResp
+	(*v1.DeleteShortcutResp)(nil),             // 52: termbridge.agent.DeleteShortcutResp
+	(*v1.UpdateShortcutOrderResp)(nil),        // 53: termbridge.agent.UpdateShortcutOrderResp
+	(*v1.ListFilesResp)(nil),                  // 54: termbridge.agent.ListFilesResp
+	(*v1.ReadFileResp)(nil),                   // 55: termbridge.agent.ReadFileResp
+	(*v1.CreateFileResp)(nil),                 // 56: termbridge.agent.CreateFileResp
+	(*v1.CreateDirectoryResp)(nil),            // 57: termbridge.agent.CreateDirectoryResp
+	(*v1.WriteFileResp)(nil),                  // 58: termbridge.agent.WriteFileResp
+	(*v1.RenameEntryResp)(nil),                // 59: termbridge.agent.RenameEntryResp
+	(*v1.MoveEntryResp)(nil),                  // 60: termbridge.agent.MoveEntryResp
+	(*v1.DeleteEntryResp)(nil),                // 61: termbridge.agent.DeleteEntryResp
+	(*v1.GitStatusResp)(nil),                  // 62: termbridge.agent.GitStatusResp
+	(*v1.GitDiffResp)(nil),                    // 63: termbridge.agent.GitDiffResp
+	(*ErrorResp)(nil),                         // 64: termbridge.shared.ErrorResp
 }
 var file_termbridge_shared_v1_tunnel_proto_depIdxs = []int32{
 	1,  // 0: termbridge.shared.TunnelFrame.hello:type_name -> termbridge.shared.Hello
@@ -1499,36 +1860,56 @@ var file_termbridge_shared_v1_tunnel_proto_depIdxs = []int32{
 	24, // 19: termbridge.shared.TunnelFrame.update_shortcut_req:type_name -> termbridge.agent.UpdateShortcutRequest
 	25, // 20: termbridge.shared.TunnelFrame.delete_shortcut_req:type_name -> termbridge.agent.DeleteShortcutReq
 	26, // 21: termbridge.shared.TunnelFrame.update_shortcut_order_req:type_name -> termbridge.agent.UpdateShortcutOrderReq
-	27, // 22: termbridge.shared.TunnelFrame.list_workspaces_resp:type_name -> termbridge.agent.ListWorkspacesResp
-	28, // 23: termbridge.shared.TunnelFrame.workspace_tree_resp:type_name -> termbridge.agent.WorkspaceTreeResp
-	29, // 24: termbridge.shared.TunnelFrame.workspace_sessions_resp:type_name -> termbridge.agent.WorkspaceSessionsResp
-	30, // 25: termbridge.shared.TunnelFrame.create_session_resp:type_name -> termbridge.agent.CreateSessionResp
-	31, // 26: termbridge.shared.TunnelFrame.get_session_resp:type_name -> termbridge.agent.GetSessionResp
-	30, // 27: termbridge.shared.TunnelFrame.rerun_session_resp:type_name -> termbridge.agent.CreateSessionResp
-	32, // 28: termbridge.shared.TunnelFrame.update_session_resp:type_name -> termbridge.agent.UpdateSessionResp
-	33, // 29: termbridge.shared.TunnelFrame.close_session_resp:type_name -> termbridge.agent.CloseSessionResp
-	34, // 30: termbridge.shared.TunnelFrame.delete_session_resp:type_name -> termbridge.agent.DeleteSessionResp
-	35, // 31: termbridge.shared.TunnelFrame.read_history_resp:type_name -> termbridge.agent.ReadHistoryResp
-	36, // 32: termbridge.shared.TunnelFrame.update_workspace_order_resp:type_name -> termbridge.agent.UpdateWorkspaceOrderResp
-	37, // 33: termbridge.shared.TunnelFrame.update_session_order_resp:type_name -> termbridge.agent.UpdateSessionOrderResp
-	38, // 34: termbridge.shared.TunnelFrame.delete_workspace_resp:type_name -> termbridge.agent.DeleteWorkspaceResp
-	39, // 35: termbridge.shared.TunnelFrame.list_shortcuts_resp:type_name -> termbridge.agent.ListShortcutsResp
-	40, // 36: termbridge.shared.TunnelFrame.create_shortcut_resp:type_name -> termbridge.agent.CreateShortcutResp
-	41, // 37: termbridge.shared.TunnelFrame.update_shortcut_resp:type_name -> termbridge.agent.UpdateShortcutResp
-	42, // 38: termbridge.shared.TunnelFrame.delete_shortcut_resp:type_name -> termbridge.agent.DeleteShortcutResp
-	43, // 39: termbridge.shared.TunnelFrame.update_shortcut_order_resp:type_name -> termbridge.agent.UpdateShortcutOrderResp
-	5,  // 40: termbridge.shared.TunnelFrame.terminal_attach:type_name -> termbridge.shared.TerminalAttachReq
-	6,  // 41: termbridge.shared.TunnelFrame.terminal_input:type_name -> termbridge.shared.TerminalInput
-	7,  // 42: termbridge.shared.TunnelFrame.terminal_output:type_name -> termbridge.shared.TerminalOutput
-	8,  // 43: termbridge.shared.TunnelFrame.terminal_resize:type_name -> termbridge.shared.TerminalResize
-	9,  // 44: termbridge.shared.TunnelFrame.terminal_closed:type_name -> termbridge.shared.TerminalClosed
-	44, // 45: termbridge.shared.TunnelFrame.error:type_name -> termbridge.shared.ErrorResp
-	10, // 46: termbridge.shared.TunnelFrame.close:type_name -> termbridge.shared.Close
-	47, // [47:47] is the sub-list for method output_type
-	47, // [47:47] is the sub-list for method input_type
-	47, // [47:47] is the sub-list for extension type_name
-	47, // [47:47] is the sub-list for extension extendee
-	0,  // [0:47] is the sub-list for field type_name
+	27, // 22: termbridge.shared.TunnelFrame.list_files_req:type_name -> termbridge.agent.ListFilesReq
+	28, // 23: termbridge.shared.TunnelFrame.read_file_req:type_name -> termbridge.agent.ReadFileReq
+	29, // 24: termbridge.shared.TunnelFrame.create_file_req:type_name -> termbridge.agent.CreateFileReq
+	30, // 25: termbridge.shared.TunnelFrame.create_directory_req:type_name -> termbridge.agent.CreateDirectoryReq
+	31, // 26: termbridge.shared.TunnelFrame.write_file_req:type_name -> termbridge.agent.WriteFileReq
+	32, // 27: termbridge.shared.TunnelFrame.rename_entry_req:type_name -> termbridge.agent.RenameEntryReq
+	33, // 28: termbridge.shared.TunnelFrame.move_entry_req:type_name -> termbridge.agent.MoveEntryReq
+	34, // 29: termbridge.shared.TunnelFrame.delete_entry_req:type_name -> termbridge.agent.DeleteEntryReq
+	35, // 30: termbridge.shared.TunnelFrame.git_status_req:type_name -> termbridge.agent.GitStatusReq
+	36, // 31: termbridge.shared.TunnelFrame.git_diff_req:type_name -> termbridge.agent.GitDiffReq
+	37, // 32: termbridge.shared.TunnelFrame.list_workspaces_resp:type_name -> termbridge.agent.ListWorkspacesResp
+	38, // 33: termbridge.shared.TunnelFrame.workspace_tree_resp:type_name -> termbridge.agent.WorkspaceTreeResp
+	39, // 34: termbridge.shared.TunnelFrame.workspace_sessions_resp:type_name -> termbridge.agent.WorkspaceSessionsResp
+	40, // 35: termbridge.shared.TunnelFrame.create_session_resp:type_name -> termbridge.agent.CreateSessionResp
+	41, // 36: termbridge.shared.TunnelFrame.get_session_resp:type_name -> termbridge.agent.GetSessionResp
+	40, // 37: termbridge.shared.TunnelFrame.rerun_session_resp:type_name -> termbridge.agent.CreateSessionResp
+	42, // 38: termbridge.shared.TunnelFrame.update_session_resp:type_name -> termbridge.agent.UpdateSessionResp
+	43, // 39: termbridge.shared.TunnelFrame.close_session_resp:type_name -> termbridge.agent.CloseSessionResp
+	44, // 40: termbridge.shared.TunnelFrame.delete_session_resp:type_name -> termbridge.agent.DeleteSessionResp
+	45, // 41: termbridge.shared.TunnelFrame.read_history_resp:type_name -> termbridge.agent.ReadHistoryResp
+	46, // 42: termbridge.shared.TunnelFrame.update_workspace_order_resp:type_name -> termbridge.agent.UpdateWorkspaceOrderResp
+	47, // 43: termbridge.shared.TunnelFrame.update_session_order_resp:type_name -> termbridge.agent.UpdateSessionOrderResp
+	48, // 44: termbridge.shared.TunnelFrame.delete_workspace_resp:type_name -> termbridge.agent.DeleteWorkspaceResp
+	49, // 45: termbridge.shared.TunnelFrame.list_shortcuts_resp:type_name -> termbridge.agent.ListShortcutsResp
+	50, // 46: termbridge.shared.TunnelFrame.create_shortcut_resp:type_name -> termbridge.agent.CreateShortcutResp
+	51, // 47: termbridge.shared.TunnelFrame.update_shortcut_resp:type_name -> termbridge.agent.UpdateShortcutResp
+	52, // 48: termbridge.shared.TunnelFrame.delete_shortcut_resp:type_name -> termbridge.agent.DeleteShortcutResp
+	53, // 49: termbridge.shared.TunnelFrame.update_shortcut_order_resp:type_name -> termbridge.agent.UpdateShortcutOrderResp
+	54, // 50: termbridge.shared.TunnelFrame.list_files_resp:type_name -> termbridge.agent.ListFilesResp
+	55, // 51: termbridge.shared.TunnelFrame.read_file_resp:type_name -> termbridge.agent.ReadFileResp
+	56, // 52: termbridge.shared.TunnelFrame.create_file_resp:type_name -> termbridge.agent.CreateFileResp
+	57, // 53: termbridge.shared.TunnelFrame.create_directory_resp:type_name -> termbridge.agent.CreateDirectoryResp
+	58, // 54: termbridge.shared.TunnelFrame.write_file_resp:type_name -> termbridge.agent.WriteFileResp
+	59, // 55: termbridge.shared.TunnelFrame.rename_entry_resp:type_name -> termbridge.agent.RenameEntryResp
+	60, // 56: termbridge.shared.TunnelFrame.move_entry_resp:type_name -> termbridge.agent.MoveEntryResp
+	61, // 57: termbridge.shared.TunnelFrame.delete_entry_resp:type_name -> termbridge.agent.DeleteEntryResp
+	62, // 58: termbridge.shared.TunnelFrame.git_status_resp:type_name -> termbridge.agent.GitStatusResp
+	63, // 59: termbridge.shared.TunnelFrame.git_diff_resp:type_name -> termbridge.agent.GitDiffResp
+	5,  // 60: termbridge.shared.TunnelFrame.terminal_attach:type_name -> termbridge.shared.TerminalAttachReq
+	6,  // 61: termbridge.shared.TunnelFrame.terminal_input:type_name -> termbridge.shared.TerminalInput
+	7,  // 62: termbridge.shared.TunnelFrame.terminal_output:type_name -> termbridge.shared.TerminalOutput
+	8,  // 63: termbridge.shared.TunnelFrame.terminal_resize:type_name -> termbridge.shared.TerminalResize
+	9,  // 64: termbridge.shared.TunnelFrame.terminal_closed:type_name -> termbridge.shared.TerminalClosed
+	64, // 65: termbridge.shared.TunnelFrame.error:type_name -> termbridge.shared.ErrorResp
+	10, // 66: termbridge.shared.TunnelFrame.close:type_name -> termbridge.shared.Close
+	67, // [67:67] is the sub-list for method output_type
+	67, // [67:67] is the sub-list for method input_type
+	67, // [67:67] is the sub-list for extension type_name
+	67, // [67:67] is the sub-list for extension extendee
+	0,  // [0:67] is the sub-list for field type_name
 }
 
 func init() { file_termbridge_shared_v1_tunnel_proto_init() }
@@ -1560,6 +1941,16 @@ func file_termbridge_shared_v1_tunnel_proto_init() {
 		(*TunnelFrame_UpdateShortcutReq)(nil),
 		(*TunnelFrame_DeleteShortcutReq)(nil),
 		(*TunnelFrame_UpdateShortcutOrderReq)(nil),
+		(*TunnelFrame_ListFilesReq)(nil),
+		(*TunnelFrame_ReadFileReq)(nil),
+		(*TunnelFrame_CreateFileReq)(nil),
+		(*TunnelFrame_CreateDirectoryReq)(nil),
+		(*TunnelFrame_WriteFileReq)(nil),
+		(*TunnelFrame_RenameEntryReq)(nil),
+		(*TunnelFrame_MoveEntryReq)(nil),
+		(*TunnelFrame_DeleteEntryReq)(nil),
+		(*TunnelFrame_GitStatusReq)(nil),
+		(*TunnelFrame_GitDiffReq)(nil),
 		(*TunnelFrame_ListWorkspacesResp)(nil),
 		(*TunnelFrame_WorkspaceTreeResp)(nil),
 		(*TunnelFrame_WorkspaceSessionsResp)(nil),
@@ -1578,6 +1969,16 @@ func file_termbridge_shared_v1_tunnel_proto_init() {
 		(*TunnelFrame_UpdateShortcutResp)(nil),
 		(*TunnelFrame_DeleteShortcutResp)(nil),
 		(*TunnelFrame_UpdateShortcutOrderResp)(nil),
+		(*TunnelFrame_ListFilesResp)(nil),
+		(*TunnelFrame_ReadFileResp)(nil),
+		(*TunnelFrame_CreateFileResp)(nil),
+		(*TunnelFrame_CreateDirectoryResp)(nil),
+		(*TunnelFrame_WriteFileResp)(nil),
+		(*TunnelFrame_RenameEntryResp)(nil),
+		(*TunnelFrame_MoveEntryResp)(nil),
+		(*TunnelFrame_DeleteEntryResp)(nil),
+		(*TunnelFrame_GitStatusResp)(nil),
+		(*TunnelFrame_GitDiffResp)(nil),
 		(*TunnelFrame_TerminalAttach)(nil),
 		(*TunnelFrame_TerminalInput)(nil),
 		(*TunnelFrame_TerminalOutput)(nil),

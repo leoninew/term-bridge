@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,8 +12,10 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	terminalapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/terminal"
+	filemodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/file"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
@@ -96,6 +99,9 @@ func (c *Client) Run(ctx context.Context) error {
 	if ack.GetHelloAck() == nil {
 		return websocket.CloseError{Code: websocket.StatusPolicyViolation, Reason: "expected hello_ack"}
 	}
+	if ack.GetHelloAck().GetProtocolVersion() != tunnel.ProtocolVersion {
+		return websocket.CloseError{Code: websocket.StatusPolicyViolation, Reason: "unsupported tunnel protocol version"}
+	}
 	return c.readLoop(ctx, conn)
 }
 
@@ -138,7 +144,7 @@ func (c *Client) handleRequest(ctx context.Context, conn *websocket.Conn, writeM
 	response, err := c.handleRuntimeRequest(ctx, frame)
 	if err != nil {
 		c.logWarn("agent tunnel request failed", append(attrs, "error", err)...)
-		_ = writeTunnelFrame(ctx, conn, writeMu, tunnel.ErrorFrame(frame.GetStreamId(), frame.GetRequestId(), "runtime_error", err.Error()))
+		_ = writeTunnelFrame(ctx, conn, writeMu, runtimeErrorFrame(frame.GetStreamId(), frame.GetRequestId(), err))
 		return
 	}
 	c.logInfo("agent tunnel request handled", attrs...)
@@ -260,9 +266,106 @@ func HandleRuntimeRequest(ctx context.Context, runtimeAccess RuntimeAccess, fram
 			return nil, err
 		}
 		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_DeleteShortcutResp{DeleteShortcutResp: &agent.DeleteShortcutResp{}}), nil
+	case *shared.TunnelFrame_ListFilesReq:
+		result, err := runtimeAccess.ListFiles(ctx, payload.ListFilesReq)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ListFilesResp{ListFilesResp: result}), nil
+	case *shared.TunnelFrame_ReadFileReq:
+		result, err := runtimeAccess.ReadFile(ctx, payload.ReadFileReq)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ReadFileResp{ReadFileResp: result}), nil
+	case *shared.TunnelFrame_CreateFileReq:
+		result, err := runtimeAccess.CreateFile(ctx, payload.CreateFileReq)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_CreateFileResp{CreateFileResp: result}), nil
+	case *shared.TunnelFrame_CreateDirectoryReq:
+		result, err := runtimeAccess.CreateDirectory(ctx, payload.CreateDirectoryReq)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_CreateDirectoryResp{CreateDirectoryResp: result}), nil
+	case *shared.TunnelFrame_WriteFileReq:
+		result, err := runtimeAccess.WriteFile(ctx, payload.WriteFileReq)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_WriteFileResp{WriteFileResp: result}), nil
+	case *shared.TunnelFrame_RenameEntryReq:
+		result, err := runtimeAccess.RenameEntry(ctx, payload.RenameEntryReq)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_RenameEntryResp{RenameEntryResp: result}), nil
+	case *shared.TunnelFrame_MoveEntryReq:
+		result, err := runtimeAccess.MoveEntry(ctx, payload.MoveEntryReq)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_MoveEntryResp{MoveEntryResp: result}), nil
+	case *shared.TunnelFrame_DeleteEntryReq:
+		result, err := runtimeAccess.DeleteEntry(ctx, payload.DeleteEntryReq)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_DeleteEntryResp{DeleteEntryResp: result}), nil
+	case *shared.TunnelFrame_GitStatusReq:
+		result, err := runtimeAccess.GitStatus(ctx, payload.GitStatusReq.GetWorkspaceId())
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_GitStatusResp{GitStatusResp: result}), nil
+	case *shared.TunnelFrame_GitDiffReq:
+		result, err := runtimeAccess.GitDiff(ctx, payload.GitDiffReq)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_GitDiffResp{GitDiffResp: result}), nil
 	default:
 		return nil, fmt.Errorf("unsupported runtime payload %T", frame.GetPayload())
 	}
+}
+
+type RuntimeError interface {
+	error
+	RuntimeErrorCode() string
+}
+
+func runtimeErrorFrame(streamId string, requestId string, err error) *shared.TunnelFrame {
+	response := &shared.ErrorResp{Code: "runtime_error", Error: "Runtime request failed.", RequestId: requestId}
+	var typed RuntimeError
+	if errors.As(err, &typed) {
+		response.Code = typed.RuntimeErrorCode()
+	}
+	response.Details = fileConflictDetails(err)
+	return &shared.TunnelFrame{StreamId: streamId, RequestId: requestId, Payload: &shared.TunnelFrame_Error{Error: response}}
+}
+
+func fileConflictDetails(err error) *structpb.Struct {
+	var fileErr *filemodel.Error
+	if !errors.As(err, &fileErr) || fileErr.Code != "revision_conflict" || fileErr.Entry == nil {
+		return nil
+	}
+	entry := fileErr.Entry
+	details, detailErr := structpb.NewStruct(map[string]any{
+		"type": "revision_conflict",
+		"current_entry": map[string]any{
+			"path":     entry.Path.String(),
+			"name":     entry.Name,
+			"kind":     string(entry.Kind),
+			"size":     entry.Size,
+			"revision": entry.Revision,
+		},
+	})
+	if detailErr != nil {
+		return nil
+	}
+	return details
 }
 
 func runtimeResponse(streamId string, requestId string, payload any) *shared.TunnelFrame {
@@ -304,6 +407,26 @@ func runtimeResponse(streamId string, requestId string, payload any) *shared.Tun
 		frame.Payload = value
 	case *shared.TunnelFrame_UpdateShortcutOrderResp:
 		frame.Payload = value
+	case *shared.TunnelFrame_ListFilesResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_ReadFileResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_CreateFileResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_CreateDirectoryResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_WriteFileResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_RenameEntryResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_MoveEntryResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_DeleteEntryResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_GitStatusResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_GitDiffResp:
+		frame.Payload = value
 	}
 	return frame
 }
@@ -327,7 +450,17 @@ func isRuntimeRequest(frame *shared.TunnelFrame) bool {
 		*shared.TunnelFrame_CreateShortcutReq,
 		*shared.TunnelFrame_UpdateShortcutReq,
 		*shared.TunnelFrame_UpdateShortcutOrderReq,
-		*shared.TunnelFrame_DeleteShortcutReq:
+		*shared.TunnelFrame_DeleteShortcutReq,
+		*shared.TunnelFrame_ListFilesReq,
+		*shared.TunnelFrame_ReadFileReq,
+		*shared.TunnelFrame_CreateFileReq,
+		*shared.TunnelFrame_CreateDirectoryReq,
+		*shared.TunnelFrame_WriteFileReq,
+		*shared.TunnelFrame_RenameEntryReq,
+		*shared.TunnelFrame_MoveEntryReq,
+		*shared.TunnelFrame_DeleteEntryReq,
+		*shared.TunnelFrame_GitStatusReq,
+		*shared.TunnelFrame_GitDiffReq:
 		return true
 	default:
 		return false
@@ -466,7 +599,7 @@ func (c *Client) tunnelHeader(device Device) (http.Header, error) {
 	if err != nil {
 		return nil, err
 	}
-	return tunnel.SignedTunnelHeader(http.MethodGet, "/api/agent/tunnel", c.config.ConnectUrl, device.Id, privateKey, time.Now(), "")
+	return tunnel.SignedTunnelHeader(http.MethodGet, tunnelPath(c.config.ConnectUrl), c.config.ConnectUrl, device.Id, privateKey, time.Now(), "")
 }
 
 func (c *Client) Config() Config {
@@ -488,8 +621,14 @@ func tunnelUrl(base string) string {
 	case "https":
 		parsed.Scheme = "wss"
 	}
-	if parsed.Path == "" || parsed.Path == "/" {
-		parsed.Path = "/api/agent/tunnel"
-	}
+	parsed.Path = tunnelPath(base)
 	return parsed.String()
+}
+
+func tunnelPath(base string) string {
+	parsed, err := url.Parse(base)
+	if err != nil {
+		return "/agent/tunnel"
+	}
+	return strings.TrimRight(parsed.Path, "/") + "/agent/tunnel"
 }
