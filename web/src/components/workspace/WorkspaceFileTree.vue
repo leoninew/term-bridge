@@ -48,101 +48,128 @@
         </button>
       </span>
     </header>
-    <p v-if="root?.error" class="file-workbench-error" role="status">{{ root.error }}</p>
-    <p v-if="root?.truncated" class="file-workbench-note" role="status">
-      {{ t('files.treeTruncated') }}
-    </p>
-    <p v-if="root?.loading && !root.loaded" class="file-workbench-note" role="status">
-      {{ t('files.loadingTree') }}
-    </p>
-    <ul class="file-workbench-tree" role="tree" :aria-label="t('files.treeTitle')">
-      <li
-        v-for="item in visibleItems"
-        :key="item.entry.path"
-        role="treeitem"
-        :aria-expanded="item.directory ? item.expanded : undefined"
-        :aria-selected="!item.directory && isActiveFile(item.entry.path) ? true : undefined"
-      >
-        <div
-          class="file-workbench-tree-row"
-          :class="{
-            'file-workbench-tree-row--active': !item.directory && isActiveFile(item.entry.path),
-          }"
-          :style="{ paddingLeft: `${8 + item.depth * 16}px` }"
-          tabindex="0"
-          @click="activate(item.entry)"
-          @keydown.enter.prevent="activate(item.entry)"
-          @keydown.space.prevent="activate(item.entry)"
+    <PageStatus
+      class="min-h-0 flex-1"
+      :loading="Boolean(root?.loading && !root.loaded)"
+      :error="root?.error || null"
+      :loading-text="t('files.loadingTree')"
+    >
+      <template #loading>
+        <p class="file-workbench-note" role="status">{{ t('files.loadingTree') }}</p>
+      </template>
+      <template #error>
+        <p class="file-workbench-error" role="status">{{ root?.error }}</p>
+      </template>
+
+      <p v-if="root?.truncated" class="file-workbench-note" role="status">
+        {{ t('files.treeTruncated') }}
+      </p>
+      <ul class="file-workbench-tree" role="tree" :aria-label="t('files.treeTitle')">
+        <li
+          v-for="item in visibleItems"
+          :key="item.entry.path"
+          role="treeitem"
+          :aria-expanded="item.directory ? item.expanded : undefined"
+          :aria-selected="!item.directory && isActiveFile(item.entry.path) ? true : undefined"
         >
-          <WorkbenchCodicon
-            v-if="item.directory"
-            :name="item.loading ? 'loading' : item.expanded ? 'chevron-down' : 'chevron-right'"
-            :spin="item.loading"
-            class-name="file-workbench-codicon file-workbench-tree-twistie"
-          />
-          <span v-else class="file-workbench-tree-twistie-spacer" />
-          <WorkbenchCodicon
-            :name="item.directory ? (item.expanded ? 'folder-opened' : 'folder') : 'file'"
-            class-name="file-workbench-codicon file-workbench-tree-icon"
-          />
-          <span class="min-w-0 flex-1 truncate">{{ item.entry.name }}</span>
-          <span class="file-workbench-tree-menu" @click.stop>
-            <button
+          <div
+            class="file-workbench-tree-row"
+            :class="{
+              'file-workbench-tree-row--active': !item.directory && isActiveFile(item.entry.path),
+            }"
+            :style="{ paddingLeft: `${8 + item.depth * 16}px` }"
+            tabindex="0"
+            @click="activate(item.entry)"
+            @keydown.enter.prevent="activate(item.entry)"
+            @keydown.space.prevent="activate(item.entry)"
+          >
+            <WorkbenchCodicon
               v-if="item.directory"
-              type="button"
-              class="file-workbench-tree-action"
-              :aria-label="t('files.newFile')"
-              :title="t('files.newFile')"
-              @click="emit('action', { type: 'create-file', path: item.entry.path })"
-            >
-              <WorkbenchCodicon name="new-file" class-name="file-workbench-codicon" />
-            </button>
-            <button
-              v-if="item.directory"
-              type="button"
-              class="file-workbench-tree-action"
-              :aria-label="t('files.newDirectory')"
-              :title="t('files.newDirectory')"
-              @click="emit('action', { type: 'create-directory', path: item.entry.path })"
-            >
-              <WorkbenchCodicon name="new-folder" class-name="file-workbench-codicon" />
-            </button>
-            <button
-              type="button"
-              class="file-workbench-tree-action"
-              :aria-label="t('files.rename')"
-              :title="t('files.rename')"
-              @click="emit('action', { type: 'rename', entry: item.entry })"
-            >
-              <WorkbenchCodicon name="edit" class-name="file-workbench-codicon" />
-            </button>
-            <button
-              type="button"
-              class="file-workbench-tree-action"
-              :aria-label="t('files.move')"
-              :title="t('files.move')"
-              @click="emit('action', { type: 'move', entry: item.entry })"
-            >
-              <WorkbenchCodicon name="files" class-name="file-workbench-codicon" />
-            </button>
-            <button
-              type="button"
-              class="file-workbench-tree-action workspace-tree-node-action-danger"
-              :aria-label="t('files.delete')"
-              :title="t('files.delete')"
-              @click="emit('action', { type: 'delete', entry: item.entry })"
-            >
-              <WorkbenchCodicon name="trash" class-name="file-workbench-codicon" />
-            </button>
-          </span>
-        </div>
-      </li>
-    </ul>
-    <footer class="file-workbench-status-bar" role="status">
-      <span class="min-w-0 flex-1 truncate">{{ statusPrimary }}</span>
-      <span v-if="statusSecondary" class="min-w-0 shrink truncate text-[var(--color-text-subtle)]">
-        {{ statusSecondary }}
-      </span>
+              :name="item.loading ? 'loading' : item.expanded ? 'chevron-down' : 'chevron-right'"
+              :spin="item.loading"
+              class-name="file-workbench-codicon file-workbench-tree-twistie"
+            />
+            <span v-else class="file-workbench-tree-twistie-spacer" />
+            <WorkbenchCodicon
+              :name="item.directory ? (item.expanded ? 'folder-opened' : 'folder') : 'file'"
+              class-name="file-workbench-codicon file-workbench-tree-icon"
+            />
+            <span class="min-w-0 flex-1 truncate">{{ item.entry.name }}</span>
+            <span class="file-workbench-tree-menu" @click.stop>
+              <button
+                v-if="item.directory"
+                type="button"
+                class="file-workbench-tree-action"
+                :aria-label="t('files.newFile')"
+                :title="t('files.newFile')"
+                @click="emit('action', { type: 'create-file', path: item.entry.path })"
+              >
+                <WorkbenchCodicon name="new-file" class-name="file-workbench-codicon" />
+              </button>
+              <button
+                v-if="item.directory"
+                type="button"
+                class="file-workbench-tree-action"
+                :aria-label="t('files.newDirectory')"
+                :title="t('files.newDirectory')"
+                @click="emit('action', { type: 'create-directory', path: item.entry.path })"
+              >
+                <WorkbenchCodicon name="new-folder" class-name="file-workbench-codicon" />
+              </button>
+              <button
+                type="button"
+                class="file-workbench-tree-action"
+                :aria-label="t('files.rename')"
+                :title="t('files.rename')"
+                @click="emit('action', { type: 'rename', entry: item.entry })"
+              >
+                <WorkbenchCodicon name="edit" class-name="file-workbench-codicon" />
+              </button>
+              <button
+                type="button"
+                class="file-workbench-tree-action"
+                :aria-label="t('files.move')"
+                :title="t('files.move')"
+                @click="emit('action', { type: 'move', entry: item.entry })"
+              >
+                <WorkbenchCodicon name="files" class-name="file-workbench-codicon" />
+              </button>
+              <button
+                type="button"
+                class="file-workbench-tree-action workspace-tree-node-action-danger"
+                :aria-label="t('files.delete')"
+                :title="t('files.delete')"
+                @click="emit('action', { type: 'delete', entry: item.entry })"
+              >
+                <WorkbenchCodicon name="trash" class-name="file-workbench-codicon" />
+              </button>
+            </span>
+          </div>
+        </li>
+      </ul>
+    </PageStatus>
+    <footer
+      class="flex h-8 shrink-0 items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-panel-header)] px-2 text-sm text-[var(--color-text-muted)]"
+      role="status"
+    >
+      <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+        <span class="min-w-0 flex-1 truncate">{{ statusPrimary }}</span>
+        <span
+          v-if="statusSecondary"
+          class="min-w-0 max-w-[45%] shrink truncate text-[var(--color-text-subtle)]"
+        >
+          {{ statusSecondary }}
+        </span>
+      </div>
+      <button
+        type="button"
+        class="flex size-6 shrink-0 items-center justify-center rounded text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus-visible:bg-[var(--color-control-hover)] focus-visible:text-[var(--color-text)]"
+        :aria-label="t('files.switchToSessions')"
+        :title="t('files.switchToSessions')"
+        @click="switchToSessions"
+      >
+        <WorkbenchCodicon name="terminal" class-name="file-workbench-codicon" />
+      </button>
     </footer>
   </section>
 </template>
@@ -154,6 +181,7 @@
   import type { FileGitRuntimeApi } from '../../features/files/runtime'
   import { isDirectory } from '../../features/files/workbenchUi'
   import { useFileWorkbenchStore } from '../../store/fileWorkbench'
+  import PageStatus from '../layout/PageStatus.vue'
   import WorkbenchCodicon from './WorkbenchCodicon.vue'
 
   export type FileTreeAction =
@@ -200,6 +228,9 @@
       ? t('files.treeStatusActiveDirty', { path: active.path })
       : t('files.treeStatusActive', { path: active.path })
   })
+  function switchToSessions() {
+    emit('back')
+  }
 
   const visibleItems = computed(() => {
     const items: VisibleTreeItem[] = []

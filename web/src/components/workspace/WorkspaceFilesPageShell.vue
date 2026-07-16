@@ -1,21 +1,35 @@
 <template>
   <div
-    v-if="ready"
     class="file-workbench-shell flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
   >
-    <WorkspaceFileWorkbench
-      v-if="workspace"
-      :workspace="workspace"
-      :target="runtimeTarget"
-      :api="fileRuntimeApi"
-      @back="goBackToSessions"
-    />
-    <div v-else class="file-workbench-missing" role="status">
-      <p class="file-workbench-error">{{ missingMessage }}</p>
-      <button type="button" class="button button-secondary" @click="goBackToSessions">
-        {{ t('files.backToSessions') }}
-      </button>
-    </div>
+    <PageStatus
+      class="flex min-h-0 w-full flex-1 flex-col"
+      :loading="!ready"
+      :error="ready && !workspace ? missingMessage : null"
+      :loading-text="t('files.loadingWorkspace')"
+    >
+      <template #loading>
+        <div class="file-workbench-missing" role="status">
+          <p class="file-workbench-empty">{{ t('files.loadingWorkspace') }}</p>
+        </div>
+      </template>
+      <template #error>
+        <div class="file-workbench-missing" role="status">
+          <p class="file-workbench-error">{{ missingMessage }}</p>
+          <button type="button" class="button button-secondary" @click="goBackToSessions">
+            {{ t('files.backToSessions') }}
+          </button>
+        </div>
+      </template>
+
+      <WorkspaceFileWorkbench
+        v-if="workspace"
+        :workspace="workspace"
+        :target="runtimeTarget"
+        :api="fileRuntimeApi"
+        @back="goBackToSessions"
+      />
+    </PageStatus>
   </div>
 </template>
 
@@ -29,6 +43,7 @@
   import type { Workspace as WorkspaceSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
   import { useNotificationsStore } from '../../store/notifications'
   import { useWorkspaceSessionsStore } from '../../store/workspaceSessions'
+  import PageStatus from '../layout/PageStatus.vue'
   import WorkspaceFileWorkbench from './WorkspaceFileWorkbench.vue'
 
   const props = defineProps<{

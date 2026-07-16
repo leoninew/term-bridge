@@ -143,8 +143,21 @@
         </DropdownMenuRoot>
       </div>
 
+      <PageStatus
+        v-if="loading && openedTabs.length === 0"
+        class="flex min-h-0 flex-1 items-center justify-center p-6"
+        :loading="true"
+        :loading-text="t('workbench.loadingContent')"
+      >
+        <template #loading>
+          <div class="text-[var(--color-text-muted)]" role="status">
+            {{ t('workbench.loadingContent') }}
+          </div>
+        </template>
+      </PageStatus>
+
       <TerminalPane
-        v-if="activeSession && activeTab"
+        v-else-if="activeSession && activeTab"
         :session="activeSession"
         :tab="activeTab"
         :ws-url="terminalWsUrl"
@@ -191,6 +204,7 @@
   import { VueDraggable } from 'vue-draggable-plus'
   import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import SessionSourceIcon from './SessionSourceIcon.vue'
+  import PageStatus from '../layout/PageStatus.vue'
   import SessionStatusBar from './SessionStatusBar.vue'
   import TerminalPane from './TerminalPane.vue'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
@@ -199,20 +213,24 @@
   import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
   import type { OpenSessionTab } from '../../store/workbench'
 
-  defineProps<{
-    openedTabs: OpenSessionTab[]
-    activeSessionId: string | null
-    activeTab: OpenSessionTab | null
-    activeSession: SessionSummary | null
-    currentDevice: DeviceSummary | CloudSessionSummary | null
-    terminalWsUrl: string | null
-    hasTerminalTabs: boolean
-    hasBackgroundRunningSessions: boolean
-    sessionTitle: (workspaceId: string, sessionId: string) => string
-    sessionLifecycleState: (workspaceId: string, sessionId: string) => string
-    sessionCommandSource: (workspaceId: string, sessionId: string) => string
-    sessionSourceLabel: (workspaceId: string, sessionId: string) => string
-  }>()
+  withDefaults(
+    defineProps<{
+      openedTabs: OpenSessionTab[]
+      activeSessionId: string | null
+      activeTab: OpenSessionTab | null
+      activeSession: SessionSummary | null
+      currentDevice: DeviceSummary | CloudSessionSummary | null
+      terminalWsUrl: string | null
+      hasTerminalTabs: boolean
+      hasBackgroundRunningSessions: boolean
+      sessionTitle: (workspaceId: string, sessionId: string) => string
+      sessionLifecycleState: (workspaceId: string, sessionId: string) => string
+      sessionCommandSource: (workspaceId: string, sessionId: string) => string
+      sessionSourceLabel: (workspaceId: string, sessionId: string) => string
+      loading?: boolean
+    }>(),
+    { loading: false },
+  )
 
   const emit = defineEmits<{
     activateTab: [sessionId: string]

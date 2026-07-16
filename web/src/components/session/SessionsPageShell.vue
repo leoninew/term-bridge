@@ -16,10 +16,13 @@
       <WorkspaceSessionSidebar
         :workspace-tree="workspaceSessions.workspaceTree"
         :active-session-id="workbench.activeSessionId"
+        :active-workspace="activeWorkspaceForViewSwitch"
         :stopping-session-id="stoppingSessionId"
         :rerunning-session-id="rerunningSessionId"
         :deleting-session-id="deletingSessionId"
         :removing-workspace-id="removingWorkspaceId"
+        :loading="workspaceSessions.loading"
+        :load-error="workspaceTreeError"
         :help-href="helpHref"
         :home-route-name="props.homeRouteName"
         @select="openSessionTab"
@@ -59,6 +62,7 @@
           :active-session="activeSession"
           :current-device="workbenchDevice"
           :terminal-ws-url="activeTerminalWsUrl"
+          :loading="workspaceSessions.loading && workbench.openedTabs.length === 0"
           :has-terminal-tabs="terminalTabs.length > 0"
           :has-background-running-sessions="hasRunningSessions"
           :session-title="sessionTitle"
@@ -88,7 +92,7 @@
     :selected-shortcut-id="createDraft.selectedShortcutId"
     :selected-shortcut-name="createDraft.selectedShortcutName"
     :shortcuts="enabledShortcuts"
-    :creating="creatingSession"
+    :creating="createAction.running"
     @update:open="dialogs.createSessionDialogOpen = $event"
     @update:cwd="createDraft.cwd = $event"
     @update:name="createDraft.sessionName = $event"
@@ -102,7 +106,7 @@
     :open="dialogs.editDialogOpen"
     :session="dialogs.selectedSession"
     :shortcuts="enabledShortcuts"
-    :editing="editingSession"
+    :editing="editAction.running"
     @update:open="dialogs.editDialogOpen = $event"
     @submit="editSelectedSession"
   />
@@ -110,7 +114,7 @@
   <DeleteSessionDialog
     :open="dialogs.deleteSessionDialogOpen"
     :session="dialogs.selectedSession"
-    :deleting="!!deletingSessionId"
+    :deleting="!!deletingSessionId || deleteAction.running"
     @update:open="dialogs.deleteSessionDialogOpen = $event"
     @confirm="deleteSelectedSession"
   />
@@ -118,7 +122,7 @@
   <RemoveWorkspaceDialog
     :open="dialogs.removeWorkspaceDialogOpen"
     :workspace="dialogs.selectedWorkspace"
-    :removing="!!removingWorkspaceId"
+    :removing="!!removingWorkspaceId || removeWorkspaceAction.running"
     @update:open="dialogs.removeWorkspaceDialogOpen = $event"
     @confirm="removeSelectedWorkspace"
   />
@@ -146,6 +150,7 @@
   import SessionWorkbench from './SessionWorkbench.vue'
   import WorkspaceSessionSidebar from '../workspace/WorkspaceSessionSidebar.vue'
   import { terminalDebug } from '../terminal/diagnostics'
+  import { useAsyncAction } from '../../composable/useAsyncAction'
   import { useCreateSessionDraft } from '../../composable/useCreateSessionDraft'
   import { useSessionDialogs } from '../../composable/useSessionDialogs'
   import { useTerminalSize } from '../../composable/useTerminalSize'
@@ -204,8 +209,6 @@
   const terminalWorkbench = ref<HTMLElement | null>(null)
   const { measureInitialTerminalSize } = useTerminalSize(terminalWorkbench)
 
-  const creatingSession = ref(false)
-  const editingSession = ref(false)
   const shortcuts = ref<Shortcut[]>([])
   const enabledShortcuts = computed(() =>
     shortcuts.value.filter((shortcut) => shortcut.enabled !== false),
@@ -215,7 +218,38 @@
   const deletingSessionId = ref<string | null>(null)
   const removingWorkspaceId = ref<string | null>(null)
   const closeBackgroundSessionsDrawerOpen = ref(false)
-  const closingBackgroundSessions = ref(false)
+  const workspaceTreeError = ref<string | null>(null)
+  const refreshAction = useAsyncAction({
+    onError: (err) => {
+      workspaceTreeError.value = t('toast.refreshFailed')
+      notifications.notifyError(t('toast.refreshFailed'), err)
+    },
+  })
+  const createAction = useAsyncAction({
+    onError: (err) => {
+      notifications.notifyError(t('toast.createSessionFailed'), err)
+      void refresh()
+    },
+  })
+  const editAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('toast.editSessionFailed'), err),
+  })
+  const deleteAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('toast.deleteSessionFailed'), err),
+  })
+  const removeWorkspaceAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('toast.removeWorkspaceFailed'), err),
+  })
+  const stopAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('toast.stopSessionFailed'), err),
+  })
+  const rerunAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('toast.rerunSessionFailed'), err),
+  })
+  const closeBackgroundAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('toast.closeBackgroundSessionsFailed'), err),
+  })
+  const closingBackgroundSessions = computed(() => closeBackgroundAction.running)
   const isLocalMode = computed(() => props.runtimeTarget.mode === 'local')
   const workbenchDevice = computed(() => props.currentDevice ?? cloudSession.cloudSession)
   const helpHref = computed(() =>
@@ -225,6 +259,12 @@
   const activeSession = computed(() => {
     const tab = workbench.activeTab
     return tab ? workspaceSessions.sessionById(tab.workspaceId, tab.sessionId) : null
+  })
+
+  const activeWorkspaceForViewSwitch = computed(() => {
+    const tab = workbench.activeTab
+    if (!tab) return null
+    return workspaceSessions.workspaceById(tab.workspaceId)
   })
 
   const activeTerminalWsUrl = computed(() => {
@@ -253,7 +293,8 @@
   )
 
   async function refresh() {
-    try {
+    workspaceTreeError.value = null
+    await refreshAction.run(async () => {
       await workspaceSessions.refresh(props.runtimeTarget, props.runtimeApi)
       await notifyHistoryError(
         await workbench.ensureActiveHistoryLoaded(
@@ -262,9 +303,7 @@
           workspaceSessions.sessionById,
         ),
       )
-    } catch (err) {
-      notifications.notifyError(t('toast.refreshFailed'), err)
-    }
+    })
   }
 
   async function openWorkspaceFiles(workspace: WorkspaceSummary) {
@@ -331,7 +370,6 @@
     dialogs.removeWorkspaceDialogOpen = false
     dialogs.clearSelectedWorkspace()
     closeBackgroundSessionsDrawerOpen.value = false
-    closingBackgroundSessions.value = false
     fileWorkbench.resetForSourceChange()
     workbench.resetForSourceChange()
     await router.replace(
@@ -340,7 +378,7 @@
   }
 
   async function startSession() {
-    if (creatingSession.value) {
+    if (createAction.running) {
       return
     }
     const draft = createDraft.validate()
@@ -348,8 +386,7 @@
       notifyCreateSessionValidationError(draft.error)
       return
     }
-    creatingSession.value = true
-    try {
+    await createAction.run(async () => {
       const size = measureInitialTerminalSize()
       terminalDebug('session.create.request', {
         name: draft.value.name,
@@ -388,17 +425,12 @@
       dialogs.createSessionDialogOpen = false
       await openSessionTab(session)
       notifications.pushToast('success', t('toast.sessionCreated'), session.name)
-    } catch (err) {
-      notifications.notifyError(t('toast.createSessionFailed'), err)
-      await refresh()
-    } finally {
-      creatingSession.value = false
-    }
+    })
   }
 
   async function editSelectedSession(payload: { name: string; command: string }) {
     const session = dialogs.selectedSession
-    if (!session || !isEditableLifecycle(session) || editingSession.value) {
+    if (!session || !isEditableLifecycle(session) || editAction.running) {
       return
     }
     if (!payload.name) {
@@ -409,8 +441,7 @@
       notifications.pushToast('error', t('toast.editSessionFailed'), t('message.commandRequired'))
       return
     }
-    editingSession.value = true
-    try {
+    await editAction.run(async () => {
       const updated = await props.runtimeApi.updateSession(
         session.workspace_id,
         session.id,
@@ -420,37 +451,42 @@
       dialogs.selectedSession = updated
       dialogs.editDialogOpen = false
       notifications.pushToast('success', t('toast.sessionEdited'), payload.name)
-    } catch (err) {
-      notifications.notifyError(t('toast.editSessionFailed'), err)
-    } finally {
-      editingSession.value = false
-    }
+    })
   }
 
   async function deleteSelectedSession() {
     const session = dialogs.selectedSession
-    if (!session || deletingSessionId.value || isActiveLifecycle(session)) {
+    if (!session || deletingSessionId.value || deleteAction.running || isActiveLifecycle(session)) {
       return
     }
     deletingSessionId.value = session.id
     try {
-      await props.runtimeApi.deleteSession(session.workspace_id, session.id)
-      workspaceSessions.removeSession(session.workspace_id, session.id)
-      const nextSession = workbench.closeTab(
-        session.workspace_id,
-        session.id,
-        workspaceSessions.sessionById,
+      await deleteAction.run(
+        async () => {
+          await props.runtimeApi.deleteSession(session.workspace_id, session.id)
+          workspaceSessions.removeSession(session.workspace_id, session.id)
+          const nextSession = workbench.closeTab(
+            session.workspace_id,
+            session.id,
+            workspaceSessions.sessionById,
+          )
+          if (nextSession) {
+            await notifyHistoryError(
+              await workbench.ensureHistoryLoaded(
+                props.runtimeTarget,
+                props.runtimeApi,
+                nextSession,
+              ),
+            )
+          }
+          dialogs.clearSelectedSession()
+          dialogs.deleteSessionDialogOpen = false
+          notifications.pushToast('success', t('toast.sessionDeleted'), session.name)
+        },
+        { rethrow: true },
       )
-      if (nextSession) {
-        await notifyHistoryError(
-          await workbench.ensureHistoryLoaded(props.runtimeTarget, props.runtimeApi, nextSession),
-        )
-      }
-      dialogs.clearSelectedSession()
-      dialogs.deleteSessionDialogOpen = false
-      notifications.pushToast('success', t('toast.sessionDeleted'), session.name)
-    } catch (err) {
-      notifications.notifyError(t('toast.deleteSessionFailed'), err)
+    } catch {
+      // notify handled by deleteAction.onError
     } finally {
       deletingSessionId.value = null
     }
@@ -458,24 +494,29 @@
 
   async function removeSelectedWorkspace() {
     const workspace = dialogs.selectedWorkspace
-    if (!workspace || removingWorkspaceId.value) {
+    if (!workspace || removingWorkspaceId.value || removeWorkspaceAction.running) {
       return
     }
     removingWorkspaceId.value = workspace.id
     try {
-      await props.runtimeApi.deleteWorkspace(workspace.id)
-      const removedSessions = workspaceSessions.removeWorkspace(workspace.id)
-      workbench.closeRemovedSessions(removedSessions)
-      fileWorkbench.removeWorkspace(workspace.id)
-      dialogs.clearSelectedWorkspace()
-      dialogs.removeWorkspaceDialogOpen = false
-      notifications.pushToast(
-        'success',
-        t('toast.workspaceRemoved'),
-        t('message.workspaceRemoved', { name: workspace.name }),
+      await removeWorkspaceAction.run(
+        async () => {
+          await props.runtimeApi.deleteWorkspace(workspace.id)
+          const removedSessions = workspaceSessions.removeWorkspace(workspace.id)
+          workbench.closeRemovedSessions(removedSessions)
+          fileWorkbench.removeWorkspace(workspace.id)
+          dialogs.clearSelectedWorkspace()
+          dialogs.removeWorkspaceDialogOpen = false
+          notifications.pushToast(
+            'success',
+            t('toast.workspaceRemoved'),
+            t('message.workspaceRemoved', { name: workspace.name }),
+          )
+        },
+        { rethrow: true },
       )
-    } catch (err) {
-      notifications.notifyError(t('toast.removeWorkspaceFailed'), err)
+    } catch {
+      // notify handled by removeWorkspaceAction.onError
     } finally {
       removingWorkspaceId.value = null
     }
@@ -537,7 +578,7 @@
   }
 
   async function closeBackgroundSessions(selectedSessions: SessionIdentity[]) {
-    if (closingBackgroundSessions.value) {
+    if (closeBackgroundAction.running) {
       return
     }
 
@@ -549,20 +590,23 @@
       return
     }
 
-    closingBackgroundSessions.value = true
     let completed = false
     try {
-      await closeSessionsSerially(
-        sessions,
-        props.runtimeApi.closeSession,
-        workspaceSessions.updateSession,
+      await closeBackgroundAction.run(
+        async () => {
+          await closeSessionsSerially(
+            sessions,
+            props.runtimeApi.closeSession,
+            workspaceSessions.updateSession,
+          )
+          completed = true
+        },
+        { rethrow: true },
       )
-      completed = true
-    } catch (err) {
-      notifications.notifyError(t('toast.closeBackgroundSessionsFailed'), err)
+    } catch {
+      // notify handled by closeBackgroundAction.onError
     } finally {
       await refresh()
-      closingBackgroundSessions.value = false
       if (completed) {
         closeBackgroundSessionsDrawerOpen.value = false
       }
@@ -607,39 +651,61 @@
   }
 
   async function stopSessionFromSidebar(session: SessionSummary) {
-    if (!isStoppableLifecycle(session) || stoppingSessionId.value) {
+    if (!isStoppableLifecycle(session) || stoppingSessionId.value || stopAction.running) {
       return
     }
     stoppingSessionId.value = session.id
     try {
-      const updated = await props.runtimeApi.closeSession(session.workspace_id, session.id)
-      workspaceSessions.updateSession(updated)
-      await notifyHistoryError(
-        await workbench.ensureHistoryLoaded(props.runtimeTarget, props.runtimeApi, updated),
+      await stopAction.run(
+        async () => {
+          const updated = await props.runtimeApi.closeSession(session.workspace_id, session.id)
+          workspaceSessions.updateSession(updated)
+          await notifyHistoryError(
+            await workbench.ensureHistoryLoaded(props.runtimeTarget, props.runtimeApi, updated),
+          )
+        },
+        { rethrow: true },
       )
-    } catch (err) {
-      notifications.notifyError(t('toast.stopSessionFailed'), err)
+    } catch {
+      // notify handled by stopAction.onError
     } finally {
       stoppingSessionId.value = null
     }
   }
 
   async function rerunSessionFromSidebar(session: SessionSummary) {
-    if (!canRerunLifecycle(session) || rerunningSessionId.value) {
+    if (!canRerunLifecycle(session) || rerunningSessionId.value || rerunAction.running) {
       return
     }
     rerunningSessionId.value = session.id
     try {
-      const size = measureInitialTerminalSize()
-      const response = await props.runtimeApi.rerunSession(session.workspace_id, session.id, size)
-      const updated = await props.runtimeApi.getSession(response.workspace_id, response.session_id)
-      workspaceSessions.updateSession(updated)
-      workbench.resetTabHistory(updated.workspace_id, updated.id)
-      await openSessionTab(updated)
-      notifications.pushToast('success', t('toast.sessionRerun'), updated.name)
-    } catch (err) {
-      notifications.notifyError(t('toast.rerunSessionFailed'), err)
-      await refreshSessionAfterRerunFailure(session)
+      await rerunAction.run(
+        async () => {
+          const size = measureInitialTerminalSize()
+          const response = await props.runtimeApi.rerunSession(
+            session.workspace_id,
+            session.id,
+            size,
+          )
+          const updated = await props.runtimeApi.getSession(
+            response.workspace_id,
+            response.session_id,
+          )
+          workspaceSessions.updateSession(updated)
+          workbench.resetTabHistory(updated.workspace_id, updated.id)
+          await openSessionTab(updated)
+          notifications.pushToast('success', t('toast.sessionRerun'), updated.name)
+        },
+        {
+          rethrow: true,
+          onError: (err) => {
+            notifications.notifyError(t('toast.rerunSessionFailed'), err)
+            void refreshSessionAfterRerunFailure(session)
+          },
+        },
+      )
+    } catch {
+      // notify/refresh handled by rerunAction onError
     } finally {
       rerunningSessionId.value = null
     }

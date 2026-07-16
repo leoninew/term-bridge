@@ -50,7 +50,7 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 		t.Fatalf("Unmarshal(started) error = %v", err)
 	}
 	if started.GetType() != terminalproto.TypeStarted || started.GetSessionId() != "sess-1" || started.GetWorkspaceId() != "ws-1" || started.GetLifecycleState() != "running" || started.GetAttachmentState() != "attached" {
-		t.Fatalf("started control = %#v, want attached session metadata", started)
+		t.Fatalf("started control type=%q session=%q workspace=%q lifecycle=%q attachment=%q", started.GetType(), started.GetSessionId(), started.GetWorkspaceId(), started.GetLifecycleState(), started.GetAttachmentState())
 	}
 	outputType, output, err := browser.Read(ctx)
 	if err != nil {

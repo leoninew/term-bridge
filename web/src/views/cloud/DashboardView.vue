@@ -31,69 +31,81 @@
             <button
               type="button"
               class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]"
-              :disabled="loading"
+              :disabled="devicesAction.running"
               @click="refreshDevices"
             >
-              <RefreshCw class="size-3.5" :class="loading ? 'animate-spin' : ''" />
-              {{ loading ? t('dashboard.refreshing') : t('dashboard.refreshDevices') }}
+              <RefreshCw class="size-3.5" :class="devicesAction.running ? 'animate-spin' : ''" />
+              {{
+                devicesAction.running ? t('dashboard.refreshing') : t('dashboard.refreshDevices')
+              }}
             </button>
           </div>
         </div>
 
-        <div v-if="loading" class="p-5 text-sm text-[var(--color-text-muted)]">
-          {{ t('dashboard.loadingDevices') }}
-        </div>
-        <div v-else-if="deviceError" class="p-5 text-sm text-[var(--color-danger-text)]">
-          {{ deviceError }}
-        </div>
-        <div
-          v-else-if="cloudDevices.devices.length === 0"
-          class="p-5 text-sm text-[var(--color-text-muted)]"
+        <PageStatus
+          class="min-w-0"
+          :loading="devicesAction.running"
+          :error="deviceError || null"
+          :empty="!devicesAction.running && !deviceError && cloudDevices.devices.length === 0"
+          :loading-text="t('dashboard.loadingDevices')"
+          :empty-text="t('dashboard.emptyTitle')"
         >
-          {{ t('dashboard.emptyTitle') }}
-        </div>
-        <ul v-else class="divide-y divide-[var(--color-border)]">
-          <li
-            v-for="device in cloudDevices.devices"
-            :key="device.id"
-            class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
-          >
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <span
-                  class="size-2 shrink-0 rounded-full"
-                  :class="device.online ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
-                />
-                <Monitor class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
-                <span class="truncate text-sm text-[var(--color-text-strong)]">
-                  {{ device.name }}
-                </span>
-                <span class="shrink-0 text-sm text-[var(--color-text-muted)]">
-                  {{ device.online ? t('cloud.online') : t('cloud.offline') }}
-                </span>
-              </div>
-              <p class="mt-1 truncate pl-8 text-sm text-[var(--color-text-muted)]">
-                {{ deviceActivity(device) }}
-              </p>
+          <template #loading>
+            <div class="p-5 text-sm text-[var(--color-text-muted)]">
+              {{ t('dashboard.loadingDevices') }}
             </div>
-            <button
-              type="button"
-              class="inline-flex size-8 shrink-0 items-center justify-center rounded-md outline-none disabled:cursor-not-allowed"
-              :disabled="!device.online"
-              :aria-label="t('dashboard.openWorkbench')"
-              @click="openCloudSessions(device.id)"
+          </template>
+          <template #error>
+            <div class="p-5 text-sm text-[var(--color-danger-text)]">{{ deviceError }}</div>
+          </template>
+          <template #empty>
+            <div class="p-5 text-sm text-[var(--color-text-muted)]">
+              {{ t('dashboard.emptyTitle') }}
+            </div>
+          </template>
+          <ul class="divide-y divide-[var(--color-border)]">
+            <li
+              v-for="device in cloudDevices.devices"
+              :key="device.id"
+              class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
             >
-              <ArrowRight
-                class="size-5"
-                :class="
-                  device.online
-                    ? 'text-[var(--color-text-subtle)]'
-                    : 'text-[var(--color-text-muted)]'
-                "
-              />
-            </button>
-          </li>
-        </ul>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span
+                    class="size-2 shrink-0 rounded-full"
+                    :class="device.online ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
+                  />
+                  <Monitor class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
+                  <span class="truncate text-sm text-[var(--color-text-strong)]">
+                    {{ device.name }}
+                  </span>
+                  <span class="shrink-0 text-sm text-[var(--color-text-muted)]">
+                    {{ device.online ? t('cloud.online') : t('cloud.offline') }}
+                  </span>
+                </div>
+                <p class="mt-1 truncate pl-8 text-sm text-[var(--color-text-muted)]">
+                  {{ deviceActivity(device) }}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="inline-flex size-8 shrink-0 items-center justify-center rounded-md outline-none disabled:cursor-not-allowed"
+                :disabled="!device.online"
+                :aria-label="t('dashboard.openWorkbench')"
+                @click="openCloudSessions(device.id)"
+              >
+                <ArrowRight
+                  class="size-5"
+                  :class="
+                    device.online
+                      ? 'text-[var(--color-text-subtle)]'
+                      : 'text-[var(--color-text-muted)]'
+                  "
+                />
+              </button>
+            </li>
+          </ul>
+        </PageStatus>
       </section>
     </div>
   </AppPageShell>
@@ -105,6 +117,8 @@
   import { ArrowRight, Monitor, RefreshCw } from '@lucide/vue'
   import { RouterLink, useRouter } from 'vue-router'
   import AppPageShell from '../../components/layout/AppPageShell.vue'
+  import PageStatus from '../../components/layout/PageStatus.vue'
+  import { useAsyncAction } from '../../composable/useAsyncAction'
   import CloudAccountMenu from '../../components/dashboard/CloudAccountMenu.vue'
   import { authLogout } from '../../features/cloud/api'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
@@ -117,27 +131,26 @@
   const cloudAuth = useCloudAuthStore()
   const cloudDevices = useCloudDevicesStore()
   const notifications = useNotificationsStore()
-  const loading = ref(false)
   const deviceError = ref('')
+  const devicesAction = useAsyncAction({
+    onError: (err) => {
+      deviceError.value = t('dashboard.loadDevicesFailed')
+      notifications.notifyError(t('dashboard.loadDevicesFailed'), err)
+    },
+  })
 
   const userDisplayName = computed(
     () => cloudAuth.user?.display_name || cloudAuth.user?.email || t('dashboard.signedIn'),
   )
 
   async function refreshDevices() {
-    if (loading.value) {
+    if (devicesAction.running) {
       return
     }
-    loading.value = true
     deviceError.value = ''
-    try {
+    await devicesAction.run(async () => {
       await cloudDevices.loadDevices()
-    } catch (err) {
-      deviceError.value = t('dashboard.loadDevicesFailed')
-      notifications.notifyError(t('dashboard.loadDevicesFailed'), err)
-    } finally {
-      loading.value = false
-    }
+    })
   }
 
   async function openCloudLogin() {

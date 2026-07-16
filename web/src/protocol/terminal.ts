@@ -8,7 +8,6 @@ export const minTerminalCols = 1
 export const maxTerminalCols = 1000
 export const minTerminalRows = 1
 export const maxTerminalRows = 1000
-export const terminalFitSafetyMargin = 1
 
 export type TerminalSize = {
   cols: number
@@ -20,13 +19,6 @@ export function clampTerminalSize(size: TerminalSize): TerminalSize {
     cols: Math.max(minTerminalCols, Math.min(maxTerminalCols, size.cols)),
     rows: Math.max(minTerminalRows, Math.min(maxTerminalRows, size.rows)),
   }
-}
-
-export function fitSafeTerminalSize(size: TerminalSize): TerminalSize {
-  return clampTerminalSize({
-    cols: size.cols - terminalFitSafetyMargin,
-    rows: size.rows - terminalFitSafetyMargin,
-  })
 }
 
 export function encodeControl(message: ClientControlMessage): string {

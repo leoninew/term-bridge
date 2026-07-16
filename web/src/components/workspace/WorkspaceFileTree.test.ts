@@ -84,6 +84,21 @@ describe('WorkspaceFileTree', () => {
     expect(wrapper.emitted('back')).toEqual([[]])
   })
 
+  it('emits back from the sessions switch in the left panel footer', async () => {
+    const store = useFileWorkbenchStore()
+    const runtimeApi = api()
+    store.openWorkspace({ mode: 'local' }, 'workspace-1')
+    const wrapper = mount(WorkspaceFileTree, {
+      props: { api: runtimeApi, workspaceName: 'Workspace' },
+      global: { plugins: [i18n] },
+    })
+
+    const switchButton = wrapper.find('footer button')
+    expect(switchButton.attributes('disabled')).toBeUndefined()
+    await switchButton.trigger('click')
+    expect(wrapper.emitted('back')).toEqual([[]])
+  })
+
   it('emits root and entry mutations and refreshes only when the user asks', async () => {
     const store = useFileWorkbenchStore()
     const runtimeApi = api()

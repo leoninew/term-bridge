@@ -156,7 +156,7 @@ func (a WebTerminalAccess) fileService() error {
 }
 func (a WebTerminalAccess) gitService() error {
 	if a.Git == nil {
-		return fmt.Errorf("Git service is unavailable")
+		return fmt.Errorf("git service is unavailable")
 	}
 	return nil
 }

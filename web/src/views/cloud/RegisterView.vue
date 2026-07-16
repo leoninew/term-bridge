@@ -20,7 +20,7 @@
               type="email"
               autocomplete="email"
               required
-              :disabled="submitting"
+              :disabled="submitAction.running"
               class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
             />
           </label>
@@ -33,7 +33,7 @@
               type="password"
               autocomplete="new-password"
               required
-              :disabled="submitting"
+              :disabled="submitAction.running"
               class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
             />
           </label>
@@ -51,7 +51,7 @@
             <button
               type="button"
               class="mt-2 text-xs text-[var(--color-primary-border)] transition-opacity hover:opacity-80"
-              :disabled="loadingTurnstile"
+              :disabled="turnstileAction.running"
               @click="loadTurnstileSiteKey"
             >
               {{ t('common.retry') }}
@@ -60,9 +60,9 @@
           <button
             type="submit"
             class="button button-primary h-10 w-full text-sm"
-            :disabled="submitting || externalSubmitting || !turnstileToken"
+            :disabled="submitAction.running || externalAction.running || !turnstileToken"
           >
-            {{ submitting ? t('common.creating') : t('cloud.register') }}
+            {{ submitAction.running ? t('common.creating') : t('cloud.register') }}
           </button>
         </div>
 
@@ -78,10 +78,10 @@
               :key="providerId"
               type="button"
               class="button button-provider h-10 w-full text-sm"
-              :disabled="submitting || externalSubmitting"
+              :disabled="submitAction.running || externalAction.running"
               @click="registerWithExternalProvider(providerId)"
             >
-              {{ externalSubmitting ? t('cloud.signingIn') : providerLabel(providerId) }}
+              {{ externalAction.running ? t('cloud.signingIn') : providerLabel(providerId) }}
             </button>
           </div>
         </template>
@@ -106,6 +106,7 @@
   import { useRouter, RouterLink } from 'vue-router'
   import TurnstileChallenge from '../../components/cloud/TurnstileChallenge.vue'
   import AppPageShell from '../../components/layout/AppPageShell.vue'
+  import { useAsyncAction } from '../../composable/useAsyncAction'
   import { authExternalUrl, authRegister, authTurnstileSiteKey } from '../../features/cloud/api'
   import { useNotificationsStore } from '../../store/notifications'
   import { useRuntimeConfigStore } from '../../store/runtimeConfig'
@@ -116,31 +117,29 @@
   const runtimeConfig = useRuntimeConfigStore()
   const email = ref('')
   const password = ref('')
-  const submitting = ref(false)
-  const externalSubmitting = ref(false)
   const turnstileSiteKey = ref('')
   const turnstileToken = ref('')
-  const loadingTurnstile = ref(false)
   const turnstile = ref<InstanceType<typeof TurnstileChallenge> | null>(null)
+  const turnstileAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('cloud.registerTitle'), err),
+  })
+  const submitAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('cloud.registerFailed'), err),
+  })
+  const externalAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('cloud.externalLoginFailed'), err),
+  })
 
   onMounted(loadTurnstileSiteKey)
 
   async function loadTurnstileSiteKey() {
-    if (loadingTurnstile.value) {
-      return
-    }
-    loadingTurnstile.value = true
-    try {
+    await turnstileAction.run(async () => {
       turnstileSiteKey.value = await authTurnstileSiteKey()
-    } catch (err) {
-      notifications.notifyError(t('cloud.registerTitle'), err)
-    } finally {
-      loadingTurnstile.value = false
-    }
+    })
   }
 
   async function submit() {
-    if (submitting.value) {
+    if (submitAction.running || externalAction.running) {
       return
     }
     if (!email.value) {
@@ -159,32 +158,30 @@
       )
       return
     }
-    submitting.value = true
     try {
-      await authRegister(email.value, password.value, turnstileToken.value)
-      notifications.pushToast('success', t('cloud.registerTitle'), t('cloud.registerSucceeded'))
-      await router.push({ name: 'cloud-verify-email', query: { email: email.value } })
-    } catch (err) {
-      notifications.notifyError(t('cloud.registerFailed'), err)
+      await submitAction.run(
+        async () => {
+          await authRegister(email.value, password.value, turnstileToken.value)
+          notifications.pushToast('success', t('cloud.registerTitle'), t('cloud.registerSucceeded'))
+          await router.push({ name: 'cloud-verify-email', query: { email: email.value } })
+        },
+        { rethrow: true },
+      )
+    } catch {
+      // notify handled by submitAction.onError
     } finally {
-      submitting.value = false
       turnstileToken.value = ''
       turnstile.value?.reset()
     }
   }
 
   async function registerWithExternalProvider(providerId: string) {
-    if (externalSubmitting.value) {
+    if (submitAction.running || externalAction.running) {
       return
     }
-    externalSubmitting.value = true
-    try {
+    await externalAction.run(async () => {
       window.location.href = await authExternalUrl(providerId)
-    } catch (err) {
-      notifications.notifyError(t('cloud.externalLoginFailed'), err)
-    } finally {
-      externalSubmitting.value = false
-    }
+    })
   }
 
   function providerLabel(providerId: string) {

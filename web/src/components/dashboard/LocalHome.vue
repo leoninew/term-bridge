@@ -132,43 +132,56 @@
           </RouterLink>
         </div>
 
-        <div v-if="workspacesLoading" class="p-5 text-sm text-[var(--color-text-muted)]">
-          {{ t('dashboard.loadingWorkspaces') }}
-        </div>
-        <div v-else-if="workspaceError" class="p-5 text-sm text-[var(--color-danger-text)]">
-          {{ workspaceError }}
-        </div>
-        <div v-else-if="workspaces.length === 0" class="p-5 text-sm text-[var(--color-text-muted)]">
-          {{ t('dashboard.emptyWorkspaces') }}
-        </div>
-        <ul v-else class="divide-y divide-[var(--color-border)]">
-          <li
-            v-for="workspace in workspaces"
-            :key="workspace.id"
-            class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
-          >
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <Folder class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
-                <span class="truncate text-sm text-[var(--color-text-strong)]">
-                  {{ workspace.name }}
-                </span>
-              </div>
-              <div
-                class="mt-1 flex min-w-0 items-center gap-3 pl-6 text-sm text-[var(--color-text-muted)]"
-              >
-                <span class="truncate">{{ workspace.path }}</span>
-                <span class="shrink-0">
-                  {{ workspaceUpdatedAt(workspace.updated_at) }}
-                </span>
-              </div>
+        <PageStatus
+          class="min-w-0"
+          :loading="workspacesLoading"
+          :error="workspaceError || null"
+          :empty="!workspacesLoading && !workspaceError && workspaces.length === 0"
+          :loading-text="t('dashboard.loadingWorkspaces')"
+          :empty-text="t('dashboard.emptyWorkspaces')"
+        >
+          <template #loading>
+            <div class="p-5 text-sm text-[var(--color-text-muted)]">
+              {{ t('dashboard.loadingWorkspaces') }}
             </div>
-            <ArrowRight
-              class="size-5 shrink-0 text-[var(--color-text-subtle)]"
-              aria-hidden="true"
-            />
-          </li>
-        </ul>
+          </template>
+          <template #error>
+            <div class="p-5 text-sm text-[var(--color-danger-text)]">{{ workspaceError }}</div>
+          </template>
+          <template #empty>
+            <div class="p-5 text-sm text-[var(--color-text-muted)]">
+              {{ t('dashboard.emptyWorkspaces') }}
+            </div>
+          </template>
+          <ul class="divide-y divide-[var(--color-border)]">
+            <li
+              v-for="workspace in workspaces"
+              :key="workspace.id"
+              class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
+            >
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <Folder class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
+                  <span class="truncate text-sm text-[var(--color-text-strong)]">
+                    {{ workspace.name }}
+                  </span>
+                </div>
+                <div
+                  class="mt-1 flex min-w-0 items-center gap-3 pl-6 text-sm text-[var(--color-text-muted)]"
+                >
+                  <span class="truncate">{{ workspace.path }}</span>
+                  <span class="shrink-0">
+                    {{ workspaceUpdatedAt(workspace.updated_at) }}
+                  </span>
+                </div>
+              </div>
+              <ArrowRight
+                class="size-5 shrink-0 text-[var(--color-text-subtle)]"
+                aria-hidden="true"
+              />
+            </li>
+          </ul>
+        </PageStatus>
       </section>
 
       <section
@@ -189,29 +202,40 @@
           </RouterLink>
         </div>
 
-        <div v-if="shortcutsLoading" class="p-5 text-sm text-[var(--color-text-muted)]">
-          {{ t('shortcut.loading') }}
-        </div>
-        <div v-else-if="shortcutError" class="p-5 text-sm text-[var(--color-danger-text)]">
-          {{ shortcutError }}
-        </div>
-        <div v-else-if="shortcuts.length === 0" class="p-5 text-sm text-[var(--color-text-muted)]">
-          {{ t('shortcut.empty') }}
-        </div>
-        <ul v-else class="grid gap-px bg-[var(--color-border)] sm:grid-cols-2 lg:grid-cols-4">
-          <li
-            v-for="shortcut in shortcuts"
-            :key="shortcut.id"
-            class="min-w-0 bg-[var(--color-surface)] px-4 py-3 text-center"
-          >
-            <p class="truncate text-sm font-semibold text-[var(--color-text-strong)]">
-              {{ shortcut.name }}
-            </p>
-            <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
-              {{ shortcut.command }}
-            </p>
-          </li>
-        </ul>
+        <PageStatus
+          class="min-w-0"
+          :loading="shortcutsLoading"
+          :error="shortcutError || null"
+          :empty="!shortcutsLoading && !shortcutError && shortcuts.length === 0"
+          :loading-text="t('shortcut.loading')"
+          :empty-text="t('shortcut.empty')"
+        >
+          <template #loading>
+            <div class="p-5 text-sm text-[var(--color-text-muted)]">
+              {{ t('shortcut.loading') }}
+            </div>
+          </template>
+          <template #error>
+            <div class="p-5 text-sm text-[var(--color-danger-text)]">{{ shortcutError }}</div>
+          </template>
+          <template #empty>
+            <div class="p-5 text-sm text-[var(--color-text-muted)]">{{ t('shortcut.empty') }}</div>
+          </template>
+          <ul class="grid gap-px bg-[var(--color-border)] sm:grid-cols-2 lg:grid-cols-4">
+            <li
+              v-for="shortcut in shortcuts"
+              :key="shortcut.id"
+              class="min-w-0 bg-[var(--color-surface)] px-4 py-3 text-center"
+            >
+              <p class="truncate text-sm font-semibold text-[var(--color-text-strong)]">
+                {{ shortcut.name }}
+              </p>
+              <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
+                {{ shortcut.command }}
+              </p>
+            </li>
+          </ul>
+        </PageStatus>
       </section>
     </div>
   </AppPageShell>
@@ -233,6 +257,8 @@
   } from '@lucide/vue'
   import { RouterLink } from 'vue-router'
   import AppPageShell from '../layout/AppPageShell.vue'
+  import PageStatus from '../layout/PageStatus.vue'
+  import { useAsyncAction } from '../../composable/useAsyncAction'
   import CloudAccountMenu from './CloudAccountMenu.vue'
   import {
     agentStatus,
@@ -263,15 +289,28 @@
   const cloudAuth = useCloudAuthStore()
   const cloudSession = useCloudSessionStore()
   const notifications = useNotificationsStore()
-  const connectingCloud = ref(false)
   const localUser = ref('')
   const localDevice = ref<DeviceSummary | null>(null)
   const workspaces = ref<Workspace[]>([])
-  const workspacesLoading = ref(false)
   const workspaceError = ref('')
   const shortcuts = ref<Shortcut[]>([])
-  const shortcutsLoading = ref(false)
   const shortcutError = ref('')
+  const workspacesAction = useAsyncAction({
+    onError: (err) => {
+      workspaceError.value = t('dashboard.loadWorkspacesFailed')
+      notifications.notifyError(t('dashboard.loadWorkspacesFailed'), err)
+    },
+  })
+  const shortcutsAction = useAsyncAction({
+    onError: (err) => {
+      shortcutError.value = t('toast.loadShortcutsFailed')
+      notifications.notifyError(t('toast.loadShortcutsFailed'), err)
+    },
+  })
+  const cloudAction = useAsyncAction()
+  const workspacesLoading = computed(() => workspacesAction.running)
+  const shortcutsLoading = computed(() => shortcutsAction.running)
+  const connectingCloud = computed(() => cloudAction.running)
 
   const cloudConnectEnabled = computed(() => cloudOAuthConfigured())
   const cloudConnectionActionLabel = computed(() =>
@@ -292,8 +331,6 @@
   const deviceName = computed(() => localDevice.value?.name || localDevice.value?.id || '')
 
   async function loadLocalHome() {
-    workspacesLoading.value = true
-    shortcutsLoading.value = true
     workspaceError.value = ''
     shortcutError.value = ''
     try {
@@ -313,40 +350,25 @@
     } catch (err) {
       workspaceError.value = t('dashboard.loadWorkspacesFailed')
       notifications.notifyError(t('dashboard.loadWorkspacesFailed'), err)
-      workspacesLoading.value = false
-      shortcutsLoading.value = false
       return
     }
 
-    await loadWorkspaces()
-    await loadShortcuts()
+    await Promise.all([loadWorkspaces(), loadShortcuts()])
   }
 
   async function loadWorkspaces() {
-    workspacesLoading.value = true
     workspaceError.value = ''
-    try {
+    await workspacesAction.run(async () => {
       const workspaceResponse = await listWorkspaces()
       workspaces.value = workspaceResponse.data.slice(0, 4)
-    } catch (err) {
-      workspaceError.value = t('dashboard.loadWorkspacesFailed')
-      notifications.notifyError(t('dashboard.loadWorkspacesFailed'), err)
-    } finally {
-      workspacesLoading.value = false
-    }
+    })
   }
 
   async function loadShortcuts() {
-    shortcutsLoading.value = true
     shortcutError.value = ''
-    try {
+    await shortcutsAction.run(async () => {
       shortcuts.value = (await listShortcuts()).slice(0, 4)
-    } catch (err) {
-      shortcutError.value = t('toast.loadShortcutsFailed')
-      notifications.notifyError(t('toast.loadShortcutsFailed'), err)
-    } finally {
-      shortcutsLoading.value = false
-    }
+    })
   }
 
   async function reconcileCloudConnection(reportedSession: CloudSessionSummary | null) {
@@ -366,21 +388,18 @@
 
   async function connectStoredCloudToken(): Promise<boolean> {
     const cloudToken = cloudAuth.cloudToken
-    if (!cloudToken || connectingCloud.value) {
+    if (!cloudToken || cloudAction.running) {
       return false
     }
-    connectingCloud.value = true
-    try {
+    const result = await cloudAction.run(async () => {
       const response = await connectCloudWithToken(cloudToken)
       const connectedSession = markCloudConnected(response.cloud_session)
       if (!connectedSession) {
         throw new Error('Cloud connect response missing cloud_session')
       }
       setCloudConnection(connectedSession)
-      return true
-    } finally {
-      connectingCloud.value = false
-    }
+    })
+    return result.ok
   }
 
   function setCloudConnection(summary: CloudSessionSummary | null) {
@@ -408,29 +427,38 @@
   }
 
   async function disconnectLocalDeviceFromCloud() {
-    if (connectingCloud.value) {
+    if (cloudAction.running) {
       return
     }
-    connectingCloud.value = true
-    try {
-      await disconnectCloudSession()
-    } catch (err) {
-      notifications.notifyError(t('dashboard.cloudDisconnectionFailed'), err)
-    } finally {
-      connectingCloud.value = false
-    }
+    await cloudAction.run(
+      async () => {
+        await disconnectCloudSession()
+      },
+      {
+        onError: (err) => notifications.notifyError(t('dashboard.cloudDisconnectionFailed'), err),
+      },
+    )
   }
 
   async function connectLocalDeviceToCloud() {
-    if (connectingCloud.value) {
+    if (cloudAction.running) {
       return
     }
     if (cloudAuth.cloudToken) {
-      try {
-        await connectStoredCloudToken()
-      } catch (err) {
-        notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
-      }
+      const result = await cloudAction.run(
+        async () => {
+          const response = await connectCloudWithToken(cloudAuth.cloudToken!)
+          const connectedSession = markCloudConnected(response.cloud_session)
+          if (!connectedSession) {
+            throw new Error('Cloud connect response missing cloud_session')
+          }
+          setCloudConnection(connectedSession)
+        },
+        {
+          onError: (err) => notifications.notifyError(t('dashboard.cloudConnectionFailed'), err),
+        },
+      )
+      void result
       return
     }
     if (!cloudOAuthConfigured()) {

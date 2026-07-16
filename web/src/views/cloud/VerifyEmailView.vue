@@ -20,7 +20,7 @@
               type="email"
               autocomplete="email"
               required
-              :disabled="submitting || resending"
+              :disabled="busy"
               class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
             />
           </label>
@@ -33,22 +33,18 @@
               inputmode="text"
               pattern="[A-Za-z0-9]{6}"
               required
-              :disabled="submitting || resending"
+              :disabled="busy"
               placeholder="ABC123"
               class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm uppercase text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
             />
           </label>
-          <button
-            type="submit"
-            class="button button-primary h-10 w-full text-sm"
-            :disabled="submitting || resending"
-          >
+          <button type="submit" class="button button-primary h-10 w-full text-sm" :disabled="busy">
             {{ t('cloud.verifyEmail') }}
           </button>
           <button
             type="button"
             class="button button-secondary h-10 w-full text-sm"
-            :disabled="submitting || resending"
+            :disabled="busy"
             @click="resend"
           >
             {{ t('cloud.resendCode') }}
@@ -60,10 +56,11 @@
 </template>
 
 <script setup lang="ts">
-  import { ref } from 'vue'
+  import { computed, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
   import AppPageShell from '../../components/layout/AppPageShell.vue'
+  import { useAsyncAction } from '../../composable/useAsyncAction'
   import { authResendVerification, authVerifyEmail } from '../../features/cloud/api'
   import { useNotificationsStore } from '../../store/notifications'
 
@@ -73,11 +70,16 @@
   const notifications = useNotificationsStore()
   const email = ref(String(route.query.email ?? ''))
   const code = ref('')
-  const submitting = ref(false)
-  const resending = ref(false)
+  const submitAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('cloud.verifyEmailFailed'), err),
+  })
+  const resendAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('cloud.resendVerificationFailed'), err),
+  })
+  const busy = computed(() => submitAction.running || resendAction.running)
 
   async function submit() {
-    if (submitting.value || resending.value) {
+    if (busy.value) {
       return
     }
     if (!email.value) {
@@ -100,8 +102,7 @@
       )
       return
     }
-    submitting.value = true
-    try {
+    await submitAction.run(async () => {
       await authVerifyEmail(email.value, code.value)
       notifications.pushToast(
         'success',
@@ -109,15 +110,11 @@
         t('cloud.verifyEmailSucceeded'),
       )
       await router.push({ name: 'cloud-login' })
-    } catch (err) {
-      notifications.notifyError(t('cloud.verifyEmailFailed'), err)
-    } finally {
-      submitting.value = false
-    }
+    })
   }
 
   async function resend() {
-    if (submitting.value || resending.value) {
+    if (busy.value) {
       return
     }
     if (!email.value) {
@@ -128,18 +125,13 @@
       )
       return
     }
-    resending.value = true
-    try {
+    await resendAction.run(async () => {
       await authResendVerification(email.value)
       notifications.pushToast(
         'success',
         t('cloud.verifyEmailTitle'),
         t('cloud.verificationCodeSent'),
       )
-    } catch (err) {
-      notifications.notifyError(t('cloud.resendVerificationFailed'), err)
-    } finally {
-      resending.value = false
-    }
+    })
   }
 </script>

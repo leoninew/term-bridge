@@ -22,7 +22,7 @@
               type="password"
               autocomplete="current-password"
               required
-              :disabled="submitting"
+              :disabled="submitAction.running"
               class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
             />
           </label>
@@ -35,16 +35,16 @@
               type="password"
               autocomplete="new-password"
               required
-              :disabled="submitting"
+              :disabled="submitAction.running"
               class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
             />
           </label>
           <button
             type="submit"
             class="button button-primary h-10 w-full text-sm"
-            :disabled="submitting"
+            :disabled="submitAction.running"
           >
-            {{ submitting ? t('cloud.changingPassword') : t('cloud.changePassword') }}
+            {{ submitAction.running ? t('cloud.changingPassword') : t('cloud.changePassword') }}
           </button>
         </div>
       </form>
@@ -56,6 +56,7 @@
   import { ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import AppPageShell from '../../components/layout/AppPageShell.vue'
+  import { useAsyncAction } from '../../composable/useAsyncAction'
   import { authChangePassword } from '../../features/cloud/api'
   import { useNotificationsStore } from '../../store/notifications'
 
@@ -63,10 +64,12 @@
   const notifications = useNotificationsStore()
   const currentPassword = ref('')
   const newPassword = ref('')
-  const submitting = ref(false)
+  const submitAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('cloud.changePasswordFailed'), err),
+  })
 
   async function submit() {
-    if (submitting.value) {
+    if (submitAction.running) {
       return
     }
     if (!currentPassword.value) {
@@ -85,16 +88,11 @@
       )
       return
     }
-    submitting.value = true
-    try {
+    await submitAction.run(async () => {
       await authChangePassword(currentPassword.value, newPassword.value)
       currentPassword.value = ''
       newPassword.value = ''
       notifications.pushToast('success', t('cloud.changePasswordSucceeded'), '')
-    } catch (err) {
-      notifications.notifyError(t('cloud.changePasswordFailed'), err)
-    } finally {
-      submitting.value = false
-    }
+    })
   }
 </script>

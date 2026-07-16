@@ -237,7 +237,10 @@
       return
     }
     if (targetDocuments.some((document) => document.dirty || document.conflict)) {
-      action.value = { type: 'close-document', paths: targetDocuments.map((document) => document.path) }
+      action.value = {
+        type: 'close-document',
+        paths: targetDocuments.map((document) => document.path),
+      }
       return
     }
     store.closeDocuments(targetDocuments.map((document) => document.path))
@@ -411,8 +414,13 @@
         }
       }
     } else if (next.type === 'close-document') {
-      const targetDocuments = store.documents.filter((document) => next.paths.includes(document.path))
-      if (targetDocuments.length !== next.paths.length || targetDocuments.some((document) => document.saving)) {
+      const targetDocuments = store.documents.filter((document) =>
+        next.paths.includes(document.path),
+      )
+      if (
+        targetDocuments.length !== next.paths.length ||
+        targetDocuments.some((document) => document.saving)
+      ) {
         return t('files.closeDocumentsSaving')
       }
       if (!store.discardDocumentDrafts(next.paths) || !store.closeDocuments(next.paths)) {

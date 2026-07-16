@@ -20,7 +20,7 @@
               type="email"
               autocomplete="email"
               required
-              :disabled="submitting"
+              :disabled="submitAction.running"
               class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
             />
           </label>
@@ -33,7 +33,7 @@
               inputmode="text"
               pattern="[A-Za-z0-9]{6}"
               required
-              :disabled="submitting"
+              :disabled="submitAction.running"
               placeholder="ABC123"
               class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm uppercase text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
             />
@@ -47,14 +47,14 @@
               type="password"
               autocomplete="new-password"
               required
-              :disabled="submitting"
+              :disabled="submitAction.running"
               class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
             />
           </label>
           <button
             type="submit"
             class="button button-primary h-10 w-full text-sm"
-            :disabled="submitting"
+            :disabled="submitAction.running"
           >
             {{ t('cloud.resetPassword') }}
           </button>
@@ -69,6 +69,7 @@
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
   import AppPageShell from '../../components/layout/AppPageShell.vue'
+  import { useAsyncAction } from '../../composable/useAsyncAction'
   import { authPasswordResetConfirm } from '../../features/cloud/api'
   import { useNotificationsStore } from '../../store/notifications'
 
@@ -79,10 +80,12 @@
   const email = ref(String(route.query.email ?? ''))
   const code = ref('')
   const password = ref('')
-  const submitting = ref(false)
+  const submitAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('cloud.resetPasswordFailed'), err),
+  })
 
   async function submit() {
-    if (submitting.value) {
+    if (submitAction.running) {
       return
     }
     if (!email.value) {
@@ -113,8 +116,7 @@
       )
       return
     }
-    submitting.value = true
-    try {
+    await submitAction.run(async () => {
       await authPasswordResetConfirm(email.value, code.value, password.value)
       notifications.pushToast(
         'success',
@@ -122,10 +124,6 @@
         t('cloud.resetPasswordSucceeded'),
       )
       await router.push({ name: 'cloud-login' })
-    } catch (err) {
-      notifications.notifyError(t('cloud.resetPasswordFailed'), err)
-    } finally {
-      submitting.value = false
-    }
+    })
   }
 </script>

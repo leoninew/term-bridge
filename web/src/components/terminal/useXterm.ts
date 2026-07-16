@@ -3,7 +3,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { terminalDebug } from './diagnostics'
-import { fitSafeTerminalSize } from '../../protocol/terminal'
+import { clampTerminalSize } from '../../protocol/terminal'
 import type { AppTheme } from '../../store/theme'
 
 type ResizeCallback = (cols: number, rows: number) => void
@@ -199,7 +199,7 @@ export function measureXtermSize(element: HTMLElement): { cols: number; rows: nu
     }
     const measuredCols = dimensions.cols
     const measuredRows = dimensions.rows
-    const size = fitSafeTerminalSize({ cols: measuredCols, rows: measuredRows })
+    const size = clampTerminalSize({ cols: measuredCols, rows: measuredRows })
     terminal.resize(size.cols, size.rows)
     terminalDebug('xterm.measure', {
       source: 'measure',
@@ -368,7 +368,7 @@ export function createXterm(
     invalidRetryCount = 0
     clearInvalidRetryTimer()
 
-    const size = fitSafeTerminalSize({ cols: measuredCols, rows: measuredRows })
+    const size = clampTerminalSize({ cols: measuredCols, rows: measuredRows })
     const terminalResized = terminal.cols !== size.cols || terminal.rows !== size.rows
     if (terminalResized) {
       terminal.resize(size.cols, size.rows)

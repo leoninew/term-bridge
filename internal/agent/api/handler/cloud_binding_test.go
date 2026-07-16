@@ -300,7 +300,7 @@ func TestExchangeOAuthCodeReturnsAccessToken(t *testing.T) {
 		t.Fatalf("decode exchange response: %v", err)
 	}
 	if body.GetAccessToken() != expectedToken || body.GetTokenType() != "bearer" {
-		t.Fatalf("exchange response = %#v", body)
+		t.Fatalf("exchange response access_token=%q token_type=%q", body.GetAccessToken(), body.GetTokenType())
 	}
 }
 

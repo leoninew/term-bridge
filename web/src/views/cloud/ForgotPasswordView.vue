@@ -20,14 +20,14 @@
               type="email"
               autocomplete="email"
               required
-              :disabled="submitting"
+              :disabled="submitAction.running"
               class="h-10 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-control-bg)] px-3.5 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary-border)] focus:ring-2 focus:ring-[var(--color-primary-border)]/20"
             />
           </label>
           <button
             type="submit"
             class="button button-primary h-10 w-full text-sm"
-            :disabled="submitting"
+            :disabled="submitAction.running"
           >
             {{ t('cloud.sendResetCode') }}
           </button>
@@ -51,6 +51,7 @@
   import { useI18n } from 'vue-i18n'
   import { useRouter, RouterLink } from 'vue-router'
   import AppPageShell from '../../components/layout/AppPageShell.vue'
+  import { useAsyncAction } from '../../composable/useAsyncAction'
   import { authPasswordResetRequest } from '../../features/cloud/api'
   import { useNotificationsStore } from '../../store/notifications'
 
@@ -58,25 +59,22 @@
   const router = useRouter()
   const notifications = useNotificationsStore()
   const email = ref('')
-  const submitting = ref(false)
+  const submitAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('cloud.sendResetCodeFailed'), err),
+  })
 
   async function submit() {
-    if (submitting.value) {
+    if (submitAction.running) {
       return
     }
     if (!email.value) {
       notifications.pushToast('error', t('cloud.sendResetCodeFailed'), t('message.emailRequired'))
       return
     }
-    submitting.value = true
-    try {
+    await submitAction.run(async () => {
       await authPasswordResetRequest(email.value)
       notifications.pushToast('success', t('cloud.forgotPassword'), t('cloud.resetCodeSent'))
       await router.push({ name: 'cloud-reset-password', query: { email: email.value } })
-    } catch (err) {
-      notifications.notifyError(t('cloud.sendResetCodeFailed'), err)
-    } finally {
-      submitting.value = false
-    }
+    })
   }
 </script>

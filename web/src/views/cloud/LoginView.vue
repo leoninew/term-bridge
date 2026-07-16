@@ -10,8 +10,8 @@
     v-else
     :username="username"
     :password="password"
-    :logging-in="loginSubmitting"
-    :external-logging-in="externalLoggingIn"
+    :logging-in="loginAction.running"
+    :external-logging-in="externalAction.running"
     :external-auth-provider-ids="runtimeConfig.config.cloud.externalAuthProviderIds"
     :turnstile-ready="!!turnstileToken"
     @update:username="username = $event"
@@ -35,6 +35,7 @@
   import { useRoute, useRouter } from 'vue-router'
   import LoginPanel from '../../components/session/LoginPanel.vue'
   import TurnstileChallenge from '../../components/cloud/TurnstileChallenge.vue'
+  import { useAsyncAction } from '../../composable/useAsyncAction'
   import {
     authExternalUrl,
     authLogin,
@@ -58,11 +59,15 @@
   const checkingAuth = ref(true)
   const username = ref('')
   const password = ref('')
-  const externalLoggingIn = ref(false)
-  const loginSubmitting = ref(false)
   const turnstileSiteKey = ref('')
   const turnstileToken = ref('')
   const turnstile = ref<InstanceType<typeof TurnstileChallenge> | null>(null)
+  const loginAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('cloud.loginFailed'), err),
+  })
+  const externalAction = useAsyncAction({
+    onError: (err) => notifications.notifyError(t('cloud.externalLoginFailed'), err),
+  })
 
   onMounted(async () => {
     try {
@@ -81,7 +86,7 @@
   })
 
   async function login() {
-    if (loginSubmitting.value) {
+    if (loginAction.running || externalAction.running) {
       return
     }
     if (!username.value) {
@@ -99,25 +104,28 @@
       )
       return
     }
-    loginSubmitting.value = true
     try {
-      const csrfToken = await authLoginCSRFToken()
-      const response = await authLogin(
-        username.value,
-        password.value,
-        turnstileToken.value,
-        csrfToken,
+      await loginAction.run(
+        async () => {
+          const csrfToken = await authLoginCSRFToken()
+          const response = await authLogin(
+            username.value,
+            password.value,
+            turnstileToken.value,
+            csrfToken,
+          )
+          password.value = ''
+          cloudAuth.setToken(response.access_token)
+          await cloudAuth.initialize()
+          if (cloudAuth.authenticated) {
+            await router.replace(redirectAfterLogin())
+          }
+        },
+        { rethrow: true },
       )
-      password.value = ''
-      cloudAuth.setToken(response.access_token)
-      await cloudAuth.initialize()
-      if (cloudAuth.authenticated) {
-        await router.replace(redirectAfterLogin())
-      }
-    } catch (err) {
-      notifications.notifyError(t('cloud.loginFailed'), err)
+    } catch {
+      // notify handled by loginAction.onError
     } finally {
-      loginSubmitting.value = false
       turnstileToken.value = ''
       turnstile.value?.reset()
     }
@@ -132,16 +140,12 @@
   }
 
   async function loginWithExternalProvider(providerId: string) {
-    if (externalLoggingIn.value) {
+    if (loginAction.running || externalAction.running) {
       return
     }
-    externalLoggingIn.value = true
-    try {
+    await externalAction.run(async () => {
       storeCloudLoginRedirect(typeof route.query.redirect === 'string' ? route.query.redirect : '')
       window.location.href = await authExternalUrl(providerId)
-    } catch (err) {
-      externalLoggingIn.value = false
-      notifications.notifyError(t('cloud.externalLoginFailed'), err)
-    }
+    })
   }
 </script>

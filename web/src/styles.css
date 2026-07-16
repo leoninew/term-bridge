@@ -29,9 +29,9 @@
   --color-danger-text: #fecaca;
   --color-state-running-text: #4ade80;
   --color-state-stopped-text: #94a3b8;
-  --color-warning-bg: #451a03;
-  --color-warning-border: #92400e;
-  --color-warning-text: #fef3c7;
+  --color-warning-bg: #17120a;
+  --color-warning-border: #6b4a12;
+  --color-warning-text: #e8b84a;
   --color-terminal-bg: #020617;
   --color-terminal-fg: #d7deea;
   --color-terminal-cursor: #f8fafc;
@@ -640,7 +640,7 @@ p {
   min-width: 0;
   min-height: 0;
   flex: 1;
-  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 3fr);
+  grid-template-columns: minmax(220px, 20%) minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -1080,7 +1080,7 @@ p {
 
 @media (max-width: 1280px) {
   .file-workbench-layout {
-    grid-template-columns: minmax(190px, 0.8fr) minmax(0, 2fr);
+    grid-template-columns: minmax(190px, 20%) minmax(0, 1fr);
   }
 }
 

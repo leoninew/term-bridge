@@ -16,7 +16,7 @@ func TestRootResolveKeepsLogicalPathWithinWorkspace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open root: %v", err)
 	}
-	defer opened.Close()
+	defer func() { _ = opened.Close() }()
 
 	resolved, err := opened.resolve("directory/notes.txt")
 	if err != nil {
@@ -176,7 +176,7 @@ func entryAt(t *testing.T, store *Store, rootPath string, path filemodel.Relativ
 	if err != nil {
 		t.Fatalf("open root: %v", err)
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	entry, err := root.entry(path)
 	if err != nil {
 		t.Fatalf("read entry %q: %v", path, err)

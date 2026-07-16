@@ -151,9 +151,9 @@ describe('WorkspaceFileWorkbench', () => {
 
     expect(store.documents.map((document) => document.path)).toEqual(['first.txt', 'second.txt'])
     expect(document.body.textContent).toContain('关闭未保存文档')
-    await document.body.querySelector('button.button-danger')?.dispatchEvent(
-      new MouseEvent('click', { bubbles: true }),
-    )
+    await document.body
+      .querySelector('button.button-danger')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await flushPromises()
 
     expect(store.documents.map((document) => document.path)).toEqual(['first.txt'])

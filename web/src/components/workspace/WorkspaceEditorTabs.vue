@@ -22,7 +22,9 @@
               <span
                 :ref="(element) => setTabTitleElement(document.key, element)"
                 class="file-workbench-tab-title"
-                :title="truncatedDocumentKeys.has(document.key) ? entryName(document.path) : undefined"
+                :title="
+                  truncatedDocumentKeys.has(document.key) ? entryName(document.path) : undefined
+                "
               >
                 {{ entryName(document.path) }}
               </span>
@@ -183,7 +185,9 @@
     }
     tabTitleObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const key = [...tabTitleElements.entries()].find(([, element]) => element === entry.target)?.[0]
+        const key = [...tabTitleElements.entries()].find(
+          ([, element]) => element === entry.target,
+        )?.[0]
         if (key) measureTabTitle(key)
       }
     })

@@ -1,7 +1,7 @@
 import type { Ref } from 'vue'
 import { terminalDebug } from '../components/terminal/diagnostics'
 import { measureXtermSize } from '../components/terminal/useXterm'
-import { fitSafeTerminalSize } from '../protocol/terminal'
+import { clampTerminalSize } from '../protocol/terminal'
 
 export function useTerminalSize(workbench: Ref<HTMLElement | null>) {
   function measureInitialTerminalSize(): { cols: number; rows: number } {
@@ -11,7 +11,7 @@ export function useTerminalSize(workbench: Ref<HTMLElement | null>) {
     }
     const measuredCols = Math.max(80, Math.floor((window.innerWidth - 360) / 9))
     const measuredRows = Math.max(24, Math.floor((window.innerHeight - 180) / 18))
-    const size = fitSafeTerminalSize({ cols: measuredCols, rows: measuredRows })
+    const size = clampTerminalSize({ cols: measuredCols, rows: measuredRows })
     terminalDebug('xterm.measure.fallback', {
       measuredCols,
       measuredRows,

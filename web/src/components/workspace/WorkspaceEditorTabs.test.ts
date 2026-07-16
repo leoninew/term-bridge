@@ -82,7 +82,9 @@ describe('WorkspaceEditorTabs', () => {
       global: { plugins: [i18n] },
     })
 
-    expect(wrapper.findAll('button.file-workbench-tab-close')[1].attributes('disabled')).toBeDefined()
+    expect(
+      wrapper.findAll('button.file-workbench-tab-close')[1].attributes('disabled'),
+    ).toBeDefined()
     await wrapper.find('button.file-workbench-tab-menu-trigger').trigger('click')
 
     const menuItems = document.body.querySelectorAll('[role="menuitem"]')
@@ -111,7 +113,9 @@ describe('WorkspaceEditorTabs', () => {
 
     await wrapper.vm.$nextTick()
     await wrapper.setProps({ documents: [active] })
-    expect(wrapper.find('.file-workbench-tab-title').attributes('title')).toBe('very-long-document-name.txt')
+    expect(wrapper.find('.file-workbench-tab-title').attributes('title')).toBe(
+      'very-long-document-name.txt',
+    )
 
     Object.defineProperty(title, 'scrollWidth', { configurable: true, value: 20 })
     await wrapper.setProps({ documents: [] })

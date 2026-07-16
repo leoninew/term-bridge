@@ -42,7 +42,7 @@ func (s *Store) List(ctx context.Context, rootPath string, directory filemodel.R
 	if err != nil {
 		return filemodel.ListResult{}, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	if err := ctx.Err(); err != nil {
 		return filemodel.ListResult{}, err
 	}
@@ -65,7 +65,7 @@ func (s *Store) Read(ctx context.Context, rootPath string, path filemodel.Relati
 	if err != nil {
 		return filemodel.ReadResult{}, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	if err := ctx.Err(); err != nil {
 		return filemodel.ReadResult{}, err
 	}
@@ -271,7 +271,7 @@ func (s *Store) withLock(ctx context.Context, rootPath string, operation func(*r
 	if err != nil {
 		return filemodel.MutationResult{}, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	return operation(root)
 }
 
@@ -402,7 +402,7 @@ func (r *root) list(path filemodel.RelativePath, limit int) (listedEntries, erro
 	if err != nil {
 		return listedEntries{}, fileError(err)
 	}
-	defer directory.Close()
+	defer func() { _ = directory.Close() }()
 	items, err := directory.ReadDir(limit + 1)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return listedEntries{}, err
@@ -454,7 +454,7 @@ func (r *root) create(path filemodel.RelativePath, text string) error {
 	if err != nil {
 		return fileError(err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if _, err := io.WriteString(file, text); err != nil {
 		return err
 	}
@@ -596,7 +596,7 @@ func readBounded(root *root, path filemodel.RelativePath, limit int64) ([]byte, 
 	if err != nil {
 		return nil, fileError(err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	data, err := io.ReadAll(io.LimitReader(file, limit+1))
 	if err != nil {
 		return nil, err
