@@ -23,17 +23,17 @@
             v-model="searchQuery"
             type="search"
             :placeholder="t('sidebar.searchPlaceholder')"
-            class="h-8 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] py-1.5 pl-8 pr-2 text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)]"
+            class="h-7 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] py-1 pl-8 pr-2 text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)]"
           />
         </label>
         <button
           type="button"
-          class="flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text)] hover:bg-[var(--color-control-hover)]"
+          class="button button-secondary button-icon file-workbench-small-button"
           :aria-label="t('sidebar.newSession')"
           :title="t('sidebar.newSession')"
           @click="emit('newSession')"
         >
-          <Plus class="size-4" />
+          <Plus class="size-3.5" />
         </button>
       </div>
     </header>
@@ -106,7 +106,16 @@
             >
               <button
                 type="button"
-                class="flex size-5 shrink-0 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
+                class="workspace-tree-node-action"
+                :aria-label="t('sidebar.openFilesAria', { name: workspace.workspace.name })"
+                :title="t('sidebar.openFilesAria', { name: workspace.workspace.name })"
+                @click.stop="emit('openFiles', workspace.workspace, $event.currentTarget)"
+              >
+                <FileCode2 class="size-3.5" />
+              </button>
+              <button
+                type="button"
+                class="workspace-tree-node-action"
                 :aria-label="
                   t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })
                 "
@@ -121,7 +130,7 @@
                   !canRemoveWorkspace(workspace) ||
                   props.removingWorkspaceId === workspace.workspace.id
                 "
-                class="flex size-5 shrink-0 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-red-500"
+                class="workspace-tree-node-action workspace-tree-node-action-danger"
                 :aria-label="removeWorkspaceLabel(workspace)"
                 :title="removeWorkspaceLabel(workspace)"
                 @click.stop="emit('removeWorkspace', workspace.workspace)"
@@ -184,7 +193,7 @@
               >
                 <button
                   type="button"
-                  class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
+                  class="workspace-tree-node-action opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100"
                   :aria-label="
                     t('sidebar.copySessionAria', {
                       name: session.session.name || session.session.command,
@@ -216,7 +225,7 @@
               >
                 <button
                   type="button"
-                  class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
+                  class="workspace-tree-node-action"
                   :aria-label="
                     t('sidebar.editSessionAria', {
                       name: session.session.name || session.session.command,
@@ -236,7 +245,7 @@
                 v-if="['stopped', 'failed'].includes(session.session.lifecycle_state)"
                 type="button"
                 :disabled="props.rerunningSessionId === session.session.id"
-                class="flex size-5 shrink-0 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text-strong)]"
+                class="workspace-tree-node-action"
                 :aria-label="
                   t('sidebar.rerunSessionAria', {
                     name: session.session.name || session.session.command,
@@ -259,7 +268,7 @@
                 v-if="session.session.lifecycle_state === 'running'"
                 type="button"
                 :disabled="props.stoppingSessionId === session.session.id"
-                class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-red-500"
+                class="workspace-tree-node-action workspace-tree-node-action-danger"
                 :aria-label="
                   t('sidebar.stopSessionAria', {
                     name: session.session.name || session.session.command,
@@ -282,7 +291,7 @@
                 v-if="['stopped', 'failed'].includes(session.session.lifecycle_state)"
                 type="button"
                 :disabled="props.deletingSessionId === session.session.id"
-                class="flex size-5 items-center justify-center rounded text-[var(--color-text-subtle)] hover:bg-[var(--color-control-hover)] hover:text-red-500"
+                class="workspace-tree-node-action workspace-tree-node-action-danger"
                 :aria-label="
                   t('sidebar.deleteSessionAria', {
                     name: session.session.name || session.session.command,
@@ -451,6 +460,7 @@
     Command,
     CircleStop,
     Copy,
+    FileCode2,
     Folder,
     FolderOpen,
     Languages,
@@ -535,6 +545,7 @@
     rerunSession: [session: SessionSummary]
     deleteSession: [session: SessionSummary]
     removeWorkspace: [workspace: WorkspaceSummary]
+    openFiles: [workspace: WorkspaceSummary, trigger: EventTarget | null]
     unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
     reorderWorkspaces: [workspaceIds: string[]]
     reorderSessions: [workspaceId: string, sessionIds: string[]]

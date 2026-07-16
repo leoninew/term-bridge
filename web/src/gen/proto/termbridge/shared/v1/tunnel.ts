@@ -5,6 +5,25 @@
 // source: termbridge/shared/v1/tunnel.proto
 
 /* eslint-disable */
+import type {
+  CreateDirectoryReq,
+  CreateDirectoryResp,
+  CreateFileReq,
+  CreateFileResp,
+  DeleteEntryReq,
+  DeleteEntryResp,
+  ListFilesReq,
+  ListFilesResp,
+  MoveEntryReq,
+  MoveEntryResp,
+  ReadFileReq,
+  ReadFileResp,
+  RenameEntryReq,
+  RenameEntryResp,
+  WriteFileReq,
+  WriteFileResp,
+} from "../../agent/v1/file";
+import type { GitDiffReq, GitDiffResp, GitStatusReq, GitStatusResp } from "../../agent/v1/git";
 import type { ReadHistoryResp, ReadWorkspaceSessionHistoryReq } from "../../agent/v1/history";
 import type {
   CloseSessionResp,
@@ -72,6 +91,16 @@ export interface TunnelFrame {
   update_shortcut_req?: UpdateShortcutRequest | undefined;
   delete_shortcut_req?: DeleteShortcutReq | undefined;
   update_shortcut_order_req?: UpdateShortcutOrderReq | undefined;
+  list_files_req?: ListFilesReq | undefined;
+  read_file_req?: ReadFileReq | undefined;
+  create_file_req?: CreateFileReq | undefined;
+  create_directory_req?: CreateDirectoryReq | undefined;
+  write_file_req?: WriteFileReq | undefined;
+  rename_entry_req?: RenameEntryReq | undefined;
+  move_entry_req?: MoveEntryReq | undefined;
+  delete_entry_req?: DeleteEntryReq | undefined;
+  git_status_req?: GitStatusReq | undefined;
+  git_diff_req?: GitDiffReq | undefined;
   list_workspaces_resp?: ListWorkspacesResp | undefined;
   workspace_tree_resp?: WorkspaceTreeResp | undefined;
   workspace_sessions_resp?: WorkspaceSessionsResp | undefined;
@@ -90,6 +119,16 @@ export interface TunnelFrame {
   update_shortcut_resp?: UpdateShortcutResp | undefined;
   delete_shortcut_resp?: DeleteShortcutResp | undefined;
   update_shortcut_order_resp?: UpdateShortcutOrderResp | undefined;
+  list_files_resp?: ListFilesResp | undefined;
+  read_file_resp?: ReadFileResp | undefined;
+  create_file_resp?: CreateFileResp | undefined;
+  create_directory_resp?: CreateDirectoryResp | undefined;
+  write_file_resp?: WriteFileResp | undefined;
+  rename_entry_resp?: RenameEntryResp | undefined;
+  move_entry_resp?: MoveEntryResp | undefined;
+  delete_entry_resp?: DeleteEntryResp | undefined;
+  git_status_resp?: GitStatusResp | undefined;
+  git_diff_resp?: GitDiffResp | undefined;
   terminal_attach?: TerminalAttachReq | undefined;
   terminal_input?: TerminalInput | undefined;
   terminal_output?: TerminalOutput | undefined;
