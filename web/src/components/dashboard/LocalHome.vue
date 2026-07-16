@@ -305,7 +305,11 @@
       } catch (err) {
         notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
       }
-      await cloudAuth.initialize()
+      try {
+        await cloudAuth.initialize()
+      } catch (err) {
+        console.warn('cloud identity load failed', err)
+      }
     } catch (err) {
       workspaceError.value = t('dashboard.loadWorkspacesFailed')
       notifications.notifyError(t('dashboard.loadWorkspacesFailed'), err)

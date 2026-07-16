@@ -35,7 +35,10 @@ export const useCloudAuthStore = defineStore('cloudAuth', () => {
     } catch (err) {
       authenticated.value = false
       user.value = null
-      throw err
+      console.warn('cloud identity load failed', err)
+      if (useRuntimeConfigStore().config.local.mode === 'cloud') {
+        throw err
+      }
     }
   }
 

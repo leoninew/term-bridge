@@ -130,6 +130,20 @@ describe('cloud auth store', () => {
     expect(mocks.fetchCloudIdentityViaCloudApi).not.toHaveBeenCalled()
   })
 
+  it('soft-fails cloud identity load in Local view when cloud is unavailable', async () => {
+    stubBrowser('local')
+    window.localStorage.setItem('termbridge_cloud_token', 'cloud-token')
+    mocks.fetchCloudIdentityViaLocalApi.mockRejectedValueOnce(new Error('cloud unavailable'))
+    const cloudAuth = useCloudAuthStore()
+
+    await expect(cloudAuth.initialize()).resolves.toBeUndefined()
+
+    expect(cloudAuth.authenticated).toBe(false)
+    expect(cloudAuth.user).toBeNull()
+    expect(cloudAuth.cloudToken).toBe('cloud-token')
+    expect(mocks.fetchCloudIdentityViaLocalApi).toHaveBeenCalledWith('cloud-token')
+  })
+
   it('keeps a verified Cloud token and loads Cloud account state', async () => {
     window.localStorage.setItem('termbridge_cloud_token', 'verified-cloud-token')
     mocks.fetchCloudIdentityViaCloudApi.mockResolvedValueOnce({

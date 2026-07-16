@@ -165,8 +165,10 @@ func (s *Handler) handleCloudAuthMe(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := s.config.CloudService.AuthMe(r.Context(), cloudToken)
 	if err != nil {
-		s.config.Logger.Warn("cloud auth me failed", "error", err)
-		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		if s.config.Logger != nil {
+			s.config.Logger.Warn("cloud auth me failed", "error", err)
+		}
+		writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: false})
 		return
 	}
 	writeJSON(w, http.StatusOK, result)

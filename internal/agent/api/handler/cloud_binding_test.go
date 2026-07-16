@@ -12,7 +12,6 @@ import (
 	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
 	cloudapi "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/cloudapi"
 	cloudv1 "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
-	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/prototime"
 
@@ -113,7 +112,7 @@ func TestCloudAuthMeRejectsPost(t *testing.T) {
 	}
 }
 
-func TestCloudAuthMeReturnsSafeUpstreamError(t *testing.T) {
+func TestCloudAuthMeSoftFailsWhenCloudIsUnavailable(t *testing.T) {
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error":"cloud failure"}`))
@@ -124,15 +123,18 @@ func TestCloudAuthMeReturnsSafeUpstreamError(t *testing.T) {
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
-	if response.Code != http.StatusBadGateway {
-		t.Fatalf("cloud auth me status = %d, want 502; body=%s", response.Code, response.Body.String())
+	if response.Code != http.StatusOK {
+		t.Fatalf("cloud auth me status = %d, want 200; body=%s", response.Code, response.Body.String())
 	}
-	var body shared.ErrorResp
+	var body cloudv1.AuthMeResp
 	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode cloud auth me error: %v", err)
+		t.Fatalf("decode cloud auth me: %v", err)
 	}
-	if body.GetCode() != errorCodeUpstream || body.GetError() != errorMessageUpstream || body.GetRequestId() == "" {
-		t.Fatalf("cloud auth me error code=%q message=%q request_id=%q", body.GetCode(), body.GetError(), body.GetRequestId())
+	if body.GetAuthenticated() {
+		t.Fatalf("authenticated = true, want false when cloud is unavailable")
+	}
+	if body.GetUser() != nil {
+		t.Fatalf("user = %#v, want nil when cloud is unavailable", body.GetUser())
 	}
 }
 
