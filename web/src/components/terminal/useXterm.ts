@@ -23,6 +23,7 @@ type XtermController = {
   terminal: Terminal
   open: (element: HTMLElement) => void
   fit: (reason?: FitReason) => void
+  focus: () => void
   write: (data: Uint8Array) => void
   pendingBytes: () => number
   setTheme: (theme: AppTheme) => void
@@ -566,6 +567,12 @@ export function createXterm(
     },
     fit(reason: FitReason = 'explicit') {
       emitResize(reason)
+    },
+    focus() {
+      if (disposed) {
+        return
+      }
+      terminal.focus()
     },
     write(data: Uint8Array) {
       writeCount += 1

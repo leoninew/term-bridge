@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+  import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { Loader2 } from '@lucide/vue'
   import { clampTerminalSize } from '../../protocol/terminal'
@@ -47,6 +47,8 @@
   let xterm: ReturnType<typeof createXterm> | null = null
   let lastTerminalSize: { cols: number; rows: number } | null = null
   let connectAttemptedForUrl: string | null = null
+  let focusFrame: number | null = null
+  let focusTimer: number | null = null
 
   const showBootOverlay = computed(() => {
     if (socket.error.value) {
@@ -81,6 +83,7 @@
           terminalRows: xterm?.terminal.rows,
         })
         xterm?.fit('started')
+        scheduleTerminalFocus('started')
       }
       if (message.type === 'replay_started') {
         replaying.value = true
@@ -114,6 +117,43 @@
       emit('terminalError', message)
     },
   )
+
+  function clearScheduledTerminalFocus() {
+    if (focusFrame !== null) {
+      window.cancelAnimationFrame(focusFrame)
+      focusFrame = null
+    }
+    if (focusTimer !== null) {
+      window.clearTimeout(focusTimer)
+      focusTimer = null
+    }
+  }
+
+  function focusTerminal(reason: string) {
+    if (!xterm) {
+      return
+    }
+    // TabsTrigger keeps DOM focus after activation; reclaim it once the live terminal is visible.
+    terminalDebug('terminal-view.focus', {
+      sessionId: props.sessionId,
+      reason,
+      sessionStarted: sessionStarted.value,
+    })
+    xterm.focus()
+  }
+
+  function scheduleTerminalFocus(reason: string) {
+    clearScheduledTerminalFocus()
+    // Wait past the tab click/focus cycle so TabsTrigger does not keep keyboard ownership.
+    focusFrame = window.requestAnimationFrame(() => {
+      focusFrame = null
+      focusTerminal(`${reason}:raf`)
+      focusTimer = window.setTimeout(() => {
+        focusTimer = null
+        focusTerminal(`${reason}:settled`)
+      }, 50)
+    })
+  }
 
   function connect(reason = 'manual') {
     if (!props.wsUrl) {
@@ -243,6 +283,7 @@
     )
     if (terminalElement.value) {
       xterm.open(terminalElement.value)
+      scheduleTerminalFocus('open')
     } else {
       terminalDebug(
         'terminal-view.mount.missing-element',
@@ -271,6 +312,14 @@
       connectAttemptedForUrl = null
       sessionStarted.value = false
       connect('wsUrl-changed')
+      void nextTick(() => scheduleTerminalFocus('wsUrl-changed'))
+    },
+  )
+
+  watch(
+    () => props.sessionId,
+    () => {
+      void nextTick(() => scheduleTerminalFocus('session-activated'))
     },
   )
 
@@ -280,6 +329,7 @@
   )
 
   onBeforeUnmount(() => {
+    clearScheduledTerminalFocus()
     socket.close()
     xterm?.dispose()
   })
