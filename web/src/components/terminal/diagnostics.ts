@@ -1,9 +1,9 @@
 type DiagnosticDetails = Record<string, unknown>
 
 const prefix = '[termbridge:terminal]'
-const terminalDebugKey = 'termbridge.terminalDebug'
 
 function isTerminalDebugEnabled(): boolean {
+const terminalDebugKey = 'termbridge.terminalDebug'
   try {
     return window.localStorage.getItem(terminalDebugKey) === '1'
   } catch {

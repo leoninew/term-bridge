@@ -130,7 +130,6 @@
     }
 
     const url = new URL(props.wsUrl, window.location.href)
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     url.searchParams.set('cols', String(lastTerminalSize.cols))
     url.searchParams.set('rows', String(lastTerminalSize.rows))
     const wsUrl = url.toString()
