@@ -7,7 +7,7 @@
 # TERMBRIDGE_ENV 只从 OS env 读取，不从 .env / .env.<env> 读取。
 # TERMBRIDGE_BUILD_VERSION 是 Taskfile/CI 编译元数据，不是 YAML 或 Viper 运行时配置键；不要添加 build_version。
 
-# JWT 认证密钥（必填）。必须是 base64 编码的 32 字节随机 key，普通明文 secret 会被拒绝。
+# Cloud JWT 认证密钥。Cloud runtime 必须提供 base64 编码的 32 字节随机 key，普通明文 secret 会被拒绝。
 # python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
 jwt:
   secret_key: ""
@@ -58,6 +58,21 @@ terminal:
       max_messages: 64
       max_bytes: 4194304
 
+# 工作区文件管理边界。所有操作仅可访问 Agent 已登记工作区的根目录。
+file:
+  max_text_bytes: 1048576
+  max_directory_entries: 1000
+  max_recursive_delete_entries: 10000
+  operation_timeout: 10s
+
+# 工作区只读 Git 状态和差异读取边界。
+git:
+  executable: git
+  command_timeout: 10s
+  max_stdout_bytes: 4194304
+  max_stderr_bytes: 65536
+  max_text_bytes: 1048576
+
 # Runtime 状态目录
 runtime:
   state_dir: data
@@ -71,6 +86,8 @@ local:
   static_dir: ""
   # 浏览器访问本地前端/setup 的地址，用于本地工作台与云端授权回跳。
   public_url: http://localhost:9030
+  # 浏览器请求 Local Agent API 的同源路径。
+  api_base_path: /api
   # 跨域 API Origin allowlist；空列表表示不开放跨域。
   # 终端 WebSocket 也会使用该列表校验浏览器 Origin；同源访问不需要配置。
   cors_allowed_origins: []
@@ -103,8 +120,8 @@ cloud:
   static_dir: ""
   # Cloud 对外访问地址，供浏览器页面、OAuth 授权跳转和帮助链接使用。
   public_url: ""
-  # Agent 到 Cloud API 与 Tunnel 的服务间地址，必须显式配置。
-  api_base_url: http://127.0.0.1:9030
+  # Cloud API 根地址，供浏览器和 Agent 使用，必须显式配置。
+  api_base_url: http://127.0.0.1:9030/api
   # 跨域 API Origin allowlist；空列表表示不开放跨域。
   # 终端 WebSocket 也会使用该列表校验浏览器 Origin；同源访问不需要配置。
   cors_allowed_origins: []
@@ -138,9 +155,6 @@ cloud:
 # Auth
 auth:
   jwt_ttl: 24h
-  local_admin:
-    username: admin
-    password: admin
   password:
     min_length: 8
     max_length: 128

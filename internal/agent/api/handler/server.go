@@ -17,33 +17,23 @@ import (
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	cloudproto "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
-	sharedAuth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
+	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 )
 
 type Config struct {
-	JWTSecret           []byte
 	DebugErrors         bool
 	Logger              *slog.Logger
-	AuthService         AuthService
 	CloudService        *agentapp.CloudService
 	LocalDevice         agentapp.Device
 	LocalDeviceStateDir string
 	LocalRuntime        agentapp.RuntimeAccess
 	CORSAllowedOrigins  []string
-	OnLocalCloudSession func(*cloudproto.CloudSessionSummary) // shared auth via sharedAuth
-}
-
-type AuthService interface {
-	Login(ctx context.Context, email, password string) (*cloudproto.LocalAuthLoginResp, error)
-	UserFromClaims(ctx context.Context, claims sharedAuth.Claims) (*cloudproto.User, error)
-	VerifyToken(token string) (sharedAuth.Claims, error)
+	OnLocalCloudSession func(*cloudproto.CloudSessionSummary)
 }
 
 type Handler struct {
 	config             Config
-	auth               *sharedAuth.Auther
-	authService        AuthService
 	writers            map[string]string
 	writerMu           sync.Mutex
 	cacheMu            sync.Mutex
@@ -56,7 +46,7 @@ type Handler struct {
 
 func New(config Config) *Handler {
 	config = normalizeConfig(config)
-	handler := &Handler{config: config, auth: sharedAuth.NewAuther(sharedAuth.Credentials{}, sharedAuth.NewTokenService(config.JWTSecret)), authService: config.AuthService, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
+	handler := &Handler{config: config, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
 	if config.LocalRuntime != nil {
 		handler.localRuntime = localRuntimeEndpoint{runtime: config.LocalRuntime, handler: handler}
 	}
@@ -74,20 +64,19 @@ func (h *Handler) Handler() http.Handler {
 
 func (h *Handler) registerCommonRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/health", h.handleHealth)
-	mux.HandleFunc("/api/auth/login", h.handleAuthLogin)
-	mux.HandleFunc("/api/auth/logout", h.authMiddleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
-	mux.HandleFunc("/api/auth/me", h.handleAuthMe)
+	mux.HandleFunc("/api/agent/status", h.handleAgentStatus)
 }
 
 func (h *Handler) registerAgentRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/cloud/connect", h.authMiddleware(http.HandlerFunc(h.handleCloudConnect)).ServeHTTP)
-	mux.HandleFunc("/api/cloud/disconnect", h.authMiddleware(http.HandlerFunc(h.handleCloudDisconnect)).ServeHTTP)
-	mux.HandleFunc("/api/cloud/oauth/exchange", h.authMiddleware(http.HandlerFunc(h.handleExchangeOAuthCode)).ServeHTTP)
-	mux.HandleFunc("/api/workspaces", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
-	mux.HandleFunc("/api/workspaces/", h.authMiddleware(http.HandlerFunc(h.handleLocalWorkspaces)).ServeHTTP)
-	mux.HandleFunc("/api/sessions", h.authMiddleware(http.HandlerFunc(h.handleLocalSessions)).ServeHTTP)
-	mux.HandleFunc("/api/shortcuts", h.authMiddleware(http.HandlerFunc(h.handleLocalShortcuts)).ServeHTTP)
-	mux.HandleFunc("/api/shortcuts/", h.authMiddleware(http.HandlerFunc(h.handleLocalShortcuts)).ServeHTTP)
+	mux.HandleFunc("/api/cloud/connect", h.handleCloudConnect)
+	mux.HandleFunc("/api/cloud/disconnect", h.handleCloudDisconnect)
+	mux.HandleFunc("/api/cloud/auth/me", h.handleCloudAuthMe)
+	mux.HandleFunc("/api/cloud/oauth/exchange", h.handleExchangeOAuthCode)
+	mux.HandleFunc("/api/workspaces", h.handleLocalWorkspaces)
+	mux.HandleFunc("/api/workspaces/", h.handleLocalWorkspaces)
+	mux.HandleFunc("/api/sessions", h.handleLocalSessions)
+	mux.HandleFunc("/api/shortcuts", h.handleLocalShortcuts)
+	mux.HandleFunc("/api/shortcuts/", h.handleLocalShortcuts)
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { h.Handler().ServeHTTP(w, r) }
@@ -100,75 +89,14 @@ func (s *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, &shared.HealthResp{Status: "ok"})
 }
 
-func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		s.methodNotAllowed(w, r, http.MethodPost)
-		return
-	}
-	if s.authService != nil {
-		result, err := s.authService.Login(r.Context(), "", "")
-		if err != nil {
-			s.writeUnauthorized(w, r)
-			return
-		}
-		writeJSON(w, http.StatusOK, result)
-		return
-	}
-	if s.auth == nil {
-		s.writeUnauthorized(w, r)
-		return
-	}
-	token, err := s.auth.SignToken("local-agent")
-	if err != nil {
-		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, "Failed to sign token", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, &cloudproto.LocalAuthLoginResp{AccessToken: token, TokenType: "bearer"})
-}
-
-func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		s.methodNotAllowed(w, r, http.MethodPost)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleAgentStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	if s.authService != nil {
-		cloudSession := s.localCloudSessionSummary()
-		device := s.localDeviceSummary()
-		claims, ok := s.claimsFromRequest(r)
-		if !ok {
-			writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: false, CloudSession: cloudSession, Device: device})
-			return
-		}
-		user, err := s.authService.UserFromClaims(r.Context(), claims)
-		if err != nil {
-			s.writeUnauthorized(w, r)
-			return
-		}
-		writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, User: user, CloudSession: cloudSession, Device: device})
-		return
-	}
-	writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, Username: s.auth.UsernameFromRequest(r), Device: s.localDeviceSummary()})
-}
-
-func (s *Handler) authMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.authService != nil {
-			if _, ok := s.claimsFromRequest(r); !ok {
-				s.writeUnauthorized(w, r)
-				return
-			}
-			next.ServeHTTP(w, r)
-			return
-		}
-		s.auth.Middleware(next, s.writeUnauthorized).ServeHTTP(w, r)
+	writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{
+		CloudSession: s.localCloudSessionSummary(),
+		Device:       s.localDeviceSummary(),
 	})
 }
 func (s *Handler) localCloudSessionSummary() *cloudproto.CloudSessionSummary {
@@ -198,26 +126,14 @@ func (s *Handler) setLocalCloudSession(summary *cloudproto.CloudSessionSummary) 
 	s.cloudSession = proto.Clone(summary).(*cloudproto.CloudSessionSummary)
 }
 
-func (s *Handler) claimsFromRequest(r *http.Request) (sharedAuth.Claims, bool) {
-	token := sharedAuth.ExtractBearerToken(r)
-	if token == "" || s.authService == nil {
-		return sharedAuth.Claims{}, false
-	}
-	claims, err := s.authService.VerifyToken(token)
-	return claims, err == nil
-}
 func (s *Handler) handleCloudConnect(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		s.methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	var req cloudproto.CloudConnectReq
-	if !s.decodeJSONRequest(w, r, &req) {
-		return
-	}
-	cloudToken := strings.TrimSpace(req.GetCloudToken())
+	cloudToken := cloudTokenFromRequest(r)
 	if cloudToken == "" {
-		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Cloud token is required.", nil)
+		s.writeAPIError(w, r, http.StatusUnauthorized, errorCodeUnauthorized, errorMessageUnauthorized, nil)
 		return
 	}
 	summary, err := s.config.CloudService.Connect(r.Context(), cloudToken, s.config.LocalDevice)
@@ -235,6 +151,29 @@ func (s *Handler) persistLocalCloudSession(summary *cloudproto.CloudSessionSumma
 	if s.config.OnLocalCloudSession != nil {
 		s.config.OnLocalCloudSession(summary)
 	}
+}
+
+func (s *Handler) handleCloudAuthMe(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	cloudToken := cloudTokenFromRequest(r)
+	if cloudToken == "" {
+		s.writeAPIError(w, r, http.StatusUnauthorized, errorCodeUnauthorized, errorMessageUnauthorized, nil)
+		return
+	}
+	result, err := s.config.CloudService.AuthMe(r.Context(), cloudToken)
+	if err != nil {
+		s.config.Logger.Warn("cloud auth me failed", "error", err)
+		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func cloudTokenFromRequest(r *http.Request) string {
+	return strings.TrimSpace(sharedauth.ExtractBearerToken(r))
 }
 
 func (s *Handler) handleCloudDisconnect(w http.ResponseWriter, r *http.Request) {
@@ -363,6 +302,30 @@ func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, e
 		s.handleWorkspaceSessionRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
 		return
 	}
+	if len(parts) >= 4 && parts[3] == "files" {
+		s.handleWorkspaceFileRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
+	if len(parts) >= 4 && parts[3] == "directories" {
+		s.handleWorkspaceDirectoryRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
+	if len(parts) >= 4 && parts[3] == "entries:rename" {
+		s.handleWorkspaceEntryRenameRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
+	if len(parts) >= 4 && parts[3] == "entries:move" {
+		s.handleWorkspaceEntryMoveRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
+	if len(parts) >= 4 && parts[3] == "entries" {
+		s.handleWorkspaceEntryRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
+	if len(parts) >= 4 && parts[3] == "git" {
+		s.handleWorkspaceGitRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
 	s.writeNotFound(w, r)
 }
 func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Request, endpoint runtimeEndpoint, deviceId string, workspaceId string, parts []string) {
@@ -477,7 +440,7 @@ func (s *Handler) handleJSONRuntimeWithStatus(w http.ResponseWriter, r *http.Req
 	}
 	result, err := endpoint.JSON(r.Context(), method, params, s.requestIdFor(w, r))
 	if err != nil {
-		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		s.writeRuntimeError(w, r, err)
 		return
 	}
 	if cacheKind != "" && deviceId != "" {
@@ -512,7 +475,7 @@ func (s *Handler) handleHistoryRuntime(w http.ResponseWriter, r *http.Request, e
 	}
 	text, offline, err := endpoint.History(r.Context(), workspaceId, sessionId, s.requestIdFor(w, r))
 	if err != nil {
-		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		s.writeRuntimeError(w, r, err)
 		return
 	}
 	if deviceId != "" {

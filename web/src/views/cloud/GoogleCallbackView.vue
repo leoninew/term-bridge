@@ -36,7 +36,7 @@
     try {
       const response = await authExternalCallback('google', code, state)
       cloudAuth.setToken(response.access_token)
-      await cloudAuth.initializeAuth({ force: true })
+      await cloudAuth.initialize()
       if (cloudAuth.authenticated) {
         await router.replace(redirectAfterLogin())
       } else {

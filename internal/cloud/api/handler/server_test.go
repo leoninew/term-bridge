@@ -3,6 +3,8 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,11 +14,13 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	authmodel "gitee.com/leoninew/TermBridge-go/internal/cloud/model/user/auth"
 	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
 type testErrorResponse struct {
@@ -46,7 +50,36 @@ func testLoginRequestBody(t *testing.T, handler *Handler, username string, passw
 
 func testCloudConfig() Config {
 	turnstile, csrf := testAuthSecurityConfig()
-	return Config{Username: "admin", Password: "admin", JWTSecret: testJWTKey, Logger: slog.Default(), Turnstile: turnstile, CSRF: csrf}
+	return Config{Logger: slog.Default(), AuthService: newTestAuthService(sharedauth.NewTokenService(testJWTKey)), DeviceRepository: testDeviceRepository{}, Turnstile: turnstile, CSRF: csrf}
+}
+
+var testTunnelPrivateKey = ed25519.NewKeyFromSeed([]byte("12345678901234567890123456789012"))
+
+type testDeviceRepository struct{}
+
+func (testDeviceRepository) UpsertDeviceBinding(context.Context, string, Device) error { return nil }
+func (testDeviceRepository) UpsertUserDevice(context.Context, string, Device) error    { return nil }
+func (testDeviceRepository) UserOwnsDevice(context.Context, string, string) (bool, error) {
+	return true, nil
+}
+func (testDeviceRepository) DeleteUserDevice(context.Context, string, string) error { return nil }
+func (testDeviceRepository) PublicKey(_ context.Context, deviceId string) (string, error) {
+	if deviceId != "dev-1" {
+		return "", nil
+	}
+	return base64.StdEncoding.EncodeToString(testTunnelPrivateKey.Public().(ed25519.PublicKey)), nil
+}
+func (testDeviceRepository) ListDevicesForUser(context.Context, string) ([]Device, error) {
+	return nil, nil
+}
+
+func signedTestTunnelHeader(t *testing.T) http.Header {
+	t.Helper()
+	header, err := tunnel.SignedTunnelHeader(http.MethodGet, "/api/agent/tunnel", "termbridge-cloud", "dev-1", testTunnelPrivateKey, time.Now(), "test-nonce")
+	if err != nil {
+		t.Fatalf("SignedTunnelHeader() error = %v", err)
+	}
+	return header
 }
 
 func TestHealth(t *testing.T) {
@@ -120,7 +153,6 @@ func TestAuthEndpoints(t *testing.T) {
 
 func TestExternalOAuthInitiationRoutes(t *testing.T) {
 	server := New(Config{
-		JWTSecret:   testJWTKey,
 		Logger:      slog.Default(),
 		AuthService: newTestAuthService(sharedauth.NewTokenService(testJWTKey)),
 	})
@@ -172,7 +204,6 @@ func TestExternalOAuthInitiationRoutes(t *testing.T) {
 func TestOAuthAuthorizationCodeCanBeExchangedOnce(t *testing.T) {
 	tokens := sharedauth.NewTokenService(testJWTKey)
 	server := New(Config{
-		JWTSecret:   testJWTKey,
 		Logger:      slog.Default(),
 		AuthService: newTestAuthService(tokens),
 		CloudOAuth: CloudOAuthConfig{
@@ -248,13 +279,6 @@ func TestOAuthAuthorizationCodeCanBeExchangedOnce(t *testing.T) {
 	assertAPIError(t, replayResponse, http.StatusBadRequest, errorCodeBadRequest)
 }
 
-func TestLoginRejectsBadPassword(t *testing.T) {
-	server := New(testCloudConfig())
-	response := httptest.NewRecorder()
-	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(testLoginRequestBody(t, server, "admin", "bad"))))
-	assertAPIError(t, response, http.StatusUnauthorized, errorCodeUnauthorized)
-}
-
 func TestLoginRejectsInvalidJSON(t *testing.T) {
 	server := New(testCloudConfig())
 	response := httptest.NewRecorder()
@@ -271,7 +295,7 @@ func TestCloudAuthEndpointsReturnStructuredErrors(t *testing.T) {
 	service.changePasswordErr = authmodel.ErrPasswordInvalid
 	service.confirmPasswordResetErr = authmodel.ErrCodeInvalid
 	turnstile, csrf := testAuthSecurityConfig()
-	server := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
+	server := New(Config{Logger: slog.Default(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
 	token, err := service.tokens.Sign(sharedauth.Claims{Sub: "user-1", Email: "user@example.test", Provider: "email"})
 	if err != nil {
 		t.Fatalf("sign test token: %v", err)
@@ -313,7 +337,7 @@ func TestCloudAuthEndpointsReturnStructuredErrors(t *testing.T) {
 func TestCloudAuthEndpointsRejectWrongMethodWithStructuredErrors(t *testing.T) {
 	service := newTestAuthService(sharedauth.NewTokenService(testJWTKey)).(*testAuthService)
 	turnstile, csrf := testAuthSecurityConfig()
-	server := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
+	server := New(Config{Logger: slog.Default(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
 	token, err := service.tokens.Sign(sharedauth.Claims{Sub: "user-1", Email: "user@example.test", Provider: "email"})
 	if err != nil {
 		t.Fatalf("sign test token: %v", err)
@@ -345,7 +369,7 @@ func TestCloudAuthEndpointsRejectWrongMethodWithStructuredErrors(t *testing.T) {
 
 func TestCloudAuthEndpointsRejectMalformedJSONWithStructuredErrors(t *testing.T) {
 	turnstile, csrf := testAuthSecurityConfig()
-	server := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: newTestAuthService(sharedauth.NewTokenService(testJWTKey)), Turnstile: turnstile, CSRF: csrf})
+	server := New(Config{Logger: slog.Default(), AuthService: newTestAuthService(sharedauth.NewTokenService(testJWTKey)), Turnstile: turnstile, CSRF: csrf})
 
 	for _, path := range []string{
 		"/api/auth/login",
@@ -363,29 +387,9 @@ func TestCloudAuthEndpointsRejectMalformedJSONWithStructuredErrors(t *testing.T)
 	}
 }
 
-func TestPasswordChangeWithoutAuthServiceReturnsStructuredNotFound(t *testing.T) {
-	server := New(testCloudConfig())
-	loginResponse := httptest.NewRecorder()
-	server.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(testLoginRequestBody(t, server, "admin", "admin"))))
-	if loginResponse.Code != http.StatusOK {
-		t.Fatalf("login status = %d, want 200; body=%s", loginResponse.Code, loginResponse.Body.String())
-	}
-	var loginBody struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.Unmarshal(loginResponse.Body.Bytes(), &loginBody); err != nil {
-		t.Fatalf("decode login response: %v", err)
-	}
-	request := httptest.NewRequest(http.MethodPost, "/api/auth/password/change", bytes.NewBufferString(`{"current_password":"admin","new_password":"password"}`))
-	request.Header.Set("Authorization", "Bearer "+loginBody.AccessToken)
-	response := httptest.NewRecorder()
-	server.ServeHTTP(response, request)
-	assertAPIError(t, response, http.StatusNotFound, errorCodeNotFound)
-}
-
 func TestPasswordResetRequestSuppressesServiceOutcomes(t *testing.T) {
 	service := newTestAuthService(sharedauth.NewTokenService(testJWTKey)).(*testAuthService)
-	server := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: service})
+	server := New(Config{Logger: slog.Default(), AuthService: service})
 
 	outcomes := []error{nil, errors.New("smtp credential secret failed")}
 	for _, outcome := range outcomes {
@@ -408,7 +412,7 @@ func TestCloudAuthUnknownCausesDoNotLeak(t *testing.T) {
 	service := newTestAuthService(sharedauth.NewTokenService(testJWTKey)).(*testAuthService)
 	service.registerErr = errors.New("database password=super-secret failed")
 	turnstile, csrf := testAuthSecurityConfig()
-	server := New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
+	server := New(Config{Logger: slog.Default(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
 	response := httptest.NewRecorder()
 	server.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"user@example.test","password":"password","turnstile_token":"turnstile-test-token"}`)))
 	body := assertAPIError(t, response, http.StatusInternalServerError, errorCodeInternal)

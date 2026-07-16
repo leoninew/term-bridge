@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { LocalMode } from '../config'
 import { useCloudAuthStore } from '../store/cloudAuth'
-import { useLocalAuthStore } from '../store/localAuth'
 import { useRuntimeConfigStore } from '../store/runtimeConfig'
 
 const cloudAccountAuthRoutes = [
@@ -16,8 +15,6 @@ const cloudAccountAuthRoutes = [
 ]
 
 const homeRoute = 'home'
-
-const agentAuthWhitelistRoutes = [homeRoute, 'local-oauth-callback']
 
 const cloudAuthWhitelistRoutes = [homeRoute, ...cloudAccountAuthRoutes]
 
@@ -145,7 +142,6 @@ export const router = createRouter({
 
 router.beforeEach(async (to) => {
   const cloudAuth = useCloudAuthStore()
-  const localAuth = useLocalAuthStore()
   const runtimeConfig = useRuntimeConfigStore()
   const routeName = to.name as string
   const routeMode = (to.meta.mode as LocalMode | undefined) ?? 'hybrid'
@@ -158,18 +154,11 @@ router.beforeEach(async (to) => {
     runtimeConfig.switchMode(routeMode)
   }
 
-  const authWhitelistRoutes =
-    runtimeConfig.view.mode === 'local' ? agentAuthWhitelistRoutes : cloudAuthWhitelistRoutes
-  if (authWhitelistRoutes.includes(routeName)) {
+  if (runtimeConfig.view.mode === 'local' || cloudAuthWhitelistRoutes.includes(routeName)) {
     return
   }
 
-  if (runtimeConfig.view.mode === 'local') {
-    await localAuth.initializeAuth()
-    return
-  }
-
-  await cloudAuth.initializeAuth()
+  await cloudAuth.initialize()
   if (!cloudAuth.authenticated) {
     return {
       name: 'cloud-login',

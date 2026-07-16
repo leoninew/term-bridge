@@ -85,11 +85,6 @@ message AuthExternalCallbackResp {
   string token_type = 2;
 }
 
-message LocalAuthLoginResp {
-  string access_token = 1;
-  string token_type = 2;
-}
-
 message CloudOAuthTokenResp {
   string access_token = 1;
   string token_type = 2;
@@ -101,8 +96,7 @@ message ExternalAuthUrlResp {
 
 message AuthMeResp {
   bool authenticated = 1;
-  string username = 2;
-  User user = 3;
-  CloudSessionSummary cloud_session = 4;
-  DeviceSummary device = 5;
+  User user = 2;
+  CloudSessionSummary cloud_session = 3;
+  DeviceSummary device = 4;
 }

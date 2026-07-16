@@ -44,7 +44,7 @@ import { cloudApiClient } from '../api/client'
 import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
 import type { RuntimeTarget } from '../runtimeTarget'
 
-export async function authMeViaCloud(): Promise<AuthMeResp> {
+export async function fetchCloudIdentityViaCloudApi(): Promise<AuthMeResp> {
   try {
     const response = await cloudApiClient.get<AuthMeResp>('/auth/me')
     return response.data
@@ -52,7 +52,6 @@ export async function authMeViaCloud(): Promise<AuthMeResp> {
     if (isUnauthorizedApiError(err)) {
       return {
         authenticated: false,
-        username: '',
         user: undefined,
         cloud_session: undefined,
         device: undefined,

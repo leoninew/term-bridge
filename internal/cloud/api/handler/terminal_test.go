@@ -69,11 +69,7 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 
 func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, inputCh chan<- []byte) {
 	t.Helper()
-	requestHeader := http.Header{}
-	req, _ := http.NewRequest(http.MethodGet, serverUrl, nil)
-	req.SetBasicAuth("admin", "admin")
-	requestHeader.Set("Authorization", req.Header.Get("Authorization"))
-	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
+	conn, _, err := websocket.Dial(ctx, "ws"+serverUrl[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: signedTestTunnelHeader(t)})
 	if err != nil {
 		t.Errorf("Dial() error = %v", err)
 		return

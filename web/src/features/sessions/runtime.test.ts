@@ -30,7 +30,7 @@ function runtimeConfig(overrides: BrowserRuntimeConfig = {}): BrowserRuntimeConf
     local: {
       mode: 'hybrid',
       publicUrl: 'http://localhost:9030',
-      apiBaseUrl: '/local-api',
+      apiBasePath: '/local-api',
       cloudOAuth: {
         clientId: 'termbridge-agent',
         redirectUrl: 'http://localhost:9030/oauth/callback',
@@ -40,7 +40,7 @@ function runtimeConfig(overrides: BrowserRuntimeConfig = {}): BrowserRuntimeConf
     },
     cloud: {
       publicUrl: 'http://localhost:9030',
-      apiBaseUrl: '/cloud-api',
+      apiBaseUrl: 'https://cloud.example.test/api',
       ...overrides.cloud,
     },
   }
@@ -71,7 +71,7 @@ describe('sessions runtime helpers', () => {
   })
 
   it('builds split-origin terminal websocket URL with token and size', () => {
-    stubBrowser(runtimeConfig({ cloud: { apiBaseUrl: 'https://cloud.example.com' } }))
+    stubBrowser(runtimeConfig({ cloud: { apiBaseUrl: 'https://cloud.example.com/api' } }))
     setActivePinia(createPinia())
 
     expect(
@@ -83,7 +83,7 @@ describe('sessions runtime helpers', () => {
         { cols: 500, rows: 0 },
       ),
     ).toBe(
-      'wss://cloud.example.com/devices/device%2F1/workspaces/workspace-1/sessions/session-1/ws?token=token-1&cols=500&rows=1',
+      'wss://cloud.example.com/api/devices/device%2F1/workspaces/workspace-1/sessions/session-1/ws?token=token-1&cols=500&rows=1',
     )
   })
 })

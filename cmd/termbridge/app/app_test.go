@@ -21,6 +21,7 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/process"
 	httpserver "gitee.com/leoninew/TermBridge-go/internal/shared/api/server"
 	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/config"
 )
 
 func TestRunExecCallsRuntimePersistsSessionAndReturnsExitCode(t *testing.T) {
@@ -122,6 +123,37 @@ func TestRunMigrateRunsAgentDatabaseMigrations(t *testing.T) {
 	}
 }
 
+func TestPortableAgentProfilesStartWithoutCloudJWT(t *testing.T) {
+	for _, profile := range []string{"prod", "test"} {
+		t.Run(profile, func(t *testing.T) {
+			restoreTermBridgeEnvironment(t)
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			t.Setenv("USERPROFILE", home)
+			cwd := t.TempDir()
+			writeDefaultConfig(t, cwd)
+			if err := os.Mkdir(filepath.Join(cwd, "web"), 0o755); err != nil {
+				t.Fatalf("Mkdir(web) error = %v", err)
+			}
+			profileContent := readRepoFile(t, "scripts", "package", ".env."+profile)
+			restorePackageProfileEnvironment(t, profileContent)
+			if err := os.WriteFile(filepath.Join(cwd, ".env."+profile), []byte(profileContent), 0o644); err != nil {
+				t.Fatalf("WriteFile(profile) error = %v", err)
+			}
+			t.Setenv("TERMBRIDGE_ENV", profile)
+			t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "")
+
+			cfg, err := config.Load(config.Options{Cwd: cwd, ValidationScope: config.ValidationScopeAgent})
+			if err != nil {
+				t.Fatalf("Load(agent profile) error = %v", err)
+			}
+			if cfg.Jwt.SecretKey != "" {
+				t.Fatalf("agent profile JWT secret = %q", cfg.Jwt.SecretKey)
+			}
+		})
+	}
+}
+
 func TestRunAgentStartsBackendAndConnectorFromConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -212,7 +244,7 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 		_, _ = w.Write([]byte(`{"accepted":true}`))
 	}))
 	defer cloudPublic.Close()
-	configContent := "local:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  public_url: " + cloudPublic.URL + "\n  api_base_url: " + cloudPublic.URL + "\n"
+	configContent := "local:\n  expose_errors: true\n  listen_url: http://127.0.0.1:9090\n  public_url: http://localhost:9444/dev/\ncloud:\n  public_url: " + cloudPublic.URL + "\n  api_base_url: " + cloudPublic.URL + "/api\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
 	oldRunBackendServer := runBackendServer
@@ -249,23 +281,8 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 		return gotServer != nil
 	})
 
-	loginResponse := httptest.NewRecorder()
-	gotServer.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", nil))
-	if loginResponse.Code != http.StatusOK {
-		t.Fatalf("agent login status = %d; body=%s", loginResponse.Code, loginResponse.Body.String())
-	}
-	var tokenResp struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.Unmarshal(loginResponse.Body.Bytes(), &tokenResp); err != nil {
-		t.Fatalf("decode agent login response: %v", err)
-	}
-	if tokenResp.AccessToken == "" {
-		t.Fatalf("agent login token is empty: %s", loginResponse.Body.String())
-	}
-
-	connectRequest := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", strings.NewReader(`{"cloud_token":"cloud-token"}`))
-	connectRequest.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
+	connectRequest := httptest.NewRequest(http.MethodPost, "/api/cloud/connect", nil)
+	connectRequest.Header.Set("Authorization", "Bearer cloud-token")
 	connectResponse := httptest.NewRecorder()
 	gotServer.ServeHTTP(connectResponse, connectRequest)
 	if connectResponse.Code != http.StatusOK {
@@ -286,11 +303,11 @@ func TestRunAgentStartsCloudConnectorAfterDeviceReport(t *testing.T) {
 	for _, client := range clientSnapshot {
 		gotTargets[client.Config().ConnectUrl] = true
 	}
-	if len(gotTargets) != 1 || !gotTargets[cloudPublic.URL] {
+	if len(gotTargets) != 1 || !gotTargets[cloudPublic.URL+"/api"] {
 		t.Fatalf("agent connector targets after device report = %#v", gotTargets)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "TermBridge agent connector targeting "+cloudPublic.URL) {
+	if !strings.Contains(out, "TermBridge agent connector targeting "+cloudPublic.URL+"/api") {
 		t.Fatalf("stdout missing cloud connector target after device report: %s", out)
 	}
 	cancelServe()
@@ -431,17 +448,18 @@ func TestPortablePackageShipsSelectableRuntimeProfiles(t *testing.T) {
 	}
 
 	for profileName, profile := range map[string]struct {
-		content  string
-		cloudURL string
+		content         string
+		cloudURL        string
+		cloudApiBaseURL string
 	}{
-		"prod": {content: prodEnv, cloudURL: "TERMBRIDGE_CLOUD__PUBLIC_URL=https://termbridge.preflite.cn"},
-		"test": {content: testEnv, cloudURL: "TERMBRIDGE_CLOUD__PUBLIC_URL=http://termbridge.lvh.me"},
+		"prod": {content: prodEnv, cloudURL: "TERMBRIDGE_CLOUD__PUBLIC_URL=https://termbridge.preflite.cn", cloudApiBaseURL: "TERMBRIDGE_CLOUD__API_BASE_URL=https://termbridge.preflite.cn/api"},
+		"test": {content: testEnv, cloudURL: "TERMBRIDGE_CLOUD__PUBLIC_URL=http://termbridge.lvh.me", cloudApiBaseURL: "TERMBRIDGE_CLOUD__API_BASE_URL=http://termbridge.lvh.me/api"},
 	} {
 		for _, want := range []string{
 			"TERMBRIDGE_LOCAL__STATIC_DIR=web",
 			"TERMBRIDGE_LOCAL__PUBLIC_URL=http://localhost:9030",
 			profile.cloudURL,
-			"TERMBRIDGE_CLOUD__API_BASE_URL=",
+			profile.cloudApiBaseURL,
 			"TERMBRIDGE_LOCAL__OAUTH__CLIENT_SECRET=agent-secret",
 			"TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL=http://localhost:9030/oauth/callback",
 		} {
@@ -472,6 +490,44 @@ func readRepoFile(t *testing.T, path ...string) string {
 		t.Fatalf("ReadFile(%s) error = %v", filepath.Join(path...), err)
 	}
 	return string(content)
+}
+
+func restorePackageProfileEnvironment(t *testing.T, profile string) {
+	t.Helper()
+	for _, line := range strings.Split(profile, "\n") {
+		key, _, ok := strings.Cut(line, "=")
+		if !ok || strings.HasPrefix(key, "#") || !strings.HasPrefix(key, "TERMBRIDGE_") {
+			continue
+		}
+		previous, existed := os.LookupEnv(key)
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatalf("Unsetenv(%s) error = %v", key, err)
+		}
+		t.Cleanup(func() {
+			if existed {
+				_ = os.Setenv(key, previous)
+				return
+			}
+			_ = os.Unsetenv(key)
+		})
+	}
+}
+
+func restoreTermBridgeEnvironment(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{"TERMBRIDGE_ENV", "TERMBRIDGE_JWT__SECRET_KEY"} {
+		previous, existed := os.LookupEnv(key)
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatalf("Unsetenv(%s) error = %v", key, err)
+		}
+		t.Cleanup(func() {
+			if existed {
+				_ = os.Setenv(key, previous)
+				return
+			}
+			_ = os.Unsetenv(key)
+		})
+	}
 }
 
 func writeDefaultConfig(t *testing.T, dir string) {

@@ -104,5 +104,3 @@ func ExtractBearerToken(r *http.Request) string {
 	}
 	return r.URL.Query().Get("token")
 }
-
-func extractBearerToken(r *http.Request) string { return ExtractBearerToken(r) }

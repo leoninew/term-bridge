@@ -4,14 +4,12 @@
     :runtime-api="runtimeApi"
     home-route-name="home"
     login-redirect="/sessions"
-    :logout="authLogout"
   />
 </template>
 
 <script setup lang="ts">
   import SessionsPageShell from '../../components/session/SessionsPageShell.vue'
   import {
-    authLogout,
     closeSession,
     createSession,
     createShortcut,

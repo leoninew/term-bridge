@@ -1,6 +1,6 @@
 <template>
   <section
-    v-if="!cloudAuth.authInitialized"
+    v-if="checkingAuth"
     class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
   >
     {{ t('cloud.checkingAuth') }}
@@ -8,14 +8,14 @@
 
   <LoginPanel
     v-else
-    :username="cloudAuth.usernameInput"
-    :password="cloudAuth.passwordInput"
-    :logging-in="cloudAuth.loggingIn || loginSubmitting"
+    :username="username"
+    :password="password"
+    :logging-in="loginSubmitting"
     :external-logging-in="externalLoggingIn"
     :external-auth-provider-ids="runtimeConfig.config.cloud.externalAuthProviderIds"
     :turnstile-ready="!!turnstileToken"
-    @update:username="cloudAuth.usernameInput = $event"
-    @update:password="cloudAuth.passwordInput = $event"
+    @update:username="username = $event"
+    @update:password="password = $event"
     @submit="login"
     @external="loginWithExternalProvider"
   >
@@ -37,6 +37,7 @@
   import TurnstileChallenge from '../../components/cloud/TurnstileChallenge.vue'
   import {
     authExternalUrl,
+    authLogin,
     authLoginCSRFToken,
     authTurnstileSiteKey,
   } from '../../features/cloud/api'
@@ -54,6 +55,9 @@
   const cloudAuth = useCloudAuthStore()
   const notifications = useNotificationsStore()
   const runtimeConfig = useRuntimeConfigStore()
+  const checkingAuth = ref(true)
+  const username = ref('')
+  const password = ref('')
   const externalLoggingIn = ref(false)
   const loginSubmitting = ref(false)
   const turnstileSiteKey = ref('')
@@ -64,25 +68,27 @@
     try {
       ;[turnstileSiteKey.value] = await Promise.all([
         authTurnstileSiteKey(),
-        cloudAuth.initializeAuth(),
+        cloudAuth.initialize(),
       ])
       if (cloudAuth.authenticated) {
         await router.replace(redirectAfterLogin())
       }
     } catch (err) {
       notifications.notifyError(t('cloud.loginFailed'), err)
+    } finally {
+      checkingAuth.value = false
     }
   })
 
   async function login() {
-    if (loginSubmitting.value || cloudAuth.loggingIn) {
+    if (loginSubmitting.value) {
       return
     }
-    if (!cloudAuth.usernameInput) {
+    if (!username.value) {
       notifications.pushToast('error', t('cloud.loginFailed'), t('message.emailRequired'))
       return
     }
-    if (!cloudAuth.passwordInput) {
+    if (!password.value) {
       notifications.pushToast('error', t('cloud.loginFailed'), t('message.passwordRequired'))
       return
     }
@@ -96,8 +102,15 @@
     loginSubmitting.value = true
     try {
       const csrfToken = await authLoginCSRFToken()
-      await cloudAuth.login(turnstileToken.value, csrfToken)
-      await cloudAuth.initializeAuth({ force: true })
+      const response = await authLogin(
+        username.value,
+        password.value,
+        turnstileToken.value,
+        csrfToken,
+      )
+      password.value = ''
+      cloudAuth.setToken(response.access_token)
+      await cloudAuth.initialize()
       if (cloudAuth.authenticated) {
         await router.replace(redirectAfterLogin())
       }

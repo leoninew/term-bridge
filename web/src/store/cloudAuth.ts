@@ -1,96 +1,82 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { authLogin, authMeViaCloud } from '../features/cloud/api'
-import { useAuthTokensStore } from './authTokens'
+import { fetchCloudIdentityViaCloudApi } from '../features/cloud/api'
+import { fetchCloudIdentityViaLocalApi } from '../features/local/api'
+import { readLocalStorageValue, removeLocalStorageValue, writeLocalStorageValue } from './storage'
+import { useRuntimeConfigStore } from './runtimeConfig'
 import { useCloudDevicesStore } from './cloudDevices'
-import type { AuthLoginResp, User as UserInfo } from '../gen/proto/termbridge/cloud/v1/auth'
+import type { AuthMeResp, User as UserInfo } from '../gen/proto/termbridge/cloud/v1/auth'
 
-type InitializeAuthOptions = {
-  force?: boolean
-}
+const CLOUD_TOKEN_KEY = 'termbridge_cloud_token'
 
 export const useCloudAuthStore = defineStore('cloudAuth', () => {
-  const authInitialized = ref(false)
+  const cloudToken = ref<string | null>(readLocalStorageValue(CLOUD_TOKEN_KEY))
   const authenticated = ref(false)
-  const loggingIn = ref(false)
-  const usernameInput = ref('')
-  const passwordInput = ref('')
   const user = ref<UserInfo | null>(null)
-  let initializedToken: string | null | undefined
 
-  async function initializeAuth(options: InitializeAuthOptions = {}) {
-    const tokens = useAuthTokensStore()
-    if (!options.force && authInitialized.value && initializedToken === tokens.cloudToken) {
-      return
-    }
+  function setCloudToken(newToken: string) {
+    cloudToken.value = newToken
+    writeLocalStorageValue(CLOUD_TOKEN_KEY, newToken)
+  }
+
+  function clearCloudToken() {
+    cloudToken.value = null
+    removeLocalStorageValue(CLOUD_TOKEN_KEY)
+  }
+
+  async function initialize() {
     try {
-      const me = await authMeViaCloud()
-      authenticated.value = me.authenticated
-      user.value = me.user ?? null
-      usernameInput.value = me.user?.email || usernameInput.value
-      if (!me.authenticated) {
-        tokens.clearCloudToken()
+      const identity = await loadCloudIdentity(cloudToken.value)
+      authenticated.value = identity.authenticated
+      user.value = identity.user ?? null
+      if (!identity.authenticated) {
+        clearCloudToken()
       }
-      initializedToken = tokens.cloudToken
     } catch (err) {
       authenticated.value = false
       user.value = null
-      initializedToken = undefined
       throw err
-    } finally {
-      authInitialized.value = true
     }
   }
 
-  async function login(turnstileToken: string, csrfToken: string) {
-    if (loggingIn.value) {
-      return
+  async function loadCloudIdentity(token: string | null): Promise<AuthMeResp> {
+    if (!token) {
+      return {
+        authenticated: false,
+        user: undefined,
+        cloud_session: undefined,
+        device: undefined,
+      }
     }
-    loggingIn.value = true
-    try {
-      const response: AuthLoginResp = await authLogin(
-        usernameInput.value,
-        passwordInput.value,
-        turnstileToken,
-        csrfToken,
-      )
-      setToken(response.access_token)
-      passwordInput.value = ''
-    } finally {
-      loggingIn.value = false
+    if (useRuntimeConfigStore().config.local.mode !== 'cloud') {
+      return fetchCloudIdentityViaLocalApi(token)
     }
+    return fetchCloudIdentityViaCloudApi()
   }
 
   function setToken(newToken: string) {
-    useAuthTokensStore().setCloudToken(newToken)
-    reset()
+    setCloudToken(newToken)
+    resetSession()
     useCloudDevicesStore().reset()
   }
 
   function clearToken() {
-    useAuthTokensStore().clearCloudToken()
-    reset()
+    clearCloudToken()
+    resetSession()
     useCloudDevicesStore().reset()
   }
 
-  function reset() {
-    authInitialized.value = false
+  function resetSession() {
     authenticated.value = false
     user.value = null
-    initializedToken = undefined
   }
 
   return {
-    authInitialized,
+    cloudToken,
     authenticated,
-    loggingIn,
-    usernameInput,
-    passwordInput,
     user,
-    initializeAuth,
-    login,
+    initialize,
     setToken,
     clearToken,
-    reset,
   }
 })

@@ -96,7 +96,7 @@
   async function loadCloudHome() {
     cloudAuthLoading.value = true
     try {
-      await cloudAuth.initializeAuth({ force: true })
+      await cloudAuth.initialize()
     } catch (err) {
       notifications.notifyError(t('cloud.loginFailed'), err)
       return

@@ -21,8 +21,8 @@ func TestStaticHandlerInjectsRuntimeConfigOnlyIntoHTML(t *testing.T) {
 		t.Fatalf("WriteFile(asset) error = %v", err)
 	}
 	runtimeConfig := browserdto.RuntimeConfig{
-		Local: browserdto.RuntimeLocalConfig{Mode: "local", PublicUrl: "http://localhost:9030", ApiBaseUrl: "/api"},
-		Cloud: browserdto.RuntimeCloudConfig{PublicUrl: "https://cloud.example.com</script><script>alert(1)</script>", ApiBaseUrl: "/api"},
+		Local: browserdto.RuntimeLocalConfig{Mode: "local", PublicUrl: "http://localhost:9030", ApiBasePath: "/api"},
+		Cloud: browserdto.RuntimeCloudConfig{PublicUrl: "https://cloud.example.com</script><script>alert(1)</script>", ApiBaseUrl: "https://cloud.example.com"},
 	}
 	if err := ValidateStaticDir(staticDir, runtimeConfig); err != nil {
 		t.Fatalf("ValidateStaticDir() error = %v", err)

@@ -23,9 +23,6 @@ const (
 	EnvPrefix       = "TERMBRIDGE"
 	EnvNameVariable = EnvPrefix + "_ENV"
 
-	DefaultAuthUsername = "admin"
-	DefaultAuthPassword = "admin"
-
 	DefaultTerminalReplayMaxBytes      int64 = 1024 * 1024
 	DefaultTerminalReplayChunkBytes          = 64 * 1024
 	DefaultTerminalClientQueueMessages       = 64
@@ -42,6 +39,8 @@ type Config struct {
 	LogHTTP           LogHTTPConfig
 	History           HistoryConfig
 	Terminal          TerminalConfig
+	File              FileConfig
+	Git               GitConfig
 	Runtime           RuntimeConfig
 	Local             LocalConfig
 	Cloud             CloudConfig
@@ -73,19 +72,11 @@ type MySQLConfig struct {
 }
 
 type AuthConfig struct {
-	Username       string
-	Password       string
-	LocalAdmin     LocalAdminConfig
 	JwtTTL         time.Duration
 	PasswordPolicy PasswordPolicy
 	Code           CodePolicy
 	Google         GoogleConfig
 	GitHub         GitHubConfig
-}
-
-type LocalAdminConfig struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
 }
 
 type PasswordPolicy struct {
@@ -149,6 +140,21 @@ type TerminalClientQueueConfig struct {
 	MaxBytes    int
 }
 
+type FileConfig struct {
+	MaxTextBytes              int64
+	MaxDirectoryEntries       int
+	MaxRecursiveDeleteEntries int
+	OperationTimeout          time.Duration
+}
+
+type GitConfig struct {
+	Executable     string
+	CommandTimeout time.Duration
+	MaxStdoutBytes int64
+	MaxStderrBytes int64
+	MaxTextBytes   int64
+}
+
 type RuntimeConfig struct {
 	StateDir string
 }
@@ -157,6 +163,7 @@ type LocalConfig struct {
 	ListenUrl          string
 	StaticDir          string
 	PublicUrl          string
+	ApiBasePath        string
 	CorsAllowedOrigins []string
 	ExposeErrors       bool
 	OAuth              LocalOAuthConfig
@@ -198,13 +205,26 @@ type CloudOAuthClientConfig struct {
 	Scopes       []string `mapstructure:"scopes"`
 }
 
+type ValidationScope string
+
+const (
+	ValidationScopeAgent        ValidationScope = "agent"
+	ValidationScopeCloud        ValidationScope = "cloud"
+	ValidationScopeMigrateAgent ValidationScope = "migrate_agent"
+	ValidationScopeMigrateCloud ValidationScope = "migrate_cloud"
+)
+
 type Options struct {
 	Cwd              string
 	Command          []string
+	ValidationScope  ValidationScope
 	LoadedConfigFile func(path string)
 }
 
 func Load(options Options) (Config, error) {
+	if !validValidationScope(options.ValidationScope) {
+		return Config{}, apperrors.Config("invalid configuration validation scope", fmt.Errorf("%q is not supported", options.ValidationScope))
+	}
 	cwd, err := resolveCwd(options.Cwd)
 	if err != nil {
 		return Config{}, err
@@ -263,14 +283,8 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	if err != nil {
 		return Config{}, apperrors.Config("invalid cloud.static_dir", err)
 	}
-	agentDatabase, err := loadDatabaseConfig(cwd, v, "local.database")
-	if err != nil {
-		return Config{}, err
-	}
-	cloudDatabase, err := loadDatabaseConfig(cwd, v, "cloud.database")
-	if err != nil {
-		return Config{}, err
-	}
+	localDatabase := loadDatabaseConfig(cwd, v, "local.database")
+	cloudDatabase := loadDatabaseConfig(cwd, v, "cloud.database")
 
 	cfg := Config{
 		Cwd:         cwd,
@@ -300,11 +314,25 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 				MaxBytes:    v.GetInt("terminal.client.queue.max_bytes"),
 			}},
 		},
+		File: FileConfig{
+			MaxTextBytes:              v.GetInt64("file.max_text_bytes"),
+			MaxDirectoryEntries:       v.GetInt("file.max_directory_entries"),
+			MaxRecursiveDeleteEntries: v.GetInt("file.max_recursive_delete_entries"),
+			OperationTimeout:          v.GetDuration("file.operation_timeout"),
+		},
+		Git: GitConfig{
+			Executable:     strings.TrimSpace(v.GetString("git.executable")),
+			CommandTimeout: v.GetDuration("git.command_timeout"),
+			MaxStdoutBytes: v.GetInt64("git.max_stdout_bytes"),
+			MaxStderrBytes: v.GetInt64("git.max_stderr_bytes"),
+			MaxTextBytes:   v.GetInt64("git.max_text_bytes"),
+		},
 		Runtime: RuntimeConfig{StateDir: stateDir},
 		Local: LocalConfig{
 			ListenUrl:          strings.TrimSpace(v.GetString("local.listen_url")),
 			StaticDir:          agentStaticDir,
 			PublicUrl:          strings.TrimSpace(v.GetString("local.public_url")),
+			ApiBasePath:        strings.TrimSpace(v.GetString("local.api_base_path")),
 			CorsAllowedOrigins: getStringSlice(v, "local.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("local.expose_errors"),
 			OAuth: LocalOAuthConfig{
@@ -313,7 +341,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 				RedirectUrl:  strings.TrimSpace(v.GetString("local.oauth.redirect_url")),
 				Scopes:       getStringSlice(v, "local.oauth.scopes"),
 			},
-			Database: agentDatabase,
+			Database: localDatabase,
 		},
 		Cloud: CloudConfig{
 			ListenUrl:          strings.TrimSpace(v.GetString("cloud.listen_url")),
@@ -330,12 +358,6 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			Database: cloudDatabase,
 		},
 		Auth: AuthConfig{
-			Username: strings.TrimSpace(v.GetString("auth.local_admin.username")),
-			Password: strings.TrimSpace(v.GetString("auth.local_admin.password")),
-			LocalAdmin: LocalAdminConfig{
-				Username: strings.TrimSpace(v.GetString("auth.local_admin.username")),
-				Password: strings.TrimSpace(v.GetString("auth.local_admin.password")),
-			},
 			JwtTTL: v.GetDuration("auth.jwt_ttl"),
 			PasswordPolicy: PasswordPolicy{
 				MinLength: v.GetInt("auth.password.min_length"),
@@ -372,37 +394,18 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 
 	normalizeLogHTTPConfig(&cfg)
 	normalizeTerminalConfig(&cfg)
+	normalizeFileConfig(&cfg)
+	normalizeGitConfig(&cfg)
 	normalizeLocalConfig(&cfg)
 	normalizeCloudConfig(&cfg)
 	if !ensureDirs {
 		return cfg, nil
 	}
 
-	if err := validateLogLevel(cfg.LogLevel); err != nil {
+	if err := validateCommonConfig(cfg); err != nil {
 		return Config{}, err
 	}
-	if err := validateLogFormat(cfg.LogFormat); err != nil {
-		return Config{}, err
-	}
-	if err := validateHistory(cfg.History); err != nil {
-		return Config{}, err
-	}
-	if err := validateTerminal(cfg.Terminal); err != nil {
-		return Config{}, err
-	}
-	if err := validateLocal(cfg.Local); err != nil {
-		return Config{}, err
-	}
-	if err := validateCloud(cfg); err != nil {
-		return Config{}, err
-	}
-	if err := validateJwt(cfg.Jwt); err != nil {
-		return Config{}, err
-	}
-	if err := validateAuth(cfg.Auth); err != nil {
-		return Config{}, err
-	}
-	if err := validateIntegrationConfig(cfg); err != nil {
+	if err := validateScopeConfig(options.ValidationScope, cfg); err != nil {
 		return Config{}, err
 	}
 	if err := ensureLogDir(cfg.LogDir); err != nil {
@@ -410,6 +413,87 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	}
 
 	return cfg, nil
+}
+
+func validValidationScope(scope ValidationScope) bool {
+	switch scope {
+	case ValidationScopeAgent, ValidationScopeCloud, ValidationScopeMigrateAgent, ValidationScopeMigrateCloud:
+		return true
+	default:
+		return false
+	}
+}
+
+func validateCommonConfig(cfg Config) error {
+	if err := validateLogLevel(cfg.LogLevel); err != nil {
+		return err
+	}
+	if err := validateLogFormat(cfg.LogFormat); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateScopeConfig(scope ValidationScope, cfg Config) error {
+	switch scope {
+	case ValidationScopeAgent:
+		return validateAgentConfig(cfg)
+	case ValidationScopeCloud:
+		return validateCloudRuntimeConfig(cfg)
+	case ValidationScopeMigrateAgent:
+		return validateDatabaseConfig("local.database", cfg.Local.Database)
+	case ValidationScopeMigrateCloud:
+		return validateDatabaseConfig("cloud.database", cfg.Cloud.Database)
+	default:
+		return apperrors.Config("invalid configuration validation scope", fmt.Errorf("%q is not supported", scope))
+	}
+}
+
+func validateAgentConfig(cfg Config) error {
+	if err := validateHistory(cfg.History); err != nil {
+		return err
+	}
+	if err := validateTerminal(cfg.Terminal); err != nil {
+		return err
+	}
+	if err := validateFile(cfg.File); err != nil {
+		return err
+	}
+	if err := validateGit(cfg.Git); err != nil {
+		return err
+	}
+	if err := validateDatabaseConfig("local.database", cfg.Local.Database); err != nil {
+		return err
+	}
+	if err := validateLocal(cfg.Local); err != nil {
+		return apperrors.Config("invalid local configuration", err)
+	}
+	return validateAgentCloudTarget(cfg.Cloud)
+}
+
+func validateCloudRuntimeConfig(cfg Config) error {
+	if err := validateDatabaseConfig("cloud.database", cfg.Cloud.Database); err != nil {
+		return err
+	}
+	if err := validateCloud(cfg); err != nil {
+		return err
+	}
+	if err := validateJwt(cfg.Jwt); err != nil {
+		return err
+	}
+	if err := validateAuth(cfg.Auth); err != nil {
+		return err
+	}
+	return validateIntegrationConfig(cfg)
+}
+
+func validateAgentCloudTarget(cfg CloudConfig) error {
+	if cfg.PublicUrl != "" {
+		if err := validateHTTPURL("cloud.public_url", cfg.PublicUrl); err != nil {
+			return err
+		}
+	}
+	return validateHTTPURL("cloud.api_base_url", cfg.ApiBaseUrl)
 }
 
 func IsGoogleAuthEnabled(cfg GoogleConfig) bool {
@@ -428,35 +512,34 @@ func loadCloudOAuthConfig(v *viper.Viper) CloudOAuthConfig {
 	return CloudOAuthConfig{Clients: clients}
 }
 
-func loadDatabaseConfig(cwd string, v *viper.Viper, prefix string) (DatabaseConfig, error) {
-	driverKey := prefix + ".driver"
-	pathKey := prefix + ".sqlite.path"
-	dsnKey := prefix + ".mysql.dsn"
-	driver := strings.ToLower(strings.TrimSpace(v.GetString(driverKey)))
-	cfg := DatabaseConfig{
-		Driver: driver,
-		SQLite: SQLiteConfig{Path: strings.TrimSpace(v.GetString(pathKey))},
-		MySQL:  MySQLConfig{Dsn: strings.TrimSpace(v.GetString(dsnKey))},
+func loadDatabaseConfig(cwd string, v *viper.Viper, prefix string) DatabaseConfig {
+	path := strings.TrimSpace(v.GetString(prefix + ".sqlite.path"))
+	if path != "" && !isConfigAbsPath(path) {
+		path = filepath.Join(cwd, path)
 	}
-	if cfg.Driver == "" {
-		return DatabaseConfig{}, apperrors.Config("invalid "+driverKey, fmt.Errorf("empty driver"))
+	return DatabaseConfig{
+		Driver: strings.ToLower(strings.TrimSpace(v.GetString(prefix + ".driver"))),
+		SQLite: SQLiteConfig{Path: path},
+		MySQL:  MySQLConfig{Dsn: strings.TrimSpace(v.GetString(prefix + ".mysql.dsn"))},
 	}
+}
+
+func validateDatabaseConfig(prefix string, cfg DatabaseConfig) error {
 	switch cfg.Driver {
 	case "sqlite":
 		if cfg.SQLite.Path == "" {
-			return DatabaseConfig{}, apperrors.Config("invalid "+pathKey, fmt.Errorf("empty path"))
-		}
-		if !isConfigAbsPath(cfg.SQLite.Path) {
-			cfg.SQLite.Path = filepath.Join(cwd, cfg.SQLite.Path)
+			return apperrors.Config("invalid "+prefix+".sqlite.path", fmt.Errorf("empty path"))
 		}
 	case "mysql":
 		if cfg.MySQL.Dsn == "" {
-			return DatabaseConfig{}, apperrors.Config("invalid "+dsnKey, fmt.Errorf("empty Dsn"))
+			return apperrors.Config("invalid "+prefix+".mysql.dsn", fmt.Errorf("empty Dsn"))
 		}
+	case "":
+		return apperrors.Config("invalid "+prefix+".driver", fmt.Errorf("empty driver"))
 	default:
-		return DatabaseConfig{}, apperrors.Config("invalid "+driverKey, fmt.Errorf("must be sqlite or mysql"))
+		return apperrors.Config("invalid "+prefix+".driver", fmt.Errorf("must be sqlite or mysql"))
 	}
-	return cfg, nil
+	return nil
 }
 
 func validateJwt(cfg JwtConfig) error {
@@ -663,10 +746,20 @@ func configKeys() []string {
 		"terminal.replay.chunk_bytes",
 		"terminal.client.queue.max_messages",
 		"terminal.client.queue.max_bytes",
+		"file.max_text_bytes",
+		"file.max_directory_entries",
+		"file.max_recursive_delete_entries",
+		"file.operation_timeout",
+		"git.executable",
+		"git.command_timeout",
+		"git.max_stdout_bytes",
+		"git.max_stderr_bytes",
+		"git.max_text_bytes",
 		"runtime.state_dir",
 		"local.listen_url",
 		"local.static_dir",
 		"local.public_url",
+		"local.api_base_path",
 		"local.cors_allowed_origins",
 		"local.expose_errors",
 		"local.oauth.client_id",
@@ -687,8 +780,6 @@ func configKeys() []string {
 		"cloud.database.driver",
 		"cloud.database.sqlite.path",
 		"cloud.database.mysql.dsn",
-		"auth.local_admin.username",
-		"auth.local_admin.password",
 		"auth.jwt_ttl",
 		"auth.password.min_length",
 		"auth.password.max_length",
@@ -862,9 +953,78 @@ func validateTerminal(cfg TerminalConfig) error {
 	return nil
 }
 
+func normalizeFileConfig(cfg *Config) {
+	if cfg.File.MaxTextBytes <= 0 {
+		cfg.File.MaxTextBytes = 1024 * 1024
+	}
+	if cfg.File.MaxDirectoryEntries <= 0 {
+		cfg.File.MaxDirectoryEntries = 1000
+	}
+	if cfg.File.MaxRecursiveDeleteEntries <= 0 {
+		cfg.File.MaxRecursiveDeleteEntries = 10000
+	}
+	if cfg.File.OperationTimeout <= 0 {
+		cfg.File.OperationTimeout = 10 * time.Second
+	}
+}
+
+func validateFile(cfg FileConfig) error {
+	if cfg.MaxTextBytes < 1 {
+		return apperrors.Config("invalid file.max_text_bytes", fmt.Errorf("must be positive"))
+	}
+	if cfg.MaxDirectoryEntries < 1 {
+		return apperrors.Config("invalid file.max_directory_entries", fmt.Errorf("must be positive"))
+	}
+	if cfg.MaxRecursiveDeleteEntries < 1 {
+		return apperrors.Config("invalid file.max_recursive_delete_entries", fmt.Errorf("must be positive"))
+	}
+	if cfg.OperationTimeout <= 0 {
+		return apperrors.Config("invalid file.operation_timeout", fmt.Errorf("must be positive"))
+	}
+	return nil
+}
+
+func normalizeGitConfig(cfg *Config) {
+	if cfg.Git.Executable == "" {
+		cfg.Git.Executable = "git"
+	}
+	if cfg.Git.CommandTimeout <= 0 {
+		cfg.Git.CommandTimeout = 10 * time.Second
+	}
+	if cfg.Git.MaxStdoutBytes <= 0 {
+		cfg.Git.MaxStdoutBytes = 4 * 1024 * 1024
+	}
+	if cfg.Git.MaxStderrBytes <= 0 {
+		cfg.Git.MaxStderrBytes = 64 * 1024
+	}
+	if cfg.Git.MaxTextBytes <= 0 {
+		cfg.Git.MaxTextBytes = 1024 * 1024
+	}
+}
+
+func validateGit(cfg GitConfig) error {
+	if strings.TrimSpace(cfg.Executable) == "" {
+		return apperrors.Config("invalid git.executable", fmt.Errorf("empty executable"))
+	}
+	if cfg.CommandTimeout <= 0 {
+		return apperrors.Config("invalid git.command_timeout", fmt.Errorf("must be positive"))
+	}
+	if cfg.MaxStdoutBytes < 1 {
+		return apperrors.Config("invalid git.max_stdout_bytes", fmt.Errorf("must be positive"))
+	}
+	if cfg.MaxStderrBytes < 1 {
+		return apperrors.Config("invalid git.max_stderr_bytes", fmt.Errorf("must be positive"))
+	}
+	if cfg.MaxTextBytes < 1 || cfg.MaxTextBytes > cfg.MaxStdoutBytes {
+		return apperrors.Config("invalid git.max_text_bytes", fmt.Errorf("must be positive and not exceed git.max_stdout_bytes"))
+	}
+	return nil
+}
+
 func normalizeLocalConfig(cfg *Config) {
 	cfg.Local.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Local.ListenUrl), "/")
 	cfg.Local.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Local.PublicUrl), "/")
+	cfg.Local.ApiBasePath = strings.TrimRight(strings.TrimSpace(cfg.Local.ApiBasePath), "/")
 	cfg.Local.CorsAllowedOrigins = normalizeHttpOrigins(cfg.Local.CorsAllowedOrigins)
 	cfg.Local.OAuth.ClientId = strings.TrimSpace(cfg.Local.OAuth.ClientId)
 	cfg.Local.OAuth.ClientSecret = strings.TrimSpace(cfg.Local.OAuth.ClientSecret)
@@ -915,7 +1075,17 @@ func validateLocal(cfg LocalConfig) error {
 	if err := validateHTTPServerConfig("local", cfg.ListenUrl, cfg.PublicUrl, cfg.CorsAllowedOrigins); err != nil {
 		return err
 	}
+	if err := validateAPIBasePath("local.api_base_path", cfg.ApiBasePath); err != nil {
+		return err
+	}
 	return validateLocalOAuth(cfg.OAuth)
+}
+
+func validateAPIBasePath(key string, value string) error {
+	if value == "" || value == "/" || !strings.HasPrefix(value, "/") || strings.HasPrefix(value, "//") {
+		return fmt.Errorf("%s must be a non-root absolute path", key)
+	}
+	return nil
 }
 
 func validateCloud(cfg Config) error {

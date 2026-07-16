@@ -1,6 +1,6 @@
 <template>
   <section
-    v-if="!cloudAuth.authInitialized"
+    v-if="checkingAuth"
     class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
   >
     {{ t('cloud.checkingAuth') }}
@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-  import { onMounted } from 'vue'
+  import { onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
   import { cloudOAuthAuthorize } from '../../features/cloud/api'
@@ -26,18 +26,21 @@
   const router = useRouter()
   const cloudAuth = useCloudAuthStore()
   const notifications = useNotificationsStore()
+  const checkingAuth = ref(true)
 
   onMounted(async () => {
-    await cloudAuth.initializeAuth()
-    if (!cloudAuth.authenticated) {
-      await router.replace({ name: 'cloud-login', query: { redirect: route.fullPath } })
-      return
-    }
     try {
+      await cloudAuth.initialize()
+      if (!cloudAuth.authenticated) {
+        await router.replace({ name: 'cloud-login', query: { redirect: route.fullPath } })
+        return
+      }
       window.location.href = await cloudOAuthAuthorize(route.fullPath)
     } catch (err) {
       notifications.notifyError(t('cloud.loginFailed'), err)
       await router.replace({ name: 'home' })
+    } finally {
+      checkingAuth.value = false
     }
   })
 </script>

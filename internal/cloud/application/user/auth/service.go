@@ -159,11 +159,6 @@ func (s *Service) Login(ctx context.Context, email, password string) (*cloud.Aut
 	return s.loginResponse(user)
 }
 
-func (s *Service) VerifyBasic(ctx context.Context, username, password string) bool {
-	_, err := s.Login(ctx, username, password)
-	return err == nil
-}
-
 func (s *Service) ChangePassword(ctx context.Context, userId, currentPassword, newPassword string) error {
 	if err := s.requireRepository(); err != nil {
 		return err

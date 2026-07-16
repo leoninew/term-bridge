@@ -23,7 +23,7 @@ function runtimeConfig(overrides: BrowserRuntimeConfig = {}): BrowserRuntimeConf
     local: {
       mode: 'hybrid',
       publicUrl: 'http://localhost:9030',
-      apiBaseUrl: '/local-api',
+      apiBasePath: '/local-api',
       cloudOAuth: {
         clientId: 'termbridge-agent',
         redirectUrl: 'http://localhost:9030/oauth/callback',
@@ -59,15 +59,13 @@ describe('runtime config store', () => {
 
   it('parses nested runtime config injected by the server', () => {
     vi.stubEnv('TERMBRIDGE_LOCAL__VERSION', 'vite-version')
-    stubWindowConfig(
-      runtimeConfig({ local: { mode: 'cloud', apiBaseUrl: 'https://local.example.com/' } }),
-    )
+    stubWindowConfig(runtimeConfig({ local: { mode: 'cloud', apiBasePath: '/local-api/' } }))
 
     const store = useRuntimeConfigStore()
 
     expect(store.config.version).toBe('server-version')
     expect(store.config.local.mode).toBe('cloud')
-    expect(store.config.local.apiBaseUrl).toBe('https://local.example.com')
+    expect(store.config.local.apiBasePath).toBe('/local-api')
     expect(store.config.cloud.publicUrl).toBe('http://termbridge.lvh.me')
     expect(store.config.cloud.apiBaseUrl).toBe('http://termbridge.lvh.me/cloud-api')
     expect(store.view.mode).toBe('cloud')
@@ -81,7 +79,7 @@ describe('runtime config store', () => {
     vi.stubEnv('TERMBRIDGE_LOCAL__VERSION', 'vite-version')
     vi.stubEnv('TERMBRIDGE_LOCAL__MODE', 'hybrid')
     vi.stubEnv('TERMBRIDGE_LOCAL__PUBLIC_URL', 'http://localhost:9030')
-    vi.stubEnv('TERMBRIDGE_LOCAL__API_BASE_URL', '/local-api')
+    vi.stubEnv('TERMBRIDGE_LOCAL__API_BASE_PATH', '/local-api')
     vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__CLIENT_ID', 'termbridge-agent')
     vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL', 'http://localhost:9030/oauth/callback')
     vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__SCOPES', 'openid,email,profile')
@@ -96,7 +94,7 @@ describe('runtime config store', () => {
       local: {
         mode: 'hybrid',
         publicUrl: 'http://localhost:9030',
-        apiBaseUrl: '/local-api',
+        apiBasePath: '/local-api',
         cloudOAuth: {
           clientId: 'termbridge-agent',
           redirectUrl: 'http://localhost:9030/oauth/callback',
@@ -119,12 +117,12 @@ describe('runtime config store', () => {
     })
     vi.stubEnv('TERMBRIDGE_LOCAL__MODE', 'cloud')
     vi.stubEnv('TERMBRIDGE_LOCAL__PUBLIC_URL', 'http://localhost:9030')
-    vi.stubEnv('TERMBRIDGE_LOCAL__API_BASE_URL', '/local-api')
+    vi.stubEnv('TERMBRIDGE_LOCAL__API_BASE_PATH', '/local-api')
     vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__CLIENT_ID', 'termbridge-agent')
     vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL', 'http://localhost:9030/oauth/callback')
     vi.stubEnv('TERMBRIDGE_LOCAL__OAUTH__SCOPES', 'openid,email,profile')
     vi.stubEnv('TERMBRIDGE_CLOUD__PUBLIC_URL', 'http://localhost:9030')
-    vi.stubEnv('TERMBRIDGE_CLOUD__API_BASE_URL', '/cloud-api')
+    vi.stubEnv('TERMBRIDGE_CLOUD__API_BASE_URL', 'https://cloud.example.com/api')
 
     const store = useRuntimeConfigStore()
 

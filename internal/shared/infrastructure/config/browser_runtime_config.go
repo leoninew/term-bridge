@@ -9,8 +9,6 @@ import (
 	browserdto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/browser"
 )
 
-const browserApiBaseUrl = "/api"
-
 func BuildBrowserRuntimeConfig(cfg Config, mode string) (browserdto.RuntimeConfig, error) {
 	if mode != "local" && mode != "cloud" {
 		return browserdto.RuntimeConfig{}, fmt.Errorf("unsupported browser runtime mode %q", mode)
@@ -34,9 +32,9 @@ func BuildBrowserRuntimeConfig(cfg Config, mode string) (browserdto.RuntimeConfi
 	return browserdto.RuntimeConfig{
 		Version: version.Version,
 		Local: browserdto.RuntimeLocalConfig{
-			Mode:       mode,
-			PublicUrl:  cfg.Local.PublicUrl,
-			ApiBaseUrl: browserApiBaseUrl,
+			Mode:        mode,
+			PublicUrl:   cfg.Local.PublicUrl,
+			ApiBasePath: cfg.Local.ApiBasePath,
 			CloudOAuth: browserdto.CloudOAuthConfig{
 				ClientId:    cfg.Local.OAuth.ClientId,
 				RedirectUrl: cfg.Local.OAuth.RedirectUrl,
@@ -45,7 +43,7 @@ func BuildBrowserRuntimeConfig(cfg Config, mode string) (browserdto.RuntimeConfi
 		},
 		Cloud: browserdto.RuntimeCloudConfig{
 			PublicUrl:               cfg.Cloud.PublicUrl,
-			ApiBaseUrl:              browserApiBaseUrl,
+			ApiBaseUrl:              cfg.Cloud.ApiBaseUrl,
 			ExternalAuthProviderIds: enabledExternalAuthProviderIds(cfg.Auth),
 		},
 	}, nil

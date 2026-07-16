@@ -6,7 +6,7 @@ import axios, {
 } from 'axios'
 import type { ErrorResp } from '../../gen/proto/termbridge/shared/v1/common'
 import { useRuntimeConfigStore, type RuntimeMode } from '../../store/runtimeConfig'
-import { useAuthTokensStore } from '../../store/authTokens'
+import { useCloudAuthStore } from '../../store/cloudAuth'
 import { router } from '../../router'
 
 export const requestIdHeader = 'X-Request-ID'
@@ -49,18 +49,19 @@ function configureApiClient(client: typeof apiClient, target: RuntimeMode): void
   client.interceptors.request.use((cfg) => {
     const runtimeConfig = useRuntimeConfigStore().config
     cfg.baseURL =
-      target === 'cloud' ? runtimeConfig.cloud.apiBaseUrl : runtimeConfig.local.apiBaseUrl
+      target === 'cloud' ? runtimeConfig.cloud.apiBaseUrl : runtimeConfig.local.apiBasePath
     return cfg
   })
 
   client.interceptors.request.use((cfg) => {
     ensureRequestId(cfg)
-    const tokens = useAuthTokensStore()
-    const token = tokens.tokenForTarget(target)
-    if (token) {
-      const headers = AxiosHeaders.from(cfg.headers)
-      headers.set('Authorization', `Bearer ${token}`)
-      cfg.headers = headers
+    if (target === 'cloud') {
+      const cloudToken = useCloudAuthStore().cloudToken
+      if (cloudToken) {
+        const headers = AxiosHeaders.from(cfg.headers)
+        headers.set('Authorization', `Bearer ${cloudToken}`)
+        cfg.headers = headers
+      }
     }
     return cfg
   })
@@ -71,12 +72,11 @@ function configureApiClient(client: typeof apiClient, target: RuntimeMode): void
       if (!error.response) {
         return Promise.reject(error)
       }
-      if (error.response.status === 401) {
-        const tokens = useAuthTokensStore()
+      if (error.response.status === 401 && target === 'cloud') {
+        const cloudAuth = useCloudAuthStore()
         const runtimeConfig = useRuntimeConfigStore()
-        tokens.clearTokenForTarget(target)
+        cloudAuth.clearToken()
         if (
-          target === 'cloud' &&
           (runtimeConfig.config.local.mode === 'cloud' ||
             runtimeConfig.config.local.mode === 'hybrid') &&
           router.currentRoute.value.name !== 'cloud-login'

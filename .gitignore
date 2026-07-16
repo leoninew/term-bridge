@@ -1,4 +1,6 @@
 .DS_Store
+.idea
+.vscode
 
 .termbridge/
 # Root runtime env files are machine-local and may contain secrets.

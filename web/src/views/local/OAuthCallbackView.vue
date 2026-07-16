@@ -12,15 +12,13 @@
   import { useRoute, useRouter } from 'vue-router'
   import { assertCloudOAuthState, consumeCloudOAuthRedirect } from '../../features/cloud/oauth'
   import { exchangeOAuthCode } from '../../features/local/api'
-  import { useAuthTokensStore } from '../../store/authTokens'
-  import { useLocalAuthStore } from '../../store/localAuth'
+  import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useNotificationsStore } from '../../store/notifications'
 
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
-  const authTokens = useAuthTokensStore()
-  const localAuth = useLocalAuthStore()
+  const cloudAuth = useCloudAuthStore()
   const notifications = useNotificationsStore()
 
   onMounted(async () => {
@@ -36,9 +34,9 @@
     }
     try {
       assertCloudOAuthState(state)
-      await localAuth.ensureToken()
       const accessToken = await exchangeOAuthCode(code)
-      authTokens.setCloudToken(accessToken)
+      cloudAuth.setToken(accessToken)
+      await cloudAuth.initialize()
       await router.replace(consumeCloudOAuthRedirect())
     } catch (err) {
       notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)

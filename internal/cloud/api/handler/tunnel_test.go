@@ -1,35 +1,22 @@
 package api
 
 import (
-	"context"
-	"encoding/json"
-	"log/slog"
-	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/coder/websocket"
 
-	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
-	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
 func TestAgentTunnelRegistersDevice(t *testing.T) {
-	handler := New(Config{Username: "admin", Password: "admin", JWTSecret: testJWTKey, Logger: slog.Default()})
+	handler := New(testCloudConfig())
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	requestHeader := http.Header{}
-	req, _ := http.NewRequest(http.MethodGet, server.URL, nil)
-	req.SetBasicAuth("admin", "admin")
-	requestHeader.Set("Authorization", req.Header.Get("Authorization"))
-	conn, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: requestHeader})
+	ctx := t.Context()
+	conn, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: signedTestTunnelHeader(t)})
 	if err != nil {
 		t.Fatalf("Dial() error = %v", err)
 	}
@@ -58,38 +45,4 @@ func TestAgentTunnelRegistersDevice(t *testing.T) {
 	if len(devices) != 1 || devices[0].Id != "dev-1" || devices[0].Name != "local" || !devices[0].Online {
 		t.Fatalf("devices = %#v", devices)
 	}
-}
-
-func TestDevicesEndpointReturnsRegisteredDevices(t *testing.T) {
-	handler := New(testCloudConfig())
-	handler.registry.Register("dev-1", "local", time.Now().UTC())
-	loginResponse := httptest.NewRecorder()
-	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", stringsReader(testLoginRequestBody(t, handler, "admin", "admin"))))
-	if loginResponse.Code != http.StatusOK {
-		t.Fatalf("login status = %d", loginResponse.Code)
-	}
-	var tokenResp struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.Unmarshal(loginResponse.Body.Bytes(), &tokenResp); err != nil {
-		t.Fatalf("decode token response: %v", err)
-	}
-	request := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
-	request.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, request)
-	if response.Code != http.StatusOK {
-		t.Fatalf("devices status = %d", response.Code)
-	}
-	var devices cloud.ListDevicesResp
-	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &devices); err != nil {
-		t.Fatalf("Unmarshal() error = %v; body=%s", err, response.Body.String())
-	}
-	if len(devices.GetItems()) != 1 || devices.GetItems()[0].GetId() != "dev-1" || !devices.GetItems()[0].GetOnline() {
-		t.Fatalf("devices count=%d first_id=%q first_online=%v", len(devices.GetItems()), devices.GetItems()[0].GetId(), devices.GetItems()[0].GetOnline())
-	}
-}
-
-func stringsReader(value string) *strings.Reader {
-	return strings.NewReader(value)
 }

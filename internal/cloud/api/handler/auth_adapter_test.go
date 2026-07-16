@@ -27,7 +27,11 @@ func (s *testAuthService) Login(ctx context.Context, email, password string) (*c
 	if s.loginErr != nil {
 		return nil, s.loginErr
 	}
-	return nil, cloudauth.ErrInvalidCredentials
+	token, err := s.tokens.Sign(sharedauth.Claims{Sub: email, Email: email, Provider: "email"})
+	if err != nil {
+		return nil, err
+	}
+	return &cloud.AuthLoginResp{AccessToken: token, TokenType: "bearer"}, nil
 }
 
 func (s *testAuthService) UserFromClaims(ctx context.Context, claims sharedauth.Claims) (*cloud.User, error) {
@@ -92,8 +96,4 @@ func (s *testAuthService) IssueUserToken(ctx context.Context, userId string) (*c
 
 func (s *testAuthService) VerifyToken(token string) (sharedauth.Claims, error) {
 	return s.tokens.Verify(token)
-}
-
-func (s *testAuthService) VerifyBasic(ctx context.Context, username, password string) bool {
-	return false
 }

@@ -15,8 +15,8 @@ export interface CloudSessionSummary {
   connected_at: string | undefined;
 }
 
+/** CloudConnectReq is intentionally empty. Cloud token is supplied via Authorization. */
 export interface CloudConnectReq {
-  cloud_token: string;
 }
 
 export interface CloudConnectResp {

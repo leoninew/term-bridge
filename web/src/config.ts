@@ -9,7 +9,7 @@ export interface CloudOAuthConfig {
 export interface RuntimeLocalConfig {
   mode: LocalMode
   publicUrl: string
-  apiBaseUrl: string
+  apiBasePath: string
   cloudOAuth: CloudOAuthConfig
 }
 
@@ -28,7 +28,7 @@ export interface RuntimeConfig {
 export type BrowserRuntimeLocalConfig = Partial<{
   mode: LocalMode
   publicUrl: string
-  apiBaseUrl: string
+  apiBasePath: string
   cloudOAuth: Partial<CloudOAuthConfig>
 }>
 

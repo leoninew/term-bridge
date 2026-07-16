@@ -152,8 +152,8 @@ func staticTestConfig(staticDir string) Config {
 	return Config{Server: ServerConfig{
 		StaticDir: staticDir,
 		BrowserRuntimeConfig: browserdto.RuntimeConfig{
-			Local: browserdto.RuntimeLocalConfig{Mode: "local", PublicUrl: "http://localhost:9030", ApiBaseUrl: "/api"},
-			Cloud: browserdto.RuntimeCloudConfig{PublicUrl: "https://cloud.example.com", ApiBaseUrl: "/api"},
+			Local: browserdto.RuntimeLocalConfig{Mode: "local", PublicUrl: "http://localhost:9030", ApiBasePath: "/api"},
+			Cloud: browserdto.RuntimeCloudConfig{PublicUrl: "https://cloud.example.com", ApiBaseUrl: "https://cloud.example.com"},
 		},
 	}}
 }

@@ -49,7 +49,7 @@ function runtimeConfigSource(): RuntimeConfigSource {
       local: {
         mode: import.meta.env.TERMBRIDGE_LOCAL__MODE as LocalMode | undefined,
         publicUrl: import.meta.env.TERMBRIDGE_LOCAL__PUBLIC_URL,
-        apiBaseUrl: import.meta.env.TERMBRIDGE_LOCAL__API_BASE_URL,
+        apiBasePath: import.meta.env.TERMBRIDGE_LOCAL__API_BASE_PATH,
         cloudOAuth: {
           clientId: import.meta.env.TERMBRIDGE_LOCAL__OAUTH__CLIENT_ID,
           redirectUrl: import.meta.env.TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL,
@@ -90,7 +90,7 @@ function parseRuntimeConfig(source: RuntimeConfigSource): RuntimeConfig {
     local: {
       mode: parseLocalMode(local?.mode, errors),
       publicUrl: requiredHTTPURL('local.publicUrl', local?.publicUrl, errors),
-      apiBaseUrl: requiredApiBaseUrl('local.apiBaseUrl', local?.apiBaseUrl, errors),
+      apiBasePath: requiredApiBasePath('local.apiBasePath', local?.apiBasePath, errors),
       cloudOAuth: parseCloudOAuth(local?.cloudOAuth, errors),
     },
     cloud: {
@@ -168,26 +168,19 @@ function requiredHTTPURL(key: string, value: string | undefined, errors: string[
   return trimmed
 }
 
-function requiredApiBaseUrl(key: string, value: string | undefined, errors: string[]): string {
+function requiredApiBasePath(key: string, value: string | undefined, errors: string[]): string {
   const trimmed = requiredString(key, value, errors).replace(/\/+$/, '')
   if (!trimmed) {
     return ''
   }
-  if (trimmed.startsWith('//')) {
-    errors.push(`${key} must not be a protocol-relative URL`)
-    return trimmed
+  if (trimmed === '/' || !trimmed.startsWith('/') || trimmed.startsWith('//')) {
+    errors.push(`${key} must be a non-root absolute path`)
   }
-  if (trimmed.startsWith('/')) {
-    return trimmed
-  }
-  try {
-    const url = new URL(trimmed)
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      errors.push(`${key} must use http or https`)
-    }
-  } catch {
-    errors.push(`${key} must be an absolute URL or same-origin path`)
-  }
+  return trimmed
+}
+
+function requiredApiBaseUrl(key: string, value: string | undefined, errors: string[]): string {
+  const trimmed = requiredHTTPURL(key, value, errors)
   return trimmed
 }
 

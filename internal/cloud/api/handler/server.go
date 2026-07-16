@@ -28,12 +28,7 @@ import (
 	"github.com/coder/websocket"
 )
 
-const ProviderLocalAdmin = "local_admin"
-
 type Config struct {
-	Username            string
-	Password            string
-	JWTSecret           []byte
 	DebugErrors         bool
 	Logger              *slog.Logger
 	AuthService         AuthService
@@ -90,12 +85,10 @@ type AuthService interface {
 	ExternalCallback(ctx context.Context, providerId, code, state string) (*cloudproto.AuthLoginResp, error)
 	IssueUserToken(ctx context.Context, userId string) (*cloudproto.CloudOAuthTokenResp, error)
 	VerifyToken(token string) (auth.Claims, error)
-	VerifyBasic(ctx context.Context, username, password string) bool
 }
 
 type Handler struct {
 	config             Config
-	auth               *auth.Auther
 	authService        AuthService
 	registry           *DeviceRegistry
 	routes             map[string]*agentRoute
@@ -202,7 +195,7 @@ func New(config Config) *Handler {
 
 func newHandler(config Config) *Handler {
 	config = normalizeConfig(config)
-	handler := &Handler{config: config, auth: auth.NewAuther(auth.Credentials{Username: config.Username, Password: config.Password}, auth.NewTokenService(config.JWTSecret)), authService: config.AuthService, registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}, oauthCodes: map[string]cloudOAuthCode{}}
+	handler := &Handler{config: config, authService: config.AuthService, registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}, oauthCodes: map[string]cloudOAuthCode{}}
 	return handler
 }
 
@@ -310,25 +303,12 @@ func (s *Handler) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	if login == "" {
 		login = req.Username
 	}
-	if s.authService != nil {
-		result, err := s.authService.Login(r.Context(), login, req.Password)
-		if err != nil {
-			s.writeAuthError(w, r, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, result)
-		return
-	}
-	if !s.auth.ValidCredentials(login, req.Password) {
-		s.writeUnauthorized(w, r)
-		return
-	}
-	token, err := s.auth.SignToken(login)
+	result, err := s.authService.Login(r.Context(), login, req.Password)
 	if err != nil {
-		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, "Failed to sign token", err)
+		s.writeAuthError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, &cloudproto.AuthLoginResp{AccessToken: token, TokenType: "bearer"})
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -344,21 +324,17 @@ func (s *Handler) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		s.methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	if s.authService != nil {
-		claims, ok := s.claimsFromRequest(r)
-		if !ok {
-			writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: false})
-			return
-		}
-		user, err := s.authService.UserFromClaims(r.Context(), claims)
-		if err != nil {
-			s.writeUnauthorized(w, r)
-			return
-		}
-		writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, User: user})
+	claims, ok := s.claimsFromRequest(r)
+	if !ok {
+		writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: false})
 		return
 	}
-	writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, Username: s.auth.UsernameFromRequest(r)})
+	user, err := s.authService.UserFromClaims(r.Context(), claims)
+	if err != nil {
+		s.writeUnauthorized(w, r)
+		return
+	}
+	writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: true, User: user})
 }
 
 func (s *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
@@ -375,10 +351,6 @@ func (s *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.verifyTurnstile(r.Context(), req.TurnstileToken) {
 		s.writeAuthSecurityError(w, r)
-		return
-	}
-	if s.authService == nil {
-		s.writeNotFound(w, r)
 		return
 	}
 	if err := s.authService.Register(r.Context(), req.Email, req.Password); err != nil {
@@ -399,10 +371,6 @@ func (s *Handler) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
-	if s.authService == nil {
-		s.writeNotFound(w, r)
-		return
-	}
 	if err := s.authService.VerifyEmail(r.Context(), req.Email, req.Code); err != nil {
 		s.writeAuthError(w, r, err)
 		return
@@ -421,10 +389,6 @@ func (s *Handler) handleResendVerification(w http.ResponseWriter, r *http.Reques
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
-	if s.authService == nil {
-		s.writeNotFound(w, r)
-		return
-	}
 	if err := s.authService.ResendVerification(r.Context(), req.Email); err != nil {
 		s.writeAuthError(w, r, err)
 		return
@@ -441,10 +405,6 @@ func (s *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	var req cloudproto.AuthChangePasswordReq
 	if !s.decodeJSONRequest(w, r, &req) {
-		return
-	}
-	if s.authService == nil {
-		s.writeNotFound(w, r)
 		return
 	}
 	claims, _ := s.claimsFromRequest(r)
@@ -466,9 +426,7 @@ func (s *Handler) handlePasswordResetRequest(w http.ResponseWriter, r *http.Requ
 	if !s.decodeJSONRequest(w, r, &req) {
 		return
 	}
-	if s.authService != nil {
-		_ = s.authService.RequestPasswordReset(r.Context(), req.Email)
-	}
+	_ = s.authService.RequestPasswordReset(r.Context(), req.Email)
 	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Handler) handlePasswordResetConfirm(w http.ResponseWriter, r *http.Request) {
@@ -481,10 +439,6 @@ func (s *Handler) handlePasswordResetConfirm(w http.ResponseWriter, r *http.Requ
 	}
 	var req cloudproto.AuthPasswordResetConfirmReq
 	if !s.decodeJSONRequest(w, r, &req) {
-		return
-	}
-	if s.authService == nil {
-		s.writeNotFound(w, r)
 		return
 	}
 	if err := s.authService.ConfirmPasswordReset(r.Context(), req.Email, req.Code, req.NewPassword); err != nil {
@@ -509,10 +463,6 @@ func (s *Handler) handleExternalAuthURL(w http.ResponseWriter, r *http.Request, 
 	if !s.requireCloudEndpoint(w, r) {
 		return
 	}
-	if s.authService == nil {
-		s.writeNotFound(w, r)
-		return
-	}
 	authUrl, err := s.authService.ExternalAuthURL(r.Context(), providerId)
 	if err != nil {
 		s.writeAuthError(w, r, err)
@@ -534,10 +484,6 @@ func (s *Handler) handleExternalOAuthCallback(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if !s.requireCloudEndpoint(w, r) {
-		return
-	}
-	if s.authService == nil {
-		s.writeNotFound(w, r)
 		return
 	}
 	var req cloudproto.AuthExternalCallbackReq
@@ -624,10 +570,6 @@ func (s *Handler) handleOAuthToken(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "OAuth authorization code is invalid or expired.", nil)
 		return
 	}
-	if s.authService == nil {
-		s.writeNotFound(w, r)
-		return
-	}
 	result, err := s.authService.IssueUserToken(r.Context(), storedCode.UserId)
 	if err != nil {
 		s.writeAuthError(w, r, err)
@@ -688,15 +630,11 @@ func randomCloudOAuthCode() (string, error) {
 
 func (s *Handler) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.authService != nil {
-			if _, ok := s.claimsFromRequest(r); !ok {
-				s.writeUnauthorized(w, r)
-				return
-			}
-			next.ServeHTTP(w, r)
+		if _, ok := s.claimsFromRequest(r); !ok {
+			s.writeUnauthorized(w, r)
 			return
 		}
-		s.auth.Middleware(next, s.writeUnauthorized).ServeHTTP(w, r)
+		next.ServeHTTP(w, r)
 	})
 }
 func (s *Handler) requireCloudEndpoint(w http.ResponseWriter, r *http.Request) bool {
@@ -794,6 +732,9 @@ func (s *Handler) handleDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	deviceId := parts[0]
+	if isFileGitDeviceRoute(parts) && !s.authorizeFileGitDevice(w, r, deviceId) {
+		return
+	}
 	route := s.routeFor(deviceId)
 	endpoint := tunnelRuntimeEndpoint{route: route, deviceId: deviceId, handler: s}
 	switch parts[1] {
@@ -885,6 +826,30 @@ func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, e
 	}
 	if len(parts) >= 4 && parts[3] == "sessions" {
 		s.handleWorkspaceSessionRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
+	if len(parts) >= 4 && parts[3] == "files" {
+		s.handleWorkspaceFileRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
+	if len(parts) >= 4 && parts[3] == "directories" {
+		s.handleWorkspaceDirectoryRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
+	if len(parts) >= 4 && parts[3] == "entries:rename" {
+		s.handleWorkspaceEntryRenameRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
+	if len(parts) >= 4 && parts[3] == "entries:move" {
+		s.handleWorkspaceEntryMoveRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
+	if len(parts) >= 4 && parts[3] == "entries" {
+		s.handleWorkspaceEntryRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+		return
+	}
+	if len(parts) >= 4 && parts[3] == "git" {
+		s.handleWorkspaceGitRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
 		return
 	}
 	s.writeNotFound(w, r)
@@ -982,7 +947,7 @@ func (s *Handler) handleWorkspaceSessionRoute(w http.ResponseWriter, r *http.Req
 }
 func (s *Handler) handleDeleteDevice(w http.ResponseWriter, r *http.Request, deviceId string) {
 	claims, ok := s.claimsFromRequest(r)
-	if !ok || claims.Provider == ProviderLocalAdmin {
+	if !ok {
 		s.writeUnauthorized(w, r)
 		return
 	}
@@ -1028,7 +993,7 @@ func (s *Handler) handleJSONRuntimeWithStatus(w http.ResponseWriter, r *http.Req
 	}
 	result, err := endpoint.JSON(r.Context(), method, params, s.requestIdFor(w, r))
 	if err != nil {
-		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		s.writeRuntimeError(w, r, err)
 		return
 	}
 	if cacheKind != "" && deviceId != "" {
@@ -1063,7 +1028,7 @@ func (s *Handler) handleHistoryRuntime(w http.ResponseWriter, r *http.Request, e
 	}
 	text, offline, err := endpoint.History(r.Context(), workspaceId, sessionId, s.requestIdFor(w, r))
 	if err != nil {
-		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		s.writeRuntimeError(w, r, err)
 		return
 	}
 	if deviceId != "" {
@@ -1249,17 +1214,7 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (s *Handler) verifyAgentTunnelRequest(r *http.Request) (string, bool) {
-	if s.config.DeviceRepository != nil {
-		return verifyRepositorySignedTunnelRequest(r.Context(), r, s.config.DeviceRepository, s.configAudience())
-	}
-	username, password, ok := r.BasicAuth()
-	if !ok {
-		return "", false
-	}
-	if s.authService != nil {
-		return "", s.authService.VerifyBasic(r.Context(), username, password)
-	}
-	return "", s.auth.ValidCredentials(username, password)
+	return verifyRepositorySignedTunnelRequest(r.Context(), r, s.config.DeviceRepository, s.configAudience())
 }
 
 func (s *Handler) configAudience() string {
@@ -1270,15 +1225,9 @@ func (s *Handler) configAudience() string {
 }
 
 func (s *Handler) devicesForRequest(r *http.Request) ([]*cloudproto.DeviceSummary, error) {
-	if s.authService == nil {
-		return s.registry.List(), nil
-	}
 	claims, ok := s.claimsFromRequest(r)
-	if !ok {
+	if !ok || s.config.DeviceRepository == nil {
 		return nil, nil
-	}
-	if s.config.DeviceRepository == nil {
-		return s.registry.List(), nil
 	}
 	devices, err := s.config.DeviceRepository.ListDevicesForUser(r.Context(), claims.Sub)
 	if err != nil {

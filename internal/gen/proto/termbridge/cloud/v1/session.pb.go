@@ -90,9 +90,9 @@ func (x *CloudSessionSummary) GetConnectedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+// CloudConnectReq is intentionally empty. Cloud token is supplied via Authorization.
 type CloudConnectReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	CloudToken    string                 `protobuf:"bytes,1,opt,name=cloud_token,json=cloudToken,proto3" json:"cloud_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -125,13 +125,6 @@ func (x *CloudConnectReq) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CloudConnectReq.ProtoReflect.Descriptor instead.
 func (*CloudConnectReq) Descriptor() ([]byte, []int) {
 	return file_termbridge_cloud_v1_session_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *CloudConnectReq) GetCloudToken() string {
-	if x != nil {
-		return x.CloudToken
-	}
-	return ""
 }
 
 type CloudConnectResp struct {
@@ -189,10 +182,8 @@ const file_termbridge_cloud_v1_session_proto_rawDesc = "" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x12\x1f\n" +
 	"\vdevice_name\x18\x03 \x01(\tR\n" +
 	"deviceName\x12=\n" +
-	"\fconnected_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\vconnectedAt\"2\n" +
-	"\x0fCloudConnectReq\x12\x1f\n" +
-	"\vcloud_token\x18\x01 \x01(\tR\n" +
-	"cloudToken\"^\n" +
+	"\fconnected_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\vconnectedAt\"\x11\n" +
+	"\x0fCloudConnectReq\"^\n" +
 	"\x10CloudConnectResp\x12J\n" +
 	"\rcloud_session\x18\x01 \x01(\v2%.termbridge.cloud.CloudSessionSummaryR\fcloudSessionB\xce\x01\n" +
 	"\x14com.termbridge.cloudB\fSessionProtoP\x01ZGgitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1\xa2\x02\x03TCX\xaa\x02\x10Termbridge.Cloud\xca\x02\x10Termbridge\\Cloud\xe2\x02\x1cTermbridge\\Cloud\\GPBMetadata\xea\x02\x11Termbridge::Cloudb\x06proto3"

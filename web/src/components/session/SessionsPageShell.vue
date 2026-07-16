@@ -1,13 +1,6 @@
 <template>
-  <section
-    v-if="!authInitialized"
-    class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
-  >
-    {{ t('cloud.checkingAuth') }}
-  </section>
-
   <SplitterGroup
-    v-else-if="isLocalMode || authenticated"
+    v-if="isLocalMode || cloudAuth.authenticated"
     direction="horizontal"
     class="sessions-shell flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
     :class="{ 'sessions-shell--files-open': fileDrawerOpen }"
@@ -172,10 +165,9 @@
   import { useCreateSessionDraft } from '../../composable/useCreateSessionDraft'
   import { useSessionDialogs } from '../../composable/useSessionDialogs'
   import { useTerminalSize } from '../../composable/useTerminalSize'
-  import { useAuthTokensStore } from '../../store/authTokens'
   import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useCloudDevicesStore } from '../../store/cloudDevices'
-  import { useLocalAuthStore } from '../../store/localAuth'
+  import { useCloudSessionStore } from '../../store/cloudSession'
   import { useRuntimeConfigStore } from '../../store/runtimeConfig'
   import {
     closeSessionsSerially,
@@ -215,10 +207,9 @@
 
   const { t } = useI18n()
   const router = useRouter()
-  const tokens = useAuthTokensStore()
   const cloudAuth = useCloudAuthStore()
   const cloudDevices = useCloudDevicesStore()
-  const localAuth = useLocalAuthStore()
+  const cloudSession = useCloudSessionStore()
   const runtimeConfig = useRuntimeConfigStore()
   const workspaceSessions = useWorkspaceSessionsStore()
   const workbench = useWorkbenchStore()
@@ -259,9 +250,7 @@
 
   const fileRuntimeApi = computed(() => createFileGitRuntimeApi(props.runtimeTarget))
   const isLocalMode = computed(() => props.runtimeTarget.mode === 'local')
-  const authInitialized = computed(() => isLocalMode.value || cloudAuth.authInitialized)
-  const authenticated = computed(() => cloudAuth.authenticated)
-  const workbenchDevice = computed(() => props.currentDevice ?? localAuth.cloudSession)
+  const workbenchDevice = computed(() => props.currentDevice ?? cloudSession.cloudSession)
   const helpHref = computed(() =>
     isLocalMode.value ? new URL('/help', runtimeConfig.config.cloud.publicUrl).toString() : '',
   )
@@ -280,7 +269,7 @@
       props.runtimeTarget,
       session.workspace_id,
       session.id,
-      props.runtimeTarget.mode === 'cloud' ? (tokens.cloudToken ?? undefined) : undefined,
+      props.runtimeTarget.mode === 'cloud' ? (cloudAuth.cloudToken ?? undefined) : undefined,
     )
   })
 
@@ -373,12 +362,9 @@
       }
     }
     if (isLocalMode.value) {
-      localAuth.reset()
+      cloudSession.reset()
     } else {
-      tokens.clearCloudToken()
-      cloudAuth.passwordInput = ''
-      cloudAuth.reset()
-      cloudDevices.reset()
+      cloudAuth.clearToken()
     }
     workspaceSessions.reset()
     dialogs.createSessionDialogOpen = false

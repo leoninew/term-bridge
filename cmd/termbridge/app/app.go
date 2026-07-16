@@ -90,11 +90,16 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	default:
 	}
 
+	validationScope, err := validationScopeForCommand(options.Command)
+	if err != nil {
+		return Result{}, err
+	}
 	command := options.Command.Exec.Command
 	loadedConfigFiles := []string{}
 	cfg, err := config.Load(config.Options{
-		Cwd:     options.Cwd,
-		Command: command,
+		Cwd:             options.Cwd,
+		Command:         command,
+		ValidationScope: validationScope,
 		LoadedConfigFile: func(path string) {
 			loadedConfigFiles = append(loadedConfigFiles, path)
 		},
@@ -132,6 +137,26 @@ func Run(ctx context.Context, options Options) (Result, error) {
 		return runMigrate(ctx, cfg, options.Command.MigrateRole)
 	default:
 		return Result{Cwd: cfg.Cwd}, apperrors.Usage("missing command")
+	}
+}
+
+func validationScopeForCommand(command Command) (config.ValidationScope, error) {
+	switch command.Kind {
+	case CommandExec, CommandWorkspace, CommandSession, CommandAgent:
+		return config.ValidationScopeAgent, nil
+	case CommandCloud:
+		return config.ValidationScopeCloud, nil
+	case CommandMigrate:
+		switch strings.TrimSpace(command.MigrateRole) {
+		case "agent":
+			return config.ValidationScopeMigrateAgent, nil
+		case "cloud":
+			return config.ValidationScopeMigrateCloud, nil
+		default:
+			return "", apperrors.Usage("migrate requires role: termbridge migrate agent|cloud")
+		}
+	default:
+		return "", apperrors.Usage("missing command")
 	}
 }
 
@@ -242,6 +267,19 @@ func agentConfig(cfg config.Config) agentserver.Config {
 				MaxBytes:    cfg.Terminal.Client.Queue.MaxBytes,
 			}},
 		},
+		File: agentserver.FileConfig{
+			MaxTextBytes:              cfg.File.MaxTextBytes,
+			MaxDirectoryEntries:       cfg.File.MaxDirectoryEntries,
+			MaxRecursiveDeleteEntries: cfg.File.MaxRecursiveDeleteEntries,
+			OperationTimeout:          cfg.File.OperationTimeout,
+		},
+		Git: agentserver.GitConfig{
+			Executable:     cfg.Git.Executable,
+			CommandTimeout: cfg.Git.CommandTimeout,
+			MaxStdoutBytes: cfg.Git.MaxStdoutBytes,
+			MaxStderrBytes: cfg.Git.MaxStderrBytes,
+			MaxTextBytes:   cfg.Git.MaxTextBytes,
+		},
 		Runtime: agentserver.RuntimeConfig{StateDir: cfg.Runtime.StateDir},
 		Server: agentserver.ServerConfig{
 			ListenURL:          cfg.Local.ListenUrl,
@@ -254,8 +292,6 @@ func agentConfig(cfg config.Config) agentserver.Config {
 			SQLite: agentserver.SQLiteConfig{Path: cfg.Local.Database.SQLite.Path},
 			MySQL:  agentserver.MySQLConfig{Dsn: cfg.Local.Database.MySQL.Dsn},
 		},
-		Auth: agentserver.AuthConfig{JwtTTL: cfg.Auth.JwtTTL},
-		Jwt:  agentserver.JwtConfig{SecretKey: cfg.Jwt.SecretKey},
 		Cloud: agentserver.CloudConnectorConfig{
 			PublicURL:  cfg.Cloud.PublicUrl,
 			ApiBaseUrl: cfg.Cloud.ApiBaseUrl,

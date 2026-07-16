@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	corsAllowHeaders = "Authorization, Content-Type"
+	corsAllowHeaders = "Authorization, Content-Type, X-Request-ID"
 	corsAllowMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
 	corsMaxAge       = "600"
 )

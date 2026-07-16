@@ -128,14 +128,14 @@ func (r *shortcutRuntime) DeleteShortcut(_ context.Context, shortcutId string) e
 	return nil
 }
 
-func TestTunnelUrlUsesCanonicalAPIPathWhenBaseHasNoPath(t *testing.T) {
+func TestTunnelUrlUsesConfiguredAPIBasePath(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		base string
 		want string
 	}{
-		{name: "HTTPS base", base: "https://cloud.example.test", want: "wss://cloud.example.test/api/agent/tunnel"},
-		{name: "HTTP root", base: "http://cloud.example.test/", want: "ws://cloud.example.test/api/agent/tunnel"},
+		{name: "HTTPS API base", base: "https://cloud.example.test/api", want: "wss://cloud.example.test/api/agent/tunnel"},
+		{name: "HTTP API base with trailing slash", base: "http://cloud.example.test/api/", want: "ws://cloud.example.test/api/agent/tunnel"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := tunnelUrl(tc.base); got != tc.want {

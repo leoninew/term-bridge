@@ -7,10 +7,10 @@ type RuntimeConfig struct {
 }
 
 type RuntimeLocalConfig struct {
-	Mode       string           `json:"mode"`
-	PublicUrl  string           `json:"publicUrl"`
-	ApiBaseUrl string           `json:"apiBaseUrl"`
-	CloudOAuth CloudOAuthConfig `json:"cloudOAuth"`
+	Mode        string           `json:"mode"`
+	PublicUrl   string           `json:"publicUrl"`
+	ApiBasePath string           `json:"apiBasePath"`
+	CloudOAuth  CloudOAuthConfig `json:"cloudOAuth"`
 }
 
 type CloudOAuthConfig struct {

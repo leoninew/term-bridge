@@ -825,58 +825,6 @@ func (x *AuthExternalCallbackResp) GetTokenType() string {
 	return ""
 }
 
-type LocalAuthLoginResp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
-	TokenType     string                 `protobuf:"bytes,2,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *LocalAuthLoginResp) Reset() {
-	*x = LocalAuthLoginResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *LocalAuthLoginResp) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*LocalAuthLoginResp) ProtoMessage() {}
-
-func (x *LocalAuthLoginResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LocalAuthLoginResp.ProtoReflect.Descriptor instead.
-func (*LocalAuthLoginResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{15}
-}
-
-func (x *LocalAuthLoginResp) GetAccessToken() string {
-	if x != nil {
-		return x.AccessToken
-	}
-	return ""
-}
-
-func (x *LocalAuthLoginResp) GetTokenType() string {
-	if x != nil {
-		return x.TokenType
-	}
-	return ""
-}
-
 type CloudOAuthTokenResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
@@ -887,7 +835,7 @@ type CloudOAuthTokenResp struct {
 
 func (x *CloudOAuthTokenResp) Reset() {
 	*x = CloudOAuthTokenResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[16]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -899,7 +847,7 @@ func (x *CloudOAuthTokenResp) String() string {
 func (*CloudOAuthTokenResp) ProtoMessage() {}
 
 func (x *CloudOAuthTokenResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[16]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -912,7 +860,7 @@ func (x *CloudOAuthTokenResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudOAuthTokenResp.ProtoReflect.Descriptor instead.
 func (*CloudOAuthTokenResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{16}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CloudOAuthTokenResp) GetAccessToken() string {
@@ -938,7 +886,7 @@ type ExternalAuthUrlResp struct {
 
 func (x *ExternalAuthUrlResp) Reset() {
 	*x = ExternalAuthUrlResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[17]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -950,7 +898,7 @@ func (x *ExternalAuthUrlResp) String() string {
 func (*ExternalAuthUrlResp) ProtoMessage() {}
 
 func (x *ExternalAuthUrlResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[17]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -963,7 +911,7 @@ func (x *ExternalAuthUrlResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExternalAuthUrlResp.ProtoReflect.Descriptor instead.
 func (*ExternalAuthUrlResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{17}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ExternalAuthUrlResp) GetAuthUrl() string {
@@ -976,17 +924,16 @@ func (x *ExternalAuthUrlResp) GetAuthUrl() string {
 type AuthMeResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Authenticated bool                   `protobuf:"varint,1,opt,name=authenticated,proto3" json:"authenticated,omitempty"`
-	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
-	User          *User                  `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
-	CloudSession  *CloudSessionSummary   `protobuf:"bytes,4,opt,name=cloud_session,json=cloudSession,proto3" json:"cloud_session,omitempty"`
-	Device        *DeviceSummary         `protobuf:"bytes,5,opt,name=device,proto3" json:"device,omitempty"`
+	User          *User                  `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	CloudSession  *CloudSessionSummary   `protobuf:"bytes,3,opt,name=cloud_session,json=cloudSession,proto3" json:"cloud_session,omitempty"`
+	Device        *DeviceSummary         `protobuf:"bytes,4,opt,name=device,proto3" json:"device,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AuthMeResp) Reset() {
 	*x = AuthMeResp{}
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[18]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -998,7 +945,7 @@ func (x *AuthMeResp) String() string {
 func (*AuthMeResp) ProtoMessage() {}
 
 func (x *AuthMeResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[18]
+	mi := &file_termbridge_cloud_v1_auth_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1011,7 +958,7 @@ func (x *AuthMeResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthMeResp.ProtoReflect.Descriptor instead.
 func (*AuthMeResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{18}
+	return file_termbridge_cloud_v1_auth_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AuthMeResp) GetAuthenticated() bool {
@@ -1019,13 +966,6 @@ func (x *AuthMeResp) GetAuthenticated() bool {
 		return x.Authenticated
 	}
 	return false
-}
-
-func (x *AuthMeResp) GetUsername() string {
-	if x != nil {
-		return x.Username
-	}
-	return ""
 }
 
 func (x *AuthMeResp) GetUser() *User {
@@ -1105,24 +1045,19 @@ const file_termbridge_cloud_v1_auth_proto_rawDesc = "" +
 	"\x18AuthExternalCallbackResp\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
 	"\n" +
-	"token_type\x18\x02 \x01(\tR\ttokenType\"V\n" +
-	"\x12LocalAuthLoginResp\x12!\n" +
-	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
-	"\n" +
 	"token_type\x18\x02 \x01(\tR\ttokenType\"W\n" +
 	"\x13CloudOAuthTokenResp\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
 	"\n" +
 	"token_type\x18\x02 \x01(\tR\ttokenType\"0\n" +
 	"\x13ExternalAuthUrlResp\x12\x19\n" +
-	"\bauth_url\x18\x01 \x01(\tR\aauthUrl\"\xff\x01\n" +
+	"\bauth_url\x18\x01 \x01(\tR\aauthUrl\"\xe3\x01\n" +
 	"\n" +
 	"AuthMeResp\x12$\n" +
-	"\rauthenticated\x18\x01 \x01(\bR\rauthenticated\x12\x1a\n" +
-	"\busername\x18\x02 \x01(\tR\busername\x12*\n" +
-	"\x04user\x18\x03 \x01(\v2\x16.termbridge.cloud.UserR\x04user\x12J\n" +
-	"\rcloud_session\x18\x04 \x01(\v2%.termbridge.cloud.CloudSessionSummaryR\fcloudSession\x127\n" +
-	"\x06device\x18\x05 \x01(\v2\x1f.termbridge.cloud.DeviceSummaryR\x06deviceB\xcb\x01\n" +
+	"\rauthenticated\x18\x01 \x01(\bR\rauthenticated\x12*\n" +
+	"\x04user\x18\x02 \x01(\v2\x16.termbridge.cloud.UserR\x04user\x12J\n" +
+	"\rcloud_session\x18\x03 \x01(\v2%.termbridge.cloud.CloudSessionSummaryR\fcloudSession\x127\n" +
+	"\x06device\x18\x04 \x01(\v2\x1f.termbridge.cloud.DeviceSummaryR\x06deviceB\xcb\x01\n" +
 	"\x14com.termbridge.cloudB\tAuthProtoP\x01ZGgitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1\xa2\x02\x03TCX\xaa\x02\x10Termbridge.Cloud\xca\x02\x10Termbridge\\Cloud\xe2\x02\x1cTermbridge\\Cloud\\GPBMetadata\xea\x02\x11Termbridge::Cloudb\x06proto3"
 
 var (
@@ -1137,7 +1072,7 @@ func file_termbridge_cloud_v1_auth_proto_rawDescGZIP() []byte {
 	return file_termbridge_cloud_v1_auth_proto_rawDescData
 }
 
-var file_termbridge_cloud_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_termbridge_cloud_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_termbridge_cloud_v1_auth_proto_goTypes = []any{
 	(*User)(nil),                        // 0: termbridge.cloud.User
 	(*AuthLoginReq)(nil),                // 1: termbridge.cloud.AuthLoginReq
@@ -1154,17 +1089,16 @@ var file_termbridge_cloud_v1_auth_proto_goTypes = []any{
 	(*CloudOAuthExchangeResp)(nil),      // 12: termbridge.cloud.CloudOAuthExchangeResp
 	(*AuthLoginResp)(nil),               // 13: termbridge.cloud.AuthLoginResp
 	(*AuthExternalCallbackResp)(nil),    // 14: termbridge.cloud.AuthExternalCallbackResp
-	(*LocalAuthLoginResp)(nil),          // 15: termbridge.cloud.LocalAuthLoginResp
-	(*CloudOAuthTokenResp)(nil),         // 16: termbridge.cloud.CloudOAuthTokenResp
-	(*ExternalAuthUrlResp)(nil),         // 17: termbridge.cloud.ExternalAuthUrlResp
-	(*AuthMeResp)(nil),                  // 18: termbridge.cloud.AuthMeResp
-	(*CloudSessionSummary)(nil),         // 19: termbridge.cloud.CloudSessionSummary
-	(*DeviceSummary)(nil),               // 20: termbridge.cloud.DeviceSummary
+	(*CloudOAuthTokenResp)(nil),         // 15: termbridge.cloud.CloudOAuthTokenResp
+	(*ExternalAuthUrlResp)(nil),         // 16: termbridge.cloud.ExternalAuthUrlResp
+	(*AuthMeResp)(nil),                  // 17: termbridge.cloud.AuthMeResp
+	(*CloudSessionSummary)(nil),         // 18: termbridge.cloud.CloudSessionSummary
+	(*DeviceSummary)(nil),               // 19: termbridge.cloud.DeviceSummary
 }
 var file_termbridge_cloud_v1_auth_proto_depIdxs = []int32{
 	0,  // 0: termbridge.cloud.AuthMeResp.user:type_name -> termbridge.cloud.User
-	19, // 1: termbridge.cloud.AuthMeResp.cloud_session:type_name -> termbridge.cloud.CloudSessionSummary
-	20, // 2: termbridge.cloud.AuthMeResp.device:type_name -> termbridge.cloud.DeviceSummary
+	18, // 1: termbridge.cloud.AuthMeResp.cloud_session:type_name -> termbridge.cloud.CloudSessionSummary
+	19, // 2: termbridge.cloud.AuthMeResp.device:type_name -> termbridge.cloud.DeviceSummary
 	3,  // [3:3] is the sub-list for method output_type
 	3,  // [3:3] is the sub-list for method input_type
 	3,  // [3:3] is the sub-list for extension type_name
@@ -1185,7 +1119,7 @@ func file_termbridge_cloud_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_termbridge_cloud_v1_auth_proto_rawDesc), len(file_termbridge_cloud_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

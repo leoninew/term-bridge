@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 
 	"golang.org/x/oauth2"
@@ -35,7 +36,7 @@ func (c *Client) RegisterCurrentDevice(ctx context.Context, cloudToken string, d
 	if err != nil {
 		return err
 	}
-	reportReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.apiBaseUrl+"/api/devices/current", bytes.NewReader(reportBody))
+	reportReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.apiBaseUrl+"/devices/current", bytes.NewReader(reportBody))
 	if err != nil {
 		return err
 	}
@@ -52,6 +53,34 @@ func (c *Client) RegisterCurrentDevice(ctx context.Context, cloudToken string, d
 	return nil
 }
 
+func (c *Client) AuthMe(ctx context.Context, cloudToken string) (*cloudproto.AuthMeResp, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiBaseUrl+"/auth/me", nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Authorization", "Bearer "+cloudToken)
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode == http.StatusUnauthorized {
+		return &cloudproto.AuthMeResp{Authenticated: false}, nil
+	}
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("cloud auth me status %d", response.StatusCode)
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	var result cloudproto.AuthMeResp
+	if err := codec.UnmarshalProtoJSON(body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *Client) ExchangeOAuthCode(ctx context.Context, client agentapp.OAuthClientConfig, code string) (string, error) {
 	cfg := oauth2.Config{
 		ClientID:     client.ClientId,
@@ -59,7 +88,7 @@ func (c *Client) ExchangeOAuthCode(ctx context.Context, client agentapp.OAuthCli
 		RedirectURL:  client.RedirectUrl,
 		Scopes:       append([]string(nil), client.Scopes...),
 		Endpoint: oauth2.Endpoint{
-			TokenURL:  c.apiBaseUrl + "/api/oauth2/token",
+			TokenURL:  c.apiBaseUrl + "/oauth2/token",
 			AuthStyle: oauth2.AuthStyleInParams,
 		},
 	}

@@ -15,12 +15,12 @@ type Config struct {
 	LogHTTP  sharedconfig.LogHTTPConfig
 	History  history.Config
 	Terminal TerminalConfig
+	File     FileConfig
+	Git      GitConfig
 	Runtime  RuntimeConfig
 	Server   ServerConfig
 	Gate     GateConfig
 	Database DatabaseConfig
-	Auth     AuthConfig
-	Jwt      JwtConfig
 	Cloud    CloudConnectorConfig
 }
 
@@ -41,6 +41,21 @@ type TerminalClientConfig struct {
 type TerminalClientQueueConfig struct {
 	MaxMessages int
 	MaxBytes    int
+}
+
+type FileConfig struct {
+	MaxTextBytes              int64
+	MaxDirectoryEntries       int
+	MaxRecursiveDeleteEntries int
+	OperationTimeout          time.Duration
+}
+
+type GitConfig struct {
+	Executable     string
+	CommandTimeout time.Duration
+	MaxStdoutBytes int64
+	MaxStderrBytes int64
+	MaxTextBytes   int64
 }
 
 type RuntimeConfig struct {
@@ -74,14 +89,6 @@ type SQLiteConfig struct {
 
 type MySQLConfig struct {
 	Dsn string
-}
-
-type AuthConfig struct {
-	JwtTTL time.Duration
-}
-
-type JwtConfig struct {
-	SecretKey string
 }
 
 type CloudConnectorConfig struct {

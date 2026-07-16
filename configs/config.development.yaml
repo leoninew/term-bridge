@@ -2,6 +2,7 @@ local:
   static_dir: 
   listen_url: http://127.0.0.1:9031
   public_url: http://localhost:9030
+  api_base_path: /api
   expose_errors: true
   cors_allowed_origins:
     - http://localhost:9030
@@ -14,7 +15,7 @@ local:
 cloud:
   listen_url: http://127.0.0.1:9032
   public_url: http://localhost:9030
-  api_base_url: http://127.0.0.1:9032
+  api_base_url: http://127.0.0.1:9032/api
   expose_errors: true
   cors_allowed_origins:
     - http://localhost:9030

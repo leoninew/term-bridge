@@ -11,16 +11,19 @@ import (
 	"time"
 
 	agentapi "gitee.com/leoninew/TermBridge-go/internal/agent/api/handler"
+	fileapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/file"
+	gitapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/git"
 	shortcutapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/shortcut"
 	terminalapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/terminal"
 	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
 	cloudapi "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/cloudapi"
 	agentdb "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/database"
+	gitexec "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/gitexec"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/pty/gopty"
+	workspacefile "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/storage/workspacefile"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/repository/task/state"
 	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	httpserver "gitee.com/leoninew/TermBridge-go/internal/shared/api/server"
-	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
 	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 	basedb "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/database"
 )
@@ -48,18 +51,24 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		return err
 	}
 
-	tokens, err := sharedauth.NewTokenServiceFromBase64Key(cfg.Jwt.SecretKey, cfg.Auth.JwtTTL)
-	if err != nil {
-		return apperrors.Config("invalid jwt.secret_key", err)
-	}
-	authService := agentapi.NewLocalAuthService(tokens)
-
 	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: cfg.Runtime.StateDir})
 	if err != nil {
 		return err
 	}
 	runtimeStore := state.NewDbStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id)
-	runtimeAccess := agentapp.WebTerminalAccess{Registry: newWebTerminalRegistry(cfg, logger, runtimeStore), Shortcuts: shortcutapp.NewService(runtimeStore)}
+	fileStore, err := workspacefile.New(workspacefile.Config{MaxTextBytes: cfg.File.MaxTextBytes, MaxDirectoryEntries: cfg.File.MaxDirectoryEntries, MaxRecursiveDeleteEntries: cfg.File.MaxRecursiveDeleteEntries})
+	if err != nil {
+		return apperrors.Config("invalid workspace file service configuration", err)
+	}
+	fileService, err := fileapp.NewService(fileapp.Config{MaxTextBytes: cfg.File.MaxTextBytes, MaxDirectoryEntries: cfg.File.MaxDirectoryEntries, MaxRecursiveDeleteEntries: cfg.File.MaxRecursiveDeleteEntries, OperationTimeout: cfg.File.OperationTimeout}, runtimeStore, fileStore)
+	if err != nil {
+		return apperrors.Config("invalid file service configuration", err)
+	}
+	gitService, err := gitapp.NewService(gitapp.Config{Executable: cfg.Git.Executable, CommandTimeout: cfg.Git.CommandTimeout, MaxStdoutBytes: cfg.Git.MaxStdoutBytes, MaxStderrBytes: cfg.Git.MaxStderrBytes, MaxTextBytes: cfg.Git.MaxTextBytes}, runtimeStore, gitexec.New(gitexec.Config{Executable: cfg.Git.Executable, MaxStdoutBytes: cfg.Git.MaxStdoutBytes, MaxStderrBytes: cfg.Git.MaxStderrBytes, MaxTextBytes: cfg.Git.MaxTextBytes}, fileStore))
+	if err != nil {
+		return apperrors.Config("invalid Git service configuration", err)
+	}
+	runtimeAccess := agentapp.WebTerminalAccess{Registry: newWebTerminalRegistry(cfg, logger, runtimeStore), Shortcuts: shortcutapp.NewService(runtimeStore), Files: fileService, Git: gitService}
 
 	serveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -74,7 +83,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		},
 	)
 
-	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, CloudService: cloudService, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, JWTSecret: tokens.SecretKey(), OnLocalCloudSession: func(summary *cloud.CloudSessionSummary) {
+	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, CloudService: cloudService, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, OnLocalCloudSession: func(summary *cloud.CloudSessionSummary) {
 		if summary == nil {
 			cloudConnector.Stop()
 			return

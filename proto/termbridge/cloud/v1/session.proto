@@ -13,9 +13,8 @@ message CloudSessionSummary {
   google.protobuf.Timestamp connected_at = 4;
 }
 
-message CloudConnectReq {
-  string cloud_token = 1;
-}
+// CloudConnectReq is intentionally empty. Cloud token is supplied via Authorization.
+message CloudConnectReq {}
 
 message CloudConnectResp {
   CloudSessionSummary cloud_session = 1;

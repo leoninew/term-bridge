@@ -10,7 +10,8 @@ import (
 func TestBuildBrowserRuntimeConfigProjectsPublicConfiguration(t *testing.T) {
 	cfg := Config{
 		Local: LocalConfig{
-			PublicUrl: "http://localhost:9030",
+			PublicUrl:   "http://localhost:9030",
+			ApiBasePath: "/api",
 			OAuth: LocalOAuthConfig{
 				ClientId:     "termbridge-agent",
 				ClientSecret: "must-not-be-exposed",
@@ -19,7 +20,8 @@ func TestBuildBrowserRuntimeConfigProjectsPublicConfiguration(t *testing.T) {
 			},
 		},
 		Cloud: CloudConfig{
-			PublicUrl: "https://termbridge.preflite.cn",
+			PublicUrl:  "https://termbridge.preflite.cn",
+			ApiBaseUrl: "https://api.termbridge.preflite.cn",
 			Turnstile: TurnstileConfig{
 				SecretKey: "must-not-be-exposed",
 			},
@@ -45,8 +47,8 @@ func TestBuildBrowserRuntimeConfigProjectsPublicConfiguration(t *testing.T) {
 	if runtimeConfig.Local.PublicUrl != "http://localhost:9030" || runtimeConfig.Cloud.PublicUrl != "https://termbridge.preflite.cn" {
 		t.Fatalf("public URLs = local %q cloud %q", runtimeConfig.Local.PublicUrl, runtimeConfig.Cloud.PublicUrl)
 	}
-	if runtimeConfig.Local.ApiBaseUrl != "/api" || runtimeConfig.Cloud.ApiBaseUrl != "/api" {
-		t.Fatalf("API bases = local %q cloud %q, want /api", runtimeConfig.Local.ApiBaseUrl, runtimeConfig.Cloud.ApiBaseUrl)
+	if runtimeConfig.Local.ApiBasePath != "/api" || runtimeConfig.Cloud.ApiBaseUrl != "https://api.termbridge.preflite.cn" {
+		t.Fatalf("API bases = local %q cloud %q", runtimeConfig.Local.ApiBasePath, runtimeConfig.Cloud.ApiBaseUrl)
 	}
 	if runtimeConfig.Local.CloudOAuth.ClientId != "termbridge-agent" || runtimeConfig.Local.CloudOAuth.RedirectUrl != "http://localhost:9030/oauth/callback" {
 		t.Fatalf("CloudOAuth = %#v", runtimeConfig.Local.CloudOAuth)

@@ -57,7 +57,6 @@ func (s *countingAuthService) IssueUserToken(context.Context, string) (*cloud.Cl
 func (s *countingAuthService) VerifyToken(string) (sharedauth.Claims, error) {
 	return sharedauth.Claims{}, nil
 }
-func (s *countingAuthService) VerifyBasic(context.Context, string, string) bool { return false }
 
 type rejectingTurnstileVerifier struct{}
 
@@ -68,7 +67,7 @@ func (rejectingTurnstileVerifier) Verify(context.Context, string, string) error 
 func TestLoginSecurityRejectsInvalidCSRFBeforeCredentialAuthentication(t *testing.T) {
 	service := &countingAuthService{}
 	turnstile, csrf := testAuthSecurityConfig()
-	handler := New(Config{JWTSecret: testJWTKey, Logger: testLogger(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
+	handler := New(Config{Logger: testLogger(), AuthService: service, Turnstile: turnstile, CSRF: csrf})
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"email":"user@example.test","password":"password","turnstile_token":"challenge","csrf_token":"invalid"}`)))
@@ -82,7 +81,7 @@ func TestLoginSecurityRejectsInvalidCSRFBeforeCredentialAuthentication(t *testin
 func TestLoginSecurityConsumesCSRFTokenAndRequiresTurnstile(t *testing.T) {
 	service := &countingAuthService{}
 	_, csrf := testAuthSecurityConfig()
-	handler := New(Config{JWTSecret: testJWTKey, Logger: testLogger(), AuthService: service, Turnstile: TurnstileConfig{Verify: rejectingTurnstileVerifier{}}, CSRF: csrf})
+	handler := New(Config{Logger: testLogger(), AuthService: service, Turnstile: TurnstileConfig{Verify: rejectingTurnstileVerifier{}}, CSRF: csrf})
 	csrfToken, err := handler.config.CSRF.Tokens.Issue()
 	if err != nil {
 		t.Fatalf("issue csrf token: %v", err)
@@ -103,7 +102,7 @@ func TestLoginSecurityConsumesCSRFTokenAndRequiresTurnstile(t *testing.T) {
 func TestRegistrationSecurityRejectsChallengeBeforeAccountCreation(t *testing.T) {
 	service := &countingAuthService{}
 	_, csrf := testAuthSecurityConfig()
-	handler := New(Config{JWTSecret: testJWTKey, Logger: testLogger(), AuthService: service, Turnstile: TurnstileConfig{Verify: rejectingTurnstileVerifier{}}, CSRF: csrf})
+	handler := New(Config{Logger: testLogger(), AuthService: service, Turnstile: TurnstileConfig{Verify: rejectingTurnstileVerifier{}}, CSRF: csrf})
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"user@example.test","password":"password","turnstile_token":"challenge"}`)))
@@ -118,7 +117,7 @@ func TestAuthSecurityEndpointsExposeOnlyPublicValues(t *testing.T) {
 	turnstile, csrf := testAuthSecurityConfig()
 	turnstile.SiteKey = "public-site-key"
 	turnstile.SecretKey = "private-secret"
-	handler := New(Config{JWTSecret: testJWTKey, Logger: testLogger(), Turnstile: turnstile, CSRF: csrf})
+	handler := New(Config{Logger: testLogger(), Turnstile: turnstile, CSRF: csrf})
 
 	configResponse := httptest.NewRecorder()
 	handler.ServeHTTP(configResponse, httptest.NewRequest(http.MethodGet, "/api/auth/turnstile/config", nil))

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -17,7 +16,7 @@ func TestLoadDefaults(t *testing.T) {
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
 
-	cfg, err := Load(Options{Cwd: cwd, Command: []string{"pwsh"}})
+	cfg, err := Load(Options{Cwd: cwd, Command: []string{"pwsh"}, ValidationScope: ValidationScopeAgent})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -72,6 +71,15 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Terminal.Client.Queue.MaxMessages != 64 || cfg.Terminal.Client.Queue.MaxBytes != 4194304 {
 		t.Fatalf("Terminal.Client.Queue = %#v", cfg.Terminal.Client.Queue)
 	}
+	if cfg.File.MaxTextBytes != 1048576 || cfg.File.MaxDirectoryEntries != 1000 || cfg.File.MaxRecursiveDeleteEntries != 10000 {
+		t.Fatalf("File = %#v", cfg.File)
+	}
+	if cfg.File.OperationTimeout.Seconds() != 10 {
+		t.Fatalf("File.OperationTimeout = %s, want 10s", cfg.File.OperationTimeout)
+	}
+	if cfg.Git.Executable != "git" || cfg.Git.CommandTimeout.Seconds() != 10 || cfg.Git.MaxStdoutBytes != 4194304 || cfg.Git.MaxStderrBytes != 65536 || cfg.Git.MaxTextBytes != 1048576 {
+		t.Fatalf("Git = %#v", cfg.Git)
+	}
 	if cfg.Local.ExposeErrors {
 		t.Fatal("Local.ExposeErrors = true, want false")
 	}
@@ -80,6 +88,9 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.Local.PublicUrl != "http://localhost:9030" {
 		t.Fatalf("Local.PublicUrl = %q, want local frontend URL", cfg.Local.PublicUrl)
+	}
+	if cfg.Local.ApiBasePath != "/api" {
+		t.Fatalf("Local.ApiBasePath = %q, want default Local API path", cfg.Local.ApiBasePath)
 	}
 	if len(cfg.Local.CorsAllowedOrigins) != 0 {
 		t.Fatalf("Local.CorsAllowedOrigins = %#v, want empty", cfg.Local.CorsAllowedOrigins)
@@ -93,11 +104,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Cloud.PublicUrl != "" {
 		t.Fatalf("Cloud.PublicUrl = %q, want empty by default", cfg.Cloud.PublicUrl)
 	}
-	if cfg.Cloud.ApiBaseUrl != "http://127.0.0.1:9030" {
+	if cfg.Cloud.ApiBaseUrl != "http://127.0.0.1:9030/api" {
 		t.Fatalf("Cloud.ApiBaseUrl = %q, want default Cloud API base URL", cfg.Cloud.ApiBaseUrl)
-	}
-	if cfg.Auth.LocalAdmin.Username != DefaultAuthUsername || cfg.Auth.LocalAdmin.Password != DefaultAuthPassword {
-		t.Fatalf("Auth.LocalAdmin = %#v, want default PoC auth", cfg.Auth.LocalAdmin)
 	}
 	if cfg.Local.StaticDir != "" {
 		t.Fatalf("Local.StaticDir = %q, want empty", cfg.Local.StaticDir)
@@ -114,10 +122,10 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "configured-logs")
 	stateDir := filepath.Join(cwd, "configured-state")
-	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\nlocal:\n  expose_errors: true\n  listen_url: http://0.0.0.0:9090\n  static_dir: web/dist\n  public_url: https://configured.example.com/app/\n  cors_allowed_origins:\n    - https://configured.example.com/\n    - https://preview.configured.example.com\n")
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\nlocal:\n  expose_errors: true\n  listen_url: http://0.0.0.0:9090\n  static_dir: web/dist\n  public_url: https://configured.example.com/app/\n  api_base_path: /configured-api/\n  cors_allowed_origins:\n    - https://configured.example.com/\n    - https://preview.configured.example.com\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	cfg, err := Load(Options{Cwd: cwd})
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -142,6 +150,9 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	}
 	if cfg.Local.PublicUrl != "https://configured.example.com/app" {
 		t.Fatalf("Local.PublicUrl = %q", cfg.Local.PublicUrl)
+	}
+	if cfg.Local.ApiBasePath != "/configured-api" {
+		t.Fatalf("Local.ApiBasePath = %q", cfg.Local.ApiBasePath)
 	}
 	wantOrigins := []string{"https://configured.example.com", "https://preview.configured.example.com"}
 	if !reflect.DeepEqual(cfg.Local.CorsAllowedOrigins, wantOrigins) {
@@ -170,7 +181,7 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	stateDir := filepath.Join(cwd, "dotenv-state")
 	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_ENABLED=false\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_EXTENSIONS=js,CSS,,.webp\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_LOCAL__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_LOCAL__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_LOCAL__CORS_ALLOWED_ORIGINS=https://dotenv.example.com,https://preview.dotenv.example.com\nTERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_LOCAL__EXPOSE_ERRORS=true\n")
 
-	cfg, err := Load(Options{Cwd: cwd})
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -220,7 +231,7 @@ func TestLoadOSEnvOverridesDotEnv(t *testing.T) {
 	t.Setenv("TERMBRIDGE_LOCAL__LISTEN_URL", "http://127.0.0.1:9092")
 	t.Setenv("TERMBRIDGE_LOCAL__EXPOSE_ERRORS", "true")
 
-	cfg, err := Load(Options{Cwd: cwd})
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -241,7 +252,7 @@ func TestLoadEnvironmentDotEnvOverridesYAMLAndSkipsDefaultDotEnv(t *testing.T) {
 	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:9093\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	cfg, err := Load(Options{Cwd: cwd})
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -266,7 +277,7 @@ func TestLoadEnvironmentNameComesOnlyFromOSEnv(t *testing.T) {
 	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n")
 	writeDotEnvFile(t, cwd, EnvFileName, EnvNameVariable+"=develop\nTERMBRIDGE_LOG__LEVEL=warn\n")
 
-	cfg, err := Load(Options{Cwd: cwd})
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -292,7 +303,7 @@ func TestLoadOSEnvOverridesEnvironmentDotEnv(t *testing.T) {
 	t.Setenv(EnvNameVariable, "develop")
 	t.Setenv("TERMBRIDGE_LOCAL__LISTEN_URL", "http://127.0.0.1:9094")
 
-	cfg, err := Load(Options{Cwd: cwd})
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -308,7 +319,7 @@ func TestLoadIgnoresMissingEnvironmentConfigAndDotEnv(t *testing.T) {
 	t.Setenv(EnvNameVariable, "develop")
 
 	loadedFiles := []string{}
-	cfg, err := Load(Options{Cwd: cwd, LoadedConfigFile: func(path string) {
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent, LoadedConfigFile: func(path string) {
 		loadedFiles = append(loadedFiles, path)
 	}})
 	if err != nil {
@@ -341,7 +352,7 @@ func TestLoadReportsActuallyLoadedConfigFilesInOrder(t *testing.T) {
 	t.Setenv(EnvNameVariable, "develop")
 
 	loadedFiles := []string{}
-	_, err := Load(Options{Cwd: cwd, LoadedConfigFile: func(path string) {
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent, LoadedConfigFile: func(path string) {
 		loadedFiles = append(loadedFiles, path)
 	}})
 	if err != nil {
@@ -364,7 +375,7 @@ func TestLoadRejectsInvalidEnvironmentDotEnv(t *testing.T) {
 	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_LOG__LEVEL='unterminated")
 	t.Setenv(EnvNameVariable, "develop")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -383,7 +394,7 @@ func TestLoadRejectsInvalidLogLevel(t *testing.T) {
 	writeEnvConfig(t, cwd, "develop", "log:\n  level: trace\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -399,7 +410,23 @@ func TestLoadRejectsInvalidHistoryLimit(t *testing.T) {
 	writeEnvConfig(t, cwd, "develop", "history:\n  max_lines: 0\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !apperrors.IsConfig(err) {
+		t.Fatalf("Load() error = %T, want config error", err)
+	}
+}
+
+func TestLoadRejectsInvalidLocalApiBasePath(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeEnvConfig(t, cwd, "develop", "local:\n  api_base_path: local-api\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -415,7 +442,7 @@ func TestLoadRejectsMissingCloudApiBaseUrl(t *testing.T) {
 	writeEnvConfig(t, cwd, "develop", "cloud:\n  api_base_url: '  '\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -431,7 +458,7 @@ func TestLoadRejectsInvalidCloudApiBaseUrl(t *testing.T) {
 	writeEnvConfig(t, cwd, "develop", "cloud:\n  api_base_url: ftp://cloud.example.test\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -447,7 +474,7 @@ func TestLoadRejectsInvalidAgentListenURL(t *testing.T) {
 	writeEnvConfig(t, cwd, "develop", "local:\n  listen_url: not-a-url\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -463,7 +490,7 @@ func TestLoadRejectsInvalidAgentPublicURL(t *testing.T) {
 	writeEnvConfig(t, cwd, "develop", "local:\n  public_url: ftp://example.com\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -479,7 +506,7 @@ func TestLoadRejectsInvalidAgentCORSAllowedOrigin(t *testing.T) {
 	writeEnvConfig(t, cwd, "develop", "local:\n  cors_allowed_origins:\n    - chrome-extension://example\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -495,7 +522,7 @@ func TestLoadNormalizesZeroOrNegativeLogBodyLimit(t *testing.T) {
 	writeEnvConfig(t, cwd, "develop", "log:\n  http:\n    request_body_limit: 0\n    response_body_limit: -1\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	cfg, err := Load(Options{Cwd: cwd})
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -504,60 +531,60 @@ func TestLoadNormalizesZeroOrNegativeLogBodyLimit(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsMissingJWTSecretKey(t *testing.T) {
+func TestAgentScopeAcceptsMissingJWTSecretKey(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	t.Setenv(EnvNameVariable, "develop")
 	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "")
 
-	_, err := Load(Options{Cwd: cwd})
-	if err == nil {
-		t.Fatal("Load() error = nil, want error")
-	}
-	if !apperrors.IsConfig(err) {
-		t.Fatalf("Load() error = %T, want config error", err)
-	}
-	if !strings.Contains(err.Error(), "invalid jwt.secret_key") {
-		t.Fatalf("Load() error = %v, want jwt secret key error", err)
-	}
-	for _, path := range []string{
-		filepath.Join(cwd, EnvFileName+".develop"),
-		filepath.Join(cwd, ConfigDirName, envConfigFileName("develop")),
-	} {
-		if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
-			t.Fatalf("runtime-generated config %q stat error = %v, want not exist", path, statErr)
-		}
+	if _, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent}); err != nil {
+		t.Fatalf("Load(agent) error = %v", err)
 	}
 }
 
-func TestLoadRejectsInvalidJWTSecretKey(t *testing.T) {
+func TestMigrateScopesValidateOnlyTheirDatabase(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "")
+	writeEnvConfig(t, cwd, "develop", "cloud:\n  database:\n    driver: sqlite\n    sqlite:\n      path: cloud-migration.db\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	if _, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeMigrateAgent}); err != nil {
+		t.Fatalf("Load(migrate agent) error = %v", err)
+	}
+	if _, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeMigrateCloud}); err != nil {
+		t.Fatalf("Load(migrate cloud) error = %v", err)
+	}
+}
+
+func TestCloudScopeRejectsInvalidJWTSecretKey(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
 	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "test-secret")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeCloud})
 	if err == nil {
-		t.Fatal("Load() error = nil, want error")
+		t.Fatal("Load(cloud) error = nil, want error")
 	}
 	if !strings.Contains(err.Error(), "invalid jwt.secret_key") {
-		t.Fatalf("Load() error = %v, want jwt secret key error", err)
+		t.Fatalf("Load(cloud) error = %v, want jwt secret key error", err)
 	}
 }
 
-func TestLoadRejectsIncompleteIntegrationConfig(t *testing.T) {
+func TestCloudScopeRejectsIncompleteIntegrationConfig(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
 	t.Setenv("TERMBRIDGE_RESEND__API_KEY", "resend-key")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeCloud})
 	if err == nil {
-		t.Fatal("Load() error = nil, want error")
+		t.Fatal("Load(cloud) error = nil, want error")
 	}
 	if !strings.Contains(err.Error(), "TERMBRIDGE_RESEND__FROM_EMAIL") {
-		t.Fatalf("Load() error = %v, want missing resend from email", err)
+		t.Fatalf("Load(cloud) error = %v, want missing resend from email", err)
 	}
 }
 
@@ -568,7 +595,7 @@ func TestLoadRejectsProductionTurnstileConfiguration(t *testing.T) {
 	t.Setenv(EnvNameVariable, "production")
 	writeEnvConfig(t, cwd, "production", "cloud:\n  public_url: https://cloud.example.test\n")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeCloud})
 	if err == nil || !strings.Contains(err.Error(), "cloud.turnstile.site_key") {
 		t.Fatalf("Load() error = %v, want missing production Turnstile site key", err)
 	}
@@ -581,7 +608,7 @@ func TestLoadProductionTurnstileConfiguration(t *testing.T) {
 	t.Setenv(EnvNameVariable, "production")
 	writeEnvConfig(t, cwd, "production", "cloud:\n  public_url: https://cloud.example.test\n  turnstile:\n    site_key: production-site-key\n    secret_key: production-secret-key\n")
 
-	cfg, err := Load(Options{Cwd: cwd})
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeCloud})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -597,7 +624,7 @@ func TestLoadLocalOAuthConfig(t *testing.T) {
 	writeEnvConfig(t, cwd, "develop", "local:\n  oauth:\n    client_id: termbridge-agent\n    client_secret: agent-secret\n    redirect_url: http://localhost:9030/oauth/callback/\n    scopes: openid,email,profile\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	cfg, err := Load(Options{Cwd: cwd})
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -623,7 +650,7 @@ func TestLoadRejectsIncompleteLocalOAuthConfig(t *testing.T) {
 	writeEnvConfig(t, cwd, "develop", "local:\n  oauth:\n    client_id: termbridge-agent\n    client_secret: \"\"\n    redirect_url: \"\"\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -640,7 +667,7 @@ func TestLoadIgnoresMissingDotEnv(t *testing.T) {
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
 
-	cfg, err := Load(Options{Cwd: cwd})
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -655,7 +682,7 @@ func TestLoadRejectsInvalidDotEnv(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL='unterminated")
 
-	_, err := Load(Options{Cwd: cwd})
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
@@ -675,7 +702,7 @@ func TestLoadIgnoresUnknownConfigAndEnvironmentKeys(t *testing.T) {
 	writeDotEnvFile(t, cwd, EnvFileName+".develop", "TERMBRIDGE_UNKNOWN__FIELD=ignored\nTERMBRIDGE_LOG__LEVEL=debug\n")
 	t.Setenv(EnvNameVariable, "develop")
 
-	cfg, err := Load(Options{Cwd: cwd})
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}

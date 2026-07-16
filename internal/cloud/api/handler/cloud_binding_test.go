@@ -135,7 +135,7 @@ func newCloudHandlerForTest(t *testing.T) *Handler {
 	insertCloudUser(t, db, "user-1", "user-1@example.test")
 	insertCloudUser(t, db, "user-2", "user-2@example.test")
 	authService := newTestAuthService(sharedauth.NewTokenService(testJWTKey))
-	return New(Config{JWTSecret: testJWTKey, Logger: slog.Default(), AuthService: authService, DeviceRepository: deviceRepo})
+	return New(Config{Logger: slog.Default(), AuthService: authService, DeviceRepository: deviceRepo})
 }
 
 func newCloudDeviceRepository(db *sql.DB) DeviceRepository {

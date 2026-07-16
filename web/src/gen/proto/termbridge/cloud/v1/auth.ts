@@ -88,11 +88,6 @@ export interface AuthExternalCallbackResp {
   token_type: string;
 }
 
-export interface LocalAuthLoginResp {
-  access_token: string;
-  token_type: string;
-}
-
 export interface CloudOAuthTokenResp {
   access_token: string;
   token_type: string;
@@ -104,7 +99,6 @@ export interface ExternalAuthUrlResp {
 
 export interface AuthMeResp {
   authenticated: boolean;
-  username: string;
   user: User | undefined;
   cloud_session: CloudSessionSummary | undefined;
   device: DeviceSummary | undefined;

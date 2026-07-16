@@ -12,6 +12,60 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 )
 
+func TestAuthMeUsesConfiguredApiBaseUrlAndCloudBearer(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/auth/me" {
+			t.Fatalf("request method=%s path=%s", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer cloud-token" {
+			t.Fatalf("authorization = %q", got)
+		}
+		body, err := codec.MarshalProtoJSON(&cloudproto.AuthMeResp{Authenticated: true, User: &cloudproto.User{Id: "user-1", Email: "user@example.test"}})
+		if err != nil {
+			t.Fatalf("encode auth me response: %v", err)
+		}
+		_, _ = w.Write(body)
+	}))
+	defer cloud.Close()
+
+	client := New(Config{ApiBaseUrl: cloud.URL + "/api", HttpClient: http.DefaultClient})
+	result, err := client.AuthMe(context.Background(), "cloud-token")
+	if err != nil {
+		t.Fatalf("AuthMe() error = %v", err)
+	}
+	if !result.GetAuthenticated() || result.GetUser().GetId() != "user-1" || result.GetUser().GetEmail() != "user@example.test" {
+		t.Fatalf("auth me result = %#v", result)
+	}
+}
+
+func TestAuthMeNormalizesCloudUnauthorizedToUnauthenticated(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer cloud.Close()
+
+	client := New(Config{ApiBaseUrl: cloud.URL + "/api", HttpClient: http.DefaultClient})
+	result, err := client.AuthMe(context.Background(), "expired-token")
+	if err != nil {
+		t.Fatalf("AuthMe() error = %v", err)
+	}
+	if result.GetAuthenticated() || result.GetUser() != nil {
+		t.Fatalf("auth me result = %#v", result)
+	}
+}
+
+func TestAuthMeRejectsInvalidCloudResponse(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"authenticated":`))
+	}))
+	defer cloud.Close()
+
+	client := New(Config{ApiBaseUrl: cloud.URL + "/api", HttpClient: http.DefaultClient})
+	if _, err := client.AuthMe(context.Background(), "cloud-token"); err == nil {
+		t.Fatal("AuthMe() error = nil")
+	}
+}
+
 func TestRegisterCurrentDeviceUsesConfiguredApiBaseUrl(t *testing.T) {
 	var deviceReport cloudproto.CurrentDeviceReq
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +86,7 @@ func TestRegisterCurrentDeviceUsesConfiguredApiBaseUrl(t *testing.T) {
 	}))
 	defer cloud.Close()
 
-	client := New(Config{ApiBaseUrl: cloud.URL, HttpClient: http.DefaultClient})
+	client := New(Config{ApiBaseUrl: cloud.URL + "/api", HttpClient: http.DefaultClient})
 	device := agentapp.Device{Id: "device-1", Name: "developer-machine", PublicKey: "public-key"}
 	if err := client.RegisterCurrentDevice(context.Background(), "cloud-token", device); err != nil {
 		t.Fatalf("RegisterCurrentDevice() error = %v", err)

@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -50,6 +51,15 @@ func TestCORSAllowedPreflightReturnsNoContent(t *testing.T) {
 	assertCORSHeaders(t, recorder, "https://app.example.com")
 	if recorder.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d", recorder.Code)
+	}
+}
+
+func TestCORSAllowsClientRequestIDHeader(t *testing.T) {
+	recorder := serveCORSRequest(t, []string{"https://app.example.com"}, http.MethodOptions, "/local-api/health", "https://app.example.com")
+
+	allowedHeaders := recorder.Header().Get("Access-Control-Allow-Headers")
+	if !strings.Contains(allowedHeaders, "X-Request-ID") {
+		t.Fatalf("Access-Control-Allow-Headers = %q, want X-Request-ID", allowedHeaders)
 	}
 }
 

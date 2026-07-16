@@ -27,42 +27,33 @@ import type {
   AuthMeResp,
   CloudOAuthExchangeReq,
   CloudOAuthExchangeResp,
-  LocalAuthLoginResp,
 } from '../../gen/proto/termbridge/cloud/v1/auth'
-import type { CloudConnectReq, CloudConnectResp } from '../../gen/proto/termbridge/cloud/v1/session'
+import type { CloudConnectResp } from '../../gen/proto/termbridge/cloud/v1/session'
 import { localApiClient } from '../api/client'
 import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
 
-export async function authMe(): Promise<AuthMeResp> {
-  try {
-    const response = await localApiClient.get<AuthMeResp>('/auth/me')
-    return response.data
-  } catch (err) {
-    if (isUnauthorizedApiError(err)) {
-      return {
-        authenticated: false,
-        username: '',
-        user: undefined,
-        cloud_session: undefined,
-        device: undefined,
-      }
-    }
-    throw err
-  }
+function cloudAuthorizationHeaders(cloudToken: string) {
+  return { Authorization: 'Bearer ' + cloudToken }
 }
 
-export async function authLoginViaLocal(): Promise<LocalAuthLoginResp> {
-  const response = await localApiClient.post<LocalAuthLoginResp>('/auth/login')
+export async function agentStatus(): Promise<AuthMeResp> {
+  const response = await localApiClient.get<AuthMeResp>('/agent/status')
   return response.data
 }
 
-export async function authLogout(): Promise<void> {
-  await localApiClient.post('/auth/logout')
+export async function fetchCloudIdentityViaLocalApi(cloudToken: string): Promise<AuthMeResp> {
+  const response = await localApiClient.get<AuthMeResp>('/cloud/auth/me', {
+    headers: cloudAuthorizationHeaders(cloudToken),
+  })
+  return response.data
 }
 
 export async function connectCloudWithToken(cloudToken: string): Promise<CloudConnectResp> {
-  const request: CloudConnectReq = { cloud_token: cloudToken }
-  const response = await localApiClient.post<CloudConnectResp>('/cloud/connect', request)
+  const response = await localApiClient.post<CloudConnectResp>(
+    '/cloud/connect',
+    {},
+    { headers: cloudAuthorizationHeaders(cloudToken) },
+  )
   return response.data
 }
 
@@ -225,14 +216,4 @@ function localRuntimePath(path: string): string {
 
 function offline(response: AxiosResponse): boolean {
   return String(response.headers['x-termbridge-offline'] ?? '').toLowerCase() === 'true'
-}
-
-function isUnauthorizedApiError(err: unknown): boolean {
-  return (
-    err instanceof Error &&
-    'status' in err &&
-    'code' in err &&
-    err.status === 401 &&
-    err.code === 'unauthorized'
-  )
 }
