@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	terminalapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/terminal"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	tunnel "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
@@ -126,6 +127,46 @@ func (r *shortcutRuntime) UpdateShortcutOrder(_ context.Context, shortcutIds []s
 func (r *shortcutRuntime) DeleteShortcut(_ context.Context, shortcutId string) error {
 	r.deletedId = shortcutId
 	return nil
+}
+
+func TestTerminalOutboundFramePreservesControlPayload(t *testing.T) {
+	started := &agent.ServerControlMessage{
+		Type:            "started",
+		SessionId:       "session-1",
+		WorkspaceId:     "workspace-1",
+		LifecycleState:  "running",
+		AttachmentState: "attached",
+	}
+	controlFrame, err := terminalOutboundFrame("stream-1", terminalapp.Outbound{Kind: terminalapp.OutboundText, Text: started})
+	if err != nil {
+		t.Fatalf("terminalOutboundFrame() error = %v", err)
+	}
+	if controlFrame.GetTerminalOutput() != nil {
+		t.Fatalf("control frame output = %#v, want no binary output", controlFrame.GetTerminalOutput())
+	}
+	control := controlFrame.GetTerminalControl()
+	if control == nil || control.GetSessionId() != started.GetSessionId() || control.GetWorkspaceId() != started.GetWorkspaceId() || control.GetLifecycleState() != started.GetLifecycleState() || control.GetAttachmentState() != started.GetAttachmentState() {
+		t.Fatalf("control frame = %#v, want complete started control", control)
+	}
+
+	output := []byte{0x1b, '[', '2', 'J'}
+	outputFrame, err := terminalOutboundFrame("stream-1", terminalapp.Outbound{Kind: terminalapp.OutboundBinary, Binary: output})
+	if err != nil {
+		t.Fatalf("terminalOutboundFrame() error = %v", err)
+	}
+	if outputFrame.GetTerminalControl() != nil {
+		t.Fatalf("binary frame control = %#v, want no terminal control", outputFrame.GetTerminalControl())
+	}
+	if got := outputFrame.GetTerminalOutput().GetData(); string(got) != string(output) {
+		t.Fatalf("binary frame data = %v, want %v", got, output)
+	}
+}
+
+func TestTerminalOutboundFrameRejectsNilControl(t *testing.T) {
+	_, err := terminalOutboundFrame("stream-1", terminalapp.Outbound{Kind: terminalapp.OutboundText})
+	if err == nil {
+		t.Fatal("terminalOutboundFrame() error = nil, want nil control rejection")
+	}
 }
 
 func TestTunnelUrlUsesConfiguredAPIBasePath(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 )
 
-const ProtocolVersion = 3
+const ProtocolVersion = 4
 
 const MaxFrameBytes = 32 * 1024 * 1024
 

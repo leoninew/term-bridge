@@ -535,9 +535,14 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 				_ = writeTunnelFrame(ctx, conn, writeMu, closed)
 				return
 			}
-			data := outboundData(outbound)
-			output := &shared.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &shared.TunnelFrame_TerminalOutput{TerminalOutput: &shared.TerminalOutput{Data: data}}}
-			if err := writeTunnelFrame(ctx, conn, writeMu, output); err != nil {
+			outboundFrame, err := terminalOutboundFrame(frame.GetStreamId(), outbound)
+			if err != nil {
+				stream.MarkSent(outbound)
+				c.logWarn("agent terminal outbound invalid", append(attrs, "error", err)...)
+				_ = writeTerminalError(ctx, conn, writeMu, frame.GetStreamId(), frame.GetRequestId(), err.Error())
+				return
+			}
+			if err := writeTunnelFrame(ctx, conn, writeMu, outboundFrame); err != nil {
 				stream.MarkSent(outbound)
 				return
 			}
@@ -587,11 +592,18 @@ func writeTunnelFrame(ctx context.Context, conn *websocket.Conn, writeMu *sync.M
 	return conn.Write(ctx, websocket.MessageText, data)
 }
 
-func outboundData(outbound terminalapp.Outbound) []byte {
-	if outbound.Kind == terminalapp.OutboundBinary {
-		return outbound.Binary
+func terminalOutboundFrame(streamId string, outbound terminalapp.Outbound) (*shared.TunnelFrame, error) {
+	switch outbound.Kind {
+	case terminalapp.OutboundBinary:
+		return &shared.TunnelFrame{StreamId: streamId, Payload: &shared.TunnelFrame_TerminalOutput{TerminalOutput: &shared.TerminalOutput{Data: outbound.Binary}}}, nil
+	case terminalapp.OutboundText:
+		if outbound.Text == nil {
+			return nil, fmt.Errorf("terminal control outbound is nil")
+		}
+		return &shared.TunnelFrame{StreamId: streamId, Payload: &shared.TunnelFrame_TerminalControl{TerminalControl: outbound.Text}}, nil
+	default:
+		return nil, fmt.Errorf("unsupported terminal outbound kind: %d", outbound.Kind)
 	}
-	return []byte(outbound.Text.Message)
 }
 
 func (c *Client) tunnelHeader(device Device) (http.Header, error) {

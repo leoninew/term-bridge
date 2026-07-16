@@ -52,6 +52,7 @@ import type {
   UpdateShortcutRequest,
   UpdateShortcutResp,
 } from "../../agent/v1/shortcut";
+import type { ServerControlMessage } from "../../agent/v1/terminal";
 import type {
   DeleteWorkspaceReq,
   DeleteWorkspaceResp,
@@ -134,6 +135,7 @@ export interface TunnelFrame {
   terminal_output?: TerminalOutput | undefined;
   terminal_resize?: TerminalResize | undefined;
   terminal_closed?: TerminalClosed | undefined;
+  terminal_control?: ServerControlMessage | undefined;
   error?: ErrorResp | undefined;
   close?: Close | undefined;
 }

@@ -93,6 +93,7 @@ type TunnelFrame struct {
 	//	*TunnelFrame_TerminalOutput
 	//	*TunnelFrame_TerminalResize
 	//	*TunnelFrame_TerminalClosed
+	//	*TunnelFrame_TerminalControl
 	//	*TunnelFrame_Error
 	//	*TunnelFrame_Close
 	Payload       isTunnelFrame_Payload `protobuf_oneof:"payload"`
@@ -736,6 +737,15 @@ func (x *TunnelFrame) GetTerminalClosed() *TerminalClosed {
 	return nil
 }
 
+func (x *TunnelFrame) GetTerminalControl() *v1.ServerControlMessage {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_TerminalControl); ok {
+			return x.TerminalControl
+		}
+	}
+	return nil
+}
+
 func (x *TunnelFrame) GetError() *ErrorResp {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_Error); ok {
@@ -1018,6 +1028,10 @@ type TunnelFrame_TerminalClosed struct {
 	TerminalClosed *TerminalClosed `protobuf:"bytes,304,opt,name=terminal_closed,json=terminalClosed,proto3,oneof"`
 }
 
+type TunnelFrame_TerminalControl struct {
+	TerminalControl *v1.ServerControlMessage `protobuf:"bytes,305,opt,name=terminal_control,json=terminalControl,proto3,oneof"`
+}
+
 type TunnelFrame_Error struct {
 	Error *ErrorResp `protobuf:"bytes,900,opt,name=error,proto3,oneof"`
 }
@@ -1155,6 +1169,8 @@ func (*TunnelFrame_TerminalOutput) isTunnelFrame_Payload() {}
 func (*TunnelFrame_TerminalResize) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_TerminalClosed) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_TerminalControl) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_Error) isTunnelFrame_Payload() {}
 
@@ -1652,7 +1668,7 @@ var File_termbridge_shared_v1_tunnel_proto protoreflect.FileDescriptor
 
 const file_termbridge_shared_v1_tunnel_proto_rawDesc = "" +
 	"\n" +
-	"!termbridge/shared/v1/tunnel.proto\x12\x11termbridge.shared\x1a\x1etermbridge/agent/v1/file.proto\x1a\x1dtermbridge/agent/v1/git.proto\x1a#termbridge/agent/v1/workspace.proto\x1a!termbridge/agent/v1/session.proto\x1a!termbridge/agent/v1/history.proto\x1a\"termbridge/agent/v1/shortcut.proto\x1a!termbridge/shared/v1/common.proto\"\xe0+\n" +
+	"!termbridge/shared/v1/tunnel.proto\x12\x11termbridge.shared\x1a\x1etermbridge/agent/v1/file.proto\x1a\x1dtermbridge/agent/v1/git.proto\x1a#termbridge/agent/v1/workspace.proto\x1a!termbridge/agent/v1/session.proto\x1a!termbridge/agent/v1/history.proto\x1a\"termbridge/agent/v1/shortcut.proto\x1a\"termbridge/agent/v1/terminal.proto\x1a!termbridge/shared/v1/common.proto\"\xb6,\n" +
 	"\vTunnelFrame\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12\x1d\n" +
 	"\n" +
@@ -1723,7 +1739,8 @@ const file_termbridge_shared_v1_tunnel_proto_rawDesc = "" +
 	"\x0eterminal_input\x18\xad\x02 \x01(\v2 .termbridge.shared.TerminalInputH\x00R\rterminalInput\x12M\n" +
 	"\x0fterminal_output\x18\xae\x02 \x01(\v2!.termbridge.shared.TerminalOutputH\x00R\x0eterminalOutput\x12M\n" +
 	"\x0fterminal_resize\x18\xaf\x02 \x01(\v2!.termbridge.shared.TerminalResizeH\x00R\x0eterminalResize\x12M\n" +
-	"\x0fterminal_closed\x18\xb0\x02 \x01(\v2!.termbridge.shared.TerminalClosedH\x00R\x0eterminalClosed\x125\n" +
+	"\x0fterminal_closed\x18\xb0\x02 \x01(\v2!.termbridge.shared.TerminalClosedH\x00R\x0eterminalClosed\x12T\n" +
+	"\x10terminal_control\x18\xb1\x02 \x01(\v2&.termbridge.agent.ServerControlMessageH\x00R\x0fterminalControl\x125\n" +
 	"\x05error\x18\x84\a \x01(\v2\x1c.termbridge.shared.ErrorRespH\x00R\x05error\x121\n" +
 	"\x05close\x18\x85\a \x01(\v2\x18.termbridge.shared.CloseH\x00R\x05closeB\t\n" +
 	"\apayload\"p\n" +
@@ -1835,7 +1852,8 @@ var file_termbridge_shared_v1_tunnel_proto_goTypes = []any{
 	(*v1.DeleteEntryResp)(nil),                // 61: termbridge.agent.DeleteEntryResp
 	(*v1.GitStatusResp)(nil),                  // 62: termbridge.agent.GitStatusResp
 	(*v1.GitDiffResp)(nil),                    // 63: termbridge.agent.GitDiffResp
-	(*ErrorResp)(nil),                         // 64: termbridge.shared.ErrorResp
+	(*v1.ServerControlMessage)(nil),           // 64: termbridge.agent.ServerControlMessage
+	(*ErrorResp)(nil),                         // 65: termbridge.shared.ErrorResp
 }
 var file_termbridge_shared_v1_tunnel_proto_depIdxs = []int32{
 	1,  // 0: termbridge.shared.TunnelFrame.hello:type_name -> termbridge.shared.Hello
@@ -1903,13 +1921,14 @@ var file_termbridge_shared_v1_tunnel_proto_depIdxs = []int32{
 	7,  // 62: termbridge.shared.TunnelFrame.terminal_output:type_name -> termbridge.shared.TerminalOutput
 	8,  // 63: termbridge.shared.TunnelFrame.terminal_resize:type_name -> termbridge.shared.TerminalResize
 	9,  // 64: termbridge.shared.TunnelFrame.terminal_closed:type_name -> termbridge.shared.TerminalClosed
-	64, // 65: termbridge.shared.TunnelFrame.error:type_name -> termbridge.shared.ErrorResp
-	10, // 66: termbridge.shared.TunnelFrame.close:type_name -> termbridge.shared.Close
-	67, // [67:67] is the sub-list for method output_type
-	67, // [67:67] is the sub-list for method input_type
-	67, // [67:67] is the sub-list for extension type_name
-	67, // [67:67] is the sub-list for extension extendee
-	0,  // [0:67] is the sub-list for field type_name
+	64, // 65: termbridge.shared.TunnelFrame.terminal_control:type_name -> termbridge.agent.ServerControlMessage
+	65, // 66: termbridge.shared.TunnelFrame.error:type_name -> termbridge.shared.ErrorResp
+	10, // 67: termbridge.shared.TunnelFrame.close:type_name -> termbridge.shared.Close
+	68, // [68:68] is the sub-list for method output_type
+	68, // [68:68] is the sub-list for method input_type
+	68, // [68:68] is the sub-list for extension type_name
+	68, // [68:68] is the sub-list for extension extendee
+	0,  // [0:68] is the sub-list for field type_name
 }
 
 func init() { file_termbridge_shared_v1_tunnel_proto_init() }
@@ -1984,6 +2003,7 @@ func file_termbridge_shared_v1_tunnel_proto_init() {
 		(*TunnelFrame_TerminalOutput)(nil),
 		(*TunnelFrame_TerminalResize)(nil),
 		(*TunnelFrame_TerminalClosed)(nil),
+		(*TunnelFrame_TerminalControl)(nil),
 		(*TunnelFrame_Error)(nil),
 		(*TunnelFrame_Close)(nil),
 	}

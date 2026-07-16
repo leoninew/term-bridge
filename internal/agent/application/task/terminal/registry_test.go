@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -380,9 +381,15 @@ func TestAttachReplaysBoundedChunkedHistory(t *testing.T) {
 	var binaryChunks int
 	var binaryBytes int
 	var truncated bool
+	var outboundTypes []string
 	for {
 		select {
 		case outbound := <-client.Outbound():
+			if outbound.Kind == OutboundText {
+				outboundTypes = append(outboundTypes, outbound.Text.GetType())
+			} else {
+				outboundTypes = append(outboundTypes, "binary")
+			}
 			if outbound.Kind == OutboundBinary {
 				binaryChunks++
 				binaryBytes += len(outbound.Binary)
@@ -407,6 +414,10 @@ replayDone:
 	}
 	if binaryChunks != 4 || binaryBytes != 1024 {
 		t.Fatalf("replay chunks/bytes = %d/%d, want 4/1024", binaryChunks, binaryBytes)
+	}
+	wantOutboundTypes := []string{terminalproto.TypeStarted, terminalproto.TypeReplayStarted, "binary", "binary", "binary", "binary", terminalproto.TypeReplayFinished}
+	if !slices.Equal(outboundTypes, wantOutboundTypes) {
+		t.Fatalf("replay outbound sequence = %v, want %v", outboundTypes, wantOutboundTypes)
 	}
 	if client.QueuedBytes() != 0 {
 		t.Fatalf("QueuedBytes() = %d, want released", client.QueuedBytes())

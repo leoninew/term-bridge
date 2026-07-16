@@ -124,6 +124,15 @@ func (t *terminalRelay) dispatch(frame *shared.TunnelFrame) bool {
 			t.logger.Warn("terminal websocket output write failed", "session_id", t.sessionId, "stream_id", frame.GetStreamId(), "error", err)
 		}
 		return true
+	case *shared.TunnelFrame_TerminalControl:
+		if err := writeTerminalControl(t.browser, payload.TerminalControl); err != nil {
+			if t.logger != nil {
+				t.logger.Warn("terminal websocket control write failed", "session_id", t.sessionId, "stream_id", frame.GetStreamId(), "error", err)
+			}
+			_ = t.browser.Close(websocket.StatusInternalError, "terminal control relay failed")
+			closeOnce(t.done)
+		}
+		return true
 	case *shared.TunnelFrame_Error:
 		message := tunnel.ErrorMessage(frame)
 		if t.logger != nil {

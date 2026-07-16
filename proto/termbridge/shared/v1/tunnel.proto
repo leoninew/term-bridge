@@ -8,6 +8,7 @@ import "termbridge/agent/v1/workspace.proto";
 import "termbridge/agent/v1/session.proto";
 import "termbridge/agent/v1/history.proto";
 import "termbridge/agent/v1/shortcut.proto";
+import "termbridge/agent/v1/terminal.proto";
 import "termbridge/shared/v1/common.proto";
 
 option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1/tunnel";
@@ -85,6 +86,7 @@ message TunnelFrame {
     TerminalOutput terminal_output = 302;
     TerminalResize terminal_resize = 303;
     TerminalClosed terminal_closed = 304;
+    termbridge.agent.ServerControlMessage terminal_control = 305;
 
     termbridge.shared.ErrorResp error = 900;
     Close close = 901;

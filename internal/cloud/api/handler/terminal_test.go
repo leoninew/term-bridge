@@ -11,7 +11,9 @@ import (
 
 	"github.com/coder/websocket"
 
+	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
@@ -36,9 +38,26 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 		t.Fatalf("browser Dial() error = %v", err)
 	}
 	defer func() { _ = browser.Close(websocket.StatusNormalClosure, "") }()
-	_, output, err := browser.Read(ctx)
+	controlType, controlData, err := browser.Read(ctx)
 	if err != nil {
-		t.Fatalf("browser Read() error = %v", err)
+		t.Fatalf("browser started control Read() error = %v", err)
+	}
+	if controlType != websocket.MessageText {
+		t.Fatalf("started frame type = %v, want text", controlType)
+	}
+	var started agent.ServerControlMessage
+	if err := json.Unmarshal(controlData, &started); err != nil {
+		t.Fatalf("Unmarshal(started) error = %v", err)
+	}
+	if started.GetType() != terminalproto.TypeStarted || started.GetSessionId() != "sess-1" || started.GetWorkspaceId() != "ws-1" || started.GetLifecycleState() != "running" || started.GetAttachmentState() != "attached" {
+		t.Fatalf("started control = %#v, want attached session metadata", started)
+	}
+	outputType, output, err := browser.Read(ctx)
+	if err != nil {
+		t.Fatalf("browser output Read() error = %v", err)
+	}
+	if outputType != websocket.MessageBinary {
+		t.Fatalf("output frame type = %v, want binary", outputType)
 	}
 	wantOutput := []byte{'h', 'e', 'l', 'l', 'o', 0xff, 0xfe, 0x1b, '[', '2', 'J'}
 	if !bytes.Equal(output, wantOutput) {
@@ -99,6 +118,9 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, input
 			if frame.GetRequestId() == "" || payload.TerminalAttach.GetWorkspaceId() == "" {
 				return
 			}
+			started := &shared.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &shared.TunnelFrame_TerminalControl{TerminalControl: &agent.ServerControlMessage{Type: terminalproto.TypeStarted, SessionId: "sess-1", WorkspaceId: "ws-1", LifecycleState: "running", AttachmentState: "attached"}}}
+			startedData, _ := tunnel.MarshalFrame(started)
+			_ = conn.Write(ctx, websocket.MessageText, startedData)
 			output := &shared.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &shared.TunnelFrame_TerminalOutput{TerminalOutput: &shared.TerminalOutput{Data: []byte{'h', 'e', 'l', 'l', 'o', 0xff, 0xfe, 0x1b, '[', '2', 'J'}}}}
 			outputData, _ := tunnel.MarshalFrame(output)
 			_ = conn.Write(ctx, websocket.MessageText, outputData)
@@ -131,6 +153,9 @@ func TestAgentDisconnectSendsStructuredTerminalError(t *testing.T) {
 		t.Fatalf("browser Dial() error = %v", err)
 	}
 	defer func() { _ = browser.Close(websocket.StatusNormalClosure, "") }()
+	if _, _, err := browser.Read(ctx); err != nil {
+		t.Fatalf("initial started Read() error = %v", err)
+	}
 	if _, _, err := browser.Read(ctx); err != nil {
 		t.Fatalf("initial output Read() error = %v", err)
 	}
