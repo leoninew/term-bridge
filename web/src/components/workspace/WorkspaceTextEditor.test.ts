@@ -127,4 +127,37 @@ describe('WorkspaceTextEditor', () => {
     expect(wrapper.text()).toContain('正在加载文件')
     expect(wrapper.text()).not.toContain('notes.txt')
   })
+
+  it('mounts Monaco after a document finishes loading', async () => {
+    const wrapper = mount(WorkspaceTextEditor, {
+      props: {
+        target: { mode: 'local' },
+        workspaceId: 'workspace-1',
+        document: document({
+          loading: true,
+          dirty: false,
+          entry: null,
+          baseRevision: '',
+          originalText: '',
+          draftText: '',
+        }),
+      },
+      global: { plugins: [i18n] },
+    })
+
+    expect(monacoMocks.createModel).not.toHaveBeenCalled()
+
+    await wrapper.setProps({
+      document: document({
+        loading: false,
+        dirty: false,
+        originalText: 'loaded',
+        draftText: 'loaded',
+      }),
+    })
+    await vi.waitFor(() => expect(monacoMocks.createModel).toHaveBeenCalled())
+    expect(monacoMocks.createModel).toHaveBeenCalledWith('loaded', 'typescript', {
+      path: '/content/notes.txt',
+    })
+  })
 })

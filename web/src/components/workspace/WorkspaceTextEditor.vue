@@ -3,35 +3,33 @@
     <p v-if="document?.conflict" class="file-workbench-warning" role="status">
       {{ t('files.revisionConflict') }}
     </p>
-    <PageStatus
-      class="min-h-0 flex-1"
-      :loading="Boolean(document?.loading)"
-      :error="document?.error || null"
-      :empty="!document"
-      :loading-text="t('files.loadingFile')"
-      :empty-text="t('files.noDocument')"
+    <div
+      v-if="document?.loading"
+      class="file-workbench-empty file-workbench-empty-center"
+      role="status"
     >
-      <template #loading>
-        <div class="file-workbench-empty file-workbench-empty-center" role="status">
-          {{ t('files.loadingFile') }}
-        </div>
-      </template>
-      <template #error>
-        <p class="file-workbench-error" role="status">{{ document?.error }}</p>
-      </template>
-      <template #empty>
-        <div class="file-workbench-empty file-workbench-empty-center">
-          {{ t('files.noDocument') }}
-        </div>
-      </template>
-      <div ref="host" class="file-workbench-monaco-host" />
-    </PageStatus>
+      {{ t('files.loadingFile') }}
+    </div>
+    <p v-else-if="document?.error" class="file-workbench-error" role="status">
+      {{ document.error }}
+    </p>
+    <div
+      v-else-if="!document"
+      class="file-workbench-empty file-workbench-empty-center"
+      role="status"
+    >
+      {{ t('files.noDocument') }}
+    </div>
+    <div
+      v-show="document && !document.loading && !document.error"
+      ref="host"
+      class="file-workbench-monaco-host"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
   import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-  import PageStatus from '../layout/PageStatus.vue'
   import { useI18n } from 'vue-i18n'
   import type { FileDocumentState } from '../../store/fileWorkbench'
   import { useThemeStore } from '../../store/theme'
@@ -132,6 +130,7 @@
     () =>
       [
         props.document?.key,
+        props.document?.loading,
         props.document?.entry?.revision,
         props.target,
         props.workspaceId,
