@@ -293,13 +293,7 @@ async function initializeWorkbench(container: HTMLElement): Promise<void> {
   // Single system extension (demo pattern for scmActionButton + createSourceControl).
   // Avoid a second LocalProcess extension that can leave SCM unregistered.
   const { getApi, setAsDefaultApi } = registerExtension(
-    {
-      name: 'termbridge-workbench',
-      publisher: 'termbridge',
-      version: '1.0.0',
-      engines: { vscode: '*' },
-      enabledApiProposals: ['scmActionButton'],
-    },
+    termBridgeWorkbenchExtensionManifest,
     ExtensionHostKind.LocalProcess,
     { system: true },
   )
@@ -415,3 +409,4 @@ export function disposeMountedWorkbench(): void {
   }
   mounted = null
 }
+import { termBridgeWorkbenchExtensionManifest } from './scmExtensionManifest'
