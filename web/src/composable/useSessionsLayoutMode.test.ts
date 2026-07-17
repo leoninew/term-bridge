@@ -26,8 +26,11 @@ describe('useSessionsLayoutMode', () => {
     vi.stubGlobal(
       'matchMedia',
       vi.fn((query: string) => {
-        const matches =
-          query.includes('max-width: 768px') ? false : query.includes('pointer: coarse') ? false : false
+        const matches = query.includes('max-width: 768px')
+          ? false
+          : query.includes('pointer: coarse')
+            ? false
+            : false
         return {
           matches,
           media: query,

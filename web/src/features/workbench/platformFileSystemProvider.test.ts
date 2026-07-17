@@ -38,7 +38,7 @@ import type { WorkbenchFsApi } from './api'
 import { TermBridgePlatformFileSystemProvider } from './platformFileSystemProvider'
 
 const documentUri = {
-  scheme: 'tb',
+  scheme: 'file',
   authority: '',
   path: '/README.md',
   query: '',

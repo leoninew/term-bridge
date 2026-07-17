@@ -1,7 +1,11 @@
 import type { Uri } from 'vscode'
 
-/** Custom scheme for TermBridge workspace files (FileSystemProvider). */
-export const WORKBENCH_SCHEME = 'tb'
+/**
+ * Workbench workspace files use the standard `file` scheme so monaco-vscode-api
+ * Explorer search / search-service-override work without scheme-specific hacks.
+ * Paths remain workspace-scoped logical paths (not host absolute paths).
+ */
+export const WORKBENCH_SCHEME = 'file'
 
 /** Virtual scheme for SCM original (left-side) content in vscode.diff. */
 export const SCM_ORIGINAL_SCHEME = 'tb-scm'

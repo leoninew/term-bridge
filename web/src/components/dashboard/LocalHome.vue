@@ -1,5 +1,7 @@
 <template>
-  <AppPageShell main-class="flex items-start justify-center overflow-y-auto px-3 py-4 text-sm sm:px-5 sm:py-6 md:items-center md:px-6 md:py-8">
+  <AppPageShell
+    main-class="flex items-start justify-center overflow-y-auto px-3 py-4 text-sm sm:px-5 sm:py-6 md:items-center md:px-6 md:py-8"
+  >
     <template #actions>
       <CloudAccountMenu
         :authenticated="cloudAuth.authenticated"
@@ -146,7 +148,9 @@
             </div>
           </template>
           <template #error>
-            <div class="px-3 py-4 text-sm text-[var(--color-danger-text)] sm:px-4 sm:py-5">{{ workspaceError }}</div>
+            <div class="px-3 py-4 text-sm text-[var(--color-danger-text)] sm:px-4 sm:py-5">
+              {{ workspaceError }}
+            </div>
           </template>
           <template #empty>
             <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
@@ -216,10 +220,14 @@
             </div>
           </template>
           <template #error>
-            <div class="px-3 py-4 text-sm text-[var(--color-danger-text)] sm:px-4 sm:py-5">{{ shortcutError }}</div>
+            <div class="px-3 py-4 text-sm text-[var(--color-danger-text)] sm:px-4 sm:py-5">
+              {{ shortcutError }}
+            </div>
           </template>
           <template #empty>
-            <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">{{ t('shortcut.empty') }}</div>
+            <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
+              {{ t('shortcut.empty') }}
+            </div>
           </template>
           <ul class="grid grid-cols-1 gap-px bg-[var(--color-border)] sm:grid-cols-2">
             <li

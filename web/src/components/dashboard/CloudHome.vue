@@ -17,7 +17,9 @@
       >
         <div class="flex flex-col justify-center gap-5 sm:gap-6">
           <div>
-            <h1 class="text-xl font-semibold leading-tight text-[var(--color-text-strong)] sm:mt-3 sm:text-lg">
+            <h1
+              class="text-xl font-semibold leading-tight text-[var(--color-text-strong)] sm:mt-3 sm:text-lg"
+            >
               {{ t('dashboard.cloudLandingTitle') }}
             </h1>
             <p class="mt-3 max-w-md text-sm leading-6 text-[var(--color-text-muted)]">

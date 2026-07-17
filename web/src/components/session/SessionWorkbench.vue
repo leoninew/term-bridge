@@ -201,10 +201,7 @@
 <script setup lang="ts">
   import { useTemplateRef, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import {
-    PanelLeft,
-    CircleStop, MoreHorizontal, SquareTerminal, X
-  } from '@lucide/vue'
+  import { PanelLeft, CircleStop, MoreHorizontal, SquareTerminal, X } from '@lucide/vue'
   import {
     DropdownMenuContent,
     DropdownMenuItem,

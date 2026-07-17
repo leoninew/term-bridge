@@ -117,7 +117,7 @@ async function registeredProvider(status: ScmStatusResp, execute = vi.fn()) {
   const fake = createVscodeFake()
   const api = createApi(status, execute)
   await registerTermBridgeScm(fake.vscode as unknown as typeof import('vscode'), api, {
-    scheme: 'tb',
+    scheme: 'file',
     authority: '',
     path: '/',
   } as import('vscode').Uri)
@@ -193,7 +193,7 @@ describe('registerTermBridgeScm', () => {
     ])
     const { commands, groups, vscode } = await registeredProvider(status)
     const [z, a] = groups.get('changes')?.resourceStates ?? []
-    const staticUri = { scheme: 'tb', authority: '', path: '/static.go' }
+    const staticUri = { scheme: 'file', authority: '', path: '/static.go' }
 
     await commands.get(ScmCommandId.open)?.(staticUri, 'changes')
     await commands.get(ScmCommandId.open)?.(z, a)
@@ -209,14 +209,14 @@ describe('registerTermBridgeScm', () => {
       2,
       'vscode.diff',
       { scheme: 'tb-scm', authority: 'changes', path: '/src/a.go' },
-      { scheme: 'tb', authority: '', path: '/src/a.go' },
+      { scheme: 'file', authority: '', path: '/src/a.go' },
       'src/a.go (Working Tree)',
     )
     expect(vscode.commands.executeCommand).toHaveBeenNthCalledWith(
       3,
       'vscode.diff',
       { scheme: 'tb-scm', authority: 'changes', path: '/src/z.go' },
-      { scheme: 'tb', authority: '', path: '/src/z.go' },
+      { scheme: 'file', authority: '', path: '/src/z.go' },
       'src/z.go (Working Tree)',
     )
   })
@@ -275,7 +275,7 @@ describe('registerTermBridgeScm', () => {
     api.status.mockImplementationOnce(() => Promise.resolve(status))
     const fake = createVscodeFake()
     await registerTermBridgeScm(fake.vscode as unknown as typeof import('vscode'), api, {
-      scheme: 'tb',
+      scheme: 'file',
       authority: '',
       path: '/',
     } as import('vscode').Uri)

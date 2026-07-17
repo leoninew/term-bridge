@@ -1,5 +1,7 @@
 <template>
-  <AppPageShell main-class="flex items-start justify-center px-4 py-5 text-sm sm:items-center sm:px-6 sm:py-8 lg:px-8 2xl:px-12">
+  <AppPageShell
+    main-class="flex items-start justify-center px-4 py-5 text-sm sm:items-center sm:px-6 sm:py-8 lg:px-8 2xl:px-12"
+  >
     <template #actions>
       <CloudAccountMenu
         :authenticated="cloudAuth.authenticated"
@@ -83,7 +85,9 @@
                     {{ device.online ? t('cloud.online') : t('cloud.offline') }}
                   </span>
                 </div>
-                <p class="mt-1 truncate pl-6 text-xs text-[var(--color-text-muted)] sm:pl-8 sm:text-sm">
+                <p
+                  class="mt-1 truncate pl-6 text-xs text-[var(--color-text-muted)] sm:pl-8 sm:text-sm"
+                >
                   {{ deviceActivity(device) }}
                 </p>
               </div>

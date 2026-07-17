@@ -137,9 +137,7 @@
               <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{
                 workspace.workspace.name
               }}</span>
-              <span
-                class="workspace-tree-node-actions flex shrink-0 items-center gap-0.5"
-              >
+              <span class="workspace-tree-node-actions flex shrink-0 items-center gap-0.5">
                 <button
                   type="button"
                   class="workspace-tree-node-action"

@@ -13,9 +13,9 @@ import getDialogsServiceOverride from '@codingame/monaco-vscode-dialogs-service-
 import getEnvironmentServiceOverride from '@codingame/monaco-vscode-environment-service-override'
 import getExplorerServiceOverride from '@codingame/monaco-vscode-explorer-service-override'
 import getExtensionServiceOverride from '@codingame/monaco-vscode-extensions-service-override'
-import {
+import getFilesServiceOverride, {
   createIndexedDBProviders,
-  registerCustomProvider,
+  registerFileSystemOverlay,
 } from '@codingame/monaco-vscode-files-service-override'
 import getKeybindingsServiceOverride, {
   initUserKeybindings,
@@ -26,6 +26,7 @@ import getLogServiceOverride from '@codingame/monaco-vscode-log-service-override
 import getModelServiceOverride from '@codingame/monaco-vscode-model-service-override'
 import getNotificationServiceOverride from '@codingame/monaco-vscode-notifications-service-override'
 import getQuickAccessServiceOverride from '@codingame/monaco-vscode-quickaccess-service-override'
+import getSearchServiceOverride from '@codingame/monaco-vscode-search-service-override'
 import getScmServiceOverride from '@codingame/monaco-vscode-scm-service-override'
 import getStorageServiceOverride from '@codingame/monaco-vscode-storage-service-override'
 import getTextmateServiceOverride from '@codingame/monaco-vscode-textmate-service-override'
@@ -55,7 +56,7 @@ import {
 import { TermBridgePlatformFileSystemProvider } from './platformFileSystemProvider'
 import { termBridgeWorkbenchExtensionManifest } from './scmExtensionManifest'
 import { registerTermBridgeScm, type ScmController } from './scmProvider'
-import { WORKBENCH_SCHEME, workspaceRootUri } from './uri'
+import { workspaceRootUri } from './uri'
 import { ensureWorkbenchAppIconStyles } from './titlebarAppIcon'
 
 // Themes + file icons (demo: theme-defaults + theme-seti)
@@ -345,7 +346,8 @@ async function initializeWorkbench(container: HTMLElement): Promise<void> {
   await createIndexedDBProviders()
 
   if (!state.customProviderRegistered) {
-    registerCustomProvider(WORKBENCH_SCHEME, state.platformFsProvider)
+    // Prefer file:// overlay (demo-aligned) so Explorer search / search providers work.
+    registerFileSystemOverlay(1, state.platformFsProvider)
     state.customProviderRegistered = true
   }
 
@@ -354,7 +356,7 @@ async function initializeWorkbench(container: HTMLElement): Promise<void> {
     initUserKeybindings('[]'),
   ])
 
-  const folderUri = monaco.Uri.from({ scheme: WORKBENCH_SCHEME, path: '/' })
+  const folderUri = monaco.Uri.file('/')
 
   const constructOptions: IWorkbenchConstructionOptions = {
     enableWorkspaceTrust: true,
@@ -388,7 +390,7 @@ async function initializeWorkbench(container: HTMLElement): Promise<void> {
       nameLong: 'TermBridge Code',
       applicationName: 'termbridge',
       dataFolderName: '.termbridge-code',
-      version: '0.1.0',
+      version: '0.84.7',
     },
   }
 
@@ -421,7 +423,9 @@ async function initializeWorkbench(container: HTMLElement): Promise<void> {
       ...getWorkspaceTrustOverride(),
       ...getWorkingCopyServiceOverride(),
       ...getScmServiceOverride(),
+      ...getFilesServiceOverride(),
       ...getExplorerServiceOverride(),
+      ...getSearchServiceOverride(),
       ...getImageResizeServiceOverride(),
       ...getWorkbenchServiceOverride(),
       ...getQuickAccessServiceOverride({
