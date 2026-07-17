@@ -19,7 +19,7 @@
   import { RouterLink } from 'vue-router'
   import type { RouteLocationRaw } from 'vue-router'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
-  import { mountCodeWorkbench } from '../../features/workbench/bootstrap'
+  import { disposeMountedWorkbench, mountCodeWorkbench } from '../../features/workbench/bootstrap'
 
   const props = defineProps<{
     runtimeTarget: RuntimeTarget
@@ -33,7 +33,7 @@
   let resizeObserver: ResizeObserver | null = null
 
   function notifyLayout() {
-    window.dispatchEvent(new Event('resize'))
+    window.dispatchEvent(new window.Event('resize'))
   }
 
   async function mount() {
@@ -76,7 +76,9 @@
   onBeforeUnmount(() => {
     resizeObserver?.disconnect()
     resizeObserver = null
-    // Workbench services are process-global; leaving the route keeps them alive.
+    // Workbench services are process-global; release only this workspace's
+    // subscription and disposable hooks when its route unmounts.
+    disposeMountedWorkbench()
   })
 </script>
 
@@ -91,11 +93,7 @@
     /* Match VS Code chrome; avoid app theme vars leaking into workbench metrics */
     background: #1e1e1e;
     color: #cccccc;
-    font-family:
-      'Segoe WPC',
-      'Segoe UI',
-      system-ui,
-      sans-serif;
+    font-family: 'Segoe WPC', 'Segoe UI', system-ui, sans-serif;
     font-size: 13px;
     line-height: 1.4;
   }

@@ -4,6 +4,7 @@ import {
   IViewsService,
   type IWorkbenchConstructionOptions,
 } from '@codingame/monaco-vscode-api'
+import { servicesInitialized } from '@codingame/monaco-vscode-api/lifecycle'
 import { ExtensionHostKind, registerExtension } from '@codingame/monaco-vscode-api/extensions'
 import getConfigurationServiceOverride, {
   initUserConfiguration,
@@ -38,8 +39,21 @@ import getImageResizeServiceOverride from '@codingame/monaco-vscode-image-resize
 import getWorkspaceTrustOverride from '@codingame/monaco-vscode-workspace-trust-service-override'
 import * as monaco from 'monaco-editor'
 import type { RuntimeTarget } from '../runtimeTarget'
-import { createWorkbenchRuntimeApi } from './api'
+import {
+  createWorkbenchRuntimeApi,
+  subscribeWorkspaceChanges,
+  type WorkbenchWorkspaceChangeSubscription,
+} from './api'
+import {
+  isServicesAlreadyInitializedError,
+  retainHmrState,
+  shouldReloadWorkbenchPage,
+  startWorkbenchInitialization,
+  type HmrContext,
+  type WorkbenchInitializationState,
+} from './bootstrapHmrState'
 import { TermBridgePlatformFileSystemProvider } from './platformFileSystemProvider'
+import { termBridgeWorkbenchExtensionManifest } from './scmExtensionManifest'
 import { registerTermBridgeScm, type ScmController } from './scmProvider'
 import { WORKBENCH_SCHEME, workspaceRootUri } from './uri'
 
@@ -65,10 +79,19 @@ export type CodeWorkbenchContext = {
   workspaceId: string
 }
 
+type Disposable = { dispose: () => void }
+
 type MountedWorkbench = {
   workspaceKey: string
-  disposables: { dispose: () => void }[]
+  disposables: Disposable[]
   scm?: ScmController
+  workspaceChanges?: WorkbenchWorkspaceChangeSubscription
+}
+
+type WorkbenchMountAttempt = {
+  key: string
+  generation: number
+  promise: Promise<void> | null
 }
 
 type VscodeApi = typeof import('vscode')
@@ -94,14 +117,77 @@ const USER_CONFIGURATION = {
   'files.exclude': {
     '**/.git': true,
   },
-  'window.title': 'TermBridge${separator}${dirty}${activeEditorShort}',
+  // 'window.title': 'TermBridge${separator}${dirty}${activeEditorShort}',
+  'window.title': '${activeEditorShort}',
 }
 
-const platformFsProvider = new TermBridgePlatformFileSystemProvider()
-let customProviderRegistered = false
-let initPromise: Promise<void> | null = null
-let vscodeApiPromise: Promise<VscodeApi> | null = null
-let mounted: MountedWorkbench | null = null
+type WorkbenchBootstrapState = WorkbenchInitializationState & {
+  stateVersion: number
+  platformFsProvider: TermBridgePlatformFileSystemProvider
+  customProviderRegistered: boolean
+  vscodeApiPromise: Promise<VscodeApi> | null
+  mounted: MountedWorkbench | null
+  mountAttempt: WorkbenchMountAttempt | null
+  mountGeneration: number
+}
+
+const HMR_STATE_KEY = 'termbridgeWorkbenchBootstrapState'
+const WORKBENCH_BOOTSTRAP_STATE_VERSION = 1
+const hot = import.meta.hot as HmrContext | undefined
+const state = retainHmrState(
+  hot,
+  HMR_STATE_KEY,
+  isWorkbenchBootstrapState,
+  (): WorkbenchBootstrapState => ({
+    stateVersion: WORKBENCH_BOOTSTRAP_STATE_VERSION,
+    platformFsProvider: new TermBridgePlatformFileSystemProvider(),
+    customProviderRegistered: false,
+    initPromise: null,
+    monacoInitializationStarted: false,
+    terminalInitializationError: null,
+    vscodeApiPromise: null,
+    mounted: null,
+    mountAttempt: null,
+    mountGeneration: 0,
+  }),
+)
+
+// Workbench Monaco services are page-global. Prefer a full reload over partial HMR
+// re-entry that can throw "Services are already initialized".
+hot?.accept?.(() => {
+  window.location.reload()
+})
+
+function isWorkbenchBootstrapState(value: unknown): value is WorkbenchBootstrapState {
+  if (value === null || typeof value !== 'object') {
+    return false
+  }
+  const candidate = value as Partial<WorkbenchBootstrapState>
+  return (
+    candidate.stateVersion === WORKBENCH_BOOTSTRAP_STATE_VERSION &&
+    candidate.platformFsProvider instanceof TermBridgePlatformFileSystemProvider &&
+    'initPromise' in candidate &&
+    typeof candidate.monacoInitializationStarted === 'boolean'
+  )
+}
+
+function disposeAll(disposables: Disposable[]): void {
+  for (const disposable of disposables.splice(0)) {
+    disposable.dispose()
+  }
+}
+
+function isCurrentMountAttempt(attempt: WorkbenchMountAttempt): boolean {
+  return state.mountAttempt === attempt && state.mountGeneration === attempt.generation
+}
+
+function disposeMountResources(
+  disposables: Disposable[],
+  workspaceChanges?: WorkbenchWorkspaceChangeSubscription,
+): void {
+  workspaceChanges?.close()
+  disposeAll(disposables)
+}
 
 function workspaceKey(ctx: CodeWorkbenchContext): string {
   if (ctx.runtimeTarget.mode === 'cloud') {
@@ -147,6 +233,46 @@ function configureWorkers(): void {
  * Create the workbench root like demo: Shadow DOM so app Tailwind/preflight
  * cannot reshape tree twisties, icons, or list row metrics.
  */
+
+/**
+ * True browser external resume: document became visible, or window regained OS focus.
+ * Internal Workbench focus moves do not fire window focus/blur.
+ */
+function bindExternalResume(onResume: () => void): { dispose: () => void } {
+  let visible = typeof document !== 'undefined' ? document.visibilityState === 'visible' : true
+  let windowFocused = typeof document !== 'undefined' ? document.hasFocus() : true
+
+  const maybeResume = () => {
+    const nextVisible = document.visibilityState === 'visible'
+    const nextFocused = document.hasFocus()
+    const becameVisible = !visible && nextVisible
+    const regainedWindowFocus = !windowFocused && nextFocused
+    visible = nextVisible
+    windowFocused = nextFocused
+    if (becameVisible || regainedWindowFocus) {
+      onResume()
+    }
+  }
+
+  const onVisibility = () => maybeResume()
+  const onFocus = () => maybeResume()
+  const onBlur = () => {
+    windowFocused = document.hasFocus()
+  }
+
+  document.addEventListener('visibilitychange', onVisibility)
+  window.addEventListener('focus', onFocus)
+  window.addEventListener('blur', onBlur)
+
+  return {
+    dispose() {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('blur', onBlur)
+    },
+  }
+}
+
 export function createWorkbenchMountRoot(container: HTMLElement): HTMLElement {
   container.replaceChildren()
   container.style.position = container.style.position || 'relative'
@@ -174,7 +300,10 @@ export function createWorkbenchMountRoot(container: HTMLElement): HTMLElement {
   return workbenchElement
 }
 
-async function waitForWorkspaceFolderUri(vscode: VscodeApi, timeoutMs = 5000): Promise<import('vscode').Uri> {
+async function waitForWorkspaceFolderUri(
+  vscode: VscodeApi,
+  timeoutMs = 5000,
+): Promise<import('vscode').Uri> {
   const existing = vscode.workspace.workspaceFolders?.[0]?.uri
   if (existing) {
     return existing
@@ -200,9 +329,9 @@ async function initializeWorkbench(container: HTMLElement): Promise<void> {
   configureWorkers()
   await createIndexedDBProviders()
 
-  if (!customProviderRegistered) {
-    registerCustomProvider(WORKBENCH_SCHEME, platformFsProvider)
-    customProviderRegistered = true
+  if (!state.customProviderRegistered) {
+    registerCustomProvider(WORKBENCH_SCHEME, state.platformFsProvider)
+    state.customProviderRegistered = true
   }
 
   await Promise.all([
@@ -248,6 +377,8 @@ async function initializeWorkbench(container: HTMLElement): Promise<void> {
     },
   }
 
+  // Crossing initialize() is irreversible for this page lifetime.
+  state.monacoInitializationStarted = true
   await initializeMonacoService(
     {
       ...getLogServiceOverride(),
@@ -290,16 +421,16 @@ async function initializeWorkbench(container: HTMLElement): Promise<void> {
     },
   )
 
-  // Single system extension (demo pattern for scmActionButton + createSourceControl).
+  // Single system extension registers the API surface and native SCM menus.
   // Avoid a second LocalProcess extension that can leave SCM unregistered.
   const { getApi, setAsDefaultApi } = registerExtension(
     termBridgeWorkbenchExtensionManifest,
     ExtensionHostKind.LocalProcess,
     { system: true },
   )
-  vscodeApiPromise = getApi()
+  state.vscodeApiPromise = getApi()
   await setAsDefaultApi()
-  await vscodeApiPromise
+  await state.vscodeApiPromise
 }
 
 /**
@@ -311,102 +442,190 @@ export async function mountCodeWorkbench(
   ctx: CodeWorkbenchContext,
 ): Promise<void> {
   const key = workspaceKey(ctx)
-
-  if (mounted && mounted.workspaceKey !== key) {
+  if (state.mounted && state.mounted.workspaceKey !== key) {
     window.location.reload()
     return
   }
-
-  // Bind remote API BEFORE initialize so startup readdir/stat hit TermBridge FS.
-  const api = createWorkbenchRuntimeApi(ctx.runtimeTarget, ctx.workspaceId)
-  platformFsProvider.bind(api)
-
-  if (!initPromise) {
-    const root = createWorkbenchMountRoot(container)
-    initPromise = initializeWorkbench(root)
-  } else if (!container.querySelector('.termbridge-code-workbench-host')) {
-    window.location.reload()
-    return
-  }
-
-  await initPromise
-
-  if (mounted && mounted.workspaceKey === key) {
-    // Re-bind API + refresh SCM when remounting same workspace key.
-    if (mounted.scm) {
-      platformFsProvider.bind(api, () => {
-        void mounted?.scm?.refresh()
-      })
-      void mounted.scm.refresh()
+  if (state.mountAttempt) {
+    if (state.mountAttempt.key !== key) {
+      window.location.reload()
+      return
     }
-    return
+    return state.mountAttempt.promise ?? Promise.resolve()
   }
 
-  if (!vscodeApiPromise) {
-    throw new Error('Workbench VS Code API is not initialized.')
+  const attempt: WorkbenchMountAttempt = {
+    key,
+    generation: state.mountGeneration,
+    promise: null,
   }
-  const vscode = await vscodeApiPromise
-  const rootUri = await waitForWorkspaceFolderUri(vscode)
-
-  const disposables: { dispose: () => void }[] = []
-  const scm = await registerTermBridgeScm(vscode, api, rootUri)
-  disposables.push(scm)
-
-  platformFsProvider.bind(api, () => {
-    void scm.refresh()
+  state.mountAttempt = attempt
+  attempt.promise = mountWorkbenchAttempt(container, ctx, attempt).finally(() => {
+    if (state.mountAttempt === attempt) {
+      state.mountAttempt = null
+    }
   })
+  return attempt.promise
+}
 
-  // Refresh when user opens Source Control (activity bar / view switch).
-  // Without this, status is only fetched once at register time.
+async function mountWorkbenchAttempt(
+  container: HTMLElement,
+  ctx: CodeWorkbenchContext,
+  attempt: WorkbenchMountAttempt,
+): Promise<void> {
+  const api = createWorkbenchRuntimeApi(ctx.runtimeTarget, ctx.workspaceId)
+  const disposables: Disposable[] = []
+  let workspaceChanges: WorkbenchWorkspaceChangeSubscription | undefined
+  let scm: ScmController | undefined
   try {
-    const viewsService = await getService(IViewsService)
+    // Bind before initialize so startup readdir/stat requests target this workspace.
+    state.platformFsProvider.bind(api)
+    const hasWorkbenchHost = Boolean(container.querySelector('.termbridge-code-workbench-host'))
+    if (
+      shouldReloadWorkbenchPage({
+        initPromise: state.initPromise,
+        servicesInitialized,
+        hasWorkbenchHost,
+      })
+    ) {
+      window.location.reload()
+      return
+    }
+    if (!state.initPromise) {
+      const root = createWorkbenchMountRoot(container)
+      try {
+        await startWorkbenchInitialization(
+          state,
+          async () => {
+            await initializeWorkbench(root)
+          },
+          () => servicesInitialized,
+        )
+      } catch (error) {
+        if (isServicesAlreadyInitializedError(error) || servicesInitialized) {
+          window.location.reload()
+          return
+        }
+        throw error
+      }
+    } else {
+      await state.initPromise
+    }
+    if (!isCurrentMountAttempt(attempt)) {
+      return
+    }
+
+    if (state.mounted && state.mounted.workspaceKey === attempt.key) {
+      if (state.mounted.scm) {
+        state.platformFsProvider.bind(api, () => {
+          void state.mounted?.scm?.refresh()
+        })
+        void state.mounted.scm.refresh()
+      }
+      return
+    }
+
+    if (!state.vscodeApiPromise) {
+      throw new Error('Workbench VS Code API is not initialized.')
+    }
+    const vscode = await state.vscodeApiPromise
+    const rootUri = await waitForWorkspaceFolderUri(vscode)
+    if (!isCurrentMountAttempt(attempt)) {
+      return
+    }
+
+    scm = await registerTermBridgeScm(vscode, api, rootUri)
+    disposables.push(scm)
+    if (!isCurrentMountAttempt(attempt)) {
+      return
+    }
+
+    state.platformFsProvider.bind(api, () => {
+      void scm?.refresh()
+    })
+
+    // Refresh when user opens Source Control (activity bar / view switch).
+    // Without this, status is only fetched once at register time.
+    try {
+      const viewsService = await getService(IViewsService)
+      disposables.push(
+        viewsService.onDidChangeViewContainerVisibility((e) => {
+          if (e.visible && e.id === 'workbench.view.scm') {
+            void scm?.refresh()
+          }
+        }),
+        viewsService.onDidChangeViewVisibility((e) => {
+          if (e.visible && (e.id === 'workbench.scm' || e.id === 'workbench.view.scm')) {
+            void scm?.refresh()
+          }
+        }),
+      )
+    } catch (error) {
+      console.warn('[termbridge-workbench] SCM view visibility hook unavailable', error)
+    }
+    if (!isCurrentMountAttempt(attempt)) {
+      return
+    }
+
+    workspaceChanges = subscribeWorkspaceChanges(ctx.runtimeTarget, ctx.workspaceId, {
+      onChange(change) {
+        state.platformFsProvider.applyWorkspaceChange(change)
+        void scm?.refresh()
+      },
+      onRescanRequired() {
+        state.platformFsProvider.rescanRequired()
+        void scm?.refresh()
+      },
+      onDisconnected() {
+        // The subscription reconnects itself. This callback is observability for
+        // consumers; the conservative FileService refresh already happened.
+      },
+    })
+    if (!isCurrentMountAttempt(attempt)) {
+      return
+    }
+
+    // External resume only (tab/window back). Do NOT use vscode.window.onDidChangeWindowState:
+    // Workbench internal focus moves (Explorer click, extension host iframe) can report focused:true
+    // and would spam /scm/status + /scm/repository, and also couple with upstream Explorer host-focus refresh.
     disposables.push(
-      viewsService.onDidChangeViewContainerVisibility((e) => {
-        if (e.visible && e.id === 'workbench.view.scm') {
-          void scm.refresh()
-        }
-      }),
-      viewsService.onDidChangeViewVisibility((e) => {
-        if (e.visible && (e.id === 'workbench.scm' || e.id === 'workbench.view.scm')) {
-          void scm.refresh()
-        }
+      bindExternalResume(() => {
+        state.platformFsProvider.rescanRequired()
+        void scm?.refresh()
       }),
     )
-  } catch (error) {
-    console.warn('[termbridge-workbench] SCM view visibility hook unavailable', error)
-  }
 
-  // Window focus can mean returning after external git changes.
-  disposables.push(
-    vscode.window.onDidChangeWindowState((state) => {
-      if (state.focused) {
-        void scm.refresh()
-      }
-    }),
-  )
+    try {
+      await vscode.commands.executeCommand('workbench.view.explorer')
+    } catch {
+      // optional
+    }
+    if (!isCurrentMountAttempt(attempt)) {
+      return
+    }
 
-  try {
-    await vscode.commands.executeCommand('workbench.view.explorer')
-  } catch {
-    // optional
-  }
-
-  window.dispatchEvent(new Event('resize'))
-
-  mounted = {
-    workspaceKey: key,
-    disposables,
-    scm,
+    window.dispatchEvent(new window.Event('resize'))
+    state.mounted = {
+      workspaceKey: attempt.key,
+      disposables,
+      scm,
+      workspaceChanges,
+    }
+    workspaceChanges = undefined
+    scm = undefined
+  } finally {
+    if (!isCurrentMountAttempt(attempt)) {
+      disposeMountResources(disposables, workspaceChanges)
+    }
   }
 }
 
 export function disposeMountedWorkbench(): void {
-  if (!mounted) {
+  state.mountGeneration += 1
+  state.mountAttempt = null
+  if (!state.mounted) {
     return
   }
-  for (const disposable of mounted.disposables.splice(0)) {
-    disposable.dispose()
-  }
-  mounted = null
+  disposeMountResources(state.mounted.disposables, state.mounted.workspaceChanges)
+  state.mounted = null
 }
-import { termBridgeWorkbenchExtensionManifest } from './scmExtensionManifest'
