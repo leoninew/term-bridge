@@ -34,6 +34,7 @@ import getStatusBarServiceOverride from '@codingame/monaco-vscode-view-status-ba
 import getTitleBarServiceOverride from '@codingame/monaco-vscode-view-title-bar-service-override'
 import getWorkbenchServiceOverride from '@codingame/monaco-vscode-workbench-service-override'
 import getWorkingCopyServiceOverride from '@codingame/monaco-vscode-working-copy-service-override'
+import getImageResizeServiceOverride from '@codingame/monaco-vscode-image-resize-service-override'
 import getWorkspaceTrustOverride from '@codingame/monaco-vscode-workspace-trust-service-override'
 import * as monaco from 'monaco-editor'
 import type { RuntimeTarget } from '../runtimeTarget'
@@ -45,6 +46,7 @@ import { WORKBENCH_SCHEME, workspaceRootUri } from './uri'
 // Themes + file icons (demo: theme-defaults + theme-seti)
 import '@codingame/monaco-vscode-theme-defaults-default-extension'
 import '@codingame/monaco-vscode-theme-seti-default-extension'
+import '@codingame/monaco-vscode-media-preview-default-extension'
 // Grammar basics for common workspace languages (subset of demo language extensions)
 import '@codingame/monaco-vscode-javascript-default-extension'
 import '@codingame/monaco-vscode-typescript-basics-default-extension'
@@ -274,6 +276,7 @@ async function initializeWorkbench(container: HTMLElement): Promise<void> {
       ...getWorkingCopyServiceOverride(),
       ...getScmServiceOverride(),
       ...getExplorerServiceOverride(),
+      ...getImageResizeServiceOverride(),
       ...getWorkbenchServiceOverride(),
       ...getQuickAccessServiceOverride({
         isKeybindingConfigurationVisible: () => false,

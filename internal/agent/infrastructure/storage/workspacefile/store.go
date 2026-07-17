@@ -621,6 +621,9 @@ func revision(path filemodel.RelativePath, info fs.FileInfo) string {
 	return base64.RawURLEncoding.EncodeToString(digest[:])
 }
 
+// readBounded returns raw file bytes up to limit.
+// Read is byte-transparent (VS Code FileSystemProvider / media preview need PNG etc.).
+// Write/create still enforce UTF-8 text via validateText.
 func readBounded(root *root, path filemodel.RelativePath, limit int64) ([]byte, error) {
 	if _, err := root.resolve(path); err != nil {
 		return nil, err
@@ -635,10 +638,7 @@ func readBounded(root *root, path filemodel.RelativePath, limit int64) ([]byte, 
 		return nil, err
 	}
 	if int64(len(data)) > limit {
-		return nil, filemodel.NewError("file_too_large", "The file exceeds the text limit.")
-	}
-	if !utf8.Valid(data) || bytesContainNUL(data) {
-		return nil, filemodel.NewError("file_not_text", "The file is not UTF-8 text.")
+		return nil, filemodel.NewError("file_too_large", "The file exceeds the size limit.")
 	}
 	return data, nil
 }
@@ -651,15 +651,6 @@ func validateText(text string, limit int64) error {
 		return filemodel.NewError("file_not_text", "Only UTF-8 text is supported.")
 	}
 	return nil
-}
-
-func bytesContainNUL(data []byte) bool {
-	for _, value := range data {
-		if value == 0 {
-			return true
-		}
-	}
-	return false
 }
 
 func isNotFound(err error) bool {

@@ -204,6 +204,24 @@ func TestStoreMoveOverwriteReplacesDestination(t *testing.T) {
 	}
 }
 
+
+func TestStoreReadBinaryPNG(t *testing.T) {
+	rootPath := t.TempDir()
+	store := testStore(t)
+	// Minimal PNG-like binary with non-UTF8 + NUL
+	png := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe}
+	if err := os.WriteFile(filepath.Join(rootPath, "sketch.png"), png, 0o600); err != nil {
+		t.Fatalf("write png: %v", err)
+	}
+	read, err := store.Read(context.Background(), rootPath, "sketch.png")
+	if err != nil {
+		t.Fatalf("read binary: %v", err)
+	}
+	if read.Text != string(png) {
+		t.Fatalf("binary content mismatch len=%d want=%d", len(read.Text), len(png))
+	}
+}
+
 func testStore(t *testing.T) *Store {
 	t.Helper()
 	store, err := New(Config{MaxTextBytes: 1024, MaxDirectoryEntries: 100, MaxRecursiveDeleteEntries: 100})

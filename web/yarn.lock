@@ -131,6 +131,13 @@
   dependencies:
     "@codingame/monaco-vscode-api" "35.0.1"
 
+"@codingame/monaco-vscode-image-resize-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-image-resize-service-override/-/monaco-vscode-image-resize-service-override-35.0.1.tgz"
+  integrity sha512-Jes7h2cZlyyLEfnexUzZkxqU5gDICcGZLW7ESJqB7/Mbx7RHO6231x/xRMksuT8TMqrFVE+nPKGfk2R4QlIxNQ==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
 "@codingame/monaco-vscode-javascript-default-extension@^35.0.1":
   version "35.0.1"
   resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-javascript-default-extension/-/monaco-vscode-javascript-default-extension-35.0.1.tgz"
@@ -187,6 +194,13 @@
   version "35.0.1"
   resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-markdown-basics-default-extension/-/monaco-vscode-markdown-basics-default-extension-35.0.1.tgz"
   integrity sha512-f/bA668gU9pudtqptklr+Kj3emWS4ILwYqQCCBj7vVCLlxEHeyTiGaDWvQI739vNB+tC71lEGMBdXmYIg2ySIw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-media-preview-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-media-preview-default-extension/-/monaco-vscode-media-preview-default-extension-35.0.1.tgz"
+  integrity sha512-qjg1eKeVrLHv2INnLBWpqLgJrBC0UvXz6AgaOONqPmx8GEKyX4vMXG+17++PB0zpmDHPNUlX7nbLpFlL3LRZAQ==
   dependencies:
     "@codingame/monaco-vscode-api" "35.0.1"
 

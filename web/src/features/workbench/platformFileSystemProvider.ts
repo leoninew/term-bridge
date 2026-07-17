@@ -27,8 +27,10 @@ import { uriToWorkspacePath } from './uri'
  * Main-thread FileService provider (registered via registerCustomProvider).
  * Must be registered BEFORE workbench initialize so Explorer uses remote FS.
  *
- * Product model: text-editor filesystem (UTF-8, no NUL, size limits).
- * Wire uses bytes; backend rejects non-text with file_not_text / file_too_large.
+ * Product model (demo-aligned):
+ * - readFile is byte-transparent (images / media preview / VS Code FS contract)
+ * - writeFile remains a text-editor filesystem (UTF-8, no NUL, size limits)
+ * - backend write rejects non-text with file_not_text / file_too_large
  */
 export class TermBridgePlatformFileSystemProvider
   implements IFileSystemProviderWithFileReadWriteCapability
