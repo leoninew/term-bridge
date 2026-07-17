@@ -74,6 +74,7 @@
         </header>
 
         <PageStatus
+          class="shortcut-page-status"
           :loading="loading"
           :error="loadError"
           :empty="!loading && !loadError && shortcuts.length === 0"

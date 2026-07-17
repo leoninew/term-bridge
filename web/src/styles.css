@@ -1528,6 +1528,14 @@ p {
   gap: 16px;
 }
 
+/* PageStatus defaults target fixed-height workbench panes. On this page the
+   root is content-sized, so flex:1 + min-height:0 collapses the list to 0. */
+.shortcut-page-status.page-status-root {
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
+}
+
 .shortcut-page-header {
   display: flex;
   min-width: 0;
