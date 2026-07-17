@@ -144,9 +144,15 @@ export function useCreateSessionDraft() {
 
 function nextCopiedSessionName(name: string, existingSessionNames: Iterable<string>) {
   const existingNames = new Set(existingSessionNames)
+  const baseName = baseCopiedSessionName(name)
   let sequence = 1
-  while (existingNames.has(`${name}_${sequence}`)) {
+  while (existingNames.has(`${baseName}_${sequence}`)) {
     sequence += 1
   }
-  return `${name}_${sequence}`
+  return `${baseName}_${sequence}`
+}
+
+function baseCopiedSessionName(name: string) {
+  const match = /^(.*)_(\d+)$/.exec(name)
+  return match?.[1] ?? name
 }

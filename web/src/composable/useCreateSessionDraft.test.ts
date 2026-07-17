@@ -169,6 +169,22 @@ describe('useCreateSessionDraft', () => {
     expect(draft.selectedShortcutId).toBeNull()
   })
 
+  it('increments a trailing numeric suffix when copying a numbered session name', () => {
+    const draft = useCreateSessionDraft()
+
+    draft.populateFromSession(session({ name: 'Build_1' }), workspace, ['Build_1'], [])
+
+    expect(draft.sessionName).toBe('Build_2')
+  })
+
+  it('fills the first free suffix after stripping a trailing numeric suffix', () => {
+    const draft = useCreateSessionDraft()
+
+    draft.populateFromSession(session({ name: 'Build_3' }), workspace, ['Build_1', 'Build_3'], [])
+
+    expect(draft.sessionName).toBe('Build_2')
+  })
+
   it('prefills a copied shortcut session from its current shortcut', () => {
     const draft = useCreateSessionDraft()
     const copiedShortcut = shortcut('shortcut-1', 'Review', 'codex review')
