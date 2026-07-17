@@ -1,9 +1,6 @@
 /** Normalize protojson wire values (enum names, int64 strings) for TS clients. */
 
-import {
-  FilePermission,
-  FileType,
-} from '../../gen/proto/termbridge/agent/v1/file'
+import { FilePermission, FileType } from '../../gen/proto/termbridge/agent/v1/file'
 import {
   ScmOperationState,
   ScmResourceState,
@@ -81,7 +78,8 @@ const scmOperationStateByName: Record<string, number> = {
   SCM_OPERATION_STATE_NO_STAGED_CHANGES: ScmOperationState.SCM_OPERATION_STATE_NO_STAGED_CHANGES,
   SCM_OPERATION_STATE_BRANCH_EXISTS: ScmOperationState.SCM_OPERATION_STATE_BRANCH_EXISTS,
   SCM_OPERATION_STATE_BRANCH_NOT_FOUND: ScmOperationState.SCM_OPERATION_STATE_BRANCH_NOT_FOUND,
-  SCM_OPERATION_STATE_INVALID_BRANCH_NAME: ScmOperationState.SCM_OPERATION_STATE_INVALID_BRANCH_NAME,
+  SCM_OPERATION_STATE_INVALID_BRANCH_NAME:
+    ScmOperationState.SCM_OPERATION_STATE_INVALID_BRANCH_NAME,
   SCM_OPERATION_STATE_INVALID_COMMIT_MESSAGE:
     ScmOperationState.SCM_OPERATION_STATE_INVALID_COMMIT_MESSAGE,
   SCM_OPERATION_STATE_CONFLICT: ScmOperationState.SCM_OPERATION_STATE_CONFLICT,

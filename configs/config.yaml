@@ -64,6 +64,8 @@ file:
   max_directory_entries: 1000
   max_recursive_delete_entries: 10000
   operation_timeout: 10s
+  # 每个浏览器文件变更订阅允许积压的事件数；溢出时强制重新扫描。
+  watch_subscriber_queue_size: 64
 
 # 工作区只读 Git 状态和差异读取边界。
 git:

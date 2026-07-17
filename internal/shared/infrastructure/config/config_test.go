@@ -71,7 +71,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Terminal.Client.Queue.MaxMessages != 64 || cfg.Terminal.Client.Queue.MaxBytes != 4194304 {
 		t.Fatalf("Terminal.Client.Queue = %#v", cfg.Terminal.Client.Queue)
 	}
-	if cfg.File.MaxTextBytes != 1048576 || cfg.File.MaxDirectoryEntries != 1000 || cfg.File.MaxRecursiveDeleteEntries != 10000 {
+	if cfg.File.MaxTextBytes != 1048576 || cfg.File.MaxDirectoryEntries != 1000 || cfg.File.MaxRecursiveDeleteEntries != 10000 || cfg.File.WatchSubscriberQueueSize != 64 {
 		t.Fatalf("File = %#v", cfg.File)
 	}
 	if cfg.File.OperationTimeout.Seconds() != 10 {

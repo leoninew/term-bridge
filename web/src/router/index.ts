@@ -1,7 +1,4 @@
-import {
-  createRouter,
-  createWebHistory,
-} from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import type { LocalMode } from '../config'
 import { useCloudAuthStore } from '../store/cloudAuth'
 import { useRuntimeConfigStore } from '../store/runtimeConfig'

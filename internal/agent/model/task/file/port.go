@@ -12,6 +12,7 @@ type WorkspaceLocator interface {
 
 type Store interface {
 	List(ctx context.Context, root string, directory RelativePath) (ListResult, error)
+	Stat(ctx context.Context, root string, path RelativePath) (Entry, error)
 	Read(ctx context.Context, root string, path RelativePath) (ReadResult, error)
 	CreateFile(ctx context.Context, root string, request CreateFileRequest) (MutationResult, error)
 	CreateDirectory(ctx context.Context, root string, request CreateDirectoryRequest) (MutationResult, error)

@@ -16,6 +16,7 @@ type runtimeEndpoint interface {
 	JSON(ctx context.Context, method string, params any, requestId string) (json.RawMessage, error)
 	History(ctx context.Context, workspaceId string, sessionId string, requestId string) (text string, offline bool, err error)
 	Attach(w http.ResponseWriter, r *http.Request, workspaceId string, sessionId string) error
+	WatchWorkspaceChanges(w http.ResponseWriter, r *http.Request, workspaceId string) error
 	Available() bool
 }
 
@@ -58,6 +59,16 @@ func (e tunnelRuntimeEndpoint) History(ctx context.Context, workspaceId string, 
 
 func (e tunnelRuntimeEndpoint) Attach(w http.ResponseWriter, r *http.Request, workspaceId string, sessionId string) error {
 	e.handler.handleTerminalWS(w, r, e.route, workspaceId, sessionId)
+	return nil
+}
+
+func (e tunnelRuntimeEndpoint) WatchWorkspaceChanges(w http.ResponseWriter, r *http.Request, workspaceId string) error {
+	if e.route == nil {
+		return errors.New("device runtime is unavailable")
+	}
+	if err := e.handler.handleWorkspaceWatchWS(w, r, e.route, workspaceId); err != nil {
+		return err
+	}
 	return nil
 }
 

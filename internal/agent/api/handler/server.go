@@ -605,4 +605,3 @@ func normalizeConfig(config Config) Config {
 	config.CORSAllowedOrigins = cleanOrigins(config.CORSAllowedOrigins)
 	return config
 }
-

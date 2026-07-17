@@ -12,9 +12,10 @@ type Service struct {
 	config     Config
 	workspaces filemodel.WorkspaceLocator
 	store      filemodel.Store
+	changes    filemodel.WorkspaceChangeSource
 }
 
-func NewService(config Config, workspaces filemodel.WorkspaceLocator, store filemodel.Store) (*Service, error) {
+func NewService(config Config, workspaces filemodel.WorkspaceLocator, store filemodel.Store, changes filemodel.WorkspaceChangeSource) (*Service, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -24,7 +25,19 @@ func NewService(config Config, workspaces filemodel.WorkspaceLocator, store file
 	if store == nil {
 		return nil, errors.New("workspace file store is required")
 	}
-	return &Service{config: config, workspaces: workspaces, store: store}, nil
+	if changes == nil {
+		return nil, errors.New("workspace change source is required")
+	}
+	return &Service{config: config, workspaces: workspaces, store: store, changes: changes}, nil
+}
+
+func (s *Service) Subscribe(ctx context.Context, workspaceId string) (filemodel.WorkspaceChangeSubscription, error) {
+	operation, err := s.root(ctx, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+	operation.Cancel()
+	return s.changes.Subscribe(ctx, operation.Root)
 }
 
 func (s *Service) List(ctx context.Context, workspaceId string, path string) (filemodel.ListResult, error) {
@@ -38,6 +51,20 @@ func (s *Service) List(ctx context.Context, workspaceId string, path string) (fi
 	}
 	defer operation.Cancel()
 	return s.store.List(operation.Context, operation.Root, parsed)
+}
+
+func (s *Service) Stat(ctx context.Context, workspaceId string, path string) (filemodel.Entry, error) {
+	// Root path "" is valid (workspace root directory).
+	parsed, err := filemodel.ParseRelativePath(path, true)
+	if err != nil {
+		return filemodel.Entry{}, err
+	}
+	operation, err := s.root(ctx, workspaceId)
+	if err != nil {
+		return filemodel.Entry{}, err
+	}
+	defer operation.Cancel()
+	return s.store.Stat(operation.Context, operation.Root, parsed)
 }
 
 func (s *Service) Read(ctx context.Context, workspaceId string, path string) (filemodel.ReadResult, error) {

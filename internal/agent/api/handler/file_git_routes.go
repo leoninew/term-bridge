@@ -15,6 +15,18 @@ func (s *Handler) handleWorkspaceFsRoute(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	switch parts[0] {
+	case "events":
+		if r.Method != http.MethodGet {
+			s.methodNotAllowed(w, r, http.MethodGet)
+			return
+		}
+		if !runtimeEndpointAvailable(endpoint) {
+			s.writeAPIError(w, r, http.StatusServiceUnavailable, errorCodeDeviceOffline, errorMessageDeviceOffline, nil)
+			return
+		}
+		if err := endpoint.WatchWorkspaceChanges(w, r, workspaceId); err != nil {
+			s.writeRuntimeError(w, r, err)
+		}
 	case "stat":
 		if r.Method != http.MethodGet {
 			s.methodNotAllowed(w, r, http.MethodGet)

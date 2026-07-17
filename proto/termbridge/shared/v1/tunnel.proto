@@ -52,6 +52,7 @@ message TunnelFrame {
     termbridge.agent.ScmOriginalContentReq scm_original_content_req = 126;
     termbridge.agent.ScmExecuteReq scm_execute_req = 127;
     termbridge.agent.ScmRepositoryReq scm_repository_req = 128;
+    termbridge.agent.FsWatchSubscribeReq fs_watch_subscribe_req = 129;
 
     termbridge.agent.ListWorkspacesResp list_workspaces_resp = 200;
     termbridge.agent.WorkspaceTreeResp workspace_tree_resp = 201;
@@ -82,6 +83,7 @@ message TunnelFrame {
     termbridge.agent.ScmOriginalContentResp scm_original_content_resp = 226;
     termbridge.agent.ScmExecuteResp scm_execute_resp = 227;
     termbridge.agent.ScmRepositoryResp scm_repository_resp = 228;
+    termbridge.agent.FsWatchSubscribed fs_watch_subscribed = 229;
 
     TerminalAttachReq terminal_attach = 300;
     TerminalInput terminal_input = 301;
@@ -89,6 +91,7 @@ message TunnelFrame {
     TerminalResize terminal_resize = 303;
     TerminalClosed terminal_closed = 304;
     termbridge.agent.ServerControlMessage terminal_control = 305;
+    termbridge.agent.FsChangeEvent fs_change_event = 306;
 
     termbridge.shared.ErrorResp error = 900;
     Close close = 901;

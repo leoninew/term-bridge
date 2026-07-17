@@ -21,6 +21,7 @@ import (
 	gitexec "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/gitexec"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/pty/gopty"
 	workspacefile "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/storage/workspacefile"
+	workspacewatch "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/workspacewatch"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/repository/task/state"
 	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	httpserver "gitee.com/leoninew/TermBridge-go/internal/shared/api/server"
@@ -56,11 +57,18 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		return err
 	}
 	runtimeStore := state.NewDbStore(db.DB, db.Driver, cfg.Runtime.StateDir, device.Id)
+	serveCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	workspaceChanges, err := workspacewatch.New(serveCtx, workspacewatch.Config{SubscriberQueueSize: cfg.File.WatchSubscriberQueueSize})
+	if err != nil {
+		return apperrors.Config("invalid workspace watcher configuration", err)
+	}
+	defer func() { _ = workspaceChanges.Close() }()
 	fileStore, err := workspacefile.New(workspacefile.Config{MaxTextBytes: cfg.File.MaxTextBytes, MaxDirectoryEntries: cfg.File.MaxDirectoryEntries, MaxRecursiveDeleteEntries: cfg.File.MaxRecursiveDeleteEntries})
 	if err != nil {
 		return apperrors.Config("invalid workspace file service configuration", err)
 	}
-	fileService, err := fileapp.NewService(fileapp.Config{MaxTextBytes: cfg.File.MaxTextBytes, MaxDirectoryEntries: cfg.File.MaxDirectoryEntries, MaxRecursiveDeleteEntries: cfg.File.MaxRecursiveDeleteEntries, OperationTimeout: cfg.File.OperationTimeout}, runtimeStore, fileStore)
+	fileService, err := fileapp.NewService(fileapp.Config{MaxTextBytes: cfg.File.MaxTextBytes, MaxDirectoryEntries: cfg.File.MaxDirectoryEntries, MaxRecursiveDeleteEntries: cfg.File.MaxRecursiveDeleteEntries, OperationTimeout: cfg.File.OperationTimeout}, runtimeStore, fileStore, workspaceChanges)
 	if err != nil {
 		return apperrors.Config("invalid file service configuration", err)
 	}
@@ -70,8 +78,6 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 	}
 	runtimeAccess := agentapp.WebTerminalAccess{Registry: newWebTerminalRegistry(cfg, logger, runtimeStore), Shortcuts: shortcutapp.NewService(runtimeStore), Files: fileService, Git: gitService}
 
-	serveCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	backendReady := make(chan struct{})
 	errCh := make(chan error, 3)
 	cloudConnector := newCloudConnectorLifecycle(serveCtx, cfg, runtimeAccess, device, logger, options, stdout)

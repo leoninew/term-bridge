@@ -7,6 +7,7 @@ import (
 	gitapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/git"
 	shortcutapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/shortcut"
 	terminalapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/terminal"
+	filemodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/file"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 )
 
@@ -33,6 +34,7 @@ type RuntimeAccess interface {
 	FsCreateDirectory(ctx context.Context, request *agent.FsCreateDirectoryReq) (*agent.FsCreateDirectoryResp, error)
 	FsDelete(ctx context.Context, request *agent.FsDeleteReq) (*agent.FsDeleteResp, error)
 	FsRename(ctx context.Context, request *agent.FsRenameReq) (*agent.FsRenameResp, error)
+	SubscribeWorkspaceChanges(ctx context.Context, workspaceId string) (filemodel.WorkspaceChangeSubscription, error)
 	ScmStatus(ctx context.Context, request *agent.ScmStatusReq) (*agent.ScmStatusResp, error)
 	ScmOriginalContent(ctx context.Context, request *agent.ScmOriginalContentReq) (*agent.ScmOriginalContentResp, error)
 	ScmExecute(ctx context.Context, request *agent.ScmExecuteReq) (*agent.ScmExecuteResp, error)
@@ -190,4 +192,3 @@ func (a WebTerminalAccess) Attach(ctx context.Context, workspaceId string, sessi
 	}
 	return a.Registry.Attach(workspaceId, sessionId)
 }
-

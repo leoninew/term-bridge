@@ -119,6 +119,67 @@ func (FilePermission) EnumDescriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{1}
 }
 
+// Physical workspace changes delivered by the Agent watcher. Paths are
+// slash-delimited workspace-relative paths and never host filesystem paths.
+type FsChangeKind int32
+
+const (
+	FsChangeKind_FS_CHANGE_KIND_UNSPECIFIED FsChangeKind = 0
+	FsChangeKind_FS_CHANGE_KIND_ADDED       FsChangeKind = 1
+	FsChangeKind_FS_CHANGE_KIND_UPDATED     FsChangeKind = 2
+	FsChangeKind_FS_CHANGE_KIND_DELETED     FsChangeKind = 3
+	FsChangeKind_FS_CHANGE_KIND_RENAMED     FsChangeKind = 4
+	// Event continuity cannot be guaranteed; the client must rescan its workspace.
+	FsChangeKind_FS_CHANGE_KIND_RESCAN_REQUIRED FsChangeKind = 5
+)
+
+// Enum value maps for FsChangeKind.
+var (
+	FsChangeKind_name = map[int32]string{
+		0: "FS_CHANGE_KIND_UNSPECIFIED",
+		1: "FS_CHANGE_KIND_ADDED",
+		2: "FS_CHANGE_KIND_UPDATED",
+		3: "FS_CHANGE_KIND_DELETED",
+		4: "FS_CHANGE_KIND_RENAMED",
+		5: "FS_CHANGE_KIND_RESCAN_REQUIRED",
+	}
+	FsChangeKind_value = map[string]int32{
+		"FS_CHANGE_KIND_UNSPECIFIED":     0,
+		"FS_CHANGE_KIND_ADDED":           1,
+		"FS_CHANGE_KIND_UPDATED":         2,
+		"FS_CHANGE_KIND_DELETED":         3,
+		"FS_CHANGE_KIND_RENAMED":         4,
+		"FS_CHANGE_KIND_RESCAN_REQUIRED": 5,
+	}
+)
+
+func (x FsChangeKind) Enum() *FsChangeKind {
+	p := new(FsChangeKind)
+	*p = x
+	return p
+}
+
+func (x FsChangeKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FsChangeKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_termbridge_agent_v1_file_proto_enumTypes[2].Descriptor()
+}
+
+func (FsChangeKind) Type() protoreflect.EnumType {
+	return &file_termbridge_agent_v1_file_proto_enumTypes[2]
+}
+
+func (x FsChangeKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FsChangeKind.Descriptor instead.
+func (FsChangeKind) EnumDescriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{2}
+}
+
 type FileStat struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Type  FileType               `protobuf:"varint,1,opt,name=type,proto3,enum=termbridge.agent.FileType" json:"type,omitempty"`
@@ -1003,6 +1064,170 @@ func (x *FsRenameResp) GetStat() *FileStat {
 	return nil
 }
 
+type FsWatchSubscribeReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FsWatchSubscribeReq) Reset() {
+	*x = FsWatchSubscribeReq{}
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FsWatchSubscribeReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FsWatchSubscribeReq) ProtoMessage() {}
+
+func (x *FsWatchSubscribeReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FsWatchSubscribeReq.ProtoReflect.Descriptor instead.
+func (*FsWatchSubscribeReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *FsWatchSubscribeReq) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type FsWatchSubscribed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FsWatchSubscribed) Reset() {
+	*x = FsWatchSubscribed{}
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FsWatchSubscribed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FsWatchSubscribed) ProtoMessage() {}
+
+func (x *FsWatchSubscribed) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FsWatchSubscribed.ProtoReflect.Descriptor instead.
+func (*FsWatchSubscribed) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *FsWatchSubscribed) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type FsChangeEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Sequence      uint64                 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	Kind          FsChangeKind           `protobuf:"varint,3,opt,name=kind,proto3,enum=termbridge.agent.FsChangeKind" json:"kind,omitempty"`
+	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
+	OldPath       string                 `protobuf:"bytes,5,opt,name=old_path,json=oldPath,proto3" json:"old_path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FsChangeEvent) Reset() {
+	*x = FsChangeEvent{}
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FsChangeEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FsChangeEvent) ProtoMessage() {}
+
+func (x *FsChangeEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FsChangeEvent.ProtoReflect.Descriptor instead.
+func (*FsChangeEvent) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *FsChangeEvent) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *FsChangeEvent) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *FsChangeEvent) GetKind() FsChangeKind {
+	if x != nil {
+		return x.Kind
+	}
+	return FsChangeKind_FS_CHANGE_KIND_UNSPECIFIED
+}
+
+func (x *FsChangeEvent) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FsChangeEvent) GetOldPath() string {
+	if x != nil {
+		return x.OldPath
+	}
+	return ""
+}
+
 var File_termbridge_agent_v1_file_proto protoreflect.FileDescriptor
 
 const file_termbridge_agent_v1_file_proto_rawDesc = "" +
@@ -1062,7 +1287,17 @@ const file_termbridge_agent_v1_file_proto_rawDesc = "" +
 	"\bnew_path\x18\x03 \x01(\tR\anewPath\x12\x1c\n" +
 	"\toverwrite\x18\x04 \x01(\bR\toverwrite\">\n" +
 	"\fFsRenameResp\x12.\n" +
-	"\x04stat\x18\x01 \x01(\v2\x1a.termbridge.agent.FileStatR\x04stat*k\n" +
+	"\x04stat\x18\x01 \x01(\v2\x1a.termbridge.agent.FileStatR\x04stat\"8\n" +
+	"\x13FsWatchSubscribeReq\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"6\n" +
+	"\x11FsWatchSubscribed\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"\xb1\x01\n" +
+	"\rFsChangeEvent\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1a\n" +
+	"\bsequence\x18\x02 \x01(\x04R\bsequence\x122\n" +
+	"\x04kind\x18\x03 \x01(\x0e2\x1e.termbridge.agent.FsChangeKindR\x04kind\x12\x12\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\x12\x19\n" +
+	"\bold_path\x18\x05 \x01(\tR\aoldPath*k\n" +
 	"\bFileType\x12\x15\n" +
 	"\x11FILE_TYPE_UNKNOWN\x10\x00\x12\x12\n" +
 	"\x0eFILE_TYPE_FILE\x10\x01\x12\x17\n" +
@@ -1070,7 +1305,14 @@ const file_termbridge_agent_v1_file_proto_rawDesc = "" +
 	"\x17FILE_TYPE_SYMBOLIC_LINK\x10@*O\n" +
 	"\x0eFilePermission\x12\x1f\n" +
 	"\x1bFILE_PERMISSION_UNSPECIFIED\x10\x00\x12\x1c\n" +
-	"\x18FILE_PERMISSION_READONLY\x10\x01B\xcb\x01\n" +
+	"\x18FILE_PERMISSION_READONLY\x10\x01*\xc0\x01\n" +
+	"\fFsChangeKind\x12\x1e\n" +
+	"\x1aFS_CHANGE_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14FS_CHANGE_KIND_ADDED\x10\x01\x12\x1a\n" +
+	"\x16FS_CHANGE_KIND_UPDATED\x10\x02\x12\x1a\n" +
+	"\x16FS_CHANGE_KIND_DELETED\x10\x03\x12\x1a\n" +
+	"\x16FS_CHANGE_KIND_RENAMED\x10\x04\x12\"\n" +
+	"\x1eFS_CHANGE_KIND_RESCAN_REQUIRED\x10\x05B\xcb\x01\n" +
 	"\x14com.termbridge.agentB\tFileProtoP\x01ZGgitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1\xa2\x02\x03TAX\xaa\x02\x10Termbridge.Agent\xca\x02\x10Termbridge\\Agent\xe2\x02\x1cTermbridge\\Agent\\GPBMetadata\xea\x02\x11Termbridge::Agentb\x06proto3"
 
 var (
@@ -1085,43 +1327,48 @@ func file_termbridge_agent_v1_file_proto_rawDescGZIP() []byte {
 	return file_termbridge_agent_v1_file_proto_rawDescData
 }
 
-var file_termbridge_agent_v1_file_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_termbridge_agent_v1_file_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_termbridge_agent_v1_file_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_termbridge_agent_v1_file_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_termbridge_agent_v1_file_proto_goTypes = []any{
 	(FileType)(0),                 // 0: termbridge.agent.FileType
 	(FilePermission)(0),           // 1: termbridge.agent.FilePermission
-	(*FileStat)(nil),              // 2: termbridge.agent.FileStat
-	(*FsStatReq)(nil),             // 3: termbridge.agent.FsStatReq
-	(*FsStatResp)(nil),            // 4: termbridge.agent.FsStatResp
-	(*FsReadDirectoryReq)(nil),    // 5: termbridge.agent.FsReadDirectoryReq
-	(*FsDirectoryEntry)(nil),      // 6: termbridge.agent.FsDirectoryEntry
-	(*FsReadDirectoryResp)(nil),   // 7: termbridge.agent.FsReadDirectoryResp
-	(*FsReadFileReq)(nil),         // 8: termbridge.agent.FsReadFileReq
-	(*FsReadFileResp)(nil),        // 9: termbridge.agent.FsReadFileResp
-	(*FsWriteFileReq)(nil),        // 10: termbridge.agent.FsWriteFileReq
-	(*FsWriteFileResp)(nil),       // 11: termbridge.agent.FsWriteFileResp
-	(*FsCreateDirectoryReq)(nil),  // 12: termbridge.agent.FsCreateDirectoryReq
-	(*FsCreateDirectoryResp)(nil), // 13: termbridge.agent.FsCreateDirectoryResp
-	(*FsDeleteReq)(nil),           // 14: termbridge.agent.FsDeleteReq
-	(*FsDeleteResp)(nil),          // 15: termbridge.agent.FsDeleteResp
-	(*FsRenameReq)(nil),           // 16: termbridge.agent.FsRenameReq
-	(*FsRenameResp)(nil),          // 17: termbridge.agent.FsRenameResp
+	(FsChangeKind)(0),             // 2: termbridge.agent.FsChangeKind
+	(*FileStat)(nil),              // 3: termbridge.agent.FileStat
+	(*FsStatReq)(nil),             // 4: termbridge.agent.FsStatReq
+	(*FsStatResp)(nil),            // 5: termbridge.agent.FsStatResp
+	(*FsReadDirectoryReq)(nil),    // 6: termbridge.agent.FsReadDirectoryReq
+	(*FsDirectoryEntry)(nil),      // 7: termbridge.agent.FsDirectoryEntry
+	(*FsReadDirectoryResp)(nil),   // 8: termbridge.agent.FsReadDirectoryResp
+	(*FsReadFileReq)(nil),         // 9: termbridge.agent.FsReadFileReq
+	(*FsReadFileResp)(nil),        // 10: termbridge.agent.FsReadFileResp
+	(*FsWriteFileReq)(nil),        // 11: termbridge.agent.FsWriteFileReq
+	(*FsWriteFileResp)(nil),       // 12: termbridge.agent.FsWriteFileResp
+	(*FsCreateDirectoryReq)(nil),  // 13: termbridge.agent.FsCreateDirectoryReq
+	(*FsCreateDirectoryResp)(nil), // 14: termbridge.agent.FsCreateDirectoryResp
+	(*FsDeleteReq)(nil),           // 15: termbridge.agent.FsDeleteReq
+	(*FsDeleteResp)(nil),          // 16: termbridge.agent.FsDeleteResp
+	(*FsRenameReq)(nil),           // 17: termbridge.agent.FsRenameReq
+	(*FsRenameResp)(nil),          // 18: termbridge.agent.FsRenameResp
+	(*FsWatchSubscribeReq)(nil),   // 19: termbridge.agent.FsWatchSubscribeReq
+	(*FsWatchSubscribed)(nil),     // 20: termbridge.agent.FsWatchSubscribed
+	(*FsChangeEvent)(nil),         // 21: termbridge.agent.FsChangeEvent
 }
 var file_termbridge_agent_v1_file_proto_depIdxs = []int32{
-	0, // 0: termbridge.agent.FileStat.type:type_name -> termbridge.agent.FileType
-	1, // 1: termbridge.agent.FileStat.permissions:type_name -> termbridge.agent.FilePermission
-	2, // 2: termbridge.agent.FsStatResp.stat:type_name -> termbridge.agent.FileStat
-	0, // 3: termbridge.agent.FsDirectoryEntry.type:type_name -> termbridge.agent.FileType
-	6, // 4: termbridge.agent.FsReadDirectoryResp.entries:type_name -> termbridge.agent.FsDirectoryEntry
-	2, // 5: termbridge.agent.FsReadFileResp.stat:type_name -> termbridge.agent.FileStat
-	2, // 6: termbridge.agent.FsWriteFileResp.stat:type_name -> termbridge.agent.FileStat
-	2, // 7: termbridge.agent.FsCreateDirectoryResp.stat:type_name -> termbridge.agent.FileStat
-	2, // 8: termbridge.agent.FsRenameResp.stat:type_name -> termbridge.agent.FileStat
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	0,  // 0: termbridge.agent.FileStat.type:type_name -> termbridge.agent.FileType
+	1,  // 1: termbridge.agent.FileStat.permissions:type_name -> termbridge.agent.FilePermission
+	3,  // 2: termbridge.agent.FsStatResp.stat:type_name -> termbridge.agent.FileStat
+	0,  // 3: termbridge.agent.FsDirectoryEntry.type:type_name -> termbridge.agent.FileType
+	7,  // 4: termbridge.agent.FsReadDirectoryResp.entries:type_name -> termbridge.agent.FsDirectoryEntry
+	3,  // 5: termbridge.agent.FsReadFileResp.stat:type_name -> termbridge.agent.FileStat
+	3,  // 6: termbridge.agent.FsWriteFileResp.stat:type_name -> termbridge.agent.FileStat
+	3,  // 7: termbridge.agent.FsCreateDirectoryResp.stat:type_name -> termbridge.agent.FileStat
+	3,  // 8: termbridge.agent.FsRenameResp.stat:type_name -> termbridge.agent.FileStat
+	2,  // 9: termbridge.agent.FsChangeEvent.kind:type_name -> termbridge.agent.FsChangeKind
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_termbridge_agent_v1_file_proto_init() }
@@ -1134,8 +1381,8 @@ func file_termbridge_agent_v1_file_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_termbridge_agent_v1_file_proto_rawDesc), len(file_termbridge_agent_v1_file_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   16,
+			NumEnums:      3,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -1,5 +1,9 @@
 import type { AxiosInstance } from 'axios'
-import type { FileStat, FsReadDirectoryResp } from '../../gen/proto/termbridge/agent/v1/file'
+import {
+  FsChangeKind,
+  type FileStat,
+  type FsReadDirectoryResp,
+} from '../../gen/proto/termbridge/agent/v1/file'
 import {
   ScmCommand,
   type ScmExecuteReq,
@@ -9,6 +13,8 @@ import {
   type ScmStatusResp,
 } from '../../gen/proto/termbridge/agent/v1/git'
 import { ApiClientError, cloudApiClient, localApiClient } from '../api/client'
+import { useCloudAuthStore } from '../../store/cloudAuth'
+import { useRuntimeConfigStore } from '../../store/runtimeConfig'
 import { runtimePath, type RuntimeTarget } from '../runtimeTarget'
 import { bytesFromWire, bytesToWire } from './bytes'
 import {
@@ -42,10 +48,7 @@ export class WorkbenchApiError extends Error {
 
 export type WorkbenchFsApi = {
   stat(path: string, options?: WorkbenchRequestOptions): Promise<FileStat>
-  readDirectory(
-    path: string,
-    options?: WorkbenchRequestOptions,
-  ): Promise<FsReadDirectoryResp>
+  readDirectory(path: string, options?: WorkbenchRequestOptions): Promise<FsReadDirectoryResp>
   readFile(
     path: string,
     options?: WorkbenchRequestOptions,
@@ -72,6 +75,17 @@ export type WorkbenchFsApi = {
   ): Promise<FileStat | undefined>
 }
 
+export type WorkbenchWorkspaceChange = {
+  sequence: number
+  kind: FsChangeKind
+  path: string
+  oldPath: string
+}
+
+export type WorkbenchWorkspaceChangeSubscription = {
+  close(): void
+}
+
 export type WorkbenchScmApi = {
   status(options?: WorkbenchRequestOptions): Promise<ScmStatusResp>
   originalContent(
@@ -91,6 +105,233 @@ export type WorkbenchScmApi = {
 }
 
 export type WorkbenchRuntimeApi = WorkbenchFsApi & WorkbenchScmApi
+
+export function workspaceChangesWsUrl(
+  target: RuntimeTarget,
+  workspaceId: string,
+  token?: string,
+): string {
+  const path = runtimePath(target, `/workspaces/${encodeURIComponent(workspaceId)}/fs/events`)
+  const params = new URLSearchParams()
+  if (token) {
+    params.set('token', token)
+  }
+  const runtimeConfig = useRuntimeConfigStore().config
+  const apiBaseUrl =
+    target.mode === 'cloud' ? runtimeConfig.cloud.apiBaseUrl : runtimeConfig.local.apiBasePath
+  return buildApiWebSocketUrl(apiBaseUrl, params.size > 0 ? `${path}?${params.toString()}` : path)
+}
+
+const workspaceChangesSubprotocol = 'termbridge.workspacefs.v1'
+const reconnectInitialDelayMs = 250
+const reconnectMaximumDelayMs = 5_000
+
+type WorkspaceWatchMessage =
+  | { type: 'change'; change: WorkbenchWorkspaceChange }
+  | { type: 'subscribed' }
+  | { type: 'invalid' }
+
+export function subscribeWorkspaceChanges(
+  target: RuntimeTarget,
+  workspaceId: string,
+  options: {
+    token?: string
+    onChange(change: WorkbenchWorkspaceChange): void
+    onRescanRequired(): void
+    onDisconnected(): void
+  },
+): WorkbenchWorkspaceChangeSubscription {
+  const cloudToken =
+    target.mode === 'cloud' ? (useCloudAuthStore().cloudToken ?? undefined) : undefined
+  const url = workspaceChangesWsUrl(target, workspaceId, options.token ?? cloudToken)
+  let socket: WebSocket | undefined
+  let closed = false
+  let nextSequence: number | undefined
+  let reconnectDelayMs = reconnectInitialDelayMs
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined
+
+  const scheduleReconnect = () => {
+    if (closed || reconnectTimer !== undefined) {
+      return
+    }
+    const delayMs = reconnectDelayMs
+    reconnectDelayMs = Math.min(reconnectDelayMs * 2, reconnectMaximumDelayMs)
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = undefined
+      connect()
+    }, delayMs)
+  }
+
+  const disconnect = () => {
+    if (closed) {
+      return
+    }
+    // A closed WebSocket cannot prove that all watcher events were delivered.
+    // Invalidate before reconnecting rather than treating the socket as a poll loop.
+    nextSequence = undefined
+    options.onRescanRequired()
+    options.onDisconnected()
+    scheduleReconnect()
+  }
+
+  const connect = () => {
+    if (closed) {
+      return
+    }
+    let candidate: WebSocket
+    try {
+      candidate = new WebSocket(url, workspaceChangesSubprotocol)
+    } catch {
+      disconnect()
+      return
+    }
+    socket = candidate
+    candidate.onopen = () => {
+      if (closed || socket !== candidate) {
+        return
+      }
+      reconnectDelayMs = reconnectInitialDelayMs
+      nextSequence = undefined
+    }
+    candidate.onmessage = (event) => {
+      if (closed || socket !== candidate) {
+        return
+      }
+      if (typeof event.data !== 'string') {
+        options.onRescanRequired()
+        return
+      }
+      const message = decodeWorkspaceWatchMessage(event.data)
+      if (message.type === 'subscribed') {
+        return
+      }
+      if (message.type === 'invalid') {
+        options.onRescanRequired()
+        return
+      }
+      const { change } = message
+      if (
+        change.kind === FsChangeKind.FS_CHANGE_KIND_RESCAN_REQUIRED ||
+        (change.sequence > 0 && nextSequence !== undefined && change.sequence !== nextSequence)
+      ) {
+        options.onRescanRequired()
+      }
+      if (change.sequence > 0) {
+        nextSequence = change.sequence + 1
+      }
+      options.onChange(change)
+    }
+    candidate.onclose = () => {
+      if (!closed && socket === candidate) {
+        socket = undefined
+        disconnect()
+      }
+    }
+    // Browsers normally follow error with close. The close handler owns the
+    // conservative reset and reconnect so the same failure is not reported twice.
+    candidate.onerror = () => {}
+  }
+
+  connect()
+  return {
+    close() {
+      closed = true
+      if (reconnectTimer !== undefined) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = undefined
+      }
+      socket?.close()
+      socket = undefined
+    },
+  }
+}
+
+function decodeWorkspaceWatchMessage(raw: string): WorkspaceWatchMessage {
+  let value: unknown
+  try {
+    value = JSON.parse(raw)
+  } catch {
+    return { type: 'invalid' }
+  }
+  if (!isRecord(value)) {
+    return { type: 'invalid' }
+  }
+  if (!('kind' in value)) {
+    return typeof value.workspace_id === 'string' ? { type: 'subscribed' } : { type: 'invalid' }
+  }
+  const kind = decodeWorkspaceChangeKind(value.kind)
+  const sequence = decodeWorkspaceSequence(value.sequence)
+  if (kind === undefined || sequence === undefined) {
+    return { type: 'invalid' }
+  }
+  const path = value.path
+  const oldPath = value.old_path
+  if (
+    (path !== undefined && typeof path !== 'string') ||
+    (oldPath !== undefined && typeof oldPath !== 'string')
+  ) {
+    return { type: 'invalid' }
+  }
+  return {
+    type: 'change',
+    change: {
+      sequence,
+      kind,
+      path: path ?? '',
+      oldPath: oldPath ?? '',
+    },
+  }
+}
+
+function decodeWorkspaceChangeKind(value: unknown): FsChangeKind | undefined {
+  const numberValue =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+        ? FsChangeKind[value as keyof typeof FsChangeKind]
+        : undefined
+  switch (numberValue) {
+    case FsChangeKind.FS_CHANGE_KIND_ADDED:
+    case FsChangeKind.FS_CHANGE_KIND_UPDATED:
+    case FsChangeKind.FS_CHANGE_KIND_DELETED:
+    case FsChangeKind.FS_CHANGE_KIND_RENAMED:
+    case FsChangeKind.FS_CHANGE_KIND_RESCAN_REQUIRED:
+      return numberValue
+    default:
+      return undefined
+  }
+}
+
+function decodeWorkspaceSequence(value: unknown): number | undefined {
+  const numberValue =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^\d+$/.test(value)
+        ? Number(value)
+        : value === undefined
+          ? 0
+          : Number.NaN
+  if (!Number.isSafeInteger(numberValue) || numberValue < 0) {
+    return undefined
+  }
+  return numberValue
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
+
+function buildApiWebSocketUrl(apiBaseUrl: string, path: string): string {
+  const normalizedBase = apiBaseUrl.replace(/\/+$/, '')
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const url = `${normalizedBase}${normalizedPath}`
+  if (apiBaseUrl.startsWith('/')) {
+    return url
+  }
+  const parsed = new URL(url)
+  parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
+  return parsed.toString()
+}
 
 type RuntimeHttpClients = {
   local: Pick<AxiosInstance, 'get' | 'post' | 'put'>

@@ -24,6 +24,7 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/prototime"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
+	workspacefs "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/workspacefs"
 
 	"github.com/coder/websocket"
 )
@@ -1103,6 +1104,60 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 	}()
 	<-term.done
 }
+func (s *Handler) handleWorkspaceWatchWS(w http.ResponseWriter, r *http.Request, route *agentRoute, workspaceId string) error {
+	streamId := "fs-watch-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		Subprotocols:   []string{workspacefs.Subprotocol},
+		OriginPatterns: s.originPatterns(r),
+	})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
+
+	watch := &workspaceWatchRelay{
+		workspaceId: workspaceId,
+		browser:     conn,
+		done:        make(chan struct{}),
+		logger:      s.config.Logger,
+	}
+	route.addWorkspaceWatch(streamId, watch)
+	defer func() {
+		route.removeWorkspaceWatch(streamId)
+		closeOnce(watch.done)
+		closeFrame := &shared.TunnelFrame{
+			StreamId: streamId,
+			Payload: &shared.TunnelFrame_Close{
+				Close: &shared.Close{Reason: "browser_disconnected"},
+			},
+		}
+		_ = route.writeFrame(context.Background(), closeFrame)
+	}()
+
+	subscribe := &shared.TunnelFrame{
+		StreamId:  streamId,
+		RequestId: s.requestIdFor(w, r),
+		Payload: &shared.TunnelFrame_FsWatchSubscribeReq{
+			FsWatchSubscribeReq: &agent.FsWatchSubscribeReq{WorkspaceId: workspaceId},
+		},
+	}
+	if err := route.writeFrame(r.Context(), subscribe); err != nil {
+		return err
+	}
+
+	go func() {
+		for {
+			_, _, err := conn.Read(r.Context())
+			if err != nil {
+				closeOnce(watch.done)
+				return
+			}
+		}
+	}()
+	<-watch.done
+	return nil
+}
+
 func terminalAttachSizeFromQuery(r *http.Request) (int, int, bool, error) {
 	colsRaw := strings.TrimSpace(r.URL.Query().Get("cols"))
 	rowsRaw := strings.TrimSpace(r.URL.Query().Get("rows"))
@@ -1173,6 +1228,7 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		s.clearRoute(hello.GetDeviceId(), route)
 		route.closeTerminals("device disconnected")
+		route.closeWorkspaceWatches("device disconnected")
 		s.registry.MarkOffline(hello.GetDeviceId(), time.Now().UTC())
 	}()
 	ack := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_HelloAck{HelloAck: &shared.HelloAck{ProtocolVersion: tunnel.ProtocolVersion}}}
@@ -1241,6 +1297,7 @@ func (s *Handler) disconnectDevice(deviceId string, reason string) {
 	s.routeMu.Unlock()
 	if route != nil {
 		route.closeTerminals(reason)
+		route.closeWorkspaceWatches(reason)
 		if route.conn != nil {
 			_ = route.conn.Close(websocket.StatusGoingAway, reason)
 		}
@@ -1255,6 +1312,7 @@ func (s *Handler) setRoute(deviceId string, route *agentRoute) {
 	s.routeMu.Unlock()
 	if old != nil {
 		old.closeTerminals("device reconnected")
+		old.closeWorkspaceWatches("device reconnected")
 		_ = old.conn.Close(websocket.StatusGoingAway, "device reconnected")
 	}
 }
@@ -1365,4 +1423,3 @@ func cleanCloudOAuthScopes(scopes []string) []string {
 	}
 	return out
 }
-

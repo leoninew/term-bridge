@@ -50,4 +50,3 @@ func TestContentAsTextRejectsBinaryAndNUL(t *testing.T) {
 		t.Fatalf("nul code = %q err=%v", filemodel.CodeOf(err), err)
 	}
 }
-

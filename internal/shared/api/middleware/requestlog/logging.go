@@ -8,6 +8,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/url"
 	"path"
 	"strconv"
 	"strings"
@@ -108,11 +109,39 @@ func requestLogAttrs(r *http.Request, requestId string) []any {
 	return []any{
 		"method", r.Method,
 		"path", r.URL.Path,
-		"query", r.URL.RawQuery,
+		"query", redactQuery(r.URL.Query()),
 		"request_id", requestId,
 		"remote_addr", r.RemoteAddr,
 		"user_agent", r.UserAgent(),
 	}
+}
+
+func redactQuery(values url.Values) string {
+	if len(values) == 0 {
+		return ""
+	}
+	redacted := url.Values{}
+	for key, value := range values {
+		copied := append([]string(nil), value...)
+		if containsSensitiveTerm(key) {
+			for index := range copied {
+				copied[index] = "[REDACTED]"
+			}
+		}
+		redacted[key] = copied
+	}
+	return redacted.Encode()
+}
+
+func containsSensitiveTerm(value string) bool {
+	lower := strings.ToLower(value)
+	terms := []string{"authorization", "code", "cookie", "credential", "password", "secret", "token", "connection string", "apikey", "api_key"}
+	for _, term := range terms {
+		if strings.Contains(lower, term) {
+			return true
+		}
+	}
+	return false
 }
 
 func requestIdFor(r *http.Request) string {

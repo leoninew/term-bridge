@@ -22,7 +22,7 @@ export function createTermBridgeFileSystemProvider(
   const provider: FileSystemProvider & { dispose: () => void } = {
     onDidChangeFile: emitter.event,
 
-    watch(_uri: Uri, _options: { recursive: boolean; excludes: string[] }): Disposable {
+    watch(): Disposable {
       return new vscode.Disposable(() => undefined)
     },
 

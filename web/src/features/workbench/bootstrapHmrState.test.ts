@@ -101,12 +101,12 @@ describe('Workbench HMR state', () => {
       throw new Error('failed after StandaloneServices started')
     })
 
-    await expect(startWorkbenchInitialization(state, initialize, servicesInitialized)).rejects.toThrow(
-      'failed after StandaloneServices started',
-    )
-    await expect(startWorkbenchInitialization(state, initialize, servicesInitialized)).rejects.toThrow(
-      'failed after StandaloneServices started',
-    )
+    await expect(
+      startWorkbenchInitialization(state, initialize, servicesInitialized),
+    ).rejects.toThrow('failed after StandaloneServices started')
+    await expect(
+      startWorkbenchInitialization(state, initialize, servicesInitialized),
+    ).rejects.toThrow('failed after StandaloneServices started')
     expect(initialize).toHaveBeenCalledTimes(1)
     expect(state.monacoInitializationStarted).toBe(true)
     expect(state.terminalInitializationError).toBeInstanceOf(Error)
@@ -116,9 +116,9 @@ describe('Workbench HMR state', () => {
     const state = initializationState()
     const initialize = vi.fn(async () => undefined)
 
-    await expect(
-      startWorkbenchInitialization(state, initialize, () => true),
-    ).rejects.toThrow(/requires a full reload/)
+    await expect(startWorkbenchInitialization(state, initialize, () => true)).rejects.toThrow(
+      /requires a full reload/,
+    )
     expect(initialize).not.toHaveBeenCalled()
     expect(state.terminalInitializationError).toBeInstanceOf(Error)
     expect(state.monacoInitializationStarted).toBe(true)
@@ -156,7 +156,9 @@ describe('Workbench HMR state', () => {
   })
 
   it('recognizes Services are already initialized errors', () => {
-    expect(isServicesAlreadyInitializedError(new Error('Services are already initialized'))).toBe(true)
+    expect(isServicesAlreadyInitializedError(new Error('Services are already initialized'))).toBe(
+      true,
+    )
     expect(isServicesAlreadyInitializedError(new Error('other'))).toBe(false)
     expect(isServicesAlreadyInitializedError('Services are already initialized')).toBe(false)
   })

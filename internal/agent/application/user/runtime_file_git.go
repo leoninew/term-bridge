@@ -12,6 +12,13 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+func (a WebTerminalAccess) SubscribeWorkspaceChanges(ctx context.Context, workspaceId string) (filemodel.WorkspaceChangeSubscription, error) {
+	if err := a.fileService(); err != nil {
+		return nil, err
+	}
+	return a.Files.Subscribe(ctx, workspaceId)
+}
+
 func (a WebTerminalAccess) FsStat(ctx context.Context, request *agent.FsStatReq) (*agent.FsStatResp, error) {
 	if err := a.fileService(); err != nil {
 		return nil, err
@@ -77,6 +84,8 @@ func (a WebTerminalAccess) FsWriteFile(ctx context.Context, request *agent.FsWri
 		}
 	} else if !request.GetOverwrite() {
 		return nil, filemodel.NewError("already_exists", "The destination already exists.")
+	} else if request.GetEtag() == "" {
+		return nil, filemodel.NewError("precondition_required", "An existing workspace file requires a revision token.")
 	}
 
 	var result filemodel.MutationResult
@@ -85,7 +94,7 @@ func (a WebTerminalAccess) FsWriteFile(ctx context.Context, request *agent.FsWri
 			Path:             pathValue,
 			Text:             text,
 			ExpectedRevision: request.GetEtag(),
-			Force:            request.GetEtag() == "",
+			Force:            false,
 		})
 	} else {
 		result, err = a.Files.CreateFile(ctx, request.GetWorkspaceId(), filemodel.CreateFileRequest{
@@ -282,15 +291,12 @@ func (a WebTerminalAccess) ScmRepository(ctx context.Context, request *agent.Scm
 }
 
 func (a WebTerminalAccess) fsStat(ctx context.Context, workspaceId string, pathValue string) (*agent.FileStat, error) {
-	list, err := a.Files.List(ctx, workspaceId, pathValue)
-	if err == nil {
-		return fileStat(list.Directory), nil
-	}
-	read, readErr := a.Files.Read(ctx, workspaceId, pathValue)
-	if readErr != nil {
+	// Metadata-only: Lstat via store.Stat. Never List (directory enumeration) or Read (content).
+	entry, err := a.Files.Stat(ctx, workspaceId, pathValue)
+	if err != nil {
 		return nil, err
 	}
-	return fileStat(read.Entry), nil
+	return fileStat(entry), nil
 }
 
 func (a WebTerminalAccess) fileService() error {

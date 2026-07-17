@@ -146,6 +146,7 @@ type FileConfig struct {
 	MaxDirectoryEntries       int
 	MaxRecursiveDeleteEntries int
 	OperationTimeout          time.Duration
+	WatchSubscriberQueueSize  int
 }
 
 type GitConfig struct {
@@ -320,6 +321,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			MaxDirectoryEntries:       v.GetInt("file.max_directory_entries"),
 			MaxRecursiveDeleteEntries: v.GetInt("file.max_recursive_delete_entries"),
 			OperationTimeout:          v.GetDuration("file.operation_timeout"),
+			WatchSubscriberQueueSize:  v.GetInt("file.watch_subscriber_queue_size"),
 		},
 		Git: GitConfig{
 			Executable:     strings.TrimSpace(v.GetString("git.executable")),
@@ -751,6 +753,7 @@ func configKeys() []string {
 		"file.max_directory_entries",
 		"file.max_recursive_delete_entries",
 		"file.operation_timeout",
+		"file.watch_subscriber_queue_size",
 		"git.executable",
 		"git.command_timeout",
 		"git.max_stdout_bytes",
@@ -967,6 +970,9 @@ func normalizeFileConfig(cfg *Config) {
 	if cfg.File.OperationTimeout <= 0 {
 		cfg.File.OperationTimeout = 10 * time.Second
 	}
+	if cfg.File.WatchSubscriberQueueSize <= 0 {
+		cfg.File.WatchSubscriberQueueSize = 64
+	}
 }
 
 func validateFile(cfg FileConfig) error {
@@ -981,6 +987,9 @@ func validateFile(cfg FileConfig) error {
 	}
 	if cfg.OperationTimeout <= 0 {
 		return apperrors.Config("invalid file.operation_timeout", fmt.Errorf("must be positive"))
+	}
+	if cfg.WatchSubscriberQueueSize < 1 {
+		return apperrors.Config("invalid file.watch_subscriber_queue_size", fmt.Errorf("must be positive"))
 	}
 	return nil
 }

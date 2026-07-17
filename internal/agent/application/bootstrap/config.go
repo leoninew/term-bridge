@@ -48,6 +48,7 @@ type FileConfig struct {
 	MaxDirectoryEntries       int
 	MaxRecursiveDeleteEntries int
 	OperationTimeout          time.Duration
+	WatchSubscriberQueueSize  int
 }
 
 type GitConfig struct {

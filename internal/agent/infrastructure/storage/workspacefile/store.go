@@ -60,6 +60,18 @@ func (s *Store) List(ctx context.Context, rootPath string, directory filemodel.R
 	return filemodel.ListResult{Directory: dirEntry, Items: items.items, Truncated: items.truncated}, nil
 }
 
+func (s *Store) Stat(ctx context.Context, rootPath string, path filemodel.RelativePath) (filemodel.Entry, error) {
+	root, err := openRoot(rootPath)
+	if err != nil {
+		return filemodel.Entry{}, err
+	}
+	defer func() { _ = root.Close() }()
+	if err := ctx.Err(); err != nil {
+		return filemodel.Entry{}, err
+	}
+	return root.entry(path)
+}
+
 func (s *Store) Read(ctx context.Context, rootPath string, path filemodel.RelativePath) (filemodel.ReadResult, error) {
 	root, err := openRoot(rootPath)
 	if err != nil {
@@ -407,7 +419,11 @@ func (r *root) entry(path filemodel.RelativePath) (filemodel.Entry, error) {
 	} else if !info.Mode().IsRegular() {
 		return filemodel.Entry{}, filemodel.NewError("type_mismatch", "The filesystem entry is unsupported.")
 	}
-	entry := filemodel.Entry{Path: path, Name: path.Base(), Kind: kind, Size: info.Size(), ModifiedAt: info.ModTime(), Revision: revision(path, info)}
+	revisionValue, err := r.revision(path, info)
+	if err != nil {
+		return filemodel.Entry{}, err
+	}
+	entry := filemodel.Entry{Path: path, Name: path.Base(), Kind: kind, Size: info.Size(), ModifiedAt: info.ModTime(), Revision: revisionValue}
 	if path == "" {
 		entry.Name = ""
 	}
@@ -615,10 +631,20 @@ func (r *root) remove(path filemodel.RelativePath, recursive bool) error {
 	return nil
 }
 
-func revision(path filemodel.RelativePath, info fs.FileInfo) string {
-	value := fmt.Sprintf("%s\x00%s\x00%d\x00%d\x00%d", path, info.Mode().String(), info.Size(), info.ModTime().UnixNano(), info.ModTime().Unix())
-	digest := sha256.Sum256([]byte(value))
-	return base64.RawURLEncoding.EncodeToString(digest[:])
+func (r *root) revision(path filemodel.RelativePath, info fs.FileInfo) (string, error) {
+	digest := sha256.New()
+	_, _ = fmt.Fprintf(digest, "%s\x00%s\x00%d\x00%d\x00%d", path, info.Mode().String(), info.Size(), info.ModTime().UnixNano(), info.ModTime().Unix())
+	if info.Mode().IsRegular() {
+		file, err := r.root.Open(path.String())
+		if err != nil {
+			return "", fileError(err)
+		}
+		defer func() { _ = file.Close() }()
+		if _, err := io.Copy(digest, file); err != nil {
+			return "", err
+		}
+	}
+	return base64.RawURLEncoding.EncodeToString(digest.Sum(nil)), nil
 }
 
 // readBounded returns raw file bytes up to limit.

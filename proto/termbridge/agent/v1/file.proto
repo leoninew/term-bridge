@@ -19,6 +19,18 @@ enum FilePermission {
   FILE_PERMISSION_READONLY = 1;
 }
 
+// Physical workspace changes delivered by the Agent watcher. Paths are
+// slash-delimited workspace-relative paths and never host filesystem paths.
+enum FsChangeKind {
+  FS_CHANGE_KIND_UNSPECIFIED = 0;
+  FS_CHANGE_KIND_ADDED = 1;
+  FS_CHANGE_KIND_UPDATED = 2;
+  FS_CHANGE_KIND_DELETED = 3;
+  FS_CHANGE_KIND_RENAMED = 4;
+  // Event continuity cannot be guaranteed; the client must rescan its workspace.
+  FS_CHANGE_KIND_RESCAN_REQUIRED = 5;
+}
+
 message FileStat {
   FileType type = 1;
   // Creation time in milliseconds since Unix epoch (vscode FileStat.ctime).
@@ -106,4 +118,20 @@ message FsRenameReq {
 
 message FsRenameResp {
   FileStat stat = 1;
+}
+
+message FsWatchSubscribeReq {
+  string workspace_id = 1;
+}
+
+message FsWatchSubscribed {
+  string workspace_id = 1;
+}
+
+message FsChangeEvent {
+  string workspace_id = 1;
+  uint64 sequence = 2;
+  FsChangeKind kind = 3;
+  string path = 4;
+  string old_path = 5;
 }

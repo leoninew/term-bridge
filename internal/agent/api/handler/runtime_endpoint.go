@@ -22,6 +22,7 @@ type runtimeEndpoint interface {
 	JSON(ctx context.Context, method string, params any, requestId string) (json.RawMessage, error)
 	History(ctx context.Context, workspaceId string, sessionId string, requestId string) (text string, offline bool, err error)
 	Attach(w http.ResponseWriter, r *http.Request, workspaceId string, sessionId string) error
+	WatchWorkspaceChanges(w http.ResponseWriter, r *http.Request, workspaceId string) error
 	Available() bool
 }
 
@@ -54,6 +55,10 @@ func (e localRuntimeEndpoint) History(ctx context.Context, workspaceId string, s
 
 func (e localRuntimeEndpoint) Attach(w http.ResponseWriter, r *http.Request, workspaceId string, sessionId string) error {
 	return e.handler.bridgeTerminalStream(w, r, e.runtime, workspaceId, sessionId)
+}
+
+func (e localRuntimeEndpoint) WatchWorkspaceChanges(w http.ResponseWriter, r *http.Request, workspaceId string) error {
+	return e.handler.bridgeWorkspaceChanges(w, r, e.runtime, workspaceId)
 }
 
 func localRuntimeRequestFrame(method string, params any, requestId string) (*shared.TunnelFrame, error) {

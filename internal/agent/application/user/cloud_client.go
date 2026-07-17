@@ -30,10 +30,11 @@ type Config struct {
 }
 
 type Client struct {
-	config Config
-	device Device
-	mu     sync.Mutex
-	terms  map[string]chan *shared.TunnelFrame
+	config  Config
+	device  Device
+	mu      sync.Mutex
+	terms   map[string]chan *shared.TunnelFrame
+	watches map[string]filemodel.WorkspaceChangeSubscription
 }
 
 func (c *Client) SetDevice(device Device) {
@@ -41,7 +42,7 @@ func (c *Client) SetDevice(device Device) {
 }
 
 func New(config Config) *Client {
-	return &Client{config: config, terms: map[string]chan *shared.TunnelFrame{}}
+	return &Client{config: config, terms: map[string]chan *shared.TunnelFrame{}, watches: map[string]filemodel.WorkspaceChangeSubscription{}}
 }
 
 func (c *Client) logInfo(message string, attrs ...any) {
@@ -107,6 +108,7 @@ func (c *Client) Run(ctx context.Context) error {
 
 func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 	var writeMu sync.Mutex
+	defer c.closeWatches()
 	for {
 		_, data, err := conn.Read(ctx)
 		if err != nil {
@@ -120,6 +122,10 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 			continue
 		}
 		switch frame.GetPayload().(type) {
+		case *shared.TunnelFrame_FsWatchSubscribeReq:
+			go c.handleWorkspaceWatch(ctx, conn, &writeMu, frame)
+		case *shared.TunnelFrame_Close:
+			c.removeWatch(frame.GetStreamId())
 		case *shared.TunnelFrame_TerminalAttach:
 			go c.handleTerminal(ctx, conn, &writeMu, frame)
 		case *shared.TunnelFrame_Ping:
@@ -128,6 +134,66 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 		default:
 			if isRuntimeRequest(frame) {
 				go c.handleRequest(ctx, conn, &writeMu, frame)
+			}
+		}
+	}
+}
+
+func (c *Client) handleWorkspaceWatch(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, frame *shared.TunnelFrame) {
+	request := frame.GetFsWatchSubscribeReq()
+	if request == nil {
+		return
+	}
+	if c.config.Runtime == nil {
+		_ = writeTunnelFrame(ctx, conn, writeMu, tunnel.ErrorFrame(frame.GetStreamId(), frame.GetRequestId(), "runtime_unavailable", "runtime access unavailable"))
+		return
+	}
+	subscription, err := c.config.Runtime.SubscribeWorkspaceChanges(ctx, request.GetWorkspaceId())
+	if err != nil {
+		_ = writeTunnelFrame(ctx, conn, writeMu, runtimeErrorFrame(frame.GetStreamId(), frame.GetRequestId(), err))
+		return
+	}
+	if !c.addWatch(frame.GetStreamId(), subscription) {
+		_ = subscription.Close()
+		_ = writeTunnelFrame(ctx, conn, writeMu, tunnel.ErrorFrame(frame.GetStreamId(), frame.GetRequestId(), "watch_exists", "workspace watch stream already exists"))
+		return
+	}
+	defer c.removeWatch(frame.GetStreamId())
+
+	ready := &shared.TunnelFrame{
+		StreamId:  frame.GetStreamId(),
+		RequestId: frame.GetRequestId(),
+		Payload:   &shared.TunnelFrame_FsWatchSubscribed{FsWatchSubscribed: &agent.FsWatchSubscribed{WorkspaceId: request.GetWorkspaceId()}},
+	}
+	if err := writeTunnelFrame(ctx, conn, writeMu, ready); err != nil {
+		return
+	}
+	initialRescan := &shared.TunnelFrame{
+		StreamId: frame.GetStreamId(),
+		Payload: &shared.TunnelFrame_FsChangeEvent{
+			FsChangeEvent: &agent.FsChangeEvent{
+				WorkspaceId: request.GetWorkspaceId(),
+				Kind:        agent.FsChangeKind_FS_CHANGE_KIND_RESCAN_REQUIRED,
+			},
+		},
+	}
+	if err := writeTunnelFrame(ctx, conn, writeMu, initialRescan); err != nil {
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case change, ok := <-subscription.Events():
+			if !ok {
+				return
+			}
+			event := &shared.TunnelFrame{
+				StreamId: frame.GetStreamId(),
+				Payload:  &shared.TunnelFrame_FsChangeEvent{FsChangeEvent: workspaceChangeEvent(request.GetWorkspaceId(), change)},
+			}
+			if err := writeTunnelFrame(ctx, conn, writeMu, event); err != nil {
+				return
 			}
 		}
 	}
@@ -557,6 +623,61 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 			}
 			stream.MarkSent(outbound)
 		}
+	}
+}
+
+func (c *Client) addWatch(streamId string, subscription filemodel.WorkspaceChangeSubscription) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, exists := c.watches[streamId]; exists {
+		return false
+	}
+	c.watches[streamId] = subscription
+	return true
+}
+
+func (c *Client) removeWatch(streamId string) {
+	c.mu.Lock()
+	subscription := c.watches[streamId]
+	delete(c.watches, streamId)
+	c.mu.Unlock()
+	if subscription != nil {
+		_ = subscription.Close()
+	}
+}
+
+func (c *Client) closeWatches() {
+	c.mu.Lock()
+	watches := c.watches
+	c.watches = map[string]filemodel.WorkspaceChangeSubscription{}
+	c.mu.Unlock()
+	for _, subscription := range watches {
+		_ = subscription.Close()
+	}
+}
+
+func workspaceChangeEvent(workspaceId string, change filemodel.WorkspaceChange) *agent.FsChangeEvent {
+	return &agent.FsChangeEvent{
+		WorkspaceId: workspaceId,
+		Sequence:    change.Sequence,
+		Kind:        workspaceChangeKind(change.Kind),
+		Path:        change.Path.String(),
+		OldPath:     change.OldPath.String(),
+	}
+}
+
+func workspaceChangeKind(kind filemodel.WorkspaceChangeKind) agent.FsChangeKind {
+	switch kind {
+	case filemodel.WorkspaceChangeAdded:
+		return agent.FsChangeKind_FS_CHANGE_KIND_ADDED
+	case filemodel.WorkspaceChangeUpdated:
+		return agent.FsChangeKind_FS_CHANGE_KIND_UPDATED
+	case filemodel.WorkspaceChangeDeleted:
+		return agent.FsChangeKind_FS_CHANGE_KIND_DELETED
+	case filemodel.WorkspaceChangeRenamed:
+		return agent.FsChangeKind_FS_CHANGE_KIND_RENAMED
+	default:
+		return agent.FsChangeKind_FS_CHANGE_KIND_RESCAN_REQUIRED
 	}
 }
 

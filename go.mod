@@ -5,6 +5,7 @@ go 1.25.7
 require (
 	github.com/aymanbagabas/go-pty v0.2.3
 	github.com/coder/websocket v1.8.15
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/mattn/go-shellwords v1.0.13
 	github.com/oklog/ulid/v2 v2.1.1
@@ -25,7 +26,6 @@ require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.21 // indirect

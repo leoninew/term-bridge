@@ -59,6 +59,21 @@ func TestMiddlewareIncludesMetadata(t *testing.T) {
 	assertLogValue(t, completed, "response_body", recorder.Body.String())
 }
 
+func TestMiddlewareRedactsSensitiveQueryValues(t *testing.T) {
+	entries, _ := runLoggedRequest(t, http.MethodGet, "/api/workspaces/ws-1/fs/events?path=README.md&token=browser-token&access_token=secondary-token", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	started, completed := assertStartedAndCompleted(t, entries)
+	want := "access_token=%5BREDACTED%5D&path=README.md&token=%5BREDACTED%5D"
+	assertLogValue(t, started, "query", want)
+	assertLogValue(t, completed, "query", want)
+	for _, entry := range entries {
+		if strings.Contains(entry["query"].(string), "browser-token") || strings.Contains(entry["query"].(string), "secondary-token") {
+			t.Fatalf("sensitive query value leaked in log entry: %+v", entry)
+		}
+	}
+}
+
 func TestMiddlewareDefaultsStatusWhenHandlerOnlyWritesBody(t *testing.T) {
 	entries, _ := runLoggedRequest(t, http.MethodGet, "/api/default-status", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

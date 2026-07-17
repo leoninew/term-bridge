@@ -272,6 +272,7 @@ func agentConfig(cfg config.Config) agentserver.Config {
 			MaxDirectoryEntries:       cfg.File.MaxDirectoryEntries,
 			MaxRecursiveDeleteEntries: cfg.File.MaxRecursiveDeleteEntries,
 			OperationTimeout:          cfg.File.OperationTimeout,
+			WatchSubscriberQueueSize:  cfg.File.WatchSubscriberQueueSize,
 		},
 		Git: agentserver.GitConfig{
 			Executable:     cfg.Git.Executable,

@@ -61,6 +61,7 @@ type TunnelFrame struct {
 	//	*TunnelFrame_ScmOriginalContentReq
 	//	*TunnelFrame_ScmExecuteReq
 	//	*TunnelFrame_ScmRepositoryReq
+	//	*TunnelFrame_FsWatchSubscribeReq
 	//	*TunnelFrame_ListWorkspacesResp
 	//	*TunnelFrame_WorkspaceTreeResp
 	//	*TunnelFrame_WorkspaceSessionsResp
@@ -90,12 +91,14 @@ type TunnelFrame struct {
 	//	*TunnelFrame_ScmOriginalContentResp
 	//	*TunnelFrame_ScmExecuteResp
 	//	*TunnelFrame_ScmRepositoryResp
+	//	*TunnelFrame_FsWatchSubscribed
 	//	*TunnelFrame_TerminalAttach
 	//	*TunnelFrame_TerminalInput
 	//	*TunnelFrame_TerminalOutput
 	//	*TunnelFrame_TerminalResize
 	//	*TunnelFrame_TerminalClosed
 	//	*TunnelFrame_TerminalControl
+	//	*TunnelFrame_FsChangeEvent
 	//	*TunnelFrame_Error
 	//	*TunnelFrame_Close
 	Payload       isTunnelFrame_Payload `protobuf_oneof:"payload"`
@@ -451,6 +454,15 @@ func (x *TunnelFrame) GetScmRepositoryReq() *v1.ScmRepositoryReq {
 	return nil
 }
 
+func (x *TunnelFrame) GetFsWatchSubscribeReq() *v1.FsWatchSubscribeReq {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_FsWatchSubscribeReq); ok {
+			return x.FsWatchSubscribeReq
+		}
+	}
+	return nil
+}
+
 func (x *TunnelFrame) GetListWorkspacesResp() *v1.ListWorkspacesResp {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_ListWorkspacesResp); ok {
@@ -712,6 +724,15 @@ func (x *TunnelFrame) GetScmRepositoryResp() *v1.ScmRepositoryResp {
 	return nil
 }
 
+func (x *TunnelFrame) GetFsWatchSubscribed() *v1.FsWatchSubscribed {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_FsWatchSubscribed); ok {
+			return x.FsWatchSubscribed
+		}
+	}
+	return nil
+}
+
 func (x *TunnelFrame) GetTerminalAttach() *TerminalAttachReq {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_TerminalAttach); ok {
@@ -761,6 +782,15 @@ func (x *TunnelFrame) GetTerminalControl() *v1.ServerControlMessage {
 	if x != nil {
 		if x, ok := x.Payload.(*TunnelFrame_TerminalControl); ok {
 			return x.TerminalControl
+		}
+	}
+	return nil
+}
+
+func (x *TunnelFrame) GetFsChangeEvent() *v1.FsChangeEvent {
+	if x != nil {
+		if x, ok := x.Payload.(*TunnelFrame_FsChangeEvent); ok {
+			return x.FsChangeEvent
 		}
 	}
 	return nil
@@ -920,6 +950,10 @@ type TunnelFrame_ScmRepositoryReq struct {
 	ScmRepositoryReq *v1.ScmRepositoryReq `protobuf:"bytes,128,opt,name=scm_repository_req,json=scmRepositoryReq,proto3,oneof"`
 }
 
+type TunnelFrame_FsWatchSubscribeReq struct {
+	FsWatchSubscribeReq *v1.FsWatchSubscribeReq `protobuf:"bytes,129,opt,name=fs_watch_subscribe_req,json=fsWatchSubscribeReq,proto3,oneof"`
+}
+
 type TunnelFrame_ListWorkspacesResp struct {
 	ListWorkspacesResp *v1.ListWorkspacesResp `protobuf:"bytes,200,opt,name=list_workspaces_resp,json=listWorkspacesResp,proto3,oneof"`
 }
@@ -1036,6 +1070,10 @@ type TunnelFrame_ScmRepositoryResp struct {
 	ScmRepositoryResp *v1.ScmRepositoryResp `protobuf:"bytes,228,opt,name=scm_repository_resp,json=scmRepositoryResp,proto3,oneof"`
 }
 
+type TunnelFrame_FsWatchSubscribed struct {
+	FsWatchSubscribed *v1.FsWatchSubscribed `protobuf:"bytes,229,opt,name=fs_watch_subscribed,json=fsWatchSubscribed,proto3,oneof"`
+}
+
 type TunnelFrame_TerminalAttach struct {
 	TerminalAttach *TerminalAttachReq `protobuf:"bytes,300,opt,name=terminal_attach,json=terminalAttach,proto3,oneof"`
 }
@@ -1058,6 +1096,10 @@ type TunnelFrame_TerminalClosed struct {
 
 type TunnelFrame_TerminalControl struct {
 	TerminalControl *v1.ServerControlMessage `protobuf:"bytes,305,opt,name=terminal_control,json=terminalControl,proto3,oneof"`
+}
+
+type TunnelFrame_FsChangeEvent struct {
+	FsChangeEvent *v1.FsChangeEvent `protobuf:"bytes,306,opt,name=fs_change_event,json=fsChangeEvent,proto3,oneof"`
 }
 
 type TunnelFrame_Error struct {
@@ -1134,6 +1176,8 @@ func (*TunnelFrame_ScmExecuteReq) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_ScmRepositoryReq) isTunnelFrame_Payload() {}
 
+func (*TunnelFrame_FsWatchSubscribeReq) isTunnelFrame_Payload() {}
+
 func (*TunnelFrame_ListWorkspacesResp) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_WorkspaceTreeResp) isTunnelFrame_Payload() {}
@@ -1192,6 +1236,8 @@ func (*TunnelFrame_ScmExecuteResp) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_ScmRepositoryResp) isTunnelFrame_Payload() {}
 
+func (*TunnelFrame_FsWatchSubscribed) isTunnelFrame_Payload() {}
+
 func (*TunnelFrame_TerminalAttach) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_TerminalInput) isTunnelFrame_Payload() {}
@@ -1203,6 +1249,8 @@ func (*TunnelFrame_TerminalResize) isTunnelFrame_Payload() {}
 func (*TunnelFrame_TerminalClosed) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_TerminalControl) isTunnelFrame_Payload() {}
+
+func (*TunnelFrame_FsChangeEvent) isTunnelFrame_Payload() {}
 
 func (*TunnelFrame_Error) isTunnelFrame_Payload() {}
 
@@ -1700,7 +1748,7 @@ var File_termbridge_shared_v1_tunnel_proto protoreflect.FileDescriptor
 
 const file_termbridge_shared_v1_tunnel_proto_rawDesc = "" +
 	"\n" +
-	"!termbridge/shared/v1/tunnel.proto\x12\x11termbridge.shared\x1a\x1etermbridge/agent/v1/file.proto\x1a\x1dtermbridge/agent/v1/git.proto\x1a#termbridge/agent/v1/workspace.proto\x1a!termbridge/agent/v1/session.proto\x1a!termbridge/agent/v1/history.proto\x1a\"termbridge/agent/v1/shortcut.proto\x1a\"termbridge/agent/v1/terminal.proto\x1a!termbridge/shared/v1/common.proto\"\xc1.\n" +
+	"!termbridge/shared/v1/tunnel.proto\x12\x11termbridge.shared\x1a\x1etermbridge/agent/v1/file.proto\x1a\x1dtermbridge/agent/v1/git.proto\x1a#termbridge/agent/v1/workspace.proto\x1a!termbridge/agent/v1/session.proto\x1a!termbridge/agent/v1/history.proto\x1a\"termbridge/agent/v1/shortcut.proto\x1a\"termbridge/agent/v1/terminal.proto\x1a!termbridge/shared/v1/common.proto\"\xc40\n" +
 	"\vTunnelFrame\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12\x1d\n" +
 	"\n" +
@@ -1738,7 +1786,8 @@ const file_termbridge_shared_v1_tunnel_proto_rawDesc = "" +
 	"\x0escm_status_req\x18} \x01(\v2\x1e.termbridge.agent.ScmStatusReqH\x00R\fscmStatusReq\x12b\n" +
 	"\x18scm_original_content_req\x18~ \x01(\v2'.termbridge.agent.ScmOriginalContentReqH\x00R\x15scmOriginalContentReq\x12I\n" +
 	"\x0fscm_execute_req\x18\x7f \x01(\v2\x1f.termbridge.agent.ScmExecuteReqH\x00R\rscmExecuteReq\x12S\n" +
-	"\x12scm_repository_req\x18\x80\x01 \x01(\v2\".termbridge.agent.ScmRepositoryReqH\x00R\x10scmRepositoryReq\x12Y\n" +
+	"\x12scm_repository_req\x18\x80\x01 \x01(\v2\".termbridge.agent.ScmRepositoryReqH\x00R\x10scmRepositoryReq\x12]\n" +
+	"\x16fs_watch_subscribe_req\x18\x81\x01 \x01(\v2%.termbridge.agent.FsWatchSubscribeReqH\x00R\x13fsWatchSubscribeReq\x12Y\n" +
 	"\x14list_workspaces_resp\x18\xc8\x01 \x01(\v2$.termbridge.agent.ListWorkspacesRespH\x00R\x12listWorkspacesResp\x12V\n" +
 	"\x13workspace_tree_resp\x18\xc9\x01 \x01(\v2#.termbridge.agent.WorkspaceTreeRespH\x00R\x11workspaceTreeResp\x12b\n" +
 	"\x17workspace_sessions_resp\x18\xca\x01 \x01(\v2'.termbridge.agent.WorkspaceSessionsRespH\x00R\x15workspaceSessionsResp\x12V\n" +
@@ -1768,13 +1817,15 @@ const file_termbridge_shared_v1_tunnel_proto_rawDesc = "" +
 	"\x0fscm_status_resp\x18\xe1\x01 \x01(\v2\x1f.termbridge.agent.ScmStatusRespH\x00R\rscmStatusResp\x12f\n" +
 	"\x19scm_original_content_resp\x18\xe2\x01 \x01(\v2(.termbridge.agent.ScmOriginalContentRespH\x00R\x16scmOriginalContentResp\x12M\n" +
 	"\x10scm_execute_resp\x18\xe3\x01 \x01(\v2 .termbridge.agent.ScmExecuteRespH\x00R\x0escmExecuteResp\x12V\n" +
-	"\x13scm_repository_resp\x18\xe4\x01 \x01(\v2#.termbridge.agent.ScmRepositoryRespH\x00R\x11scmRepositoryResp\x12P\n" +
+	"\x13scm_repository_resp\x18\xe4\x01 \x01(\v2#.termbridge.agent.ScmRepositoryRespH\x00R\x11scmRepositoryResp\x12V\n" +
+	"\x13fs_watch_subscribed\x18\xe5\x01 \x01(\v2#.termbridge.agent.FsWatchSubscribedH\x00R\x11fsWatchSubscribed\x12P\n" +
 	"\x0fterminal_attach\x18\xac\x02 \x01(\v2$.termbridge.shared.TerminalAttachReqH\x00R\x0eterminalAttach\x12J\n" +
 	"\x0eterminal_input\x18\xad\x02 \x01(\v2 .termbridge.shared.TerminalInputH\x00R\rterminalInput\x12M\n" +
 	"\x0fterminal_output\x18\xae\x02 \x01(\v2!.termbridge.shared.TerminalOutputH\x00R\x0eterminalOutput\x12M\n" +
 	"\x0fterminal_resize\x18\xaf\x02 \x01(\v2!.termbridge.shared.TerminalResizeH\x00R\x0eterminalResize\x12M\n" +
 	"\x0fterminal_closed\x18\xb0\x02 \x01(\v2!.termbridge.shared.TerminalClosedH\x00R\x0eterminalClosed\x12T\n" +
-	"\x10terminal_control\x18\xb1\x02 \x01(\v2&.termbridge.agent.ServerControlMessageH\x00R\x0fterminalControl\x125\n" +
+	"\x10terminal_control\x18\xb1\x02 \x01(\v2&.termbridge.agent.ServerControlMessageH\x00R\x0fterminalControl\x12J\n" +
+	"\x0ffs_change_event\x18\xb2\x02 \x01(\v2\x1f.termbridge.agent.FsChangeEventH\x00R\rfsChangeEvent\x125\n" +
 	"\x05error\x18\x84\a \x01(\v2\x1c.termbridge.shared.ErrorRespH\x00R\x05error\x121\n" +
 	"\x05close\x18\x85\a \x01(\v2\x18.termbridge.shared.CloseH\x00R\x05closeB\t\n" +
 	"\apayload\"p\n" +
@@ -1860,36 +1911,39 @@ var file_termbridge_shared_v1_tunnel_proto_goTypes = []any{
 	(*v1.ScmOriginalContentReq)(nil),          // 35: termbridge.agent.ScmOriginalContentReq
 	(*v1.ScmExecuteReq)(nil),                  // 36: termbridge.agent.ScmExecuteReq
 	(*v1.ScmRepositoryReq)(nil),               // 37: termbridge.agent.ScmRepositoryReq
-	(*v1.ListWorkspacesResp)(nil),             // 38: termbridge.agent.ListWorkspacesResp
-	(*v1.WorkspaceTreeResp)(nil),              // 39: termbridge.agent.WorkspaceTreeResp
-	(*v1.WorkspaceSessionsResp)(nil),          // 40: termbridge.agent.WorkspaceSessionsResp
-	(*v1.CreateSessionResp)(nil),              // 41: termbridge.agent.CreateSessionResp
-	(*v1.GetSessionResp)(nil),                 // 42: termbridge.agent.GetSessionResp
-	(*v1.UpdateSessionResp)(nil),              // 43: termbridge.agent.UpdateSessionResp
-	(*v1.CloseSessionResp)(nil),               // 44: termbridge.agent.CloseSessionResp
-	(*v1.DeleteSessionResp)(nil),              // 45: termbridge.agent.DeleteSessionResp
-	(*v1.ReadHistoryResp)(nil),                // 46: termbridge.agent.ReadHistoryResp
-	(*v1.UpdateWorkspaceOrderResp)(nil),       // 47: termbridge.agent.UpdateWorkspaceOrderResp
-	(*v1.UpdateSessionOrderResp)(nil),         // 48: termbridge.agent.UpdateSessionOrderResp
-	(*v1.DeleteWorkspaceResp)(nil),            // 49: termbridge.agent.DeleteWorkspaceResp
-	(*v1.ListShortcutsResp)(nil),              // 50: termbridge.agent.ListShortcutsResp
-	(*v1.CreateShortcutResp)(nil),             // 51: termbridge.agent.CreateShortcutResp
-	(*v1.UpdateShortcutResp)(nil),             // 52: termbridge.agent.UpdateShortcutResp
-	(*v1.DeleteShortcutResp)(nil),             // 53: termbridge.agent.DeleteShortcutResp
-	(*v1.UpdateShortcutOrderResp)(nil),        // 54: termbridge.agent.UpdateShortcutOrderResp
-	(*v1.FsStatResp)(nil),                     // 55: termbridge.agent.FsStatResp
-	(*v1.FsReadDirectoryResp)(nil),            // 56: termbridge.agent.FsReadDirectoryResp
-	(*v1.FsReadFileResp)(nil),                 // 57: termbridge.agent.FsReadFileResp
-	(*v1.FsWriteFileResp)(nil),                // 58: termbridge.agent.FsWriteFileResp
-	(*v1.FsCreateDirectoryResp)(nil),          // 59: termbridge.agent.FsCreateDirectoryResp
-	(*v1.FsDeleteResp)(nil),                   // 60: termbridge.agent.FsDeleteResp
-	(*v1.FsRenameResp)(nil),                   // 61: termbridge.agent.FsRenameResp
-	(*v1.ScmStatusResp)(nil),                  // 62: termbridge.agent.ScmStatusResp
-	(*v1.ScmOriginalContentResp)(nil),         // 63: termbridge.agent.ScmOriginalContentResp
-	(*v1.ScmExecuteResp)(nil),                 // 64: termbridge.agent.ScmExecuteResp
-	(*v1.ScmRepositoryResp)(nil),              // 65: termbridge.agent.ScmRepositoryResp
-	(*v1.ServerControlMessage)(nil),           // 66: termbridge.agent.ServerControlMessage
-	(*ErrorResp)(nil),                         // 67: termbridge.shared.ErrorResp
+	(*v1.FsWatchSubscribeReq)(nil),            // 38: termbridge.agent.FsWatchSubscribeReq
+	(*v1.ListWorkspacesResp)(nil),             // 39: termbridge.agent.ListWorkspacesResp
+	(*v1.WorkspaceTreeResp)(nil),              // 40: termbridge.agent.WorkspaceTreeResp
+	(*v1.WorkspaceSessionsResp)(nil),          // 41: termbridge.agent.WorkspaceSessionsResp
+	(*v1.CreateSessionResp)(nil),              // 42: termbridge.agent.CreateSessionResp
+	(*v1.GetSessionResp)(nil),                 // 43: termbridge.agent.GetSessionResp
+	(*v1.UpdateSessionResp)(nil),              // 44: termbridge.agent.UpdateSessionResp
+	(*v1.CloseSessionResp)(nil),               // 45: termbridge.agent.CloseSessionResp
+	(*v1.DeleteSessionResp)(nil),              // 46: termbridge.agent.DeleteSessionResp
+	(*v1.ReadHistoryResp)(nil),                // 47: termbridge.agent.ReadHistoryResp
+	(*v1.UpdateWorkspaceOrderResp)(nil),       // 48: termbridge.agent.UpdateWorkspaceOrderResp
+	(*v1.UpdateSessionOrderResp)(nil),         // 49: termbridge.agent.UpdateSessionOrderResp
+	(*v1.DeleteWorkspaceResp)(nil),            // 50: termbridge.agent.DeleteWorkspaceResp
+	(*v1.ListShortcutsResp)(nil),              // 51: termbridge.agent.ListShortcutsResp
+	(*v1.CreateShortcutResp)(nil),             // 52: termbridge.agent.CreateShortcutResp
+	(*v1.UpdateShortcutResp)(nil),             // 53: termbridge.agent.UpdateShortcutResp
+	(*v1.DeleteShortcutResp)(nil),             // 54: termbridge.agent.DeleteShortcutResp
+	(*v1.UpdateShortcutOrderResp)(nil),        // 55: termbridge.agent.UpdateShortcutOrderResp
+	(*v1.FsStatResp)(nil),                     // 56: termbridge.agent.FsStatResp
+	(*v1.FsReadDirectoryResp)(nil),            // 57: termbridge.agent.FsReadDirectoryResp
+	(*v1.FsReadFileResp)(nil),                 // 58: termbridge.agent.FsReadFileResp
+	(*v1.FsWriteFileResp)(nil),                // 59: termbridge.agent.FsWriteFileResp
+	(*v1.FsCreateDirectoryResp)(nil),          // 60: termbridge.agent.FsCreateDirectoryResp
+	(*v1.FsDeleteResp)(nil),                   // 61: termbridge.agent.FsDeleteResp
+	(*v1.FsRenameResp)(nil),                   // 62: termbridge.agent.FsRenameResp
+	(*v1.ScmStatusResp)(nil),                  // 63: termbridge.agent.ScmStatusResp
+	(*v1.ScmOriginalContentResp)(nil),         // 64: termbridge.agent.ScmOriginalContentResp
+	(*v1.ScmExecuteResp)(nil),                 // 65: termbridge.agent.ScmExecuteResp
+	(*v1.ScmRepositoryResp)(nil),              // 66: termbridge.agent.ScmRepositoryResp
+	(*v1.FsWatchSubscribed)(nil),              // 67: termbridge.agent.FsWatchSubscribed
+	(*v1.ServerControlMessage)(nil),           // 68: termbridge.agent.ServerControlMessage
+	(*v1.FsChangeEvent)(nil),                  // 69: termbridge.agent.FsChangeEvent
+	(*ErrorResp)(nil),                         // 70: termbridge.shared.ErrorResp
 }
 var file_termbridge_shared_v1_tunnel_proto_depIdxs = []int32{
 	1,  // 0: termbridge.shared.TunnelFrame.hello:type_name -> termbridge.shared.Hello
@@ -1925,48 +1979,51 @@ var file_termbridge_shared_v1_tunnel_proto_depIdxs = []int32{
 	35, // 30: termbridge.shared.TunnelFrame.scm_original_content_req:type_name -> termbridge.agent.ScmOriginalContentReq
 	36, // 31: termbridge.shared.TunnelFrame.scm_execute_req:type_name -> termbridge.agent.ScmExecuteReq
 	37, // 32: termbridge.shared.TunnelFrame.scm_repository_req:type_name -> termbridge.agent.ScmRepositoryReq
-	38, // 33: termbridge.shared.TunnelFrame.list_workspaces_resp:type_name -> termbridge.agent.ListWorkspacesResp
-	39, // 34: termbridge.shared.TunnelFrame.workspace_tree_resp:type_name -> termbridge.agent.WorkspaceTreeResp
-	40, // 35: termbridge.shared.TunnelFrame.workspace_sessions_resp:type_name -> termbridge.agent.WorkspaceSessionsResp
-	41, // 36: termbridge.shared.TunnelFrame.create_session_resp:type_name -> termbridge.agent.CreateSessionResp
-	42, // 37: termbridge.shared.TunnelFrame.get_session_resp:type_name -> termbridge.agent.GetSessionResp
-	41, // 38: termbridge.shared.TunnelFrame.rerun_session_resp:type_name -> termbridge.agent.CreateSessionResp
-	43, // 39: termbridge.shared.TunnelFrame.update_session_resp:type_name -> termbridge.agent.UpdateSessionResp
-	44, // 40: termbridge.shared.TunnelFrame.close_session_resp:type_name -> termbridge.agent.CloseSessionResp
-	45, // 41: termbridge.shared.TunnelFrame.delete_session_resp:type_name -> termbridge.agent.DeleteSessionResp
-	46, // 42: termbridge.shared.TunnelFrame.read_history_resp:type_name -> termbridge.agent.ReadHistoryResp
-	47, // 43: termbridge.shared.TunnelFrame.update_workspace_order_resp:type_name -> termbridge.agent.UpdateWorkspaceOrderResp
-	48, // 44: termbridge.shared.TunnelFrame.update_session_order_resp:type_name -> termbridge.agent.UpdateSessionOrderResp
-	49, // 45: termbridge.shared.TunnelFrame.delete_workspace_resp:type_name -> termbridge.agent.DeleteWorkspaceResp
-	50, // 46: termbridge.shared.TunnelFrame.list_shortcuts_resp:type_name -> termbridge.agent.ListShortcutsResp
-	51, // 47: termbridge.shared.TunnelFrame.create_shortcut_resp:type_name -> termbridge.agent.CreateShortcutResp
-	52, // 48: termbridge.shared.TunnelFrame.update_shortcut_resp:type_name -> termbridge.agent.UpdateShortcutResp
-	53, // 49: termbridge.shared.TunnelFrame.delete_shortcut_resp:type_name -> termbridge.agent.DeleteShortcutResp
-	54, // 50: termbridge.shared.TunnelFrame.update_shortcut_order_resp:type_name -> termbridge.agent.UpdateShortcutOrderResp
-	55, // 51: termbridge.shared.TunnelFrame.fs_stat_resp:type_name -> termbridge.agent.FsStatResp
-	56, // 52: termbridge.shared.TunnelFrame.fs_read_directory_resp:type_name -> termbridge.agent.FsReadDirectoryResp
-	57, // 53: termbridge.shared.TunnelFrame.fs_read_file_resp:type_name -> termbridge.agent.FsReadFileResp
-	58, // 54: termbridge.shared.TunnelFrame.fs_write_file_resp:type_name -> termbridge.agent.FsWriteFileResp
-	59, // 55: termbridge.shared.TunnelFrame.fs_create_directory_resp:type_name -> termbridge.agent.FsCreateDirectoryResp
-	60, // 56: termbridge.shared.TunnelFrame.fs_delete_resp:type_name -> termbridge.agent.FsDeleteResp
-	61, // 57: termbridge.shared.TunnelFrame.fs_rename_resp:type_name -> termbridge.agent.FsRenameResp
-	62, // 58: termbridge.shared.TunnelFrame.scm_status_resp:type_name -> termbridge.agent.ScmStatusResp
-	63, // 59: termbridge.shared.TunnelFrame.scm_original_content_resp:type_name -> termbridge.agent.ScmOriginalContentResp
-	64, // 60: termbridge.shared.TunnelFrame.scm_execute_resp:type_name -> termbridge.agent.ScmExecuteResp
-	65, // 61: termbridge.shared.TunnelFrame.scm_repository_resp:type_name -> termbridge.agent.ScmRepositoryResp
-	5,  // 62: termbridge.shared.TunnelFrame.terminal_attach:type_name -> termbridge.shared.TerminalAttachReq
-	6,  // 63: termbridge.shared.TunnelFrame.terminal_input:type_name -> termbridge.shared.TerminalInput
-	7,  // 64: termbridge.shared.TunnelFrame.terminal_output:type_name -> termbridge.shared.TerminalOutput
-	8,  // 65: termbridge.shared.TunnelFrame.terminal_resize:type_name -> termbridge.shared.TerminalResize
-	9,  // 66: termbridge.shared.TunnelFrame.terminal_closed:type_name -> termbridge.shared.TerminalClosed
-	66, // 67: termbridge.shared.TunnelFrame.terminal_control:type_name -> termbridge.agent.ServerControlMessage
-	67, // 68: termbridge.shared.TunnelFrame.error:type_name -> termbridge.shared.ErrorResp
-	10, // 69: termbridge.shared.TunnelFrame.close:type_name -> termbridge.shared.Close
-	70, // [70:70] is the sub-list for method output_type
-	70, // [70:70] is the sub-list for method input_type
-	70, // [70:70] is the sub-list for extension type_name
-	70, // [70:70] is the sub-list for extension extendee
-	0,  // [0:70] is the sub-list for field type_name
+	38, // 33: termbridge.shared.TunnelFrame.fs_watch_subscribe_req:type_name -> termbridge.agent.FsWatchSubscribeReq
+	39, // 34: termbridge.shared.TunnelFrame.list_workspaces_resp:type_name -> termbridge.agent.ListWorkspacesResp
+	40, // 35: termbridge.shared.TunnelFrame.workspace_tree_resp:type_name -> termbridge.agent.WorkspaceTreeResp
+	41, // 36: termbridge.shared.TunnelFrame.workspace_sessions_resp:type_name -> termbridge.agent.WorkspaceSessionsResp
+	42, // 37: termbridge.shared.TunnelFrame.create_session_resp:type_name -> termbridge.agent.CreateSessionResp
+	43, // 38: termbridge.shared.TunnelFrame.get_session_resp:type_name -> termbridge.agent.GetSessionResp
+	42, // 39: termbridge.shared.TunnelFrame.rerun_session_resp:type_name -> termbridge.agent.CreateSessionResp
+	44, // 40: termbridge.shared.TunnelFrame.update_session_resp:type_name -> termbridge.agent.UpdateSessionResp
+	45, // 41: termbridge.shared.TunnelFrame.close_session_resp:type_name -> termbridge.agent.CloseSessionResp
+	46, // 42: termbridge.shared.TunnelFrame.delete_session_resp:type_name -> termbridge.agent.DeleteSessionResp
+	47, // 43: termbridge.shared.TunnelFrame.read_history_resp:type_name -> termbridge.agent.ReadHistoryResp
+	48, // 44: termbridge.shared.TunnelFrame.update_workspace_order_resp:type_name -> termbridge.agent.UpdateWorkspaceOrderResp
+	49, // 45: termbridge.shared.TunnelFrame.update_session_order_resp:type_name -> termbridge.agent.UpdateSessionOrderResp
+	50, // 46: termbridge.shared.TunnelFrame.delete_workspace_resp:type_name -> termbridge.agent.DeleteWorkspaceResp
+	51, // 47: termbridge.shared.TunnelFrame.list_shortcuts_resp:type_name -> termbridge.agent.ListShortcutsResp
+	52, // 48: termbridge.shared.TunnelFrame.create_shortcut_resp:type_name -> termbridge.agent.CreateShortcutResp
+	53, // 49: termbridge.shared.TunnelFrame.update_shortcut_resp:type_name -> termbridge.agent.UpdateShortcutResp
+	54, // 50: termbridge.shared.TunnelFrame.delete_shortcut_resp:type_name -> termbridge.agent.DeleteShortcutResp
+	55, // 51: termbridge.shared.TunnelFrame.update_shortcut_order_resp:type_name -> termbridge.agent.UpdateShortcutOrderResp
+	56, // 52: termbridge.shared.TunnelFrame.fs_stat_resp:type_name -> termbridge.agent.FsStatResp
+	57, // 53: termbridge.shared.TunnelFrame.fs_read_directory_resp:type_name -> termbridge.agent.FsReadDirectoryResp
+	58, // 54: termbridge.shared.TunnelFrame.fs_read_file_resp:type_name -> termbridge.agent.FsReadFileResp
+	59, // 55: termbridge.shared.TunnelFrame.fs_write_file_resp:type_name -> termbridge.agent.FsWriteFileResp
+	60, // 56: termbridge.shared.TunnelFrame.fs_create_directory_resp:type_name -> termbridge.agent.FsCreateDirectoryResp
+	61, // 57: termbridge.shared.TunnelFrame.fs_delete_resp:type_name -> termbridge.agent.FsDeleteResp
+	62, // 58: termbridge.shared.TunnelFrame.fs_rename_resp:type_name -> termbridge.agent.FsRenameResp
+	63, // 59: termbridge.shared.TunnelFrame.scm_status_resp:type_name -> termbridge.agent.ScmStatusResp
+	64, // 60: termbridge.shared.TunnelFrame.scm_original_content_resp:type_name -> termbridge.agent.ScmOriginalContentResp
+	65, // 61: termbridge.shared.TunnelFrame.scm_execute_resp:type_name -> termbridge.agent.ScmExecuteResp
+	66, // 62: termbridge.shared.TunnelFrame.scm_repository_resp:type_name -> termbridge.agent.ScmRepositoryResp
+	67, // 63: termbridge.shared.TunnelFrame.fs_watch_subscribed:type_name -> termbridge.agent.FsWatchSubscribed
+	5,  // 64: termbridge.shared.TunnelFrame.terminal_attach:type_name -> termbridge.shared.TerminalAttachReq
+	6,  // 65: termbridge.shared.TunnelFrame.terminal_input:type_name -> termbridge.shared.TerminalInput
+	7,  // 66: termbridge.shared.TunnelFrame.terminal_output:type_name -> termbridge.shared.TerminalOutput
+	8,  // 67: termbridge.shared.TunnelFrame.terminal_resize:type_name -> termbridge.shared.TerminalResize
+	9,  // 68: termbridge.shared.TunnelFrame.terminal_closed:type_name -> termbridge.shared.TerminalClosed
+	68, // 69: termbridge.shared.TunnelFrame.terminal_control:type_name -> termbridge.agent.ServerControlMessage
+	69, // 70: termbridge.shared.TunnelFrame.fs_change_event:type_name -> termbridge.agent.FsChangeEvent
+	70, // 71: termbridge.shared.TunnelFrame.error:type_name -> termbridge.shared.ErrorResp
+	10, // 72: termbridge.shared.TunnelFrame.close:type_name -> termbridge.shared.Close
+	73, // [73:73] is the sub-list for method output_type
+	73, // [73:73] is the sub-list for method input_type
+	73, // [73:73] is the sub-list for extension type_name
+	73, // [73:73] is the sub-list for extension extendee
+	0,  // [0:73] is the sub-list for field type_name
 }
 
 func init() { file_termbridge_shared_v1_tunnel_proto_init() }
@@ -2009,6 +2066,7 @@ func file_termbridge_shared_v1_tunnel_proto_init() {
 		(*TunnelFrame_ScmOriginalContentReq)(nil),
 		(*TunnelFrame_ScmExecuteReq)(nil),
 		(*TunnelFrame_ScmRepositoryReq)(nil),
+		(*TunnelFrame_FsWatchSubscribeReq)(nil),
 		(*TunnelFrame_ListWorkspacesResp)(nil),
 		(*TunnelFrame_WorkspaceTreeResp)(nil),
 		(*TunnelFrame_WorkspaceSessionsResp)(nil),
@@ -2038,12 +2096,14 @@ func file_termbridge_shared_v1_tunnel_proto_init() {
 		(*TunnelFrame_ScmOriginalContentResp)(nil),
 		(*TunnelFrame_ScmExecuteResp)(nil),
 		(*TunnelFrame_ScmRepositoryResp)(nil),
+		(*TunnelFrame_FsWatchSubscribed)(nil),
 		(*TunnelFrame_TerminalAttach)(nil),
 		(*TunnelFrame_TerminalInput)(nil),
 		(*TunnelFrame_TerminalOutput)(nil),
 		(*TunnelFrame_TerminalResize)(nil),
 		(*TunnelFrame_TerminalClosed)(nil),
 		(*TunnelFrame_TerminalControl)(nil),
+		(*TunnelFrame_FsChangeEvent)(nil),
 		(*TunnelFrame_Error)(nil),
 		(*TunnelFrame_Close)(nil),
 	}

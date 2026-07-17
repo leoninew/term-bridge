@@ -337,10 +337,16 @@ func TestRunCommandCreatesLogStateAndReturnsCommandExitCode(t *testing.T) {
 	if strings.Contains(stderr.String(), "error:") {
 		t.Fatalf("stderr contains TermBridge error for user exit code: %s", stderr.String())
 	}
-	logFile := filepath.Join(cwd, "logs", "termbridge.log")
-	info, err := os.Stat(logFile)
+	logMatches, err := filepath.Glob(filepath.Join(cwd, "logs", "termbridge.*.log"))
 	if err != nil {
-		t.Fatalf("os.Stat(%q) error = %v", logFile, err)
+		t.Fatalf("Glob() error = %v", err)
+	}
+	if len(logMatches) != 1 {
+		t.Fatalf("log file matches = %#v, want 1", logMatches)
+	}
+	info, err := os.Stat(logMatches[0])
+	if err != nil {
+		t.Fatalf("os.Stat(%q) error = %v", logMatches[0], err)
 	}
 	if info.Size() == 0 {
 		t.Fatal("log file is empty")

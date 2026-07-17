@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import type {
+  FsChangeEvent,
   FsCreateDirectoryReq,
   FsCreateDirectoryResp,
   FsDeleteReq,
@@ -18,6 +19,8 @@ import type {
   FsRenameResp,
   FsStatReq,
   FsStatResp,
+  FsWatchSubscribed,
+  FsWatchSubscribeReq,
   FsWriteFileReq,
   FsWriteFileResp,
 } from "../../agent/v1/file";
@@ -110,6 +113,7 @@ export interface TunnelFrame {
   scm_original_content_req?: ScmOriginalContentReq | undefined;
   scm_execute_req?: ScmExecuteReq | undefined;
   scm_repository_req?: ScmRepositoryReq | undefined;
+  fs_watch_subscribe_req?: FsWatchSubscribeReq | undefined;
   list_workspaces_resp?: ListWorkspacesResp | undefined;
   workspace_tree_resp?: WorkspaceTreeResp | undefined;
   workspace_sessions_resp?: WorkspaceSessionsResp | undefined;
@@ -139,12 +143,14 @@ export interface TunnelFrame {
   scm_original_content_resp?: ScmOriginalContentResp | undefined;
   scm_execute_resp?: ScmExecuteResp | undefined;
   scm_repository_resp?: ScmRepositoryResp | undefined;
+  fs_watch_subscribed?: FsWatchSubscribed | undefined;
   terminal_attach?: TerminalAttachReq | undefined;
   terminal_input?: TerminalInput | undefined;
   terminal_output?: TerminalOutput | undefined;
   terminal_resize?: TerminalResize | undefined;
   terminal_closed?: TerminalClosed | undefined;
   terminal_control?: ServerControlMessage | undefined;
+  fs_change_event?: FsChangeEvent | undefined;
   error?: ErrorResp | undefined;
   close?: Close | undefined;
 }

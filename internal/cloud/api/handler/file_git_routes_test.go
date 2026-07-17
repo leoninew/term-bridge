@@ -91,4 +91,3 @@ func fileGitUserToken(t *testing.T, handler *Handler, userId string) string {
 	}
 	return token
 }
-

@@ -36,7 +36,7 @@ func TestRootResolveKeepsLogicalPathWithinWorkspace(t *testing.T) {
 func TestStoreCreatesWritesAndDeletesWorkspaceEntry(t *testing.T) {
 	rootPath := t.TempDir()
 	store := testStore(t)
-	root := entryAt(t, store, rootPath, "")
+	root := entryAt(t, rootPath, "")
 
 	created, err := store.CreateFile(context.Background(), rootPath, filemodel.CreateFileRequest{Path: "notes.txt", Text: "first", ExpectedParentRevision: root.Revision})
 	if err != nil {
@@ -62,12 +62,36 @@ func TestStoreCreatesWritesAndDeletesWorkspaceEntry(t *testing.T) {
 		t.Fatalf("updated entry = %#v, want a new revision", updated.DestinationEntry)
 	}
 
-	parent := entryAt(t, store, rootPath, "")
+	parent := entryAt(t, rootPath, "")
 	if _, err := store.Delete(context.Background(), rootPath, filemodel.DeleteRequest{Path: "notes.txt", ExpectedRevision: updated.DestinationEntry.Revision, ExpectedParentRevision: parent.Revision}); err != nil {
 		t.Fatalf("delete file: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(rootPath, "notes.txt")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("deleted file stat error = %v, want not found", err)
+	}
+}
+
+func TestStoreRevisionChangesWhenContentsChangeWithoutMetadataChange(t *testing.T) {
+	rootPath := t.TempDir()
+	filePath := filepath.Join(rootPath, "notes.txt")
+	if err := os.WriteFile(filePath, []byte("first"), 0o600); err != nil {
+		t.Fatalf("seed file: %v", err)
+	}
+	before := entryAt(t, rootPath, "notes.txt")
+
+	if err := os.WriteFile(filePath, []byte("other"), 0o600); err != nil {
+		t.Fatalf("replace content: %v", err)
+	}
+	if err := os.Chtimes(filePath, before.ModifiedAt, before.ModifiedAt); err != nil {
+		t.Fatalf("restore timestamp: %v", err)
+	}
+	after := entryAt(t, rootPath, "notes.txt")
+
+	if after.Size != before.Size || !after.ModifiedAt.Equal(before.ModifiedAt) {
+		t.Fatalf("replacement metadata = size:%d mtime:%v, want preserved size:%d mtime:%v", after.Size, after.ModifiedAt, before.Size, before.ModifiedAt)
+	}
+	if after.Revision == before.Revision {
+		t.Fatalf("revision = %q after equal-metadata content replacement, want a new revision", after.Revision)
 	}
 }
 
@@ -77,7 +101,7 @@ func TestStoreRejectsStaleWrite(t *testing.T) {
 		t.Fatalf("seed file: %v", err)
 	}
 	store := testStore(t)
-	entry := entryAt(t, store, rootPath, "notes.txt")
+	entry := entryAt(t, rootPath, "notes.txt")
 
 	_, err := store.Write(context.Background(), rootPath, filemodel.WriteRequest{Path: "notes.txt", Text: "second", ExpectedRevision: "stale"})
 	if filemodel.CodeOf(err) != "revision_conflict" {
@@ -101,8 +125,8 @@ func TestStoreRequiresRecursiveIntentForNonEmptyDirectory(t *testing.T) {
 		t.Fatalf("seed nested file: %v", err)
 	}
 	store := testStore(t)
-	directory := entryAt(t, store, rootPath, "directory")
-	root := entryAt(t, store, rootPath, "")
+	directory := entryAt(t, rootPath, "directory")
+	root := entryAt(t, rootPath, "")
 
 	_, err := store.Delete(context.Background(), rootPath, filemodel.DeleteRequest{Path: "directory", ExpectedRevision: directory.Revision, ExpectedParentRevision: root.Revision})
 	if filemodel.CodeOf(err) != "directory_not_empty" {
@@ -112,8 +136,8 @@ func TestStoreRequiresRecursiveIntentForNonEmptyDirectory(t *testing.T) {
 		t.Fatalf("nested file after refused deletion: %v", err)
 	}
 
-	directory = entryAt(t, store, rootPath, "directory")
-	root = entryAt(t, store, rootPath, "")
+	directory = entryAt(t, rootPath, "directory")
+	root = entryAt(t, rootPath, "")
 	deleted, err := store.Delete(context.Background(), rootPath, filemodel.DeleteRequest{Path: "directory", ExpectedRevision: directory.Revision, ExpectedParentRevision: root.Revision, Recursive: true})
 	if err != nil {
 		t.Fatalf("delete directory recursively: %v", err)
@@ -161,7 +185,6 @@ func TestStoreRejectsSymlinkIntermediateDirectory(t *testing.T) {
 	}
 }
 
-
 func TestStoreMoveOverwriteReplacesDestination(t *testing.T) {
 	rootPath := t.TempDir()
 	store := testStore(t)
@@ -204,6 +227,37 @@ func TestStoreMoveOverwriteReplacesDestination(t *testing.T) {
 	}
 }
 
+func TestStoreStatIsMetadataOnly(t *testing.T) {
+	rootPath := t.TempDir()
+	store := testStore(t)
+	if err := os.WriteFile(filepath.Join(rootPath, "index.html"), []byte("<html></html>"), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(rootPath, "web"), 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	fileEntry, err := store.Stat(context.Background(), rootPath, "index.html")
+	if err != nil {
+		t.Fatalf("stat file: %v", err)
+	}
+	if fileEntry.Kind != filemodel.EntryKindFile || fileEntry.Size != int64(len("<html></html>")) {
+		t.Fatalf("file entry = %#v", fileEntry)
+	}
+	dirEntry, err := store.Stat(context.Background(), rootPath, "web")
+	if err != nil {
+		t.Fatalf("stat dir: %v", err)
+	}
+	if dirEntry.Kind != filemodel.EntryKindDirectory {
+		t.Fatalf("dir entry = %#v", dirEntry)
+	}
+	rootEntry, err := store.Stat(context.Background(), rootPath, "")
+	if err != nil {
+		t.Fatalf("stat root: %v", err)
+	}
+	if rootEntry.Kind != filemodel.EntryKindDirectory {
+		t.Fatalf("root entry = %#v", rootEntry)
+	}
+}
 
 func TestStoreReadBinaryPNG(t *testing.T) {
 	rootPath := t.TempDir()
@@ -231,7 +285,7 @@ func testStore(t *testing.T) *Store {
 	return store
 }
 
-func entryAt(t *testing.T, store *Store, rootPath string, path filemodel.RelativePath) filemodel.Entry {
+func entryAt(t *testing.T, rootPath string, path filemodel.RelativePath) filemodel.Entry {
 	t.Helper()
 	root, err := openRoot(rootPath)
 	if err != nil {
