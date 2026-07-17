@@ -27,6 +27,7 @@ const (
 	DefaultTerminalReplayChunkBytes          = 64 * 1024
 	DefaultTerminalClientQueueMessages       = 64
 	DefaultTerminalClientQueueBytes          = 4 * 1024 * 1024
+	MaxGitCommandTimeout                     = 10 * time.Second
 )
 
 type Config struct {
@@ -1006,8 +1007,8 @@ func validateGit(cfg GitConfig) error {
 	if strings.TrimSpace(cfg.Executable) == "" {
 		return apperrors.Config("invalid git.executable", fmt.Errorf("empty executable"))
 	}
-	if cfg.CommandTimeout <= 0 {
-		return apperrors.Config("invalid git.command_timeout", fmt.Errorf("must be positive"))
+	if cfg.CommandTimeout <= 0 || cfg.CommandTimeout > MaxGitCommandTimeout {
+		return apperrors.Config("invalid git.command_timeout", fmt.Errorf("must be between 1ns and %s", MaxGitCommandTimeout))
 	}
 	if cfg.MaxStdoutBytes < 1 {
 		return apperrors.Config("invalid git.max_stdout_bytes", fmt.Errorf("must be positive"))

@@ -35,6 +35,7 @@
         @delete-session="openDeleteSessionDialog"
         @remove-workspace="dialogs.openRemoveWorkspaceDialog"
         @open-files="openWorkspaceFiles"
+        @open-git="openWorkspaceGit"
         @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
         @reorder-workspaces="reorderWorkspaces"
         @reorder-sessions="reorderSessions"
@@ -181,7 +182,6 @@
   import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
   import { useNotificationsStore } from '../../store/notifications'
   import { useWorkbenchStore } from '../../store/workbench'
-  import { useFileWorkbenchStore } from '../../store/fileWorkbench'
   import { useWorkspaceSessionsStore } from '../../store/workspaceSessions'
 
   const props = defineProps<{
@@ -201,7 +201,6 @@
   const runtimeConfig = useRuntimeConfigStore()
   const workspaceSessions = useWorkspaceSessionsStore()
   const workbench = useWorkbenchStore()
-  const fileWorkbench = useFileWorkbenchStore()
   const notifications = useNotificationsStore()
   const dialogs = useSessionDialogs()
   const createDraft = useCreateSessionDraft()
@@ -309,13 +308,30 @@
   async function openWorkspaceFiles(workspace: WorkspaceSummary) {
     if (props.runtimeTarget.mode === 'local') {
       await router.push({
-        name: 'local-workspace-files',
+        name: 'local-workspace-code',
         params: { workspaceId: workspace.id },
       })
       return
     }
     await router.push({
-      name: 'cloud-workspace-files',
+      name: 'cloud-workspace-code',
+      params: {
+        deviceId: props.runtimeTarget.deviceId,
+        workspaceId: workspace.id,
+      },
+    })
+  }
+
+  async function openWorkspaceGit(workspace: WorkspaceSummary) {
+    if (props.runtimeTarget.mode === 'local') {
+      await router.push({
+        name: 'local-workspace-code',
+        params: { workspaceId: workspace.id },
+      })
+      return
+    }
+    await router.push({
+      name: 'cloud-workspace-code',
       params: {
         deviceId: props.runtimeTarget.deviceId,
         workspaceId: workspace.id,
@@ -370,7 +386,6 @@
     dialogs.removeWorkspaceDialogOpen = false
     dialogs.clearSelectedWorkspace()
     closeBackgroundSessionsDrawerOpen.value = false
-    fileWorkbench.resetForSourceChange()
     workbench.resetForSourceChange()
     await router.replace(
       isLocalMode.value ? { name: props.homeRouteName } : { name: 'cloud-login' },
@@ -504,7 +519,6 @@
           await props.runtimeApi.deleteWorkspace(workspace.id)
           const removedSessions = workspaceSessions.removeWorkspace(workspace.id)
           workbench.closeRemovedSessions(removedSessions)
-          fileWorkbench.removeWorkspace(workspace.id)
           dialogs.clearSelectedWorkspace()
           dialogs.removeWorkspaceDialogOpen = false
           notifications.pushToast(
@@ -839,3 +853,5 @@
     }
   })
 </script>
+
+

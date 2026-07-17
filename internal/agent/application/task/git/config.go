@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	gitmodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/git"
 )
 
 type Config struct {
@@ -28,4 +30,12 @@ func (c Config) Validate() error {
 		return fmt.Errorf("git text limit must not exceed stdout limit")
 	}
 	return nil
+}
+
+func validateCommitMessage(value string) error {
+	return gitmodel.ValidateCommitMessage(value)
+}
+
+func validateBranchName(value string) error {
+	return gitmodel.ValidateBranchName(value)
 }

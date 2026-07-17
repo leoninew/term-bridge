@@ -27,6 +27,319 @@
     "@babel/helper-string-parser" "^7.29.7"
     "@babel/helper-validator-identifier" "^7.29.7"
 
+"@codingame/monaco-vscode-api@^35.0.1", "@codingame/monaco-vscode-api@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-api/-/monaco-vscode-api-35.0.1.tgz"
+  integrity sha512-pJMSRMI0m5Mvx54u6iBGh+iad9KqfICnwAcjswNJOO7Xt1OXm5xILcM32VkMe4UX0YmrGAvYc0WVKWL8I9O4ng==
+  dependencies:
+    "@codingame/monaco-vscode-base-service-override" "35.0.1"
+    "@codingame/monaco-vscode-environment-service-override" "35.0.1"
+    "@codingame/monaco-vscode-extensions-service-override" "35.0.1"
+    "@codingame/monaco-vscode-files-service-override" "35.0.1"
+    "@codingame/monaco-vscode-host-service-override" "35.0.1"
+    "@codingame/monaco-vscode-layout-service-override" "35.0.1"
+    "@codingame/monaco-vscode-quickaccess-service-override" "35.0.1"
+    "@vscode/diff" "0.0.2-7"
+    "@vscode/iconv-lite-umd" "0.7.1"
+    dompurify "3.4.11"
+    jschardet "3.1.4"
+    marked "14.0.0"
+
+"@codingame/monaco-vscode-base-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-base-service-override/-/monaco-vscode-base-service-override-35.0.1.tgz"
+  integrity sha512-t1jG2GWrJcNJBzvSSC7H174C/7VmPDFR3FT89cmmYu1XjSs9XUDYgjLAzaQrf+KP6zlWv+uE3HvLBo0OESQ4MQ==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-bulk-edit-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-bulk-edit-service-override/-/monaco-vscode-bulk-edit-service-override-35.0.1.tgz"
+  integrity sha512-4pLqH3KRUU0IevwRFBUPvHkiP9+wkWHIsPNXq/BVwulvEAgR69bjmpXkRHXXGOUilYdq1LCoICFGIyAtmyrTdg==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-configuration-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-configuration-service-override/-/monaco-vscode-configuration-service-override-35.0.1.tgz"
+  integrity sha512-ndOt5a9jok43KSunXygHg/enZ19jHhxxsyzNg+T3ymSi3dpBNRHB30sJ7zeh+Ogz3a4y35gx8rlLSlwqB9ZoXQ==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+    "@codingame/monaco-vscode-files-service-override" "35.0.1"
+
+"@codingame/monaco-vscode-css-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-css-default-extension/-/monaco-vscode-css-default-extension-35.0.1.tgz"
+  integrity sha512-eSWRb0x4PHovpqViONJPJrMZhIyWbFt86CiblN8MeRL44Tig1d2c4XZzyw3UyVyRTPztMblW95F81OojhkJdJQ==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-dialogs-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-dialogs-service-override/-/monaco-vscode-dialogs-service-override-35.0.1.tgz"
+  integrity sha512-tPOLJgBVynQjWN/eJ343g9aQk8P9VWPIQjA4R5cpPxM0GclPHBl3cy5Lj4g9wrBPPCu/1jsukenbOdOZ9xNfjg==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-environment-service-override@^35.0.1", "@codingame/monaco-vscode-environment-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-environment-service-override/-/monaco-vscode-environment-service-override-35.0.1.tgz"
+  integrity sha512-ISzGfJQoDd0zQejYjTCYHHFfuocRluNC6XixEvgCYonGW+uOd8pLg8W3deUnN3jKXCVjdQhZ3AdraI8lgxhGnw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-explorer-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-explorer-service-override/-/monaco-vscode-explorer-service-override-35.0.1.tgz"
+  integrity sha512-hTeVVepUXl9+sM2qZP7QMvA9zEDacl4ubkVWmcqpaxvQ5YUQysFtWeZPQkKOuTfS4lCH374mfiQ02GkbrkDpmg==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-extensions-service-override@^35.0.1", "@codingame/monaco-vscode-extensions-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-extensions-service-override/-/monaco-vscode-extensions-service-override-35.0.1.tgz"
+  integrity sha512-AMqRfu1UP5D8r3NR/YXJPcgJRnLJAxJDOOZTp3ydNLUyVjN10z9TFpYlL5FJPbu433ygG+vfJmI4+Bzau32e+Q==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+    "@codingame/monaco-vscode-files-service-override" "35.0.1"
+
+"@codingame/monaco-vscode-files-service-override@^35.0.1", "@codingame/monaco-vscode-files-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-files-service-override/-/monaco-vscode-files-service-override-35.0.1.tgz"
+  integrity sha512-tuyXQG4xajLk3uHpYRF0KCO1DV1L3U6tf+COPumRgDmJUINNOPBWpJ43uAdDnE2MNJL9eY5E4LlIxeHSZChaZw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-go-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-go-default-extension/-/monaco-vscode-go-default-extension-35.0.1.tgz"
+  integrity sha512-MXHK9Cg9Ulj/2+6tnd5XAVTeiAjcqfbCSMrkk2lYoZmcrcs6nlW1ypHhOYvDWAurtbUi1+E4GJu8KiVr39Oi5g==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-host-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-host-service-override/-/monaco-vscode-host-service-override-35.0.1.tgz"
+  integrity sha512-wjcDPFjOCXGWwtv/sS4e/1Nn3PQq5bMq9eIpZ+a2UcNZbV55o4FMaqdbhtlT3sC54ttRsMQZiAzCUIK39tfWWw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-html-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-html-default-extension/-/monaco-vscode-html-default-extension-35.0.1.tgz"
+  integrity sha512-oU3GJYUpOMuyuOtIgduj5dXLv7fCK5LTNSP9KocATzcE4TW7ZndHvLOp0DUxxxjyZO7lU1GhKjiwKNySSHeVxg==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-javascript-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-javascript-default-extension/-/monaco-vscode-javascript-default-extension-35.0.1.tgz"
+  integrity sha512-R3TnZny27xjtYxYqeHj3lZ7p4VPD7z/G44dIeBpU3dHjd4+jb6GBklN7cSOnauCehDWUXKmyjhH/pAyMwhcR6w==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-json-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-json-default-extension/-/monaco-vscode-json-default-extension-35.0.1.tgz"
+  integrity sha512-BY01m2UWTadgERsI2yWgSsiLReKX9K0nnuQzbDYE9WtcgQxTdhRiZnslQfNm4eR/cJ/U/u21O83lWCxIffR0fg==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-keybindings-service-override@^35.0.1", "@codingame/monaco-vscode-keybindings-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-keybindings-service-override/-/monaco-vscode-keybindings-service-override-35.0.1.tgz"
+  integrity sha512-jld9Hd71sCSO534YpuKoXdaIVyr7GOxhwrHIs4y+n3P6ZQaCo9H0IPZZ8NtPTgup1vuOeDFYcLjTkjRl7AaycQ==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+    "@codingame/monaco-vscode-files-service-override" "35.0.1"
+
+"@codingame/monaco-vscode-languages-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-languages-service-override/-/monaco-vscode-languages-service-override-35.0.1.tgz"
+  integrity sha512-ikHAYqW/M7FJeYQOJa30Koi92fqesBZkItgmtI96itNgqhkdGElsA0bK0h1avTwAgS35n0a1COex3DBssf8bsw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+    "@codingame/monaco-vscode-files-service-override" "35.0.1"
+
+"@codingame/monaco-vscode-layout-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-layout-service-override/-/monaco-vscode-layout-service-override-35.0.1.tgz"
+  integrity sha512-3l5I5S8ykkyCqhyd104W8Y1Zr05l5Uwe/+MDfYXJVolWPL2tVqSXjdnYVwdh9DoRBleo8NTEEYQVJ906zXWRog==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-lifecycle-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-lifecycle-service-override/-/monaco-vscode-lifecycle-service-override-35.0.1.tgz"
+  integrity sha512-fq5lNwJYQnF7G0A2SNjgxKkKE+zKyv7ohGFTy41oRXxwSye3ktxLhNIO7Lqq4WgK020uWY0gtjhwypYEbVf59w==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-log-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-log-service-override/-/monaco-vscode-log-service-override-35.0.1.tgz"
+  integrity sha512-+Vkcgg/jFVxKxUAACjxA2flEi64HPik5XAhGtMjPEdv6bz5hsK+chd9GAixytoMfNzBd8mf+omBdlShFCG2zxw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+    "@codingame/monaco-vscode-environment-service-override" "35.0.1"
+
+"@codingame/monaco-vscode-markdown-basics-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-markdown-basics-default-extension/-/monaco-vscode-markdown-basics-default-extension-35.0.1.tgz"
+  integrity sha512-f/bA668gU9pudtqptklr+Kj3emWS4ILwYqQCCBj7vVCLlxEHeyTiGaDWvQI739vNB+tC71lEGMBdXmYIg2ySIw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-model-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-model-service-override/-/monaco-vscode-model-service-override-35.0.1.tgz"
+  integrity sha512-lRWmcs/d03gMEatYCZj0h3ze9Nl6R7V/0rhPrmut79/TBRTsdGQHMdZReHSfu3NlSkrze07JI6g8+j9T1GrSdw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-notifications-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-notifications-service-override/-/monaco-vscode-notifications-service-override-35.0.1.tgz"
+  integrity sha512-1mj4178dS8DUX5TgI1YnotK4bBRvHCHCYvjKTQXZLoHG2LtuzQG+pZiX2IuJ+eFk47C/hrsx2ylpvaUOj5mgSg==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-python-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-python-default-extension/-/monaco-vscode-python-default-extension-35.0.1.tgz"
+  integrity sha512-wtFYyl1oR3wfzZNJb89YXkC3TdFa4kUlHbkDx0X4pjM6CDDBymW8l5ydrnCs+avm7uHUPrmf+t9aZKKz0sgv0A==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-quickaccess-service-override@^35.0.1", "@codingame/monaco-vscode-quickaccess-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-quickaccess-service-override/-/monaco-vscode-quickaccess-service-override-35.0.1.tgz"
+  integrity sha512-riQIc83YKHIH1eC3AumkA6KI1YgJIQzPHHabH7Q/9MlEngO10QT9lVRQY6itx0K3rR28baz38CL6H+iV+HPVOw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-scm-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-scm-service-override/-/monaco-vscode-scm-service-override-35.0.1.tgz"
+  integrity sha512-QzUNrkBiIoR5426UJiyrtdRVhAar+LX6bz2X+u04ZBPaOHQnbdcya0ZAEdGNoAJ2mfKN8e3+TniWF5u3hrAcwA==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-shellscript-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-shellscript-default-extension/-/monaco-vscode-shellscript-default-extension-35.0.1.tgz"
+  integrity sha512-HY17Ltzk05lRUeXXRaYLfV5jTzwwXF6l88YHx0/sRR6pHRzWvVOQLhaITFEblnRbX/vpsGuqWBfdJUbJ1Z6i1A==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-storage-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-storage-service-override/-/monaco-vscode-storage-service-override-35.0.1.tgz"
+  integrity sha512-qupIOdo0ZY8FcsexIDVunhqpWKiEpZ7Di+E2o9vJlH9AyOSneg0qc77dxqufFqdF9Xzo0wfpmlUgTjcyFiLduw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-textmate-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-textmate-service-override/-/monaco-vscode-textmate-service-override-35.0.1.tgz"
+  integrity sha512-VLfp3Ei+lAPgVM1EzjIpXKDdAKMNUErVZ9WTsLQStts4O5geQ87i55DbaildRc3Ialf8ELU6Dea9qTH0R2XVGA==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+    "@codingame/monaco-vscode-files-service-override" "35.0.1"
+
+"@codingame/monaco-vscode-theme-defaults-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-theme-defaults-default-extension/-/monaco-vscode-theme-defaults-default-extension-35.0.1.tgz"
+  integrity sha512-Cax+SH5JaozvM5f6/ut7dYPtlIJw6guLWxVjACPGK4tFAK11DKc+kNdW/QxzTvlrIJoZA2As5+HeQJo1QzqHVw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-theme-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-theme-service-override/-/monaco-vscode-theme-service-override-35.0.1.tgz"
+  integrity sha512-dBF71oD/yKAqPT8Sl0CLy2pzpV2Q9unICL+NroRZPA989X1d4/74UV650Tmp3S2StYLSVQKcZ0qhZ8vcf6zRYQ==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+    "@codingame/monaco-vscode-files-service-override" "35.0.1"
+
+"@codingame/monaco-vscode-theme-seti-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-theme-seti-default-extension/-/monaco-vscode-theme-seti-default-extension-35.0.1.tgz"
+  integrity sha512-GrKvI91r5IIpnvqL7JxJ4Se4qoUfkCzml6z3hSxyuewbckZNoVxMmJmw+mNOXruhaTgQxSVu2SGXl7lgrJnZow==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-typescript-basics-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-typescript-basics-default-extension/-/monaco-vscode-typescript-basics-default-extension-35.0.1.tgz"
+  integrity sha512-IzAu6Grb1jGJBh33Oa2Ux+9Qw2Gsftb/tk2PQeuHaXLdZblxO5+B6VR7QS+21lifwCdkS6Dn2fPihSArOeszFQ==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-view-banner-service-override@^35.0.1", "@codingame/monaco-vscode-view-banner-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-view-banner-service-override/-/monaco-vscode-view-banner-service-override-35.0.1.tgz"
+  integrity sha512-lzB1NhrRIkcqY7229+IrOdMpoXZB+w5RKQWZwKxtYGwlGWKG5jZ5IC3WWJVAUgQwMCeO9Vm96uy9L4+spqc6cg==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-view-common-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-view-common-service-override/-/monaco-vscode-view-common-service-override-35.0.1.tgz"
+  integrity sha512-qfbBJfClz18VZwZV0htcD4l7TQqotIZx3yMb8O1Ud0bNByFkj/SkN7q+XoSZtjW/eo4GVimlMV9TjDdCXIpaBQ==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+    "@codingame/monaco-vscode-bulk-edit-service-override" "35.0.1"
+
+"@codingame/monaco-vscode-view-status-bar-service-override@^35.0.1", "@codingame/monaco-vscode-view-status-bar-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-view-status-bar-service-override/-/monaco-vscode-view-status-bar-service-override-35.0.1.tgz"
+  integrity sha512-+mwQzHJTObAjlntGgpgJ17feYll7ljAzfran5CAYtpnIvykBT83M9rCo07k66Qs8u9xmHq1tMzzekq61o0DgQw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-view-title-bar-service-override@^35.0.1", "@codingame/monaco-vscode-view-title-bar-service-override@35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-view-title-bar-service-override/-/monaco-vscode-view-title-bar-service-override-35.0.1.tgz"
+  integrity sha512-sS8hLpTaXFwIKSaJZXjb/tLi0CfRCbFDF+Yj1dhXqqSGyRma7FCqYaoTzt+rcrd9BKJVxyy8MPhAqEn48lHpSQ==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-workbench-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-workbench-service-override/-/monaco-vscode-workbench-service-override-35.0.1.tgz"
+  integrity sha512-9KnyoG1L1vE/H1WpxD0n6BSro7Vw+BHRXfabmUNp2OQxyj2ihTcnoblGS50gX1aLfSIfz111llD2d8zMtocaBQ==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+    "@codingame/monaco-vscode-keybindings-service-override" "35.0.1"
+    "@codingame/monaco-vscode-quickaccess-service-override" "35.0.1"
+    "@codingame/monaco-vscode-view-banner-service-override" "35.0.1"
+    "@codingame/monaco-vscode-view-common-service-override" "35.0.1"
+    "@codingame/monaco-vscode-view-status-bar-service-override" "35.0.1"
+    "@codingame/monaco-vscode-view-title-bar-service-override" "35.0.1"
+
+"@codingame/monaco-vscode-working-copy-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-working-copy-service-override/-/monaco-vscode-working-copy-service-override-35.0.1.tgz"
+  integrity sha512-75YvwXorpzVibOjrIqqmeQSgfhK/tYjKZtgyfNE3FA+1TyHM89xU+UI32vfacoIRtbiWSaQ4XYPxhGk/wnLNtA==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+    "@codingame/monaco-vscode-files-service-override" "35.0.1"
+
+"@codingame/monaco-vscode-workspace-trust-service-override@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-workspace-trust-service-override/-/monaco-vscode-workspace-trust-service-override-35.0.1.tgz"
+  integrity sha512-H1jMRhZVziSJrlkDDxrpg2DueTI7Eo/S+hm3BZE619PMPYpIFADf9G38yt3npmsg26HrLre6cfIrL7IWfwaQUg==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
+"@codingame/monaco-vscode-yaml-default-extension@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-yaml-default-extension/-/monaco-vscode-yaml-default-extension-35.0.1.tgz"
+  integrity sha512-C52dfU0Vk6i0m6+vBi8SbpuEy4Jv/MZn5XZPVMmi+htCsBBVxmipn/DhNvLGFblE7VMcUqLiTPyn2nGqNw2Mdw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+
 "@eslint-community/eslint-utils@^4.4.0", "@eslint-community/eslint-utils@^4.8.0", "@eslint-community/eslint-utils@^4.9.1":
   version "4.9.1"
   resolved "https://registry.npmmirror.com/@eslint-community/eslint-utils/-/eslint-utils-4.9.1.tgz"
@@ -595,10 +908,15 @@
     path-browserify "^1.0.1"
     vscode-uri "^3.0.8"
 
-"@vscode/codicons@^0.0.45":
-  version "0.0.45"
-  resolved "https://registry.npmmirror.com/@vscode/codicons/-/codicons-0.0.45.tgz"
-  integrity sha512-1KAZ7XCMagp5Gdrlr4bbbcAqgcIL623iO1wW6rfcSVGAVUQvR0WP7bQx1SbJ11gmV3fdQTSEFIJQ/5C+HuVasw==
+"@vscode/diff@0.0.2-7":
+  version "0.0.2-7"
+  resolved "https://registry.npmmirror.com/@vscode/diff/-/diff-0.0.2-7.tgz"
+  integrity sha512-zGPIPeUAmQs79u7g6FTLmhlXFIocUTtuHYmCV5lRZf6vlDk7SWEOpBlYY6SsShC3TB/lm2KxXMj9tP32YOPrhg==
+
+"@vscode/iconv-lite-umd@0.7.1":
+  version "0.7.1"
+  resolved "https://registry.npmmirror.com/@vscode/iconv-lite-umd/-/iconv-lite-umd-0.7.1.tgz"
+  integrity sha512-tK6k0DXFHW7q5+GGuGZO+phpAqpxO4WXl+BLc/8/uOk3RsM2ssAL3CQUQDb1TGfwltjsauhN6S4ghYZzs4sPFw==
 
 "@vue/compiler-core@3.5.35":
   version "3.5.35"
@@ -1026,10 +1344,10 @@ detect-libc@^2.0.3:
   resolved "https://registry.npmmirror.com/detect-libc/-/detect-libc-2.1.2.tgz"
   integrity sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==
 
-dompurify@3.2.7:
-  version "3.2.7"
-  resolved "https://registry.npmmirror.com/dompurify/-/dompurify-3.2.7.tgz"
-  integrity sha512-WhL/YuveyGXJaerVlMYGWhvQswa7myDG17P7Vu65EWC05o8vfeNbvNf4d/BOvH99+ZW+LlQsc1GDKMa1vNK6dw==
+dompurify@3.4.11:
+  version "3.4.11"
+  resolved "https://registry.npmmirror.com/dompurify/-/dompurify-3.4.11.tgz"
+  integrity sha512-zhlUV12GsaRzMsf9q5M254YhA4+VuF0fG+QFqu6aYpoGlKtz+w8//jBcGVYBgQkR5GHjUomejY84AV+/uPbWdw==
   optionalDependencies:
     "@types/trusted-types" "^2.0.7"
 
@@ -1542,6 +1860,11 @@ js-cookie@^3.0.5:
   resolved "https://registry.npmmirror.com/js-cookie/-/js-cookie-3.0.8.tgz"
   integrity sha512-yeJd4aNAdYZQjaon2bpD/Gb0B/omw7HQOsynXXcOiWVCacbBcPlgn8S/d1X6blFSaHao7ozqtW7NZW19xpCtIw==
 
+jschardet@3.1.4:
+  version "3.1.4"
+  resolved "https://registry.npmmirror.com/jschardet/-/jschardet-3.1.4.tgz"
+  integrity sha512-/kmVISmrwVwtyYU40iQUOp3SUPk2dhNCMsZBQX0R1/jZ8maaXJ/oZIzUOiyOqcgtLnETFKYChbJ5iDC/eWmFHg==
+
 json-buffer@3.0.1:
   version "3.0.1"
   resolved "https://registry.npmmirror.com/json-buffer/-/json-buffer-3.0.1.tgz"
@@ -1668,13 +1991,12 @@ mitt@^3.0.1:
   resolved "https://registry.npmmirror.com/mitt/-/mitt-3.0.1.tgz"
   integrity sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw==
 
-monaco-editor@^0.55.1:
-  version "0.55.1"
-  resolved "https://registry.npmmirror.com/monaco-editor/-/monaco-editor-0.55.1.tgz"
-  integrity sha512-jz4x+TJNFHwHtwuV9vA9rMujcZRb0CEilTEwG2rRSpe/A7Jdkuj8xPKttCgOh+v/lkHy7HsZ64oj+q3xoAFl9A==
+"monaco-editor@npm:@codingame/monaco-vscode-editor-api@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-editor-api/-/monaco-vscode-editor-api-35.0.1.tgz"
+  integrity sha512-/mCv1YThBj6SV0/MSnm9LsS1TiyobHGd2ngBAT/6IXu0YYCi+JMXoHv9GRy68ziSLahHB4RpooSgiEaF6Qcvjw==
   dependencies:
-    dompurify "3.2.7"
-    marked "14.0.0"
+    "@codingame/monaco-vscode-api" "35.0.1"
 
 ms@^2.1.3:
   version "2.1.3"
@@ -2175,6 +2497,14 @@ vscode-uri@^3.0.8:
   version "3.1.0"
   resolved "https://registry.npmmirror.com/vscode-uri/-/vscode-uri-3.1.0.tgz"
   integrity sha512-/BpdSx+yCQGnCvecbyXdxHDkuk55/G3xwnC0GqY4gmQ3j+A+g8kzzgB4Nk/SINjqn6+waqw3EgbVF2QKExkRxQ==
+
+"vscode@npm:@codingame/monaco-vscode-extension-api@^35.0.1":
+  version "35.0.1"
+  resolved "https://registry.npmmirror.com/@codingame/monaco-vscode-extension-api/-/monaco-vscode-extension-api-35.0.1.tgz"
+  integrity sha512-Hkvz68t/3sufjHcmmremSF4VEiBnRaeJjTcQgmBPSqSCO0r6P5Co3Qn6jPuQkxbtPipziUT4TDpmmgSUUyHMEw==
+  dependencies:
+    "@codingame/monaco-vscode-api" "35.0.1"
+    "@codingame/monaco-vscode-extensions-service-override" "35.0.1"
 
 vue-component-type-helpers@^3.0.0:
   version "3.3.7"

@@ -41,16 +41,17 @@ message TunnelFrame {
     termbridge.agent.UpdateShortcutRequest update_shortcut_req = 115;
     termbridge.agent.DeleteShortcutReq delete_shortcut_req = 116;
     termbridge.agent.UpdateShortcutOrderReq update_shortcut_order_req = 117;
-    termbridge.agent.ListFilesReq list_files_req = 118;
-    termbridge.agent.ReadFileReq read_file_req = 119;
-    termbridge.agent.CreateFileReq create_file_req = 120;
-    termbridge.agent.CreateDirectoryReq create_directory_req = 121;
-    termbridge.agent.WriteFileReq write_file_req = 122;
-    termbridge.agent.RenameEntryReq rename_entry_req = 123;
-    termbridge.agent.MoveEntryReq move_entry_req = 124;
-    termbridge.agent.DeleteEntryReq delete_entry_req = 125;
-    termbridge.agent.GitStatusReq git_status_req = 126;
-    termbridge.agent.GitDiffReq git_diff_req = 127;
+    termbridge.agent.FsStatReq fs_stat_req = 118;
+    termbridge.agent.FsReadDirectoryReq fs_read_directory_req = 119;
+    termbridge.agent.FsReadFileReq fs_read_file_req = 120;
+    termbridge.agent.FsWriteFileReq fs_write_file_req = 121;
+    termbridge.agent.FsCreateDirectoryReq fs_create_directory_req = 122;
+    termbridge.agent.FsDeleteReq fs_delete_req = 123;
+    termbridge.agent.FsRenameReq fs_rename_req = 124;
+    termbridge.agent.ScmStatusReq scm_status_req = 125;
+    termbridge.agent.ScmOriginalContentReq scm_original_content_req = 126;
+    termbridge.agent.ScmExecuteReq scm_execute_req = 127;
+    termbridge.agent.ScmRepositoryReq scm_repository_req = 128;
 
     termbridge.agent.ListWorkspacesResp list_workspaces_resp = 200;
     termbridge.agent.WorkspaceTreeResp workspace_tree_resp = 201;
@@ -70,16 +71,17 @@ message TunnelFrame {
     termbridge.agent.UpdateShortcutResp update_shortcut_resp = 215;
     termbridge.agent.DeleteShortcutResp delete_shortcut_resp = 216;
     termbridge.agent.UpdateShortcutOrderResp update_shortcut_order_resp = 217;
-    termbridge.agent.ListFilesResp list_files_resp = 218;
-    termbridge.agent.ReadFileResp read_file_resp = 219;
-    termbridge.agent.CreateFileResp create_file_resp = 220;
-    termbridge.agent.CreateDirectoryResp create_directory_resp = 221;
-    termbridge.agent.WriteFileResp write_file_resp = 222;
-    termbridge.agent.RenameEntryResp rename_entry_resp = 223;
-    termbridge.agent.MoveEntryResp move_entry_resp = 224;
-    termbridge.agent.DeleteEntryResp delete_entry_resp = 225;
-    termbridge.agent.GitStatusResp git_status_resp = 226;
-    termbridge.agent.GitDiffResp git_diff_resp = 227;
+    termbridge.agent.FsStatResp fs_stat_resp = 218;
+    termbridge.agent.FsReadDirectoryResp fs_read_directory_resp = 219;
+    termbridge.agent.FsReadFileResp fs_read_file_resp = 220;
+    termbridge.agent.FsWriteFileResp fs_write_file_resp = 221;
+    termbridge.agent.FsCreateDirectoryResp fs_create_directory_resp = 222;
+    termbridge.agent.FsDeleteResp fs_delete_resp = 223;
+    termbridge.agent.FsRenameResp fs_rename_resp = 224;
+    termbridge.agent.ScmStatusResp scm_status_resp = 225;
+    termbridge.agent.ScmOriginalContentResp scm_original_content_resp = 226;
+    termbridge.agent.ScmExecuteResp scm_execute_resp = 227;
+    termbridge.agent.ScmRepositoryResp scm_repository_resp = 228;
 
     TerminalAttachReq terminal_attach = 300;
     TerminalInput terminal_input = 301;
@@ -138,3 +140,4 @@ message TerminalClosed {
 message Close {
   string reason = 1;
 }
+

@@ -13,19 +13,59 @@ func TestLocalRuntimeRequestFrameBuildsFileGitFrames(t *testing.T) {
 		params any
 		assert func(*testing.T, *shared.TunnelFrame)
 	}{
-		{method: "list_files", params: &agent.ListFilesReq{WorkspaceId: "workspace-1", Path: "directory"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
-			if request := frame.GetListFilesReq(); request == nil || request.GetPath() != "directory" {
-				t.Fatalf("list files request = %#v", request)
+		{method: "fs_stat", params: &agent.FsStatReq{WorkspaceId: "workspace-1", Path: "directory"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetFsStatReq(); request == nil || request.GetPath() != "directory" {
+				t.Fatalf("fs stat request = %#v", request)
 			}
 		}},
-		{method: "write_file", params: &agent.WriteFileReq{WorkspaceId: "workspace-1", Path: "notes.txt", Text: "updated"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
-			if request := frame.GetWriteFileReq(); request == nil || request.GetText() != "updated" {
-				t.Fatalf("write file request = %#v", request)
+		{method: "fs_read_directory", params: &agent.FsReadDirectoryReq{WorkspaceId: "workspace-1", Path: "directory"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetFsReadDirectoryReq(); request == nil || request.GetPath() != "directory" {
+				t.Fatalf("fs read directory request = %#v", request)
 			}
 		}},
-		{method: "git_diff", params: &agent.GitDiffReq{WorkspaceId: "workspace-1", Path: "notes.txt", Layer: agent.GitLayer_GIT_LAYER_UNSTAGED}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
-			if request := frame.GetGitDiffReq(); request == nil || request.GetLayer() != agent.GitLayer_GIT_LAYER_UNSTAGED {
-				t.Fatalf("Git diff request = %#v", request)
+		{method: "fs_read_file", params: &agent.FsReadFileReq{WorkspaceId: "workspace-1", Path: "notes.txt"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetFsReadFileReq(); request == nil || request.GetPath() != "notes.txt" {
+				t.Fatalf("fs read file request = %#v", request)
+			}
+		}},
+		{method: "fs_write_file", params: &agent.FsWriteFileReq{WorkspaceId: "workspace-1", Path: "notes.txt", Content: []byte("updated"), Create: true, Overwrite: true}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetFsWriteFileReq(); request == nil || string(request.GetContent()) != "updated" {
+				t.Fatalf("fs write file request = %#v", request)
+			}
+		}},
+		{method: "fs_create_directory", params: &agent.FsCreateDirectoryReq{WorkspaceId: "workspace-1", Path: "dir"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetFsCreateDirectoryReq(); request == nil || request.GetPath() != "dir" {
+				t.Fatalf("fs create directory request = %#v", request)
+			}
+		}},
+		{method: "fs_delete", params: &agent.FsDeleteReq{WorkspaceId: "workspace-1", Path: "notes.txt", Recursive: true}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetFsDeleteReq(); request == nil || !request.GetRecursive() {
+				t.Fatalf("fs delete request = %#v", request)
+			}
+		}},
+		{method: "fs_rename", params: &agent.FsRenameReq{WorkspaceId: "workspace-1", OldPath: "a.txt", NewPath: "b.txt", Overwrite: true}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetFsRenameReq(); request == nil || request.GetNewPath() != "b.txt" {
+				t.Fatalf("fs rename request = %#v", request)
+			}
+		}},
+		{method: "scm_status", params: &agent.ScmStatusReq{WorkspaceId: "workspace-1"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetScmStatusReq(); request == nil || request.GetWorkspaceId() != "workspace-1" {
+				t.Fatalf("scm status request = %#v", request)
+			}
+		}},
+		{method: "scm_original_content", params: &agent.ScmOriginalContentReq{WorkspaceId: "workspace-1", Path: "notes.txt", GroupId: "changes"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetScmOriginalContentReq(); request == nil || request.GetGroupId() != "changes" {
+				t.Fatalf("scm original content request = %#v", request)
+			}
+		}},
+		{method: "scm_execute", params: &agent.ScmExecuteReq{WorkspaceId: "workspace-1", Command: agent.ScmCommand_SCM_COMMAND_STAGE, Path: "notes.txt", GroupId: "changes"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetScmExecuteReq(); request == nil || request.GetCommand() != agent.ScmCommand_SCM_COMMAND_STAGE {
+				t.Fatalf("scm execute request = %#v", request)
+			}
+		}},
+		{method: "scm_repository", params: &agent.ScmRepositoryReq{WorkspaceId: "workspace-1"}, assert: func(t *testing.T, frame *shared.TunnelFrame) {
+			if request := frame.GetScmRepositoryReq(); request == nil || request.GetWorkspaceId() != "workspace-1" {
+				t.Fatalf("scm repository request = %#v", request)
 			}
 		}},
 	}

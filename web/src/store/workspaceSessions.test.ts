@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { WorkspaceTreeNode as WorkspaceTreeSummary } from '../gen/proto/termbridge/agent/v1/workspace'
-import type { SessionRuntimeApi } from '../features/sessions/runtime'
+import type { ApiResult, SessionRuntimeApi } from '../features/sessions/runtime'
 import { useWorkspaceSessionsStore } from './workspaceSessions'
 
 const runtimeApi = {
@@ -11,6 +11,14 @@ const runtimeApi = {
 } as unknown as SessionRuntimeApi
 
 const target = { mode: 'cloud' as const, deviceId: 'device-1' }
+
+function deferred<T>() {
+  let resolve: (value: T) => void
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve
+  })
+  return { promise, resolve: resolve! }
+}
 
 const workspaceTree: WorkspaceTreeSummary[] = [
   {
@@ -87,6 +95,25 @@ describe('useWorkspaceSessionsStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+  })
+
+  it('keeps the latest workspace refresh when an earlier response finishes last', async () => {
+    const store = useWorkspaceSessionsStore()
+    const first = deferred<ApiResult<WorkspaceTreeSummary[]>>()
+    const second = deferred<ApiResult<WorkspaceTreeSummary[]>>()
+    vi.mocked(runtimeApi.listWorkspaceTree)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    const firstRefresh = store.refresh({ mode: 'cloud', deviceId: 'device-a' }, runtimeApi)
+    const secondRefresh = store.refresh({ mode: 'cloud', deviceId: 'device-b' }, runtimeApi)
+    second.resolve({ data: [workspaceTree[1]!], offline: false })
+    await secondRefresh
+    first.resolve({ data: [workspaceTree[0]!], offline: false })
+    await firstRefresh
+
+    expect(store.workspaceTree.map((workspace) => workspace.id)).toEqual(['workspace-2'])
+    expect(store.loading).toBe(false)
   })
 
   it('projects workspaces and sessions from workspaceTree', () => {

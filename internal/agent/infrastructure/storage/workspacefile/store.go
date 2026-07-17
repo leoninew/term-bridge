@@ -215,10 +215,19 @@ func (s *Store) Move(ctx context.Context, rootPath string, request filemodel.Mov
 			return filemodel.MutationResult{}, err
 		}
 		if existing, err := root.entry(request.DestinationPath); err == nil {
+			if !request.Overwrite {
+				if err := requireEntryRevision(existing, request.ExpectedDestinationRevision); err != nil {
+					return filemodel.MutationResult{}, err
+				}
+				return filemodel.MutationResult{}, filemodel.NewError("already_exists", "The destination already exists.")
+			}
+			// overwrite: replace destination under the same lock (VS Code rename overwrite).
 			if err := requireEntryRevision(existing, request.ExpectedDestinationRevision); err != nil {
 				return filemodel.MutationResult{}, err
 			}
-			return filemodel.MutationResult{}, filemodel.NewError("already_exists", "The destination already exists.")
+			if err := root.remove(request.DestinationPath, true); err != nil {
+				return filemodel.MutationResult{}, err
+			}
 		} else if !isNotFound(err) {
 			return filemodel.MutationResult{}, err
 		}
@@ -257,6 +266,26 @@ func (s *Store) Delete(ctx context.Context, rootPath string, request filemodel.D
 		}
 		return filemodel.MutationResult{SourceEntry: &entry, AffectedCount: count, AffectedPathPrefixes: []filemodel.RelativePath{request.Path}}, nil
 	})
+}
+
+// DeleteRegularFile removes one regular workspace file through the rooted store.
+// It is intentionally limited to the Git untracked-file workflow, whose status
+// preflight is owned by the Git service rather than a browser revision token.
+func (s *Store) DeleteRegularFile(ctx context.Context, rootPath string, path filemodel.RelativePath) error {
+	_, err := s.withLock(ctx, rootPath, func(root *root) (filemodel.MutationResult, error) {
+		entry, err := root.entry(path)
+		if err != nil {
+			return filemodel.MutationResult{}, err
+		}
+		if entry.Kind != filemodel.EntryKindFile {
+			return filemodel.MutationResult{}, filemodel.NewError("type_mismatch", "Only a regular file can be removed.")
+		}
+		if err := root.remove(path, false); err != nil {
+			return filemodel.MutationResult{}, err
+		}
+		return filemodel.MutationResult{}, nil
+	})
+	return err
 }
 
 func (s *Store) withLock(ctx context.Context, rootPath string, operation func(*root) (filemodel.MutationResult, error)) (filemodel.MutationResult, error) {
@@ -440,7 +469,11 @@ func (r *root) requireRevision(path filemodel.RelativePath, expected string) err
 }
 
 func requireEntryRevision(entry filemodel.Entry, expected string) error {
-	if expected == "" || entry.Revision != expected {
+	// Empty token means the caller did not request optimistic concurrency.
+	if expected == "" {
+		return nil
+	}
+	if entry.Revision != expected {
 		return filemodel.Conflict(&entry)
 	}
 	return nil

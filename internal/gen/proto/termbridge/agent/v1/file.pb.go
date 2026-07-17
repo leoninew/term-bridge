@@ -9,7 +9,6 @@ package v1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -22,82 +21,133 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type FileEntryKind int32
+type FileType int32
 
 const (
-	FileEntryKind_FILE_ENTRY_KIND_UNSPECIFIED FileEntryKind = 0
-	FileEntryKind_FILE_ENTRY_KIND_FILE        FileEntryKind = 1
-	FileEntryKind_FILE_ENTRY_KIND_DIRECTORY   FileEntryKind = 2
+	FileType_FILE_TYPE_UNKNOWN       FileType = 0
+	FileType_FILE_TYPE_FILE          FileType = 1
+	FileType_FILE_TYPE_DIRECTORY     FileType = 2
+	FileType_FILE_TYPE_SYMBOLIC_LINK FileType = 64
 )
 
-// Enum value maps for FileEntryKind.
+// Enum value maps for FileType.
 var (
-	FileEntryKind_name = map[int32]string{
-		0: "FILE_ENTRY_KIND_UNSPECIFIED",
-		1: "FILE_ENTRY_KIND_FILE",
-		2: "FILE_ENTRY_KIND_DIRECTORY",
+	FileType_name = map[int32]string{
+		0:  "FILE_TYPE_UNKNOWN",
+		1:  "FILE_TYPE_FILE",
+		2:  "FILE_TYPE_DIRECTORY",
+		64: "FILE_TYPE_SYMBOLIC_LINK",
 	}
-	FileEntryKind_value = map[string]int32{
-		"FILE_ENTRY_KIND_UNSPECIFIED": 0,
-		"FILE_ENTRY_KIND_FILE":        1,
-		"FILE_ENTRY_KIND_DIRECTORY":   2,
+	FileType_value = map[string]int32{
+		"FILE_TYPE_UNKNOWN":       0,
+		"FILE_TYPE_FILE":          1,
+		"FILE_TYPE_DIRECTORY":     2,
+		"FILE_TYPE_SYMBOLIC_LINK": 64,
 	}
 )
 
-func (x FileEntryKind) Enum() *FileEntryKind {
-	p := new(FileEntryKind)
+func (x FileType) Enum() *FileType {
+	p := new(FileType)
 	*p = x
 	return p
 }
 
-func (x FileEntryKind) String() string {
+func (x FileType) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (FileEntryKind) Descriptor() protoreflect.EnumDescriptor {
+func (FileType) Descriptor() protoreflect.EnumDescriptor {
 	return file_termbridge_agent_v1_file_proto_enumTypes[0].Descriptor()
 }
 
-func (FileEntryKind) Type() protoreflect.EnumType {
+func (FileType) Type() protoreflect.EnumType {
 	return &file_termbridge_agent_v1_file_proto_enumTypes[0]
 }
 
-func (x FileEntryKind) Number() protoreflect.EnumNumber {
+func (x FileType) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use FileEntryKind.Descriptor instead.
-func (FileEntryKind) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use FileType.Descriptor instead.
+func (FileType) EnumDescriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{0}
 }
 
-type FileEntry struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Kind          FileEntryKind          `protobuf:"varint,3,opt,name=kind,proto3,enum=termbridge.agent.FileEntryKind" json:"kind,omitempty"`
-	Size          int64                  `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
-	ModifiedAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=modified_at,json=modifiedAt,proto3" json:"modified_at,omitempty"`
-	Revision      string                 `protobuf:"bytes,6,opt,name=revision,proto3" json:"revision,omitempty"`
-	HasChildren   *bool                  `protobuf:"varint,7,opt,name=has_children,json=hasChildren,proto3,oneof" json:"has_children,omitempty"`
+type FilePermission int32
+
+const (
+	FilePermission_FILE_PERMISSION_UNSPECIFIED FilePermission = 0
+	FilePermission_FILE_PERMISSION_READONLY    FilePermission = 1
+)
+
+// Enum value maps for FilePermission.
+var (
+	FilePermission_name = map[int32]string{
+		0: "FILE_PERMISSION_UNSPECIFIED",
+		1: "FILE_PERMISSION_READONLY",
+	}
+	FilePermission_value = map[string]int32{
+		"FILE_PERMISSION_UNSPECIFIED": 0,
+		"FILE_PERMISSION_READONLY":    1,
+	}
+)
+
+func (x FilePermission) Enum() *FilePermission {
+	p := new(FilePermission)
+	*p = x
+	return p
+}
+
+func (x FilePermission) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FilePermission) Descriptor() protoreflect.EnumDescriptor {
+	return file_termbridge_agent_v1_file_proto_enumTypes[1].Descriptor()
+}
+
+func (FilePermission) Type() protoreflect.EnumType {
+	return &file_termbridge_agent_v1_file_proto_enumTypes[1]
+}
+
+func (x FilePermission) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FilePermission.Descriptor instead.
+func (FilePermission) EnumDescriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{1}
+}
+
+type FileStat struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Type  FileType               `protobuf:"varint,1,opt,name=type,proto3,enum=termbridge.agent.FileType" json:"type,omitempty"`
+	// Creation time in milliseconds since Unix epoch (vscode FileStat.ctime).
+	Ctime int64 `protobuf:"varint,2,opt,name=ctime,proto3" json:"ctime,omitempty"`
+	// Modification time in milliseconds since Unix epoch (vscode FileStat.mtime).
+	Mtime       int64          `protobuf:"varint,3,opt,name=mtime,proto3" json:"mtime,omitempty"`
+	Size        int64          `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
+	Permissions FilePermission `protobuf:"varint,5,opt,name=permissions,proto3,enum=termbridge.agent.FilePermission" json:"permissions,omitempty"`
+	// Opaque concurrency token (etag); empty means unknown.
+	Etag          string `protobuf:"bytes,6,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *FileEntry) Reset() {
-	*x = FileEntry{}
+func (x *FileStat) Reset() {
+	*x = FileStat{}
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *FileEntry) String() string {
+func (x *FileStat) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*FileEntry) ProtoMessage() {}
+func (*FileStat) ProtoMessage() {}
 
-func (x *FileEntry) ProtoReflect() protoreflect.Message {
+func (x *FileStat) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -109,233 +159,54 @@ func (x *FileEntry) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use FileEntry.ProtoReflect.Descriptor instead.
-func (*FileEntry) Descriptor() ([]byte, []int) {
+// Deprecated: Use FileStat.ProtoReflect.Descriptor instead.
+func (*FileStat) Descriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *FileEntry) GetPath() string {
+func (x *FileStat) GetType() FileType {
 	if x != nil {
-		return x.Path
+		return x.Type
 	}
-	return ""
+	return FileType_FILE_TYPE_UNKNOWN
 }
 
-func (x *FileEntry) GetName() string {
+func (x *FileStat) GetCtime() int64 {
 	if x != nil {
-		return x.Name
+		return x.Ctime
 	}
-	return ""
+	return 0
 }
 
-func (x *FileEntry) GetKind() FileEntryKind {
+func (x *FileStat) GetMtime() int64 {
 	if x != nil {
-		return x.Kind
+		return x.Mtime
 	}
-	return FileEntryKind_FILE_ENTRY_KIND_UNSPECIFIED
+	return 0
 }
 
-func (x *FileEntry) GetSize() int64 {
+func (x *FileStat) GetSize() int64 {
 	if x != nil {
 		return x.Size
 	}
 	return 0
 }
 
-func (x *FileEntry) GetModifiedAt() *timestamppb.Timestamp {
+func (x *FileStat) GetPermissions() FilePermission {
 	if x != nil {
-		return x.ModifiedAt
+		return x.Permissions
 	}
-	return nil
+	return FilePermission_FILE_PERMISSION_UNSPECIFIED
 }
 
-func (x *FileEntry) GetRevision() string {
+func (x *FileStat) GetEtag() string {
 	if x != nil {
-		return x.Revision
+		return x.Etag
 	}
 	return ""
 }
 
-func (x *FileEntry) GetHasChildren() bool {
-	if x != nil && x.HasChildren != nil {
-		return *x.HasChildren
-	}
-	return false
-}
-
-type RevisionPrecondition struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Path             string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
-}
-
-func (x *RevisionPrecondition) Reset() {
-	*x = RevisionPrecondition{}
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RevisionPrecondition) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RevisionPrecondition) ProtoMessage() {}
-
-func (x *RevisionPrecondition) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RevisionPrecondition.ProtoReflect.Descriptor instead.
-func (*RevisionPrecondition) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *RevisionPrecondition) GetPath() string {
-	if x != nil {
-		return x.Path
-	}
-	return ""
-}
-
-func (x *RevisionPrecondition) GetExpectedRevision() string {
-	if x != nil {
-		return x.ExpectedRevision
-	}
-	return ""
-}
-
-type FileConflict struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	CurrentEntry  *FileEntry             `protobuf:"bytes,2,opt,name=current_entry,json=currentEntry,proto3" json:"current_entry,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *FileConflict) Reset() {
-	*x = FileConflict{}
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *FileConflict) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*FileConflict) ProtoMessage() {}
-
-func (x *FileConflict) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use FileConflict.ProtoReflect.Descriptor instead.
-func (*FileConflict) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *FileConflict) GetType() string {
-	if x != nil {
-		return x.Type
-	}
-	return ""
-}
-
-func (x *FileConflict) GetCurrentEntry() *FileEntry {
-	if x != nil {
-		return x.CurrentEntry
-	}
-	return nil
-}
-
-type FileMutationResult struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	SourceEntry          *FileEntry             `protobuf:"bytes,1,opt,name=source_entry,json=sourceEntry,proto3" json:"source_entry,omitempty"`
-	DestinationEntry     *FileEntry             `protobuf:"bytes,2,opt,name=destination_entry,json=destinationEntry,proto3" json:"destination_entry,omitempty"`
-	AffectedCount        int32                  `protobuf:"varint,3,opt,name=affected_count,json=affectedCount,proto3" json:"affected_count,omitempty"`
-	AffectedPathPrefixes []string               `protobuf:"bytes,4,rep,name=affected_path_prefixes,json=affectedPathPrefixes,proto3" json:"affected_path_prefixes,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
-}
-
-func (x *FileMutationResult) Reset() {
-	*x = FileMutationResult{}
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *FileMutationResult) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*FileMutationResult) ProtoMessage() {}
-
-func (x *FileMutationResult) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use FileMutationResult.ProtoReflect.Descriptor instead.
-func (*FileMutationResult) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *FileMutationResult) GetSourceEntry() *FileEntry {
-	if x != nil {
-		return x.SourceEntry
-	}
-	return nil
-}
-
-func (x *FileMutationResult) GetDestinationEntry() *FileEntry {
-	if x != nil {
-		return x.DestinationEntry
-	}
-	return nil
-}
-
-func (x *FileMutationResult) GetAffectedCount() int32 {
-	if x != nil {
-		return x.AffectedCount
-	}
-	return 0
-}
-
-func (x *FileMutationResult) GetAffectedPathPrefixes() []string {
-	if x != nil {
-		return x.AffectedPathPrefixes
-	}
-	return nil
-}
-
-type ListFilesReq struct {
+type FsStatReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
@@ -343,21 +214,21 @@ type ListFilesReq struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListFilesReq) Reset() {
-	*x = ListFilesReq{}
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[4]
+func (x *FsStatReq) Reset() {
+	*x = FsStatReq{}
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListFilesReq) String() string {
+func (x *FsStatReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListFilesReq) ProtoMessage() {}
+func (*FsStatReq) ProtoMessage() {}
 
-func (x *ListFilesReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[4]
+func (x *FsStatReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -368,48 +239,195 @@ func (x *ListFilesReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListFilesReq.ProtoReflect.Descriptor instead.
-func (*ListFilesReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{4}
+// Deprecated: Use FsStatReq.ProtoReflect.Descriptor instead.
+func (*FsStatReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *ListFilesReq) GetWorkspaceId() string {
+func (x *FsStatReq) GetWorkspaceId() string {
 	if x != nil {
 		return x.WorkspaceId
 	}
 	return ""
 }
 
-func (x *ListFilesReq) GetPath() string {
+func (x *FsStatReq) GetPath() string {
 	if x != nil {
 		return x.Path
 	}
 	return ""
 }
 
-type ListFilesResp struct {
+type FsStatResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Directory     *FileEntry             `protobuf:"bytes,1,opt,name=directory,proto3" json:"directory,omitempty"`
-	Items         []*FileEntry           `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
-	Truncated     bool                   `protobuf:"varint,3,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	Stat          *FileStat              `protobuf:"bytes,1,opt,name=stat,proto3" json:"stat,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListFilesResp) Reset() {
-	*x = ListFilesResp{}
+func (x *FsStatResp) Reset() {
+	*x = FsStatResp{}
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FsStatResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FsStatResp) ProtoMessage() {}
+
+func (x *FsStatResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FsStatResp.ProtoReflect.Descriptor instead.
+func (*FsStatResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *FsStatResp) GetStat() *FileStat {
+	if x != nil {
+		return x.Stat
+	}
+	return nil
+}
+
+type FsReadDirectoryReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FsReadDirectoryReq) Reset() {
+	*x = FsReadDirectoryReq{}
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FsReadDirectoryReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FsReadDirectoryReq) ProtoMessage() {}
+
+func (x *FsReadDirectoryReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FsReadDirectoryReq.ProtoReflect.Descriptor instead.
+func (*FsReadDirectoryReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *FsReadDirectoryReq) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *FsReadDirectoryReq) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type FsDirectoryEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Type          FileType               `protobuf:"varint,2,opt,name=type,proto3,enum=termbridge.agent.FileType" json:"type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FsDirectoryEntry) Reset() {
+	*x = FsDirectoryEntry{}
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FsDirectoryEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FsDirectoryEntry) ProtoMessage() {}
+
+func (x *FsDirectoryEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FsDirectoryEntry.ProtoReflect.Descriptor instead.
+func (*FsDirectoryEntry) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *FsDirectoryEntry) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *FsDirectoryEntry) GetType() FileType {
+	if x != nil {
+		return x.Type
+	}
+	return FileType_FILE_TYPE_UNKNOWN
+}
+
+type FsReadDirectoryResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entries       []*FsDirectoryEntry    `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	Truncated     bool                   `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FsReadDirectoryResp) Reset() {
+	*x = FsReadDirectoryResp{}
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListFilesResp) String() string {
+func (x *FsReadDirectoryResp) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListFilesResp) ProtoMessage() {}
+func (*FsReadDirectoryResp) ProtoMessage() {}
 
-func (x *ListFilesResp) ProtoReflect() protoreflect.Message {
+func (x *FsReadDirectoryResp) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -421,33 +439,26 @@ func (x *ListFilesResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListFilesResp.ProtoReflect.Descriptor instead.
-func (*ListFilesResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use FsReadDirectoryResp.ProtoReflect.Descriptor instead.
+func (*FsReadDirectoryResp) Descriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ListFilesResp) GetDirectory() *FileEntry {
+func (x *FsReadDirectoryResp) GetEntries() []*FsDirectoryEntry {
 	if x != nil {
-		return x.Directory
+		return x.Entries
 	}
 	return nil
 }
 
-func (x *ListFilesResp) GetItems() []*FileEntry {
-	if x != nil {
-		return x.Items
-	}
-	return nil
-}
-
-func (x *ListFilesResp) GetTruncated() bool {
+func (x *FsReadDirectoryResp) GetTruncated() bool {
 	if x != nil {
 		return x.Truncated
 	}
 	return false
 }
 
-type ReadFileReq struct {
+type FsReadFileReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
@@ -455,20 +466,20 @@ type ReadFileReq struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ReadFileReq) Reset() {
-	*x = ReadFileReq{}
+func (x *FsReadFileReq) Reset() {
+	*x = FsReadFileReq{}
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ReadFileReq) String() string {
+func (x *FsReadFileReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ReadFileReq) ProtoMessage() {}
+func (*FsReadFileReq) ProtoMessage() {}
 
-func (x *ReadFileReq) ProtoReflect() protoreflect.Message {
+func (x *FsReadFileReq) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -480,47 +491,47 @@ func (x *ReadFileReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ReadFileReq.ProtoReflect.Descriptor instead.
-func (*ReadFileReq) Descriptor() ([]byte, []int) {
+// Deprecated: Use FsReadFileReq.ProtoReflect.Descriptor instead.
+func (*FsReadFileReq) Descriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *ReadFileReq) GetWorkspaceId() string {
+func (x *FsReadFileReq) GetWorkspaceId() string {
 	if x != nil {
 		return x.WorkspaceId
 	}
 	return ""
 }
 
-func (x *ReadFileReq) GetPath() string {
+func (x *FsReadFileReq) GetPath() string {
 	if x != nil {
 		return x.Path
 	}
 	return ""
 }
 
-type ReadFileResp struct {
+type FsReadFileResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Entry         *FileEntry             `protobuf:"bytes,1,opt,name=entry,proto3" json:"entry,omitempty"`
-	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	Content       []byte                 `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"`
+	Stat          *FileStat              `protobuf:"bytes,2,opt,name=stat,proto3" json:"stat,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ReadFileResp) Reset() {
-	*x = ReadFileResp{}
+func (x *FsReadFileResp) Reset() {
+	*x = FsReadFileResp{}
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ReadFileResp) String() string {
+func (x *FsReadFileResp) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ReadFileResp) ProtoMessage() {}
+func (*FsReadFileResp) ProtoMessage() {}
 
-func (x *ReadFileResp) ProtoReflect() protoreflect.Message {
+func (x *FsReadFileResp) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -532,51 +543,52 @@ func (x *ReadFileResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ReadFileResp.ProtoReflect.Descriptor instead.
-func (*ReadFileResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use FsReadFileResp.ProtoReflect.Descriptor instead.
+func (*FsReadFileResp) Descriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *ReadFileResp) GetEntry() *FileEntry {
+func (x *FsReadFileResp) GetContent() []byte {
 	if x != nil {
-		return x.Entry
+		return x.Content
 	}
 	return nil
 }
 
-func (x *ReadFileResp) GetText() string {
+func (x *FsReadFileResp) GetStat() *FileStat {
 	if x != nil {
-		return x.Text
+		return x.Stat
 	}
-	return ""
+	return nil
 }
 
-type CreateFileReq struct {
-	state                       protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId                 string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Path                        string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	Text                        string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
-	Overwrite                   bool                   `protobuf:"varint,4,opt,name=overwrite,proto3" json:"overwrite,omitempty"`
-	ExpectedParentRevision      string                 `protobuf:"bytes,5,opt,name=expected_parent_revision,json=expectedParentRevision,proto3" json:"expected_parent_revision,omitempty"`
-	ExpectedDestinationRevision string                 `protobuf:"bytes,6,opt,name=expected_destination_revision,json=expectedDestinationRevision,proto3" json:"expected_destination_revision,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+type FsWriteFileReq struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Path        string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Content     []byte                 `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
+	Create      bool                   `protobuf:"varint,4,opt,name=create,proto3" json:"create,omitempty"`
+	Overwrite   bool                   `protobuf:"varint,5,opt,name=overwrite,proto3" json:"overwrite,omitempty"`
+	// When non-empty, write fails unless current etag matches (FileSystemError.FileExists / conflict).
+	Etag          string `protobuf:"bytes,6,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateFileReq) Reset() {
-	*x = CreateFileReq{}
+func (x *FsWriteFileReq) Reset() {
+	*x = FsWriteFileReq{}
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateFileReq) String() string {
+func (x *FsWriteFileReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateFileReq) ProtoMessage() {}
+func (*FsWriteFileReq) ProtoMessage() {}
 
-func (x *CreateFileReq) ProtoReflect() protoreflect.Message {
+func (x *FsWriteFileReq) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -588,74 +600,74 @@ func (x *CreateFileReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateFileReq.ProtoReflect.Descriptor instead.
-func (*CreateFileReq) Descriptor() ([]byte, []int) {
+// Deprecated: Use FsWriteFileReq.ProtoReflect.Descriptor instead.
+func (*FsWriteFileReq) Descriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *CreateFileReq) GetWorkspaceId() string {
+func (x *FsWriteFileReq) GetWorkspaceId() string {
 	if x != nil {
 		return x.WorkspaceId
 	}
 	return ""
 }
 
-func (x *CreateFileReq) GetPath() string {
+func (x *FsWriteFileReq) GetPath() string {
 	if x != nil {
 		return x.Path
 	}
 	return ""
 }
 
-func (x *CreateFileReq) GetText() string {
+func (x *FsWriteFileReq) GetContent() []byte {
 	if x != nil {
-		return x.Text
+		return x.Content
 	}
-	return ""
+	return nil
 }
 
-func (x *CreateFileReq) GetOverwrite() bool {
+func (x *FsWriteFileReq) GetCreate() bool {
+	if x != nil {
+		return x.Create
+	}
+	return false
+}
+
+func (x *FsWriteFileReq) GetOverwrite() bool {
 	if x != nil {
 		return x.Overwrite
 	}
 	return false
 }
 
-func (x *CreateFileReq) GetExpectedParentRevision() string {
+func (x *FsWriteFileReq) GetEtag() string {
 	if x != nil {
-		return x.ExpectedParentRevision
+		return x.Etag
 	}
 	return ""
 }
 
-func (x *CreateFileReq) GetExpectedDestinationRevision() string {
-	if x != nil {
-		return x.ExpectedDestinationRevision
-	}
-	return ""
-}
-
-type CreateFileResp struct {
+type FsWriteFileResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        *FileMutationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	Stat          *FileStat              `protobuf:"bytes,1,opt,name=stat,proto3" json:"stat,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateFileResp) Reset() {
-	*x = CreateFileResp{}
+func (x *FsWriteFileResp) Reset() {
+	*x = FsWriteFileResp{}
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateFileResp) String() string {
+func (x *FsWriteFileResp) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateFileResp) ProtoMessage() {}
+func (*FsWriteFileResp) ProtoMessage() {}
 
-func (x *CreateFileResp) ProtoReflect() protoreflect.Message {
+func (x *FsWriteFileResp) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -667,42 +679,40 @@ func (x *CreateFileResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateFileResp.ProtoReflect.Descriptor instead.
-func (*CreateFileResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use FsWriteFileResp.ProtoReflect.Descriptor instead.
+func (*FsWriteFileResp) Descriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *CreateFileResp) GetResult() *FileMutationResult {
+func (x *FsWriteFileResp) GetStat() *FileStat {
 	if x != nil {
-		return x.Result
+		return x.Stat
 	}
 	return nil
 }
 
-type CreateDirectoryReq struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId            string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Path                   string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	AllowExisting          bool                   `protobuf:"varint,3,opt,name=allow_existing,json=allowExisting,proto3" json:"allow_existing,omitempty"`
-	ExpectedParentRevision string                 `protobuf:"bytes,4,opt,name=expected_parent_revision,json=expectedParentRevision,proto3" json:"expected_parent_revision,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+type FsCreateDirectoryReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateDirectoryReq) Reset() {
-	*x = CreateDirectoryReq{}
+func (x *FsCreateDirectoryReq) Reset() {
+	*x = FsCreateDirectoryReq{}
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateDirectoryReq) String() string {
+func (x *FsCreateDirectoryReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateDirectoryReq) ProtoMessage() {}
+func (*FsCreateDirectoryReq) ProtoMessage() {}
 
-func (x *CreateDirectoryReq) ProtoReflect() protoreflect.Message {
+func (x *FsCreateDirectoryReq) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -714,60 +724,46 @@ func (x *CreateDirectoryReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateDirectoryReq.ProtoReflect.Descriptor instead.
-func (*CreateDirectoryReq) Descriptor() ([]byte, []int) {
+// Deprecated: Use FsCreateDirectoryReq.ProtoReflect.Descriptor instead.
+func (*FsCreateDirectoryReq) Descriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *CreateDirectoryReq) GetWorkspaceId() string {
+func (x *FsCreateDirectoryReq) GetWorkspaceId() string {
 	if x != nil {
 		return x.WorkspaceId
 	}
 	return ""
 }
 
-func (x *CreateDirectoryReq) GetPath() string {
+func (x *FsCreateDirectoryReq) GetPath() string {
 	if x != nil {
 		return x.Path
 	}
 	return ""
 }
 
-func (x *CreateDirectoryReq) GetAllowExisting() bool {
-	if x != nil {
-		return x.AllowExisting
-	}
-	return false
-}
-
-func (x *CreateDirectoryReq) GetExpectedParentRevision() string {
-	if x != nil {
-		return x.ExpectedParentRevision
-	}
-	return ""
-}
-
-type CreateDirectoryResp struct {
+type FsCreateDirectoryResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        *FileMutationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	Stat          *FileStat              `protobuf:"bytes,1,opt,name=stat,proto3" json:"stat,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateDirectoryResp) Reset() {
-	*x = CreateDirectoryResp{}
+func (x *FsCreateDirectoryResp) Reset() {
+	*x = FsCreateDirectoryResp{}
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateDirectoryResp) String() string {
+func (x *FsCreateDirectoryResp) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateDirectoryResp) ProtoMessage() {}
+func (*FsCreateDirectoryResp) ProtoMessage() {}
 
-func (x *CreateDirectoryResp) ProtoReflect() protoreflect.Message {
+func (x *FsCreateDirectoryResp) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -779,43 +775,42 @@ func (x *CreateDirectoryResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateDirectoryResp.ProtoReflect.Descriptor instead.
-func (*CreateDirectoryResp) Descriptor() ([]byte, []int) {
+// Deprecated: Use FsCreateDirectoryResp.ProtoReflect.Descriptor instead.
+func (*FsCreateDirectoryResp) Descriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *CreateDirectoryResp) GetResult() *FileMutationResult {
+func (x *FsCreateDirectoryResp) GetStat() *FileStat {
 	if x != nil {
-		return x.Result
+		return x.Stat
 	}
 	return nil
 }
 
-type WriteFileReq struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId      string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Path             string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	Text             string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
-	ExpectedRevision string                 `protobuf:"bytes,4,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	Force            bool                   `protobuf:"varint,5,opt,name=force,proto3" json:"force,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+type FsDeleteReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Recursive     bool                   `protobuf:"varint,3,opt,name=recursive,proto3" json:"recursive,omitempty"`
+	UseTrash      bool                   `protobuf:"varint,4,opt,name=use_trash,json=useTrash,proto3" json:"use_trash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-func (x *WriteFileReq) Reset() {
-	*x = WriteFileReq{}
+func (x *FsDeleteReq) Reset() {
+	*x = FsDeleteReq{}
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WriteFileReq) String() string {
+func (x *FsDeleteReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WriteFileReq) ProtoMessage() {}
+func (*FsDeleteReq) ProtoMessage() {}
 
-func (x *WriteFileReq) ProtoReflect() protoreflect.Message {
+func (x *FsDeleteReq) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_agent_v1_file_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -827,452 +822,60 @@ func (x *WriteFileReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use WriteFileReq.ProtoReflect.Descriptor instead.
-func (*WriteFileReq) Descriptor() ([]byte, []int) {
+// Deprecated: Use FsDeleteReq.ProtoReflect.Descriptor instead.
+func (*FsDeleteReq) Descriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *WriteFileReq) GetWorkspaceId() string {
+func (x *FsDeleteReq) GetWorkspaceId() string {
 	if x != nil {
 		return x.WorkspaceId
 	}
 	return ""
 }
 
-func (x *WriteFileReq) GetPath() string {
+func (x *FsDeleteReq) GetPath() string {
 	if x != nil {
 		return x.Path
 	}
 	return ""
 }
 
-func (x *WriteFileReq) GetText() string {
-	if x != nil {
-		return x.Text
-	}
-	return ""
-}
-
-func (x *WriteFileReq) GetExpectedRevision() string {
-	if x != nil {
-		return x.ExpectedRevision
-	}
-	return ""
-}
-
-func (x *WriteFileReq) GetForce() bool {
-	if x != nil {
-		return x.Force
-	}
-	return false
-}
-
-type WriteFileResp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        *FileMutationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WriteFileResp) Reset() {
-	*x = WriteFileResp{}
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WriteFileResp) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WriteFileResp) ProtoMessage() {}
-
-func (x *WriteFileResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WriteFileResp.ProtoReflect.Descriptor instead.
-func (*WriteFileResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *WriteFileResp) GetResult() *FileMutationResult {
-	if x != nil {
-		return x.Result
-	}
-	return nil
-}
-
-type RenameEntryReq struct {
-	state                       protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId                 string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Path                        string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	NewName                     string                 `protobuf:"bytes,3,opt,name=new_name,json=newName,proto3" json:"new_name,omitempty"`
-	ExpectedSourceRevision      string                 `protobuf:"bytes,4,opt,name=expected_source_revision,json=expectedSourceRevision,proto3" json:"expected_source_revision,omitempty"`
-	ExpectedParentRevision      string                 `protobuf:"bytes,5,opt,name=expected_parent_revision,json=expectedParentRevision,proto3" json:"expected_parent_revision,omitempty"`
-	ExpectedDestinationRevision string                 `protobuf:"bytes,6,opt,name=expected_destination_revision,json=expectedDestinationRevision,proto3" json:"expected_destination_revision,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
-}
-
-func (x *RenameEntryReq) Reset() {
-	*x = RenameEntryReq{}
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RenameEntryReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RenameEntryReq) ProtoMessage() {}
-
-func (x *RenameEntryReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RenameEntryReq.ProtoReflect.Descriptor instead.
-func (*RenameEntryReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *RenameEntryReq) GetWorkspaceId() string {
-	if x != nil {
-		return x.WorkspaceId
-	}
-	return ""
-}
-
-func (x *RenameEntryReq) GetPath() string {
-	if x != nil {
-		return x.Path
-	}
-	return ""
-}
-
-func (x *RenameEntryReq) GetNewName() string {
-	if x != nil {
-		return x.NewName
-	}
-	return ""
-}
-
-func (x *RenameEntryReq) GetExpectedSourceRevision() string {
-	if x != nil {
-		return x.ExpectedSourceRevision
-	}
-	return ""
-}
-
-func (x *RenameEntryReq) GetExpectedParentRevision() string {
-	if x != nil {
-		return x.ExpectedParentRevision
-	}
-	return ""
-}
-
-func (x *RenameEntryReq) GetExpectedDestinationRevision() string {
-	if x != nil {
-		return x.ExpectedDestinationRevision
-	}
-	return ""
-}
-
-type RenameEntryResp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        *FileMutationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RenameEntryResp) Reset() {
-	*x = RenameEntryResp{}
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RenameEntryResp) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RenameEntryResp) ProtoMessage() {}
-
-func (x *RenameEntryResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RenameEntryResp.ProtoReflect.Descriptor instead.
-func (*RenameEntryResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{15}
-}
-
-func (x *RenameEntryResp) GetResult() *FileMutationResult {
-	if x != nil {
-		return x.Result
-	}
-	return nil
-}
-
-type MoveEntryReq struct {
-	state                             protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId                       string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	SourcePath                        string                 `protobuf:"bytes,2,opt,name=source_path,json=sourcePath,proto3" json:"source_path,omitempty"`
-	DestinationPath                   string                 `protobuf:"bytes,3,opt,name=destination_path,json=destinationPath,proto3" json:"destination_path,omitempty"`
-	ExpectedSourceRevision            string                 `protobuf:"bytes,4,opt,name=expected_source_revision,json=expectedSourceRevision,proto3" json:"expected_source_revision,omitempty"`
-	ExpectedSourceParentRevision      string                 `protobuf:"bytes,5,opt,name=expected_source_parent_revision,json=expectedSourceParentRevision,proto3" json:"expected_source_parent_revision,omitempty"`
-	ExpectedDestinationParentRevision string                 `protobuf:"bytes,6,opt,name=expected_destination_parent_revision,json=expectedDestinationParentRevision,proto3" json:"expected_destination_parent_revision,omitempty"`
-	ExpectedDestinationRevision       string                 `protobuf:"bytes,7,opt,name=expected_destination_revision,json=expectedDestinationRevision,proto3" json:"expected_destination_revision,omitempty"`
-	unknownFields                     protoimpl.UnknownFields
-	sizeCache                         protoimpl.SizeCache
-}
-
-func (x *MoveEntryReq) Reset() {
-	*x = MoveEntryReq{}
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *MoveEntryReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MoveEntryReq) ProtoMessage() {}
-
-func (x *MoveEntryReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MoveEntryReq.ProtoReflect.Descriptor instead.
-func (*MoveEntryReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{16}
-}
-
-func (x *MoveEntryReq) GetWorkspaceId() string {
-	if x != nil {
-		return x.WorkspaceId
-	}
-	return ""
-}
-
-func (x *MoveEntryReq) GetSourcePath() string {
-	if x != nil {
-		return x.SourcePath
-	}
-	return ""
-}
-
-func (x *MoveEntryReq) GetDestinationPath() string {
-	if x != nil {
-		return x.DestinationPath
-	}
-	return ""
-}
-
-func (x *MoveEntryReq) GetExpectedSourceRevision() string {
-	if x != nil {
-		return x.ExpectedSourceRevision
-	}
-	return ""
-}
-
-func (x *MoveEntryReq) GetExpectedSourceParentRevision() string {
-	if x != nil {
-		return x.ExpectedSourceParentRevision
-	}
-	return ""
-}
-
-func (x *MoveEntryReq) GetExpectedDestinationParentRevision() string {
-	if x != nil {
-		return x.ExpectedDestinationParentRevision
-	}
-	return ""
-}
-
-func (x *MoveEntryReq) GetExpectedDestinationRevision() string {
-	if x != nil {
-		return x.ExpectedDestinationRevision
-	}
-	return ""
-}
-
-type MoveEntryResp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        *FileMutationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *MoveEntryResp) Reset() {
-	*x = MoveEntryResp{}
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[17]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *MoveEntryResp) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MoveEntryResp) ProtoMessage() {}
-
-func (x *MoveEntryResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[17]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MoveEntryResp.ProtoReflect.Descriptor instead.
-func (*MoveEntryResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{17}
-}
-
-func (x *MoveEntryResp) GetResult() *FileMutationResult {
-	if x != nil {
-		return x.Result
-	}
-	return nil
-}
-
-type DeleteEntryReq struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId            string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Path                   string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	ExpectedRevision       string                 `protobuf:"bytes,3,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
-	ExpectedParentRevision string                 `protobuf:"bytes,4,opt,name=expected_parent_revision,json=expectedParentRevision,proto3" json:"expected_parent_revision,omitempty"`
-	Recursive              bool                   `protobuf:"varint,5,opt,name=recursive,proto3" json:"recursive,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
-}
-
-func (x *DeleteEntryReq) Reset() {
-	*x = DeleteEntryReq{}
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[18]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DeleteEntryReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeleteEntryReq) ProtoMessage() {}
-
-func (x *DeleteEntryReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[18]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeleteEntryReq.ProtoReflect.Descriptor instead.
-func (*DeleteEntryReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{18}
-}
-
-func (x *DeleteEntryReq) GetWorkspaceId() string {
-	if x != nil {
-		return x.WorkspaceId
-	}
-	return ""
-}
-
-func (x *DeleteEntryReq) GetPath() string {
-	if x != nil {
-		return x.Path
-	}
-	return ""
-}
-
-func (x *DeleteEntryReq) GetExpectedRevision() string {
-	if x != nil {
-		return x.ExpectedRevision
-	}
-	return ""
-}
-
-func (x *DeleteEntryReq) GetExpectedParentRevision() string {
-	if x != nil {
-		return x.ExpectedParentRevision
-	}
-	return ""
-}
-
-func (x *DeleteEntryReq) GetRecursive() bool {
+func (x *FsDeleteReq) GetRecursive() bool {
 	if x != nil {
 		return x.Recursive
 	}
 	return false
 }
 
-type DeleteEntryResp struct {
+func (x *FsDeleteReq) GetUseTrash() bool {
+	if x != nil {
+		return x.UseTrash
+	}
+	return false
+}
+
+type FsDeleteResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        *FileMutationResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DeleteEntryResp) Reset() {
-	*x = DeleteEntryResp{}
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[19]
+func (x *FsDeleteResp) Reset() {
+	*x = FsDeleteResp{}
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DeleteEntryResp) String() string {
+func (x *FsDeleteResp) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DeleteEntryResp) ProtoMessage() {}
+func (*FsDeleteResp) ProtoMessage() {}
 
-func (x *DeleteEntryResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_file_proto_msgTypes[19]
+func (x *FsDeleteResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1283,14 +886,119 @@ func (x *DeleteEntryResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DeleteEntryResp.ProtoReflect.Descriptor instead.
-func (*DeleteEntryResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{19}
+// Deprecated: Use FsDeleteResp.ProtoReflect.Descriptor instead.
+func (*FsDeleteResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{13}
 }
 
-func (x *DeleteEntryResp) GetResult() *FileMutationResult {
+type FsRenameReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	OldPath       string                 `protobuf:"bytes,2,opt,name=old_path,json=oldPath,proto3" json:"old_path,omitempty"`
+	NewPath       string                 `protobuf:"bytes,3,opt,name=new_path,json=newPath,proto3" json:"new_path,omitempty"`
+	Overwrite     bool                   `protobuf:"varint,4,opt,name=overwrite,proto3" json:"overwrite,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FsRenameReq) Reset() {
+	*x = FsRenameReq{}
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FsRenameReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FsRenameReq) ProtoMessage() {}
+
+func (x *FsRenameReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[14]
 	if x != nil {
-		return x.Result
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FsRenameReq.ProtoReflect.Descriptor instead.
+func (*FsRenameReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *FsRenameReq) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *FsRenameReq) GetOldPath() string {
+	if x != nil {
+		return x.OldPath
+	}
+	return ""
+}
+
+func (x *FsRenameReq) GetNewPath() string {
+	if x != nil {
+		return x.NewPath
+	}
+	return ""
+}
+
+func (x *FsRenameReq) GetOverwrite() bool {
+	if x != nil {
+		return x.Overwrite
+	}
+	return false
+}
+
+type FsRenameResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Stat          *FileStat              `protobuf:"bytes,1,opt,name=stat,proto3" json:"stat,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FsRenameResp) Reset() {
+	*x = FsRenameResp{}
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FsRenameResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FsRenameResp) ProtoMessage() {}
+
+func (x *FsRenameResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_file_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FsRenameResp.ProtoReflect.Descriptor instead.
+func (*FsRenameResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_file_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *FsRenameResp) GetStat() *FileStat {
+	if x != nil {
+		return x.Stat
 	}
 	return nil
 }
@@ -1299,97 +1007,70 @@ var File_termbridge_agent_v1_file_proto protoreflect.FileDescriptor
 
 const file_termbridge_agent_v1_file_proto_rawDesc = "" +
 	"\n" +
-	"\x1etermbridge/agent/v1/file.proto\x12\x10termbridge.agent\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8e\x02\n" +
-	"\tFileEntry\x12\x12\n" +
-	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x123\n" +
-	"\x04kind\x18\x03 \x01(\x0e2\x1f.termbridge.agent.FileEntryKindR\x04kind\x12\x12\n" +
-	"\x04size\x18\x04 \x01(\x03R\x04size\x12;\n" +
-	"\vmodified_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"modifiedAt\x12\x1a\n" +
-	"\brevision\x18\x06 \x01(\tR\brevision\x12&\n" +
-	"\fhas_children\x18\a \x01(\bH\x00R\vhasChildren\x88\x01\x01B\x0f\n" +
-	"\r_has_children\"W\n" +
-	"\x14RevisionPrecondition\x12\x12\n" +
-	"\x04path\x18\x01 \x01(\tR\x04path\x12+\n" +
-	"\x11expected_revision\x18\x02 \x01(\tR\x10expectedRevision\"d\n" +
-	"\fFileConflict\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x12@\n" +
-	"\rcurrent_entry\x18\x02 \x01(\v2\x1b.termbridge.agent.FileEntryR\fcurrentEntry\"\xfb\x01\n" +
-	"\x12FileMutationResult\x12>\n" +
-	"\fsource_entry\x18\x01 \x01(\v2\x1b.termbridge.agent.FileEntryR\vsourceEntry\x12H\n" +
-	"\x11destination_entry\x18\x02 \x01(\v2\x1b.termbridge.agent.FileEntryR\x10destinationEntry\x12%\n" +
-	"\x0eaffected_count\x18\x03 \x01(\x05R\raffectedCount\x124\n" +
-	"\x16affected_path_prefixes\x18\x04 \x03(\tR\x14affectedPathPrefixes\"E\n" +
-	"\fListFilesReq\x12!\n" +
+	"\x1etermbridge/agent/v1/file.proto\x12\x10termbridge.agent\"\xd2\x01\n" +
+	"\bFileStat\x12.\n" +
+	"\x04type\x18\x01 \x01(\x0e2\x1a.termbridge.agent.FileTypeR\x04type\x12\x14\n" +
+	"\x05ctime\x18\x02 \x01(\x03R\x05ctime\x12\x14\n" +
+	"\x05mtime\x18\x03 \x01(\x03R\x05mtime\x12\x12\n" +
+	"\x04size\x18\x04 \x01(\x03R\x04size\x12B\n" +
+	"\vpermissions\x18\x05 \x01(\x0e2 .termbridge.agent.FilePermissionR\vpermissions\x12\x12\n" +
+	"\x04etag\x18\x06 \x01(\tR\x04etag\"B\n" +
+	"\tFsStatReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\"\x9b\x01\n" +
-	"\rListFilesResp\x129\n" +
-	"\tdirectory\x18\x01 \x01(\v2\x1b.termbridge.agent.FileEntryR\tdirectory\x121\n" +
-	"\x05items\x18\x02 \x03(\v2\x1b.termbridge.agent.FileEntryR\x05items\x12\x1c\n" +
-	"\ttruncated\x18\x03 \x01(\bR\ttruncated\"D\n" +
-	"\vReadFileReq\x12!\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"<\n" +
+	"\n" +
+	"FsStatResp\x12.\n" +
+	"\x04stat\x18\x01 \x01(\v2\x1a.termbridge.agent.FileStatR\x04stat\"K\n" +
+	"\x12FsReadDirectoryReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\"U\n" +
-	"\fReadFileResp\x121\n" +
-	"\x05entry\x18\x01 \x01(\v2\x1b.termbridge.agent.FileEntryR\x05entry\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text\"\xf6\x01\n" +
-	"\rCreateFileReq\x12!\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"V\n" +
+	"\x10FsDirectoryEntry\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12.\n" +
+	"\x04type\x18\x02 \x01(\x0e2\x1a.termbridge.agent.FileTypeR\x04type\"q\n" +
+	"\x13FsReadDirectoryResp\x12<\n" +
+	"\aentries\x18\x01 \x03(\v2\".termbridge.agent.FsDirectoryEntryR\aentries\x12\x1c\n" +
+	"\ttruncated\x18\x02 \x01(\bR\ttruncated\"F\n" +
+	"\rFsReadFileReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x12\x12\n" +
-	"\x04text\x18\x03 \x01(\tR\x04text\x12\x1c\n" +
-	"\toverwrite\x18\x04 \x01(\bR\toverwrite\x128\n" +
-	"\x18expected_parent_revision\x18\x05 \x01(\tR\x16expectedParentRevision\x12B\n" +
-	"\x1dexpected_destination_revision\x18\x06 \x01(\tR\x1bexpectedDestinationRevision\"N\n" +
-	"\x0eCreateFileResp\x12<\n" +
-	"\x06result\x18\x01 \x01(\v2$.termbridge.agent.FileMutationResultR\x06result\"\xac\x01\n" +
-	"\x12CreateDirectoryReq\x12!\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"Z\n" +
+	"\x0eFsReadFileResp\x12\x18\n" +
+	"\acontent\x18\x01 \x01(\fR\acontent\x12.\n" +
+	"\x04stat\x18\x02 \x01(\v2\x1a.termbridge.agent.FileStatR\x04stat\"\xab\x01\n" +
+	"\x0eFsWriteFileReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x12%\n" +
-	"\x0eallow_existing\x18\x03 \x01(\bR\rallowExisting\x128\n" +
-	"\x18expected_parent_revision\x18\x04 \x01(\tR\x16expectedParentRevision\"S\n" +
-	"\x13CreateDirectoryResp\x12<\n" +
-	"\x06result\x18\x01 \x01(\v2$.termbridge.agent.FileMutationResultR\x06result\"\x9c\x01\n" +
-	"\fWriteFileReq\x12!\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x18\n" +
+	"\acontent\x18\x03 \x01(\fR\acontent\x12\x16\n" +
+	"\x06create\x18\x04 \x01(\bR\x06create\x12\x1c\n" +
+	"\toverwrite\x18\x05 \x01(\bR\toverwrite\x12\x12\n" +
+	"\x04etag\x18\x06 \x01(\tR\x04etag\"A\n" +
+	"\x0fFsWriteFileResp\x12.\n" +
+	"\x04stat\x18\x01 \x01(\v2\x1a.termbridge.agent.FileStatR\x04stat\"M\n" +
+	"\x14FsCreateDirectoryReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x12\x12\n" +
-	"\x04text\x18\x03 \x01(\tR\x04text\x12+\n" +
-	"\x11expected_revision\x18\x04 \x01(\tR\x10expectedRevision\x12\x14\n" +
-	"\x05force\x18\x05 \x01(\bR\x05force\"M\n" +
-	"\rWriteFileResp\x12<\n" +
-	"\x06result\x18\x01 \x01(\v2$.termbridge.agent.FileMutationResultR\x06result\"\x9a\x02\n" +
-	"\x0eRenameEntryReq\x12!\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"G\n" +
+	"\x15FsCreateDirectoryResp\x12.\n" +
+	"\x04stat\x18\x01 \x01(\v2\x1a.termbridge.agent.FileStatR\x04stat\"\x7f\n" +
+	"\vFsDeleteReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x12\x19\n" +
-	"\bnew_name\x18\x03 \x01(\tR\anewName\x128\n" +
-	"\x18expected_source_revision\x18\x04 \x01(\tR\x16expectedSourceRevision\x128\n" +
-	"\x18expected_parent_revision\x18\x05 \x01(\tR\x16expectedParentRevision\x12B\n" +
-	"\x1dexpected_destination_revision\x18\x06 \x01(\tR\x1bexpectedDestinationRevision\"O\n" +
-	"\x0fRenameEntryResp\x12<\n" +
-	"\x06result\x18\x01 \x01(\v2$.termbridge.agent.FileMutationResultR\x06result\"\x93\x03\n" +
-	"\fMoveEntryReq\x12!\n" +
-	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1f\n" +
-	"\vsource_path\x18\x02 \x01(\tR\n" +
-	"sourcePath\x12)\n" +
-	"\x10destination_path\x18\x03 \x01(\tR\x0fdestinationPath\x128\n" +
-	"\x18expected_source_revision\x18\x04 \x01(\tR\x16expectedSourceRevision\x12E\n" +
-	"\x1fexpected_source_parent_revision\x18\x05 \x01(\tR\x1cexpectedSourceParentRevision\x12O\n" +
-	"$expected_destination_parent_revision\x18\x06 \x01(\tR!expectedDestinationParentRevision\x12B\n" +
-	"\x1dexpected_destination_revision\x18\a \x01(\tR\x1bexpectedDestinationRevision\"M\n" +
-	"\rMoveEntryResp\x12<\n" +
-	"\x06result\x18\x01 \x01(\v2$.termbridge.agent.FileMutationResultR\x06result\"\xcc\x01\n" +
-	"\x0eDeleteEntryReq\x12!\n" +
-	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x12+\n" +
-	"\x11expected_revision\x18\x03 \x01(\tR\x10expectedRevision\x128\n" +
-	"\x18expected_parent_revision\x18\x04 \x01(\tR\x16expectedParentRevision\x12\x1c\n" +
-	"\trecursive\x18\x05 \x01(\bR\trecursive\"O\n" +
-	"\x0fDeleteEntryResp\x12<\n" +
-	"\x06result\x18\x01 \x01(\v2$.termbridge.agent.FileMutationResultR\x06result*i\n" +
-	"\rFileEntryKind\x12\x1f\n" +
-	"\x1bFILE_ENTRY_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
-	"\x14FILE_ENTRY_KIND_FILE\x10\x01\x12\x1d\n" +
-	"\x19FILE_ENTRY_KIND_DIRECTORY\x10\x02B\xcb\x01\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1c\n" +
+	"\trecursive\x18\x03 \x01(\bR\trecursive\x12\x1b\n" +
+	"\tuse_trash\x18\x04 \x01(\bR\buseTrash\"\x0e\n" +
+	"\fFsDeleteResp\"\x84\x01\n" +
+	"\vFsRenameReq\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x19\n" +
+	"\bold_path\x18\x02 \x01(\tR\aoldPath\x12\x19\n" +
+	"\bnew_path\x18\x03 \x01(\tR\anewPath\x12\x1c\n" +
+	"\toverwrite\x18\x04 \x01(\bR\toverwrite\">\n" +
+	"\fFsRenameResp\x12.\n" +
+	"\x04stat\x18\x01 \x01(\v2\x1a.termbridge.agent.FileStatR\x04stat*k\n" +
+	"\bFileType\x12\x15\n" +
+	"\x11FILE_TYPE_UNKNOWN\x10\x00\x12\x12\n" +
+	"\x0eFILE_TYPE_FILE\x10\x01\x12\x17\n" +
+	"\x13FILE_TYPE_DIRECTORY\x10\x02\x12\x1b\n" +
+	"\x17FILE_TYPE_SYMBOLIC_LINK\x10@*O\n" +
+	"\x0eFilePermission\x12\x1f\n" +
+	"\x1bFILE_PERMISSION_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18FILE_PERMISSION_READONLY\x10\x01B\xcb\x01\n" +
 	"\x14com.termbridge.agentB\tFileProtoP\x01ZGgitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1\xa2\x02\x03TAX\xaa\x02\x10Termbridge.Agent\xca\x02\x10Termbridge\\Agent\xe2\x02\x1cTermbridge\\Agent\\GPBMetadata\xea\x02\x11Termbridge::Agentb\x06proto3"
 
 var (
@@ -1404,52 +1085,43 @@ func file_termbridge_agent_v1_file_proto_rawDescGZIP() []byte {
 	return file_termbridge_agent_v1_file_proto_rawDescData
 }
 
-var file_termbridge_agent_v1_file_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_termbridge_agent_v1_file_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_termbridge_agent_v1_file_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_termbridge_agent_v1_file_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_termbridge_agent_v1_file_proto_goTypes = []any{
-	(FileEntryKind)(0),            // 0: termbridge.agent.FileEntryKind
-	(*FileEntry)(nil),             // 1: termbridge.agent.FileEntry
-	(*RevisionPrecondition)(nil),  // 2: termbridge.agent.RevisionPrecondition
-	(*FileConflict)(nil),          // 3: termbridge.agent.FileConflict
-	(*FileMutationResult)(nil),    // 4: termbridge.agent.FileMutationResult
-	(*ListFilesReq)(nil),          // 5: termbridge.agent.ListFilesReq
-	(*ListFilesResp)(nil),         // 6: termbridge.agent.ListFilesResp
-	(*ReadFileReq)(nil),           // 7: termbridge.agent.ReadFileReq
-	(*ReadFileResp)(nil),          // 8: termbridge.agent.ReadFileResp
-	(*CreateFileReq)(nil),         // 9: termbridge.agent.CreateFileReq
-	(*CreateFileResp)(nil),        // 10: termbridge.agent.CreateFileResp
-	(*CreateDirectoryReq)(nil),    // 11: termbridge.agent.CreateDirectoryReq
-	(*CreateDirectoryResp)(nil),   // 12: termbridge.agent.CreateDirectoryResp
-	(*WriteFileReq)(nil),          // 13: termbridge.agent.WriteFileReq
-	(*WriteFileResp)(nil),         // 14: termbridge.agent.WriteFileResp
-	(*RenameEntryReq)(nil),        // 15: termbridge.agent.RenameEntryReq
-	(*RenameEntryResp)(nil),       // 16: termbridge.agent.RenameEntryResp
-	(*MoveEntryReq)(nil),          // 17: termbridge.agent.MoveEntryReq
-	(*MoveEntryResp)(nil),         // 18: termbridge.agent.MoveEntryResp
-	(*DeleteEntryReq)(nil),        // 19: termbridge.agent.DeleteEntryReq
-	(*DeleteEntryResp)(nil),       // 20: termbridge.agent.DeleteEntryResp
-	(*timestamppb.Timestamp)(nil), // 21: google.protobuf.Timestamp
+	(FileType)(0),                 // 0: termbridge.agent.FileType
+	(FilePermission)(0),           // 1: termbridge.agent.FilePermission
+	(*FileStat)(nil),              // 2: termbridge.agent.FileStat
+	(*FsStatReq)(nil),             // 3: termbridge.agent.FsStatReq
+	(*FsStatResp)(nil),            // 4: termbridge.agent.FsStatResp
+	(*FsReadDirectoryReq)(nil),    // 5: termbridge.agent.FsReadDirectoryReq
+	(*FsDirectoryEntry)(nil),      // 6: termbridge.agent.FsDirectoryEntry
+	(*FsReadDirectoryResp)(nil),   // 7: termbridge.agent.FsReadDirectoryResp
+	(*FsReadFileReq)(nil),         // 8: termbridge.agent.FsReadFileReq
+	(*FsReadFileResp)(nil),        // 9: termbridge.agent.FsReadFileResp
+	(*FsWriteFileReq)(nil),        // 10: termbridge.agent.FsWriteFileReq
+	(*FsWriteFileResp)(nil),       // 11: termbridge.agent.FsWriteFileResp
+	(*FsCreateDirectoryReq)(nil),  // 12: termbridge.agent.FsCreateDirectoryReq
+	(*FsCreateDirectoryResp)(nil), // 13: termbridge.agent.FsCreateDirectoryResp
+	(*FsDeleteReq)(nil),           // 14: termbridge.agent.FsDeleteReq
+	(*FsDeleteResp)(nil),          // 15: termbridge.agent.FsDeleteResp
+	(*FsRenameReq)(nil),           // 16: termbridge.agent.FsRenameReq
+	(*FsRenameResp)(nil),          // 17: termbridge.agent.FsRenameResp
 }
 var file_termbridge_agent_v1_file_proto_depIdxs = []int32{
-	0,  // 0: termbridge.agent.FileEntry.kind:type_name -> termbridge.agent.FileEntryKind
-	21, // 1: termbridge.agent.FileEntry.modified_at:type_name -> google.protobuf.Timestamp
-	1,  // 2: termbridge.agent.FileConflict.current_entry:type_name -> termbridge.agent.FileEntry
-	1,  // 3: termbridge.agent.FileMutationResult.source_entry:type_name -> termbridge.agent.FileEntry
-	1,  // 4: termbridge.agent.FileMutationResult.destination_entry:type_name -> termbridge.agent.FileEntry
-	1,  // 5: termbridge.agent.ListFilesResp.directory:type_name -> termbridge.agent.FileEntry
-	1,  // 6: termbridge.agent.ListFilesResp.items:type_name -> termbridge.agent.FileEntry
-	1,  // 7: termbridge.agent.ReadFileResp.entry:type_name -> termbridge.agent.FileEntry
-	4,  // 8: termbridge.agent.CreateFileResp.result:type_name -> termbridge.agent.FileMutationResult
-	4,  // 9: termbridge.agent.CreateDirectoryResp.result:type_name -> termbridge.agent.FileMutationResult
-	4,  // 10: termbridge.agent.WriteFileResp.result:type_name -> termbridge.agent.FileMutationResult
-	4,  // 11: termbridge.agent.RenameEntryResp.result:type_name -> termbridge.agent.FileMutationResult
-	4,  // 12: termbridge.agent.MoveEntryResp.result:type_name -> termbridge.agent.FileMutationResult
-	4,  // 13: termbridge.agent.DeleteEntryResp.result:type_name -> termbridge.agent.FileMutationResult
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	0, // 0: termbridge.agent.FileStat.type:type_name -> termbridge.agent.FileType
+	1, // 1: termbridge.agent.FileStat.permissions:type_name -> termbridge.agent.FilePermission
+	2, // 2: termbridge.agent.FsStatResp.stat:type_name -> termbridge.agent.FileStat
+	0, // 3: termbridge.agent.FsDirectoryEntry.type:type_name -> termbridge.agent.FileType
+	6, // 4: termbridge.agent.FsReadDirectoryResp.entries:type_name -> termbridge.agent.FsDirectoryEntry
+	2, // 5: termbridge.agent.FsReadFileResp.stat:type_name -> termbridge.agent.FileStat
+	2, // 6: termbridge.agent.FsWriteFileResp.stat:type_name -> termbridge.agent.FileStat
+	2, // 7: termbridge.agent.FsCreateDirectoryResp.stat:type_name -> termbridge.agent.FileStat
+	2, // 8: termbridge.agent.FsRenameResp.stat:type_name -> termbridge.agent.FileStat
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_termbridge_agent_v1_file_proto_init() }
@@ -1457,14 +1129,13 @@ func file_termbridge_agent_v1_file_proto_init() {
 	if File_termbridge_agent_v1_file_proto != nil {
 		return
 	}
-	file_termbridge_agent_v1_file_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_termbridge_agent_v1_file_proto_rawDesc), len(file_termbridge_agent_v1_file_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   20,
+			NumEnums:      2,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -2,59 +2,134 @@ syntax = "proto3";
 
 package termbridge.agent;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1/git";
 
-enum GitState {
-  GIT_STATE_UNSPECIFIED = 0;
-  GIT_STATE_AVAILABLE = 1;
-  GIT_STATE_NOT_REPOSITORY = 2;
-  GIT_STATE_EXECUTABLE_UNAVAILABLE = 3;
-  GIT_STATE_BINARY = 4;
-  GIT_STATE_TOO_LARGE = 5;
-  GIT_STATE_UNMERGED = 6;
-  GIT_STATE_SUBMODULE = 7;
-  GIT_STATE_LAYER_UNAVAILABLE = 8;
-  GIT_STATE_UNAVAILABLE = 9;
+// Wire contract aligned with vscode.scm SourceControl / ResourceGroup / ResourceState.
+// Frontend SCM Provider consumes these shapes without DTO translation.
+
+enum ScmState {
+  SCM_STATE_UNSPECIFIED = 0;
+  SCM_STATE_AVAILABLE = 1;
+  SCM_STATE_NOT_REPOSITORY = 2;
+  SCM_STATE_EXECUTABLE_UNAVAILABLE = 3;
+  SCM_STATE_UNAVAILABLE = 4;
 }
 
-enum GitLayer {
-  GIT_LAYER_UNSPECIFIED = 0;
-  GIT_LAYER_STAGED = 1;
-  GIT_LAYER_UNSTAGED = 2;
-  GIT_LAYER_UNTRACKED = 3;
+enum ScmResourceState {
+  SCM_RESOURCE_STATE_UNSPECIFIED = 0;
+  SCM_RESOURCE_STATE_AVAILABLE = 1;
+  SCM_RESOURCE_STATE_BINARY = 2;
+  SCM_RESOURCE_STATE_TOO_LARGE = 3;
+  SCM_RESOURCE_STATE_UNMERGED = 4;
+  SCM_RESOURCE_STATE_SUBMODULE = 5;
+  SCM_RESOURCE_STATE_UNAVAILABLE = 6;
 }
 
-message GitChange {
+message ScmResourceDecorations {
+  bool strike_through = 1;
+  bool faded = 2;
+  string tooltip = 3;
+  string letter = 4;
+  string color_id = 5;
+}
+
+message ScmResource {
   string path = 1;
   string original_path = 2;
-  string index_status = 3;
-  string worktree_status = 4;
-  bool untracked = 5;
-  bool unmerged = 6;
-  repeated GitLayer available_layers = 7;
+  string group_id = 3;
+  ScmResourceDecorations decorations = 4;
+  ScmResourceState resource_state = 5;
 }
 
-message GitStatusReq {
+message ScmResourceGroup {
+  string id = 1;
+  string label = 2;
+  repeated ScmResource resources = 3;
+  bool hide_when_empty = 4;
+}
+
+message ScmStatusReq {
   string workspace_id = 1;
 }
 
-message GitStatusResp {
-  GitState state = 1;
-  repeated GitChange changes = 2;
+message ScmStatusResp {
+  ScmState state = 1;
+  repeated ScmResourceGroup groups = 2;
+  int32 count = 3;
+  string message = 4;
+}
+
+// Original content for quickDiff / open diff (left side).
+message ScmOriginalContentReq {
+  string workspace_id = 1;
+  string path = 2;
+  string group_id = 3;
+}
+
+message ScmOriginalContentResp {
+  ScmResourceState resource_state = 1;
+  bytes content = 2;
   string message = 3;
 }
 
-message GitDiffReq {
-  string workspace_id = 1;
-  string path = 2;
-  GitLayer layer = 3;
+enum ScmCommand {
+  SCM_COMMAND_UNSPECIFIED = 0;
+  SCM_COMMAND_STAGE = 1;
+  SCM_COMMAND_UNSTAGE = 2;
+  SCM_COMMAND_DISCARD = 3;
+  SCM_COMMAND_COMMIT = 4;
+  SCM_COMMAND_CREATE_BRANCH = 5;
+  SCM_COMMAND_SWITCH_BRANCH = 6;
 }
 
-message GitDiffResp {
-  GitState state = 1;
-  string original_path = 2;
-  string modified_path = 3;
-  string original_text = 4;
-  string modified_text = 5;
-  string message = 6;
+enum ScmOperationState {
+  SCM_OPERATION_STATE_UNSPECIFIED = 0;
+  SCM_OPERATION_STATE_OK = 1;
+  SCM_OPERATION_STATE_CLEAN_WORKTREE_REQUIRED = 2;
+  SCM_OPERATION_STATE_NO_STAGED_CHANGES = 3;
+  SCM_OPERATION_STATE_BRANCH_EXISTS = 4;
+  SCM_OPERATION_STATE_BRANCH_NOT_FOUND = 5;
+  SCM_OPERATION_STATE_INVALID_BRANCH_NAME = 6;
+  SCM_OPERATION_STATE_INVALID_COMMIT_MESSAGE = 7;
+  SCM_OPERATION_STATE_CONFLICT = 8;
+  SCM_OPERATION_STATE_FAILED = 9;
+  SCM_OPERATION_STATE_UNAVAILABLE = 10;
+}
+
+message ScmExecuteReq {
+  string workspace_id = 1;
+  ScmCommand command = 2;
+  string path = 3;
+  string group_id = 4;
+  string message = 5;
+  string branch_name = 6;
+}
+
+message ScmExecuteResp {
+  ScmOperationState operation_state = 1;
+  string message = 2;
+  ScmStatusResp status = 3;
+  ScmRepositoryResp repository = 4;
+}
+
+message ScmHistoryEntry {
+  string id = 1;
+  string short_id = 2;
+  string subject = 3;
+  string author_name = 4;
+  google.protobuf.Timestamp authored_at = 5;
+}
+
+message ScmRepositoryReq {
+  string workspace_id = 1;
+}
+
+message ScmRepositoryResp {
+  ScmState state = 1;
+  string current_branch = 2;
+  repeated string local_branches = 3;
+  repeated ScmHistoryEntry history = 4;
+  string message = 5;
 }

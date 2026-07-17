@@ -8,132 +8,106 @@
 
 export const protobufPackage = "termbridge.agent";
 
-export enum FileEntryKind {
-  FILE_ENTRY_KIND_UNSPECIFIED = 0,
-  FILE_ENTRY_KIND_FILE = 1,
-  FILE_ENTRY_KIND_DIRECTORY = 2,
+export enum FileType {
+  FILE_TYPE_UNKNOWN = 0,
+  FILE_TYPE_FILE = 1,
+  FILE_TYPE_DIRECTORY = 2,
+  FILE_TYPE_SYMBOLIC_LINK = 64,
   UNRECOGNIZED = -1,
 }
 
-export interface FileEntry {
-  path: string;
-  name: string;
-  kind: FileEntryKind;
+export enum FilePermission {
+  FILE_PERMISSION_UNSPECIFIED = 0,
+  FILE_PERMISSION_READONLY = 1,
+  UNRECOGNIZED = -1,
+}
+
+export interface FileStat {
+  type: FileType;
+  /** Creation time in milliseconds since Unix epoch (vscode FileStat.ctime). */
+  ctime: number;
+  /** Modification time in milliseconds since Unix epoch (vscode FileStat.mtime). */
+  mtime: number;
   size: number;
-  modified_at: string | undefined;
-  revision: string;
-  has_children?: boolean | undefined;
+  permissions: FilePermission;
+  /** Opaque concurrency token (etag); empty means unknown. */
+  etag: string;
 }
 
-export interface RevisionPrecondition {
-  path: string;
-  expected_revision: string;
-}
-
-export interface FileConflict {
-  type: string;
-  current_entry: FileEntry | undefined;
-}
-
-export interface FileMutationResult {
-  source_entry: FileEntry | undefined;
-  destination_entry: FileEntry | undefined;
-  affected_count: number;
-  affected_path_prefixes: string[];
-}
-
-export interface ListFilesReq {
+export interface FsStatReq {
   workspace_id: string;
   path: string;
 }
 
-export interface ListFilesResp {
-  directory: FileEntry | undefined;
-  items: FileEntry[];
+export interface FsStatResp {
+  stat: FileStat | undefined;
+}
+
+export interface FsReadDirectoryReq {
+  workspace_id: string;
+  path: string;
+}
+
+export interface FsDirectoryEntry {
+  name: string;
+  type: FileType;
+}
+
+export interface FsReadDirectoryResp {
+  entries: FsDirectoryEntry[];
   truncated: boolean;
 }
 
-export interface ReadFileReq {
+export interface FsReadFileReq {
   workspace_id: string;
   path: string;
 }
 
-export interface ReadFileResp {
-  entry: FileEntry | undefined;
-  text: string;
+export interface FsReadFileResp {
+  content: Uint8Array;
+  stat: FileStat | undefined;
 }
 
-export interface CreateFileReq {
+export interface FsWriteFileReq {
   workspace_id: string;
   path: string;
-  text: string;
+  content: Uint8Array;
+  create: boolean;
   overwrite: boolean;
-  expected_parent_revision: string;
-  expected_destination_revision: string;
+  /** When non-empty, write fails unless current etag matches (FileSystemError.FileExists / conflict). */
+  etag: string;
 }
 
-export interface CreateFileResp {
-  result: FileMutationResult | undefined;
+export interface FsWriteFileResp {
+  stat: FileStat | undefined;
 }
 
-export interface CreateDirectoryReq {
+export interface FsCreateDirectoryReq {
   workspace_id: string;
   path: string;
-  allow_existing: boolean;
-  expected_parent_revision: string;
 }
 
-export interface CreateDirectoryResp {
-  result: FileMutationResult | undefined;
+export interface FsCreateDirectoryResp {
+  stat: FileStat | undefined;
 }
 
-export interface WriteFileReq {
+export interface FsDeleteReq {
   workspace_id: string;
   path: string;
-  text: string;
-  expected_revision: string;
-  force: boolean;
-}
-
-export interface WriteFileResp {
-  result: FileMutationResult | undefined;
-}
-
-export interface RenameEntryReq {
-  workspace_id: string;
-  path: string;
-  new_name: string;
-  expected_source_revision: string;
-  expected_parent_revision: string;
-  expected_destination_revision: string;
-}
-
-export interface RenameEntryResp {
-  result: FileMutationResult | undefined;
-}
-
-export interface MoveEntryReq {
-  workspace_id: string;
-  source_path: string;
-  destination_path: string;
-  expected_source_revision: string;
-  expected_source_parent_revision: string;
-  expected_destination_parent_revision: string;
-  expected_destination_revision: string;
-}
-
-export interface MoveEntryResp {
-  result: FileMutationResult | undefined;
-}
-
-export interface DeleteEntryReq {
-  workspace_id: string;
-  path: string;
-  expected_revision: string;
-  expected_parent_revision: string;
   recursive: boolean;
+  use_trash: boolean;
 }
 
-export interface DeleteEntryResp {
-  result: FileMutationResult | undefined;
+export interface FsDeleteResp {
+}
+
+export interface FsRenameReq {
+  workspace_id: string;
+  old_path: string;
+  new_path: string;
+  overwrite: boolean;
+}
+
+export interface FsRenameResp {
+  stat: FileStat | undefined;
 }

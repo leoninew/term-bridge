@@ -142,6 +142,15 @@
                 <button
                   type="button"
                   class="workspace-tree-node-action"
+                  :aria-label="t('sidebar.openGitAria', { name: workspace.workspace.name })"
+                  :title="t('sidebar.openGitAria', { name: workspace.workspace.name })"
+                  @click.stop="emit('openGit', workspace.workspace, $event.currentTarget)"
+                >
+                  <GitCompare class="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  class="workspace-tree-node-action"
                   :aria-label="
                     t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })
                   "
@@ -489,6 +498,16 @@
       >
         <FileCode2 class="size-4" />
       </button>
+      <button
+        type="button"
+        class="flex size-6 shrink-0 items-center justify-center rounded text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus-visible:bg-[var(--color-control-hover)] focus-visible:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
+        :disabled="!props.activeWorkspace"
+        :aria-label="switchToGitAria"
+        :title="switchToGitAria"
+        @click="switchToGit"
+      >
+        <GitCompare class="size-4" />
+      </button>
     </footer>
   </aside>
 </template>
@@ -507,6 +526,7 @@
     Copy,
     FileCode2,
     Folder,
+    GitCompare,
     FolderOpen,
     Languages,
     LayoutDashboard,
@@ -595,6 +615,7 @@
     deleteSession: [session: SessionSummary]
     removeWorkspace: [workspace: WorkspaceSummary]
     openFiles: [workspace: WorkspaceSummary, trigger: EventTarget | null]
+    openGit: [workspace: WorkspaceSummary, trigger: EventTarget | null]
     unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
     reorderWorkspaces: [workspaceIds: string[]]
     reorderSessions: [workspaceId: string, sessionIds: string[]]
@@ -629,10 +650,19 @@
     if (!props.activeWorkspace) return t('sidebar.switchToFilesDisabled')
     return t('sidebar.switchToFilesAria', { name: props.activeWorkspace.name })
   })
+  const switchToGitAria = computed(() => {
+    if (!props.activeWorkspace) return t('sidebar.switchToGitDisabled')
+    return t('sidebar.switchToGitAria', { name: props.activeWorkspace.name })
+  })
 
   function switchToFiles() {
     if (!props.activeWorkspace) return
     emit('openFiles', props.activeWorkspace, null)
+  }
+
+  function switchToGit() {
+    if (!props.activeWorkspace) return
+    emit('openGit', props.activeWorkspace, null)
   }
 
   function changeLocale(value: unknown) {

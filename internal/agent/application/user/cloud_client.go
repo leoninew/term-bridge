@@ -266,66 +266,72 @@ func HandleRuntimeRequest(ctx context.Context, runtimeAccess RuntimeAccess, fram
 			return nil, err
 		}
 		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_DeleteShortcutResp{DeleteShortcutResp: &agent.DeleteShortcutResp{}}), nil
-	case *shared.TunnelFrame_ListFilesReq:
-		result, err := runtimeAccess.ListFiles(ctx, payload.ListFilesReq)
+	case *shared.TunnelFrame_FsStatReq:
+		result, err := runtimeAccess.FsStat(ctx, payload.FsStatReq)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ListFilesResp{ListFilesResp: result}), nil
-	case *shared.TunnelFrame_ReadFileReq:
-		result, err := runtimeAccess.ReadFile(ctx, payload.ReadFileReq)
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_FsStatResp{FsStatResp: result}), nil
+	case *shared.TunnelFrame_FsReadDirectoryReq:
+		result, err := runtimeAccess.FsReadDirectory(ctx, payload.FsReadDirectoryReq)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ReadFileResp{ReadFileResp: result}), nil
-	case *shared.TunnelFrame_CreateFileReq:
-		result, err := runtimeAccess.CreateFile(ctx, payload.CreateFileReq)
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_FsReadDirectoryResp{FsReadDirectoryResp: result}), nil
+	case *shared.TunnelFrame_FsReadFileReq:
+		result, err := runtimeAccess.FsReadFile(ctx, payload.FsReadFileReq)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_CreateFileResp{CreateFileResp: result}), nil
-	case *shared.TunnelFrame_CreateDirectoryReq:
-		result, err := runtimeAccess.CreateDirectory(ctx, payload.CreateDirectoryReq)
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_FsReadFileResp{FsReadFileResp: result}), nil
+	case *shared.TunnelFrame_FsWriteFileReq:
+		result, err := runtimeAccess.FsWriteFile(ctx, payload.FsWriteFileReq)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_CreateDirectoryResp{CreateDirectoryResp: result}), nil
-	case *shared.TunnelFrame_WriteFileReq:
-		result, err := runtimeAccess.WriteFile(ctx, payload.WriteFileReq)
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_FsWriteFileResp{FsWriteFileResp: result}), nil
+	case *shared.TunnelFrame_FsCreateDirectoryReq:
+		result, err := runtimeAccess.FsCreateDirectory(ctx, payload.FsCreateDirectoryReq)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_WriteFileResp{WriteFileResp: result}), nil
-	case *shared.TunnelFrame_RenameEntryReq:
-		result, err := runtimeAccess.RenameEntry(ctx, payload.RenameEntryReq)
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_FsCreateDirectoryResp{FsCreateDirectoryResp: result}), nil
+	case *shared.TunnelFrame_FsDeleteReq:
+		result, err := runtimeAccess.FsDelete(ctx, payload.FsDeleteReq)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_RenameEntryResp{RenameEntryResp: result}), nil
-	case *shared.TunnelFrame_MoveEntryReq:
-		result, err := runtimeAccess.MoveEntry(ctx, payload.MoveEntryReq)
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_FsDeleteResp{FsDeleteResp: result}), nil
+	case *shared.TunnelFrame_FsRenameReq:
+		result, err := runtimeAccess.FsRename(ctx, payload.FsRenameReq)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_MoveEntryResp{MoveEntryResp: result}), nil
-	case *shared.TunnelFrame_DeleteEntryReq:
-		result, err := runtimeAccess.DeleteEntry(ctx, payload.DeleteEntryReq)
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_FsRenameResp{FsRenameResp: result}), nil
+	case *shared.TunnelFrame_ScmStatusReq:
+		result, err := runtimeAccess.ScmStatus(ctx, payload.ScmStatusReq)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_DeleteEntryResp{DeleteEntryResp: result}), nil
-	case *shared.TunnelFrame_GitStatusReq:
-		result, err := runtimeAccess.GitStatus(ctx, payload.GitStatusReq.GetWorkspaceId())
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ScmStatusResp{ScmStatusResp: result}), nil
+	case *shared.TunnelFrame_ScmOriginalContentReq:
+		result, err := runtimeAccess.ScmOriginalContent(ctx, payload.ScmOriginalContentReq)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_GitStatusResp{GitStatusResp: result}), nil
-	case *shared.TunnelFrame_GitDiffReq:
-		result, err := runtimeAccess.GitDiff(ctx, payload.GitDiffReq)
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ScmOriginalContentResp{ScmOriginalContentResp: result}), nil
+	case *shared.TunnelFrame_ScmExecuteReq:
+		result, err := runtimeAccess.ScmExecute(ctx, payload.ScmExecuteReq)
 		if err != nil {
 			return nil, err
 		}
-		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_GitDiffResp{GitDiffResp: result}), nil
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ScmExecuteResp{ScmExecuteResp: result}), nil
+	case *shared.TunnelFrame_ScmRepositoryReq:
+		result, err := runtimeAccess.ScmRepository(ctx, payload.ScmRepositoryReq)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeResponse(streamId, requestId, &shared.TunnelFrame_ScmRepositoryResp{ScmRepositoryResp: result}), nil
 	default:
 		return nil, fmt.Errorf("unsupported runtime payload %T", frame.GetPayload())
 	}
@@ -407,25 +413,27 @@ func runtimeResponse(streamId string, requestId string, payload any) *shared.Tun
 		frame.Payload = value
 	case *shared.TunnelFrame_UpdateShortcutOrderResp:
 		frame.Payload = value
-	case *shared.TunnelFrame_ListFilesResp:
+	case *shared.TunnelFrame_FsStatResp:
 		frame.Payload = value
-	case *shared.TunnelFrame_ReadFileResp:
+	case *shared.TunnelFrame_FsReadDirectoryResp:
 		frame.Payload = value
-	case *shared.TunnelFrame_CreateFileResp:
+	case *shared.TunnelFrame_FsReadFileResp:
 		frame.Payload = value
-	case *shared.TunnelFrame_CreateDirectoryResp:
+	case *shared.TunnelFrame_FsWriteFileResp:
 		frame.Payload = value
-	case *shared.TunnelFrame_WriteFileResp:
+	case *shared.TunnelFrame_FsCreateDirectoryResp:
 		frame.Payload = value
-	case *shared.TunnelFrame_RenameEntryResp:
+	case *shared.TunnelFrame_FsDeleteResp:
 		frame.Payload = value
-	case *shared.TunnelFrame_MoveEntryResp:
+	case *shared.TunnelFrame_FsRenameResp:
 		frame.Payload = value
-	case *shared.TunnelFrame_DeleteEntryResp:
+	case *shared.TunnelFrame_ScmStatusResp:
 		frame.Payload = value
-	case *shared.TunnelFrame_GitStatusResp:
+	case *shared.TunnelFrame_ScmOriginalContentResp:
 		frame.Payload = value
-	case *shared.TunnelFrame_GitDiffResp:
+	case *shared.TunnelFrame_ScmExecuteResp:
+		frame.Payload = value
+	case *shared.TunnelFrame_ScmRepositoryResp:
 		frame.Payload = value
 	}
 	return frame
@@ -451,16 +459,17 @@ func isRuntimeRequest(frame *shared.TunnelFrame) bool {
 		*shared.TunnelFrame_UpdateShortcutReq,
 		*shared.TunnelFrame_UpdateShortcutOrderReq,
 		*shared.TunnelFrame_DeleteShortcutReq,
-		*shared.TunnelFrame_ListFilesReq,
-		*shared.TunnelFrame_ReadFileReq,
-		*shared.TunnelFrame_CreateFileReq,
-		*shared.TunnelFrame_CreateDirectoryReq,
-		*shared.TunnelFrame_WriteFileReq,
-		*shared.TunnelFrame_RenameEntryReq,
-		*shared.TunnelFrame_MoveEntryReq,
-		*shared.TunnelFrame_DeleteEntryReq,
-		*shared.TunnelFrame_GitStatusReq,
-		*shared.TunnelFrame_GitDiffReq:
+		*shared.TunnelFrame_FsStatReq,
+		*shared.TunnelFrame_FsReadDirectoryReq,
+		*shared.TunnelFrame_FsReadFileReq,
+		*shared.TunnelFrame_FsWriteFileReq,
+		*shared.TunnelFrame_FsCreateDirectoryReq,
+		*shared.TunnelFrame_FsDeleteReq,
+		*shared.TunnelFrame_FsRenameReq,
+		*shared.TunnelFrame_ScmStatusReq,
+		*shared.TunnelFrame_ScmOriginalContentReq,
+		*shared.TunnelFrame_ScmExecuteReq,
+		*shared.TunnelFrame_ScmRepositoryReq:
 		return true
 	default:
 		return false

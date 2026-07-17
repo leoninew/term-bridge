@@ -69,6 +69,7 @@ type RenameRequest struct {
 type MoveRequest struct {
 	SourcePath                        RelativePath
 	DestinationPath                   RelativePath
+	Overwrite                         bool
 	ExpectedSourceRevision            string
 	ExpectedSourceParentRevision      string
 	ExpectedDestinationParentRevision string

@@ -161,6 +161,49 @@ func TestStoreRejectsSymlinkIntermediateDirectory(t *testing.T) {
 	}
 }
 
+
+func TestStoreMoveOverwriteReplacesDestination(t *testing.T) {
+	rootPath := t.TempDir()
+	store := testStore(t)
+	if err := os.WriteFile(filepath.Join(rootPath, "a.txt"), []byte("source"), 0o600); err != nil {
+		t.Fatalf("seed a: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(rootPath, "b.txt"), []byte("dest"), 0o600); err != nil {
+		t.Fatalf("seed b: %v", err)
+	}
+
+	_, err := store.Move(context.Background(), rootPath, filemodel.MoveRequest{
+		SourcePath:      "a.txt",
+		DestinationPath: "b.txt",
+		Overwrite:       false,
+	})
+	if filemodel.CodeOf(err) != "already_exists" {
+		t.Fatalf("move without overwrite code = %q, want already_exists; err=%v", filemodel.CodeOf(err), err)
+	}
+
+	moved, err := store.Move(context.Background(), rootPath, filemodel.MoveRequest{
+		SourcePath:      "a.txt",
+		DestinationPath: "b.txt",
+		Overwrite:       true,
+	})
+	if err != nil {
+		t.Fatalf("move with overwrite: %v", err)
+	}
+	if moved.DestinationEntry == nil || moved.DestinationEntry.Path != "b.txt" {
+		t.Fatalf("moved entry = %#v", moved.DestinationEntry)
+	}
+	if _, err := os.Stat(filepath.Join(rootPath, "a.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("source should be gone: %v", err)
+	}
+	read, err := store.Read(context.Background(), rootPath, "b.txt")
+	if err != nil {
+		t.Fatalf("read destination: %v", err)
+	}
+	if read.Text != "source" {
+		t.Fatalf("destination text = %q, want source", read.Text)
+	}
+}
+
 func testStore(t *testing.T) *Store {
 	t.Helper()
 	store, err := New(Config{MaxTextBytes: 1024, MaxDirectoryEntries: 100, MaxRecursiveDeleteEntries: 100})

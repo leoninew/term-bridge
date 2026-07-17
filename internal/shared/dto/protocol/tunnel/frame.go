@@ -143,26 +143,28 @@ func responseMessage(frame *shared.TunnelFrame) proto.Message {
 		return payload.DeleteShortcutResp
 	case *shared.TunnelFrame_UpdateShortcutOrderResp:
 		return payload.UpdateShortcutOrderResp
-	case *shared.TunnelFrame_ListFilesResp:
-		return payload.ListFilesResp
-	case *shared.TunnelFrame_ReadFileResp:
-		return payload.ReadFileResp
-	case *shared.TunnelFrame_CreateFileResp:
-		return payload.CreateFileResp
-	case *shared.TunnelFrame_CreateDirectoryResp:
-		return payload.CreateDirectoryResp
-	case *shared.TunnelFrame_WriteFileResp:
-		return payload.WriteFileResp
-	case *shared.TunnelFrame_RenameEntryResp:
-		return payload.RenameEntryResp
-	case *shared.TunnelFrame_MoveEntryResp:
-		return payload.MoveEntryResp
-	case *shared.TunnelFrame_DeleteEntryResp:
-		return payload.DeleteEntryResp
-	case *shared.TunnelFrame_GitStatusResp:
-		return payload.GitStatusResp
-	case *shared.TunnelFrame_GitDiffResp:
-		return payload.GitDiffResp
+	case *shared.TunnelFrame_FsStatResp:
+		return payload.FsStatResp
+	case *shared.TunnelFrame_FsReadDirectoryResp:
+		return payload.FsReadDirectoryResp
+	case *shared.TunnelFrame_FsReadFileResp:
+		return payload.FsReadFileResp
+	case *shared.TunnelFrame_FsWriteFileResp:
+		return payload.FsWriteFileResp
+	case *shared.TunnelFrame_FsCreateDirectoryResp:
+		return payload.FsCreateDirectoryResp
+	case *shared.TunnelFrame_FsDeleteResp:
+		return payload.FsDeleteResp
+	case *shared.TunnelFrame_FsRenameResp:
+		return payload.FsRenameResp
+	case *shared.TunnelFrame_ScmStatusResp:
+		return payload.ScmStatusResp
+	case *shared.TunnelFrame_ScmOriginalContentResp:
+		return payload.ScmOriginalContentResp
+	case *shared.TunnelFrame_ScmExecuteResp:
+		return payload.ScmExecuteResp
+	case *shared.TunnelFrame_ScmRepositoryResp:
+		return payload.ScmRepositoryResp
 	default:
 		return nil
 	}

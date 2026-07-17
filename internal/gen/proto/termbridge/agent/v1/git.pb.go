@@ -9,6 +9,7 @@ package v1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -21,155 +22,281 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type GitState int32
+type ScmState int32
 
 const (
-	GitState_GIT_STATE_UNSPECIFIED            GitState = 0
-	GitState_GIT_STATE_AVAILABLE              GitState = 1
-	GitState_GIT_STATE_NOT_REPOSITORY         GitState = 2
-	GitState_GIT_STATE_EXECUTABLE_UNAVAILABLE GitState = 3
-	GitState_GIT_STATE_BINARY                 GitState = 4
-	GitState_GIT_STATE_TOO_LARGE              GitState = 5
-	GitState_GIT_STATE_UNMERGED               GitState = 6
-	GitState_GIT_STATE_SUBMODULE              GitState = 7
-	GitState_GIT_STATE_LAYER_UNAVAILABLE      GitState = 8
-	GitState_GIT_STATE_UNAVAILABLE            GitState = 9
+	ScmState_SCM_STATE_UNSPECIFIED            ScmState = 0
+	ScmState_SCM_STATE_AVAILABLE              ScmState = 1
+	ScmState_SCM_STATE_NOT_REPOSITORY         ScmState = 2
+	ScmState_SCM_STATE_EXECUTABLE_UNAVAILABLE ScmState = 3
+	ScmState_SCM_STATE_UNAVAILABLE            ScmState = 4
 )
 
-// Enum value maps for GitState.
+// Enum value maps for ScmState.
 var (
-	GitState_name = map[int32]string{
-		0: "GIT_STATE_UNSPECIFIED",
-		1: "GIT_STATE_AVAILABLE",
-		2: "GIT_STATE_NOT_REPOSITORY",
-		3: "GIT_STATE_EXECUTABLE_UNAVAILABLE",
-		4: "GIT_STATE_BINARY",
-		5: "GIT_STATE_TOO_LARGE",
-		6: "GIT_STATE_UNMERGED",
-		7: "GIT_STATE_SUBMODULE",
-		8: "GIT_STATE_LAYER_UNAVAILABLE",
-		9: "GIT_STATE_UNAVAILABLE",
+	ScmState_name = map[int32]string{
+		0: "SCM_STATE_UNSPECIFIED",
+		1: "SCM_STATE_AVAILABLE",
+		2: "SCM_STATE_NOT_REPOSITORY",
+		3: "SCM_STATE_EXECUTABLE_UNAVAILABLE",
+		4: "SCM_STATE_UNAVAILABLE",
 	}
-	GitState_value = map[string]int32{
-		"GIT_STATE_UNSPECIFIED":            0,
-		"GIT_STATE_AVAILABLE":              1,
-		"GIT_STATE_NOT_REPOSITORY":         2,
-		"GIT_STATE_EXECUTABLE_UNAVAILABLE": 3,
-		"GIT_STATE_BINARY":                 4,
-		"GIT_STATE_TOO_LARGE":              5,
-		"GIT_STATE_UNMERGED":               6,
-		"GIT_STATE_SUBMODULE":              7,
-		"GIT_STATE_LAYER_UNAVAILABLE":      8,
-		"GIT_STATE_UNAVAILABLE":            9,
+	ScmState_value = map[string]int32{
+		"SCM_STATE_UNSPECIFIED":            0,
+		"SCM_STATE_AVAILABLE":              1,
+		"SCM_STATE_NOT_REPOSITORY":         2,
+		"SCM_STATE_EXECUTABLE_UNAVAILABLE": 3,
+		"SCM_STATE_UNAVAILABLE":            4,
 	}
 )
 
-func (x GitState) Enum() *GitState {
-	p := new(GitState)
+func (x ScmState) Enum() *ScmState {
+	p := new(ScmState)
 	*p = x
 	return p
 }
 
-func (x GitState) String() string {
+func (x ScmState) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (GitState) Descriptor() protoreflect.EnumDescriptor {
+func (ScmState) Descriptor() protoreflect.EnumDescriptor {
 	return file_termbridge_agent_v1_git_proto_enumTypes[0].Descriptor()
 }
 
-func (GitState) Type() protoreflect.EnumType {
+func (ScmState) Type() protoreflect.EnumType {
 	return &file_termbridge_agent_v1_git_proto_enumTypes[0]
 }
 
-func (x GitState) Number() protoreflect.EnumNumber {
+func (x ScmState) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use GitState.Descriptor instead.
-func (GitState) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use ScmState.Descriptor instead.
+func (ScmState) EnumDescriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{0}
 }
 
-type GitLayer int32
+type ScmResourceState int32
 
 const (
-	GitLayer_GIT_LAYER_UNSPECIFIED GitLayer = 0
-	GitLayer_GIT_LAYER_STAGED      GitLayer = 1
-	GitLayer_GIT_LAYER_UNSTAGED    GitLayer = 2
-	GitLayer_GIT_LAYER_UNTRACKED   GitLayer = 3
+	ScmResourceState_SCM_RESOURCE_STATE_UNSPECIFIED ScmResourceState = 0
+	ScmResourceState_SCM_RESOURCE_STATE_AVAILABLE   ScmResourceState = 1
+	ScmResourceState_SCM_RESOURCE_STATE_BINARY      ScmResourceState = 2
+	ScmResourceState_SCM_RESOURCE_STATE_TOO_LARGE   ScmResourceState = 3
+	ScmResourceState_SCM_RESOURCE_STATE_UNMERGED    ScmResourceState = 4
+	ScmResourceState_SCM_RESOURCE_STATE_SUBMODULE   ScmResourceState = 5
+	ScmResourceState_SCM_RESOURCE_STATE_UNAVAILABLE ScmResourceState = 6
 )
 
-// Enum value maps for GitLayer.
+// Enum value maps for ScmResourceState.
 var (
-	GitLayer_name = map[int32]string{
-		0: "GIT_LAYER_UNSPECIFIED",
-		1: "GIT_LAYER_STAGED",
-		2: "GIT_LAYER_UNSTAGED",
-		3: "GIT_LAYER_UNTRACKED",
+	ScmResourceState_name = map[int32]string{
+		0: "SCM_RESOURCE_STATE_UNSPECIFIED",
+		1: "SCM_RESOURCE_STATE_AVAILABLE",
+		2: "SCM_RESOURCE_STATE_BINARY",
+		3: "SCM_RESOURCE_STATE_TOO_LARGE",
+		4: "SCM_RESOURCE_STATE_UNMERGED",
+		5: "SCM_RESOURCE_STATE_SUBMODULE",
+		6: "SCM_RESOURCE_STATE_UNAVAILABLE",
 	}
-	GitLayer_value = map[string]int32{
-		"GIT_LAYER_UNSPECIFIED": 0,
-		"GIT_LAYER_STAGED":      1,
-		"GIT_LAYER_UNSTAGED":    2,
-		"GIT_LAYER_UNTRACKED":   3,
+	ScmResourceState_value = map[string]int32{
+		"SCM_RESOURCE_STATE_UNSPECIFIED": 0,
+		"SCM_RESOURCE_STATE_AVAILABLE":   1,
+		"SCM_RESOURCE_STATE_BINARY":      2,
+		"SCM_RESOURCE_STATE_TOO_LARGE":   3,
+		"SCM_RESOURCE_STATE_UNMERGED":    4,
+		"SCM_RESOURCE_STATE_SUBMODULE":   5,
+		"SCM_RESOURCE_STATE_UNAVAILABLE": 6,
 	}
 )
 
-func (x GitLayer) Enum() *GitLayer {
-	p := new(GitLayer)
+func (x ScmResourceState) Enum() *ScmResourceState {
+	p := new(ScmResourceState)
 	*p = x
 	return p
 }
 
-func (x GitLayer) String() string {
+func (x ScmResourceState) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (GitLayer) Descriptor() protoreflect.EnumDescriptor {
+func (ScmResourceState) Descriptor() protoreflect.EnumDescriptor {
 	return file_termbridge_agent_v1_git_proto_enumTypes[1].Descriptor()
 }
 
-func (GitLayer) Type() protoreflect.EnumType {
+func (ScmResourceState) Type() protoreflect.EnumType {
 	return &file_termbridge_agent_v1_git_proto_enumTypes[1]
 }
 
-func (x GitLayer) Number() protoreflect.EnumNumber {
+func (x ScmResourceState) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use GitLayer.Descriptor instead.
-func (GitLayer) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use ScmResourceState.Descriptor instead.
+func (ScmResourceState) EnumDescriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{1}
 }
 
-type GitChange struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Path            string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	OriginalPath    string                 `protobuf:"bytes,2,opt,name=original_path,json=originalPath,proto3" json:"original_path,omitempty"`
-	IndexStatus     string                 `protobuf:"bytes,3,opt,name=index_status,json=indexStatus,proto3" json:"index_status,omitempty"`
-	WorktreeStatus  string                 `protobuf:"bytes,4,opt,name=worktree_status,json=worktreeStatus,proto3" json:"worktree_status,omitempty"`
-	Untracked       bool                   `protobuf:"varint,5,opt,name=untracked,proto3" json:"untracked,omitempty"`
-	Unmerged        bool                   `protobuf:"varint,6,opt,name=unmerged,proto3" json:"unmerged,omitempty"`
-	AvailableLayers []GitLayer             `protobuf:"varint,7,rep,packed,name=available_layers,json=availableLayers,proto3,enum=termbridge.agent.GitLayer" json:"available_layers,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+type ScmCommand int32
+
+const (
+	ScmCommand_SCM_COMMAND_UNSPECIFIED   ScmCommand = 0
+	ScmCommand_SCM_COMMAND_STAGE         ScmCommand = 1
+	ScmCommand_SCM_COMMAND_UNSTAGE       ScmCommand = 2
+	ScmCommand_SCM_COMMAND_DISCARD       ScmCommand = 3
+	ScmCommand_SCM_COMMAND_COMMIT        ScmCommand = 4
+	ScmCommand_SCM_COMMAND_CREATE_BRANCH ScmCommand = 5
+	ScmCommand_SCM_COMMAND_SWITCH_BRANCH ScmCommand = 6
+)
+
+// Enum value maps for ScmCommand.
+var (
+	ScmCommand_name = map[int32]string{
+		0: "SCM_COMMAND_UNSPECIFIED",
+		1: "SCM_COMMAND_STAGE",
+		2: "SCM_COMMAND_UNSTAGE",
+		3: "SCM_COMMAND_DISCARD",
+		4: "SCM_COMMAND_COMMIT",
+		5: "SCM_COMMAND_CREATE_BRANCH",
+		6: "SCM_COMMAND_SWITCH_BRANCH",
+	}
+	ScmCommand_value = map[string]int32{
+		"SCM_COMMAND_UNSPECIFIED":   0,
+		"SCM_COMMAND_STAGE":         1,
+		"SCM_COMMAND_UNSTAGE":       2,
+		"SCM_COMMAND_DISCARD":       3,
+		"SCM_COMMAND_COMMIT":        4,
+		"SCM_COMMAND_CREATE_BRANCH": 5,
+		"SCM_COMMAND_SWITCH_BRANCH": 6,
+	}
+)
+
+func (x ScmCommand) Enum() *ScmCommand {
+	p := new(ScmCommand)
+	*p = x
+	return p
 }
 
-func (x *GitChange) Reset() {
-	*x = GitChange{}
+func (x ScmCommand) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ScmCommand) Descriptor() protoreflect.EnumDescriptor {
+	return file_termbridge_agent_v1_git_proto_enumTypes[2].Descriptor()
+}
+
+func (ScmCommand) Type() protoreflect.EnumType {
+	return &file_termbridge_agent_v1_git_proto_enumTypes[2]
+}
+
+func (x ScmCommand) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ScmCommand.Descriptor instead.
+func (ScmCommand) EnumDescriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{2}
+}
+
+type ScmOperationState int32
+
+const (
+	ScmOperationState_SCM_OPERATION_STATE_UNSPECIFIED             ScmOperationState = 0
+	ScmOperationState_SCM_OPERATION_STATE_OK                      ScmOperationState = 1
+	ScmOperationState_SCM_OPERATION_STATE_CLEAN_WORKTREE_REQUIRED ScmOperationState = 2
+	ScmOperationState_SCM_OPERATION_STATE_NO_STAGED_CHANGES       ScmOperationState = 3
+	ScmOperationState_SCM_OPERATION_STATE_BRANCH_EXISTS           ScmOperationState = 4
+	ScmOperationState_SCM_OPERATION_STATE_BRANCH_NOT_FOUND        ScmOperationState = 5
+	ScmOperationState_SCM_OPERATION_STATE_INVALID_BRANCH_NAME     ScmOperationState = 6
+	ScmOperationState_SCM_OPERATION_STATE_INVALID_COMMIT_MESSAGE  ScmOperationState = 7
+	ScmOperationState_SCM_OPERATION_STATE_CONFLICT                ScmOperationState = 8
+	ScmOperationState_SCM_OPERATION_STATE_FAILED                  ScmOperationState = 9
+	ScmOperationState_SCM_OPERATION_STATE_UNAVAILABLE             ScmOperationState = 10
+)
+
+// Enum value maps for ScmOperationState.
+var (
+	ScmOperationState_name = map[int32]string{
+		0:  "SCM_OPERATION_STATE_UNSPECIFIED",
+		1:  "SCM_OPERATION_STATE_OK",
+		2:  "SCM_OPERATION_STATE_CLEAN_WORKTREE_REQUIRED",
+		3:  "SCM_OPERATION_STATE_NO_STAGED_CHANGES",
+		4:  "SCM_OPERATION_STATE_BRANCH_EXISTS",
+		5:  "SCM_OPERATION_STATE_BRANCH_NOT_FOUND",
+		6:  "SCM_OPERATION_STATE_INVALID_BRANCH_NAME",
+		7:  "SCM_OPERATION_STATE_INVALID_COMMIT_MESSAGE",
+		8:  "SCM_OPERATION_STATE_CONFLICT",
+		9:  "SCM_OPERATION_STATE_FAILED",
+		10: "SCM_OPERATION_STATE_UNAVAILABLE",
+	}
+	ScmOperationState_value = map[string]int32{
+		"SCM_OPERATION_STATE_UNSPECIFIED":             0,
+		"SCM_OPERATION_STATE_OK":                      1,
+		"SCM_OPERATION_STATE_CLEAN_WORKTREE_REQUIRED": 2,
+		"SCM_OPERATION_STATE_NO_STAGED_CHANGES":       3,
+		"SCM_OPERATION_STATE_BRANCH_EXISTS":           4,
+		"SCM_OPERATION_STATE_BRANCH_NOT_FOUND":        5,
+		"SCM_OPERATION_STATE_INVALID_BRANCH_NAME":     6,
+		"SCM_OPERATION_STATE_INVALID_COMMIT_MESSAGE":  7,
+		"SCM_OPERATION_STATE_CONFLICT":                8,
+		"SCM_OPERATION_STATE_FAILED":                  9,
+		"SCM_OPERATION_STATE_UNAVAILABLE":             10,
+	}
+)
+
+func (x ScmOperationState) Enum() *ScmOperationState {
+	p := new(ScmOperationState)
+	*p = x
+	return p
+}
+
+func (x ScmOperationState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ScmOperationState) Descriptor() protoreflect.EnumDescriptor {
+	return file_termbridge_agent_v1_git_proto_enumTypes[3].Descriptor()
+}
+
+func (ScmOperationState) Type() protoreflect.EnumType {
+	return &file_termbridge_agent_v1_git_proto_enumTypes[3]
+}
+
+func (x ScmOperationState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ScmOperationState.Descriptor instead.
+func (ScmOperationState) EnumDescriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{3}
+}
+
+type ScmResourceDecorations struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StrikeThrough bool                   `protobuf:"varint,1,opt,name=strike_through,json=strikeThrough,proto3" json:"strike_through,omitempty"`
+	Faded         bool                   `protobuf:"varint,2,opt,name=faded,proto3" json:"faded,omitempty"`
+	Tooltip       string                 `protobuf:"bytes,3,opt,name=tooltip,proto3" json:"tooltip,omitempty"`
+	Letter        string                 `protobuf:"bytes,4,opt,name=letter,proto3" json:"letter,omitempty"`
+	ColorId       string                 `protobuf:"bytes,5,opt,name=color_id,json=colorId,proto3" json:"color_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScmResourceDecorations) Reset() {
+	*x = ScmResourceDecorations{}
 	mi := &file_termbridge_agent_v1_git_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GitChange) String() string {
+func (x *ScmResourceDecorations) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GitChange) ProtoMessage() {}
+func (*ScmResourceDecorations) ProtoMessage() {}
 
-func (x *GitChange) ProtoReflect() protoreflect.Message {
+func (x *ScmResourceDecorations) ProtoReflect() protoreflect.Message {
 	mi := &file_termbridge_agent_v1_git_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -181,82 +308,212 @@ func (x *GitChange) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GitChange.ProtoReflect.Descriptor instead.
-func (*GitChange) Descriptor() ([]byte, []int) {
+// Deprecated: Use ScmResourceDecorations.ProtoReflect.Descriptor instead.
+func (*ScmResourceDecorations) Descriptor() ([]byte, []int) {
 	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *GitChange) GetPath() string {
+func (x *ScmResourceDecorations) GetStrikeThrough() bool {
+	if x != nil {
+		return x.StrikeThrough
+	}
+	return false
+}
+
+func (x *ScmResourceDecorations) GetFaded() bool {
+	if x != nil {
+		return x.Faded
+	}
+	return false
+}
+
+func (x *ScmResourceDecorations) GetTooltip() string {
+	if x != nil {
+		return x.Tooltip
+	}
+	return ""
+}
+
+func (x *ScmResourceDecorations) GetLetter() string {
+	if x != nil {
+		return x.Letter
+	}
+	return ""
+}
+
+func (x *ScmResourceDecorations) GetColorId() string {
+	if x != nil {
+		return x.ColorId
+	}
+	return ""
+}
+
+type ScmResource struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Path          string                  `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	OriginalPath  string                  `protobuf:"bytes,2,opt,name=original_path,json=originalPath,proto3" json:"original_path,omitempty"`
+	GroupId       string                  `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	Decorations   *ScmResourceDecorations `protobuf:"bytes,4,opt,name=decorations,proto3" json:"decorations,omitempty"`
+	ResourceState ScmResourceState        `protobuf:"varint,5,opt,name=resource_state,json=resourceState,proto3,enum=termbridge.agent.ScmResourceState" json:"resource_state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScmResource) Reset() {
+	*x = ScmResource{}
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScmResource) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScmResource) ProtoMessage() {}
+
+func (x *ScmResource) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScmResource.ProtoReflect.Descriptor instead.
+func (*ScmResource) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ScmResource) GetPath() string {
 	if x != nil {
 		return x.Path
 	}
 	return ""
 }
 
-func (x *GitChange) GetOriginalPath() string {
+func (x *ScmResource) GetOriginalPath() string {
 	if x != nil {
 		return x.OriginalPath
 	}
 	return ""
 }
 
-func (x *GitChange) GetIndexStatus() string {
+func (x *ScmResource) GetGroupId() string {
 	if x != nil {
-		return x.IndexStatus
+		return x.GroupId
 	}
 	return ""
 }
 
-func (x *GitChange) GetWorktreeStatus() string {
+func (x *ScmResource) GetDecorations() *ScmResourceDecorations {
 	if x != nil {
-		return x.WorktreeStatus
-	}
-	return ""
-}
-
-func (x *GitChange) GetUntracked() bool {
-	if x != nil {
-		return x.Untracked
-	}
-	return false
-}
-
-func (x *GitChange) GetUnmerged() bool {
-	if x != nil {
-		return x.Unmerged
-	}
-	return false
-}
-
-func (x *GitChange) GetAvailableLayers() []GitLayer {
-	if x != nil {
-		return x.AvailableLayers
+		return x.Decorations
 	}
 	return nil
 }
 
-type GitStatusReq struct {
+func (x *ScmResource) GetResourceState() ScmResourceState {
+	if x != nil {
+		return x.ResourceState
+	}
+	return ScmResourceState_SCM_RESOURCE_STATE_UNSPECIFIED
+}
+
+type ScmResourceGroup struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	Resources     []*ScmResource         `protobuf:"bytes,3,rep,name=resources,proto3" json:"resources,omitempty"`
+	HideWhenEmpty bool                   `protobuf:"varint,4,opt,name=hide_when_empty,json=hideWhenEmpty,proto3" json:"hide_when_empty,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScmResourceGroup) Reset() {
+	*x = ScmResourceGroup{}
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScmResourceGroup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScmResourceGroup) ProtoMessage() {}
+
+func (x *ScmResourceGroup) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScmResourceGroup.ProtoReflect.Descriptor instead.
+func (*ScmResourceGroup) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ScmResourceGroup) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ScmResourceGroup) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *ScmResourceGroup) GetResources() []*ScmResource {
+	if x != nil {
+		return x.Resources
+	}
+	return nil
+}
+
+func (x *ScmResourceGroup) GetHideWhenEmpty() bool {
+	if x != nil {
+		return x.HideWhenEmpty
+	}
+	return false
+}
+
+type ScmStatusReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GitStatusReq) Reset() {
-	*x = GitStatusReq{}
-	mi := &file_termbridge_agent_v1_git_proto_msgTypes[1]
+func (x *ScmStatusReq) Reset() {
+	*x = ScmStatusReq{}
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GitStatusReq) String() string {
+func (x *ScmStatusReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GitStatusReq) ProtoMessage() {}
+func (*ScmStatusReq) ProtoMessage() {}
 
-func (x *GitStatusReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_git_proto_msgTypes[1]
+func (x *ScmStatusReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -267,42 +524,43 @@ func (x *GitStatusReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GitStatusReq.ProtoReflect.Descriptor instead.
-func (*GitStatusReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{1}
+// Deprecated: Use ScmStatusReq.ProtoReflect.Descriptor instead.
+func (*ScmStatusReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *GitStatusReq) GetWorkspaceId() string {
+func (x *ScmStatusReq) GetWorkspaceId() string {
 	if x != nil {
 		return x.WorkspaceId
 	}
 	return ""
 }
 
-type GitStatusResp struct {
+type ScmStatusResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	State         GitState               `protobuf:"varint,1,opt,name=state,proto3,enum=termbridge.agent.GitState" json:"state,omitempty"`
-	Changes       []*GitChange           `protobuf:"bytes,2,rep,name=changes,proto3" json:"changes,omitempty"`
-	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	State         ScmState               `protobuf:"varint,1,opt,name=state,proto3,enum=termbridge.agent.ScmState" json:"state,omitempty"`
+	Groups        []*ScmResourceGroup    `protobuf:"bytes,2,rep,name=groups,proto3" json:"groups,omitempty"`
+	Count         int32                  `protobuf:"varint,3,opt,name=count,proto3" json:"count,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GitStatusResp) Reset() {
-	*x = GitStatusResp{}
-	mi := &file_termbridge_agent_v1_git_proto_msgTypes[2]
+func (x *ScmStatusResp) Reset() {
+	*x = ScmStatusResp{}
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GitStatusResp) String() string {
+func (x *ScmStatusResp) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GitStatusResp) ProtoMessage() {}
+func (*ScmStatusResp) ProtoMessage() {}
 
-func (x *GitStatusResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_git_proto_msgTypes[2]
+func (x *ScmStatusResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -313,56 +571,64 @@ func (x *GitStatusResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GitStatusResp.ProtoReflect.Descriptor instead.
-func (*GitStatusResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{2}
+// Deprecated: Use ScmStatusResp.ProtoReflect.Descriptor instead.
+func (*ScmStatusResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *GitStatusResp) GetState() GitState {
+func (x *ScmStatusResp) GetState() ScmState {
 	if x != nil {
 		return x.State
 	}
-	return GitState_GIT_STATE_UNSPECIFIED
+	return ScmState_SCM_STATE_UNSPECIFIED
 }
 
-func (x *GitStatusResp) GetChanges() []*GitChange {
+func (x *ScmStatusResp) GetGroups() []*ScmResourceGroup {
 	if x != nil {
-		return x.Changes
+		return x.Groups
 	}
 	return nil
 }
 
-func (x *GitStatusResp) GetMessage() string {
+func (x *ScmStatusResp) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *ScmStatusResp) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
 	return ""
 }
 
-type GitDiffReq struct {
+// Original content for quickDiff / open diff (left side).
+type ScmOriginalContentReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	Layer         GitLayer               `protobuf:"varint,3,opt,name=layer,proto3,enum=termbridge.agent.GitLayer" json:"layer,omitempty"`
+	GroupId       string                 `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GitDiffReq) Reset() {
-	*x = GitDiffReq{}
-	mi := &file_termbridge_agent_v1_git_proto_msgTypes[3]
+func (x *ScmOriginalContentReq) Reset() {
+	*x = ScmOriginalContentReq{}
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GitDiffReq) String() string {
+func (x *ScmOriginalContentReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GitDiffReq) ProtoMessage() {}
+func (*ScmOriginalContentReq) ProtoMessage() {}
 
-func (x *GitDiffReq) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_git_proto_msgTypes[3]
+func (x *ScmOriginalContentReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -373,59 +639,56 @@ func (x *GitDiffReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GitDiffReq.ProtoReflect.Descriptor instead.
-func (*GitDiffReq) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{3}
+// Deprecated: Use ScmOriginalContentReq.ProtoReflect.Descriptor instead.
+func (*ScmOriginalContentReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *GitDiffReq) GetWorkspaceId() string {
+func (x *ScmOriginalContentReq) GetWorkspaceId() string {
 	if x != nil {
 		return x.WorkspaceId
 	}
 	return ""
 }
 
-func (x *GitDiffReq) GetPath() string {
+func (x *ScmOriginalContentReq) GetPath() string {
 	if x != nil {
 		return x.Path
 	}
 	return ""
 }
 
-func (x *GitDiffReq) GetLayer() GitLayer {
+func (x *ScmOriginalContentReq) GetGroupId() string {
 	if x != nil {
-		return x.Layer
+		return x.GroupId
 	}
-	return GitLayer_GIT_LAYER_UNSPECIFIED
+	return ""
 }
 
-type GitDiffResp struct {
+type ScmOriginalContentResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	State         GitState               `protobuf:"varint,1,opt,name=state,proto3,enum=termbridge.agent.GitState" json:"state,omitempty"`
-	OriginalPath  string                 `protobuf:"bytes,2,opt,name=original_path,json=originalPath,proto3" json:"original_path,omitempty"`
-	ModifiedPath  string                 `protobuf:"bytes,3,opt,name=modified_path,json=modifiedPath,proto3" json:"modified_path,omitempty"`
-	OriginalText  string                 `protobuf:"bytes,4,opt,name=original_text,json=originalText,proto3" json:"original_text,omitempty"`
-	ModifiedText  string                 `protobuf:"bytes,5,opt,name=modified_text,json=modifiedText,proto3" json:"modified_text,omitempty"`
-	Message       string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`
+	ResourceState ScmResourceState       `protobuf:"varint,1,opt,name=resource_state,json=resourceState,proto3,enum=termbridge.agent.ScmResourceState" json:"resource_state,omitempty"`
+	Content       []byte                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GitDiffResp) Reset() {
-	*x = GitDiffResp{}
-	mi := &file_termbridge_agent_v1_git_proto_msgTypes[4]
+func (x *ScmOriginalContentResp) Reset() {
+	*x = ScmOriginalContentResp{}
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GitDiffResp) String() string {
+func (x *ScmOriginalContentResp) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GitDiffResp) ProtoMessage() {}
+func (*ScmOriginalContentResp) ProtoMessage() {}
 
-func (x *GitDiffResp) ProtoReflect() protoreflect.Message {
-	mi := &file_termbridge_agent_v1_git_proto_msgTypes[4]
+func (x *ScmOriginalContentResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -436,47 +699,374 @@ func (x *GitDiffResp) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GitDiffResp.ProtoReflect.Descriptor instead.
-func (*GitDiffResp) Descriptor() ([]byte, []int) {
-	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{4}
+// Deprecated: Use ScmOriginalContentResp.ProtoReflect.Descriptor instead.
+func (*ScmOriginalContentResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *GitDiffResp) GetState() GitState {
+func (x *ScmOriginalContentResp) GetResourceState() ScmResourceState {
+	if x != nil {
+		return x.ResourceState
+	}
+	return ScmResourceState_SCM_RESOURCE_STATE_UNSPECIFIED
+}
+
+func (x *ScmOriginalContentResp) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *ScmOriginalContentResp) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type ScmExecuteReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Command       ScmCommand             `protobuf:"varint,2,opt,name=command,proto3,enum=termbridge.agent.ScmCommand" json:"command,omitempty"`
+	Path          string                 `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
+	GroupId       string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	Message       string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	BranchName    string                 `protobuf:"bytes,6,opt,name=branch_name,json=branchName,proto3" json:"branch_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScmExecuteReq) Reset() {
+	*x = ScmExecuteReq{}
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScmExecuteReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScmExecuteReq) ProtoMessage() {}
+
+func (x *ScmExecuteReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScmExecuteReq.ProtoReflect.Descriptor instead.
+func (*ScmExecuteReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ScmExecuteReq) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *ScmExecuteReq) GetCommand() ScmCommand {
+	if x != nil {
+		return x.Command
+	}
+	return ScmCommand_SCM_COMMAND_UNSPECIFIED
+}
+
+func (x *ScmExecuteReq) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *ScmExecuteReq) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *ScmExecuteReq) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ScmExecuteReq) GetBranchName() string {
+	if x != nil {
+		return x.BranchName
+	}
+	return ""
+}
+
+type ScmExecuteResp struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OperationState ScmOperationState      `protobuf:"varint,1,opt,name=operation_state,json=operationState,proto3,enum=termbridge.agent.ScmOperationState" json:"operation_state,omitempty"`
+	Message        string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Status         *ScmStatusResp         `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Repository     *ScmRepositoryResp     `protobuf:"bytes,4,opt,name=repository,proto3" json:"repository,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ScmExecuteResp) Reset() {
+	*x = ScmExecuteResp{}
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScmExecuteResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScmExecuteResp) ProtoMessage() {}
+
+func (x *ScmExecuteResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScmExecuteResp.ProtoReflect.Descriptor instead.
+func (*ScmExecuteResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ScmExecuteResp) GetOperationState() ScmOperationState {
+	if x != nil {
+		return x.OperationState
+	}
+	return ScmOperationState_SCM_OPERATION_STATE_UNSPECIFIED
+}
+
+func (x *ScmExecuteResp) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ScmExecuteResp) GetStatus() *ScmStatusResp {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *ScmExecuteResp) GetRepository() *ScmRepositoryResp {
+	if x != nil {
+		return x.Repository
+	}
+	return nil
+}
+
+type ScmHistoryEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ShortId       string                 `protobuf:"bytes,2,opt,name=short_id,json=shortId,proto3" json:"short_id,omitempty"`
+	Subject       string                 `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
+	AuthorName    string                 `protobuf:"bytes,4,opt,name=author_name,json=authorName,proto3" json:"author_name,omitempty"`
+	AuthoredAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=authored_at,json=authoredAt,proto3" json:"authored_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScmHistoryEntry) Reset() {
+	*x = ScmHistoryEntry{}
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScmHistoryEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScmHistoryEntry) ProtoMessage() {}
+
+func (x *ScmHistoryEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScmHistoryEntry.ProtoReflect.Descriptor instead.
+func (*ScmHistoryEntry) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ScmHistoryEntry) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ScmHistoryEntry) GetShortId() string {
+	if x != nil {
+		return x.ShortId
+	}
+	return ""
+}
+
+func (x *ScmHistoryEntry) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *ScmHistoryEntry) GetAuthorName() string {
+	if x != nil {
+		return x.AuthorName
+	}
+	return ""
+}
+
+func (x *ScmHistoryEntry) GetAuthoredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AuthoredAt
+	}
+	return nil
+}
+
+type ScmRepositoryReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScmRepositoryReq) Reset() {
+	*x = ScmRepositoryReq{}
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScmRepositoryReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScmRepositoryReq) ProtoMessage() {}
+
+func (x *ScmRepositoryReq) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScmRepositoryReq.ProtoReflect.Descriptor instead.
+func (*ScmRepositoryReq) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ScmRepositoryReq) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ScmRepositoryResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	State         ScmState               `protobuf:"varint,1,opt,name=state,proto3,enum=termbridge.agent.ScmState" json:"state,omitempty"`
+	CurrentBranch string                 `protobuf:"bytes,2,opt,name=current_branch,json=currentBranch,proto3" json:"current_branch,omitempty"`
+	LocalBranches []string               `protobuf:"bytes,3,rep,name=local_branches,json=localBranches,proto3" json:"local_branches,omitempty"`
+	History       []*ScmHistoryEntry     `protobuf:"bytes,4,rep,name=history,proto3" json:"history,omitempty"`
+	Message       string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScmRepositoryResp) Reset() {
+	*x = ScmRepositoryResp{}
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScmRepositoryResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScmRepositoryResp) ProtoMessage() {}
+
+func (x *ScmRepositoryResp) ProtoReflect() protoreflect.Message {
+	mi := &file_termbridge_agent_v1_git_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScmRepositoryResp.ProtoReflect.Descriptor instead.
+func (*ScmRepositoryResp) Descriptor() ([]byte, []int) {
+	return file_termbridge_agent_v1_git_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ScmRepositoryResp) GetState() ScmState {
 	if x != nil {
 		return x.State
 	}
-	return GitState_GIT_STATE_UNSPECIFIED
+	return ScmState_SCM_STATE_UNSPECIFIED
 }
 
-func (x *GitDiffResp) GetOriginalPath() string {
+func (x *ScmRepositoryResp) GetCurrentBranch() string {
 	if x != nil {
-		return x.OriginalPath
+		return x.CurrentBranch
 	}
 	return ""
 }
 
-func (x *GitDiffResp) GetModifiedPath() string {
+func (x *ScmRepositoryResp) GetLocalBranches() []string {
 	if x != nil {
-		return x.ModifiedPath
+		return x.LocalBranches
 	}
-	return ""
+	return nil
 }
 
-func (x *GitDiffResp) GetOriginalText() string {
+func (x *ScmRepositoryResp) GetHistory() []*ScmHistoryEntry {
 	if x != nil {
-		return x.OriginalText
+		return x.History
 	}
-	return ""
+	return nil
 }
 
-func (x *GitDiffResp) GetModifiedText() string {
-	if x != nil {
-		return x.ModifiedText
-	}
-	return ""
-}
-
-func (x *GitDiffResp) GetMessage() string {
+func (x *ScmRepositoryResp) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
@@ -487,49 +1077,106 @@ var File_termbridge_agent_v1_git_proto protoreflect.FileDescriptor
 
 const file_termbridge_agent_v1_git_proto_rawDesc = "" +
 	"\n" +
-	"\x1dtermbridge/agent/v1/git.proto\x12\x10termbridge.agent\"\x91\x02\n" +
-	"\tGitChange\x12\x12\n" +
+	"\x1dtermbridge/agent/v1/git.proto\x12\x10termbridge.agent\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa2\x01\n" +
+	"\x16ScmResourceDecorations\x12%\n" +
+	"\x0estrike_through\x18\x01 \x01(\bR\rstrikeThrough\x12\x14\n" +
+	"\x05faded\x18\x02 \x01(\bR\x05faded\x12\x18\n" +
+	"\atooltip\x18\x03 \x01(\tR\atooltip\x12\x16\n" +
+	"\x06letter\x18\x04 \x01(\tR\x06letter\x12\x19\n" +
+	"\bcolor_id\x18\x05 \x01(\tR\acolorId\"\xf8\x01\n" +
+	"\vScmResource\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12#\n" +
-	"\roriginal_path\x18\x02 \x01(\tR\foriginalPath\x12!\n" +
-	"\findex_status\x18\x03 \x01(\tR\vindexStatus\x12'\n" +
-	"\x0fworktree_status\x18\x04 \x01(\tR\x0eworktreeStatus\x12\x1c\n" +
-	"\tuntracked\x18\x05 \x01(\bR\tuntracked\x12\x1a\n" +
-	"\bunmerged\x18\x06 \x01(\bR\bunmerged\x12E\n" +
-	"\x10available_layers\x18\a \x03(\x0e2\x1a.termbridge.agent.GitLayerR\x0favailableLayers\"1\n" +
-	"\fGitStatusReq\x12!\n" +
-	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"\x92\x01\n" +
-	"\rGitStatusResp\x120\n" +
-	"\x05state\x18\x01 \x01(\x0e2\x1a.termbridge.agent.GitStateR\x05state\x125\n" +
-	"\achanges\x18\x02 \x03(\v2\x1b.termbridge.agent.GitChangeR\achanges\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"u\n" +
-	"\n" +
-	"GitDiffReq\x12!\n" +
+	"\roriginal_path\x18\x02 \x01(\tR\foriginalPath\x12\x19\n" +
+	"\bgroup_id\x18\x03 \x01(\tR\agroupId\x12J\n" +
+	"\vdecorations\x18\x04 \x01(\v2(.termbridge.agent.ScmResourceDecorationsR\vdecorations\x12I\n" +
+	"\x0eresource_state\x18\x05 \x01(\x0e2\".termbridge.agent.ScmResourceStateR\rresourceState\"\x9d\x01\n" +
+	"\x10ScmResourceGroup\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12;\n" +
+	"\tresources\x18\x03 \x03(\v2\x1d.termbridge.agent.ScmResourceR\tresources\x12&\n" +
+	"\x0fhide_when_empty\x18\x04 \x01(\bR\rhideWhenEmpty\"1\n" +
+	"\fScmStatusReq\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"\xad\x01\n" +
+	"\rScmStatusResp\x120\n" +
+	"\x05state\x18\x01 \x01(\x0e2\x1a.termbridge.agent.ScmStateR\x05state\x12:\n" +
+	"\x06groups\x18\x02 \x03(\v2\".termbridge.agent.ScmResourceGroupR\x06groups\x12\x14\n" +
+	"\x05count\x18\x03 \x01(\x05R\x05count\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"i\n" +
+	"\x15ScmOriginalContentReq\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x120\n" +
-	"\x05layer\x18\x03 \x01(\x0e2\x1a.termbridge.agent.GitLayerR\x05layer\"\xed\x01\n" +
-	"\vGitDiffResp\x120\n" +
-	"\x05state\x18\x01 \x01(\x0e2\x1a.termbridge.agent.GitStateR\x05state\x12#\n" +
-	"\roriginal_path\x18\x02 \x01(\tR\foriginalPath\x12#\n" +
-	"\rmodified_path\x18\x03 \x01(\tR\fmodifiedPath\x12#\n" +
-	"\roriginal_text\x18\x04 \x01(\tR\foriginalText\x12#\n" +
-	"\rmodified_text\x18\x05 \x01(\tR\fmodifiedText\x12\x18\n" +
-	"\amessage\x18\x06 \x01(\tR\amessage*\x9e\x02\n" +
-	"\bGitState\x12\x19\n" +
-	"\x15GIT_STATE_UNSPECIFIED\x10\x00\x12\x17\n" +
-	"\x13GIT_STATE_AVAILABLE\x10\x01\x12\x1c\n" +
-	"\x18GIT_STATE_NOT_REPOSITORY\x10\x02\x12$\n" +
-	" GIT_STATE_EXECUTABLE_UNAVAILABLE\x10\x03\x12\x14\n" +
-	"\x10GIT_STATE_BINARY\x10\x04\x12\x17\n" +
-	"\x13GIT_STATE_TOO_LARGE\x10\x05\x12\x16\n" +
-	"\x12GIT_STATE_UNMERGED\x10\x06\x12\x17\n" +
-	"\x13GIT_STATE_SUBMODULE\x10\a\x12\x1f\n" +
-	"\x1bGIT_STATE_LAYER_UNAVAILABLE\x10\b\x12\x19\n" +
-	"\x15GIT_STATE_UNAVAILABLE\x10\t*l\n" +
-	"\bGitLayer\x12\x19\n" +
-	"\x15GIT_LAYER_UNSPECIFIED\x10\x00\x12\x14\n" +
-	"\x10GIT_LAYER_STAGED\x10\x01\x12\x16\n" +
-	"\x12GIT_LAYER_UNSTAGED\x10\x02\x12\x17\n" +
-	"\x13GIT_LAYER_UNTRACKED\x10\x03B\xca\x01\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x19\n" +
+	"\bgroup_id\x18\x03 \x01(\tR\agroupId\"\x97\x01\n" +
+	"\x16ScmOriginalContentResp\x12I\n" +
+	"\x0eresource_state\x18\x01 \x01(\x0e2\".termbridge.agent.ScmResourceStateR\rresourceState\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\fR\acontent\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\xd4\x01\n" +
+	"\rScmExecuteReq\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x126\n" +
+	"\acommand\x18\x02 \x01(\x0e2\x1c.termbridge.agent.ScmCommandR\acommand\x12\x12\n" +
+	"\x04path\x18\x03 \x01(\tR\x04path\x12\x19\n" +
+	"\bgroup_id\x18\x04 \x01(\tR\agroupId\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\x12\x1f\n" +
+	"\vbranch_name\x18\x06 \x01(\tR\n" +
+	"branchName\"\xf6\x01\n" +
+	"\x0eScmExecuteResp\x12L\n" +
+	"\x0foperation_state\x18\x01 \x01(\x0e2#.termbridge.agent.ScmOperationStateR\x0eoperationState\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x127\n" +
+	"\x06status\x18\x03 \x01(\v2\x1f.termbridge.agent.ScmStatusRespR\x06status\x12C\n" +
+	"\n" +
+	"repository\x18\x04 \x01(\v2#.termbridge.agent.ScmRepositoryRespR\n" +
+	"repository\"\xb4\x01\n" +
+	"\x0fScmHistoryEntry\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
+	"\bshort_id\x18\x02 \x01(\tR\ashortId\x12\x18\n" +
+	"\asubject\x18\x03 \x01(\tR\asubject\x12\x1f\n" +
+	"\vauthor_name\x18\x04 \x01(\tR\n" +
+	"authorName\x12;\n" +
+	"\vauthored_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"authoredAt\"5\n" +
+	"\x10ScmRepositoryReq\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"\xea\x01\n" +
+	"\x11ScmRepositoryResp\x120\n" +
+	"\x05state\x18\x01 \x01(\x0e2\x1a.termbridge.agent.ScmStateR\x05state\x12%\n" +
+	"\x0ecurrent_branch\x18\x02 \x01(\tR\rcurrentBranch\x12%\n" +
+	"\x0elocal_branches\x18\x03 \x03(\tR\rlocalBranches\x12;\n" +
+	"\ahistory\x18\x04 \x03(\v2!.termbridge.agent.ScmHistoryEntryR\ahistory\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage*\x9d\x01\n" +
+	"\bScmState\x12\x19\n" +
+	"\x15SCM_STATE_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13SCM_STATE_AVAILABLE\x10\x01\x12\x1c\n" +
+	"\x18SCM_STATE_NOT_REPOSITORY\x10\x02\x12$\n" +
+	" SCM_STATE_EXECUTABLE_UNAVAILABLE\x10\x03\x12\x19\n" +
+	"\x15SCM_STATE_UNAVAILABLE\x10\x04*\x80\x02\n" +
+	"\x10ScmResourceState\x12\"\n" +
+	"\x1eSCM_RESOURCE_STATE_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cSCM_RESOURCE_STATE_AVAILABLE\x10\x01\x12\x1d\n" +
+	"\x19SCM_RESOURCE_STATE_BINARY\x10\x02\x12 \n" +
+	"\x1cSCM_RESOURCE_STATE_TOO_LARGE\x10\x03\x12\x1f\n" +
+	"\x1bSCM_RESOURCE_STATE_UNMERGED\x10\x04\x12 \n" +
+	"\x1cSCM_RESOURCE_STATE_SUBMODULE\x10\x05\x12\"\n" +
+	"\x1eSCM_RESOURCE_STATE_UNAVAILABLE\x10\x06*\xc8\x01\n" +
+	"\n" +
+	"ScmCommand\x12\x1b\n" +
+	"\x17SCM_COMMAND_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11SCM_COMMAND_STAGE\x10\x01\x12\x17\n" +
+	"\x13SCM_COMMAND_UNSTAGE\x10\x02\x12\x17\n" +
+	"\x13SCM_COMMAND_DISCARD\x10\x03\x12\x16\n" +
+	"\x12SCM_COMMAND_COMMIT\x10\x04\x12\x1d\n" +
+	"\x19SCM_COMMAND_CREATE_BRANCH\x10\x05\x12\x1d\n" +
+	"\x19SCM_COMMAND_SWITCH_BRANCH\x10\x06*\xc5\x03\n" +
+	"\x11ScmOperationState\x12#\n" +
+	"\x1fSCM_OPERATION_STATE_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16SCM_OPERATION_STATE_OK\x10\x01\x12/\n" +
+	"+SCM_OPERATION_STATE_CLEAN_WORKTREE_REQUIRED\x10\x02\x12)\n" +
+	"%SCM_OPERATION_STATE_NO_STAGED_CHANGES\x10\x03\x12%\n" +
+	"!SCM_OPERATION_STATE_BRANCH_EXISTS\x10\x04\x12(\n" +
+	"$SCM_OPERATION_STATE_BRANCH_NOT_FOUND\x10\x05\x12+\n" +
+	"'SCM_OPERATION_STATE_INVALID_BRANCH_NAME\x10\x06\x12.\n" +
+	"*SCM_OPERATION_STATE_INVALID_COMMIT_MESSAGE\x10\a\x12 \n" +
+	"\x1cSCM_OPERATION_STATE_CONFLICT\x10\b\x12\x1e\n" +
+	"\x1aSCM_OPERATION_STATE_FAILED\x10\t\x12#\n" +
+	"\x1fSCM_OPERATION_STATE_UNAVAILABLE\x10\n" +
+	"B\xca\x01\n" +
 	"\x14com.termbridge.agentB\bGitProtoP\x01ZGgitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1\xa2\x02\x03TAX\xaa\x02\x10Termbridge.Agent\xca\x02\x10Termbridge\\Agent\xe2\x02\x1cTermbridge\\Agent\\GPBMetadata\xea\x02\x11Termbridge::Agentb\x06proto3"
 
 var (
@@ -544,28 +1191,46 @@ func file_termbridge_agent_v1_git_proto_rawDescGZIP() []byte {
 	return file_termbridge_agent_v1_git_proto_rawDescData
 }
 
-var file_termbridge_agent_v1_git_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_termbridge_agent_v1_git_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_termbridge_agent_v1_git_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_termbridge_agent_v1_git_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_termbridge_agent_v1_git_proto_goTypes = []any{
-	(GitState)(0),         // 0: termbridge.agent.GitState
-	(GitLayer)(0),         // 1: termbridge.agent.GitLayer
-	(*GitChange)(nil),     // 2: termbridge.agent.GitChange
-	(*GitStatusReq)(nil),  // 3: termbridge.agent.GitStatusReq
-	(*GitStatusResp)(nil), // 4: termbridge.agent.GitStatusResp
-	(*GitDiffReq)(nil),    // 5: termbridge.agent.GitDiffReq
-	(*GitDiffResp)(nil),   // 6: termbridge.agent.GitDiffResp
+	(ScmState)(0),                  // 0: termbridge.agent.ScmState
+	(ScmResourceState)(0),          // 1: termbridge.agent.ScmResourceState
+	(ScmCommand)(0),                // 2: termbridge.agent.ScmCommand
+	(ScmOperationState)(0),         // 3: termbridge.agent.ScmOperationState
+	(*ScmResourceDecorations)(nil), // 4: termbridge.agent.ScmResourceDecorations
+	(*ScmResource)(nil),            // 5: termbridge.agent.ScmResource
+	(*ScmResourceGroup)(nil),       // 6: termbridge.agent.ScmResourceGroup
+	(*ScmStatusReq)(nil),           // 7: termbridge.agent.ScmStatusReq
+	(*ScmStatusResp)(nil),          // 8: termbridge.agent.ScmStatusResp
+	(*ScmOriginalContentReq)(nil),  // 9: termbridge.agent.ScmOriginalContentReq
+	(*ScmOriginalContentResp)(nil), // 10: termbridge.agent.ScmOriginalContentResp
+	(*ScmExecuteReq)(nil),          // 11: termbridge.agent.ScmExecuteReq
+	(*ScmExecuteResp)(nil),         // 12: termbridge.agent.ScmExecuteResp
+	(*ScmHistoryEntry)(nil),        // 13: termbridge.agent.ScmHistoryEntry
+	(*ScmRepositoryReq)(nil),       // 14: termbridge.agent.ScmRepositoryReq
+	(*ScmRepositoryResp)(nil),      // 15: termbridge.agent.ScmRepositoryResp
+	(*timestamppb.Timestamp)(nil),  // 16: google.protobuf.Timestamp
 }
 var file_termbridge_agent_v1_git_proto_depIdxs = []int32{
-	1, // 0: termbridge.agent.GitChange.available_layers:type_name -> termbridge.agent.GitLayer
-	0, // 1: termbridge.agent.GitStatusResp.state:type_name -> termbridge.agent.GitState
-	2, // 2: termbridge.agent.GitStatusResp.changes:type_name -> termbridge.agent.GitChange
-	1, // 3: termbridge.agent.GitDiffReq.layer:type_name -> termbridge.agent.GitLayer
-	0, // 4: termbridge.agent.GitDiffResp.state:type_name -> termbridge.agent.GitState
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	4,  // 0: termbridge.agent.ScmResource.decorations:type_name -> termbridge.agent.ScmResourceDecorations
+	1,  // 1: termbridge.agent.ScmResource.resource_state:type_name -> termbridge.agent.ScmResourceState
+	5,  // 2: termbridge.agent.ScmResourceGroup.resources:type_name -> termbridge.agent.ScmResource
+	0,  // 3: termbridge.agent.ScmStatusResp.state:type_name -> termbridge.agent.ScmState
+	6,  // 4: termbridge.agent.ScmStatusResp.groups:type_name -> termbridge.agent.ScmResourceGroup
+	1,  // 5: termbridge.agent.ScmOriginalContentResp.resource_state:type_name -> termbridge.agent.ScmResourceState
+	2,  // 6: termbridge.agent.ScmExecuteReq.command:type_name -> termbridge.agent.ScmCommand
+	3,  // 7: termbridge.agent.ScmExecuteResp.operation_state:type_name -> termbridge.agent.ScmOperationState
+	8,  // 8: termbridge.agent.ScmExecuteResp.status:type_name -> termbridge.agent.ScmStatusResp
+	15, // 9: termbridge.agent.ScmExecuteResp.repository:type_name -> termbridge.agent.ScmRepositoryResp
+	16, // 10: termbridge.agent.ScmHistoryEntry.authored_at:type_name -> google.protobuf.Timestamp
+	0,  // 11: termbridge.agent.ScmRepositoryResp.state:type_name -> termbridge.agent.ScmState
+	13, // 12: termbridge.agent.ScmRepositoryResp.history:type_name -> termbridge.agent.ScmHistoryEntry
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_termbridge_agent_v1_git_proto_init() }
@@ -578,8 +1243,8 @@ func file_termbridge_agent_v1_git_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_termbridge_agent_v1_git_proto_rawDesc), len(file_termbridge_agent_v1_git_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   5,
+			NumEnums:      4,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

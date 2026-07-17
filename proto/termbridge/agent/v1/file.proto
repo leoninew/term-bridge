@@ -2,135 +2,108 @@ syntax = "proto3";
 
 package termbridge.agent;
 
-import "google/protobuf/timestamp.proto";
-
 option go_package = "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1/file";
 
-enum FileEntryKind {
-  FILE_ENTRY_KIND_UNSPECIFIED = 0;
-  FILE_ENTRY_KIND_FILE = 1;
-  FILE_ENTRY_KIND_DIRECTORY = 2;
+// Wire contract aligned with vscode.FileSystemProvider / FileStat / FileType.
+// See: https://code.visualstudio.com/api/references/vscode-api#FileSystemProvider
+
+enum FileType {
+  FILE_TYPE_UNKNOWN = 0;
+  FILE_TYPE_FILE = 1;
+  FILE_TYPE_DIRECTORY = 2;
+  FILE_TYPE_SYMBOLIC_LINK = 64;
 }
 
-message FileEntry {
-  string path = 1;
-  string name = 2;
-  FileEntryKind kind = 3;
+enum FilePermission {
+  FILE_PERMISSION_UNSPECIFIED = 0;
+  FILE_PERMISSION_READONLY = 1;
+}
+
+message FileStat {
+  FileType type = 1;
+  // Creation time in milliseconds since Unix epoch (vscode FileStat.ctime).
+  int64 ctime = 2;
+  // Modification time in milliseconds since Unix epoch (vscode FileStat.mtime).
+  int64 mtime = 3;
   int64 size = 4;
-  google.protobuf.Timestamp modified_at = 5;
-  string revision = 6;
-  optional bool has_children = 7;
+  FilePermission permissions = 5;
+  // Opaque concurrency token (etag); empty means unknown.
+  string etag = 6;
 }
 
-message RevisionPrecondition {
-  string path = 1;
-  string expected_revision = 2;
-}
-
-message FileConflict {
-  string type = 1;
-  FileEntry current_entry = 2;
-}
-
-message FileMutationResult {
-  FileEntry source_entry = 1;
-  FileEntry destination_entry = 2;
-  int32 affected_count = 3;
-  repeated string affected_path_prefixes = 4;
-}
-
-message ListFilesReq {
+message FsStatReq {
   string workspace_id = 1;
   string path = 2;
 }
 
-message ListFilesResp {
-  FileEntry directory = 1;
-  repeated FileEntry items = 2;
-  bool truncated = 3;
+message FsStatResp {
+  FileStat stat = 1;
 }
 
-message ReadFileReq {
+message FsReadDirectoryReq {
   string workspace_id = 1;
   string path = 2;
 }
 
-message ReadFileResp {
-  FileEntry entry = 1;
-  string text = 2;
+message FsDirectoryEntry {
+  string name = 1;
+  FileType type = 2;
 }
 
-message CreateFileReq {
+message FsReadDirectoryResp {
+  repeated FsDirectoryEntry entries = 1;
+  bool truncated = 2;
+}
+
+message FsReadFileReq {
   string workspace_id = 1;
   string path = 2;
-  string text = 3;
+}
+
+message FsReadFileResp {
+  bytes content = 1;
+  FileStat stat = 2;
+}
+
+message FsWriteFileReq {
+  string workspace_id = 1;
+  string path = 2;
+  bytes content = 3;
+  bool create = 4;
+  bool overwrite = 5;
+  // When non-empty, write fails unless current etag matches (FileSystemError.FileExists / conflict).
+  string etag = 6;
+}
+
+message FsWriteFileResp {
+  FileStat stat = 1;
+}
+
+message FsCreateDirectoryReq {
+  string workspace_id = 1;
+  string path = 2;
+}
+
+message FsCreateDirectoryResp {
+  FileStat stat = 1;
+}
+
+message FsDeleteReq {
+  string workspace_id = 1;
+  string path = 2;
+  bool recursive = 3;
+  bool use_trash = 4;
+}
+
+message FsDeleteResp {}
+
+message FsRenameReq {
+  string workspace_id = 1;
+  string old_path = 2;
+  string new_path = 3;
   bool overwrite = 4;
-  string expected_parent_revision = 5;
-  string expected_destination_revision = 6;
 }
 
-message CreateFileResp {
-  FileMutationResult result = 1;
-}
-
-message CreateDirectoryReq {
-  string workspace_id = 1;
-  string path = 2;
-  bool allow_existing = 3;
-  string expected_parent_revision = 4;
-}
-
-message CreateDirectoryResp {
-  FileMutationResult result = 1;
-}
-
-message WriteFileReq {
-  string workspace_id = 1;
-  string path = 2;
-  string text = 3;
-  string expected_revision = 4;
-  bool force = 5;
-}
-
-message WriteFileResp {
-  FileMutationResult result = 1;
-}
-
-message RenameEntryReq {
-  string workspace_id = 1;
-  string path = 2;
-  string new_name = 3;
-  string expected_source_revision = 4;
-  string expected_parent_revision = 5;
-  string expected_destination_revision = 6;
-}
-
-message RenameEntryResp {
-  FileMutationResult result = 1;
-}
-
-message MoveEntryReq {
-  string workspace_id = 1;
-  string source_path = 2;
-  string destination_path = 3;
-  string expected_source_revision = 4;
-  string expected_source_parent_revision = 5;
-  string expected_destination_parent_revision = 6;
-  string expected_destination_revision = 7;
-}
-
-message MoveEntryResp {
-  FileMutationResult result = 1;
-}
-
-message DeleteEntryReq {
-  string workspace_id = 1;
-  string path = 2;
-  string expected_revision = 3;
-  string expected_parent_revision = 4;
-  bool recursive = 5;
-}
-
-message DeleteEntryResp {
-  FileMutationResult result = 1;
+message FsRenameResp {
+  FileStat stat = 1;
 }

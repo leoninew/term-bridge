@@ -41,7 +41,7 @@ func TestFileGitRouteHidesUnownedDeviceBeforeTunnelLookup(t *testing.T) {
 	handler.setRoute("dev-1", newAgentRoute("dev-1", nil))
 	token := fileGitUserToken(t, handler, "user-1")
 
-	request := httptest.NewRequest(http.MethodGet, "/api/devices/dev-1/workspaces/ws-1/files/tree", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/devices/dev-1/workspaces/ws-1/fs/readDirectory?path=", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -62,7 +62,7 @@ func TestFileGitRouteReturnsDeviceOfflineForOwnedDevice(t *testing.T) {
 	handler := newFileGitHandler(t, repository)
 	token := fileGitUserToken(t, handler, "user-1")
 
-	request := httptest.NewRequest(http.MethodGet, "/api/devices/dev-1/workspaces/ws-1/git/status", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/devices/dev-1/workspaces/ws-1/scm/status", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -91,3 +91,4 @@ func fileGitUserToken(t *testing.T, handler *Handler, userId string) string {
 	}
 	return token
 }
+

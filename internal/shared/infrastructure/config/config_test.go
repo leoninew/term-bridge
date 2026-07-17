@@ -617,6 +617,22 @@ func TestLoadProductionTurnstileConfiguration(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsGitCommandTimeoutBeyondCloudBudget(t *testing.T) {
+	isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeEnvConfig(t, cwd, "develop", "git:\n  command_timeout: 11s\n")
+	t.Setenv(EnvNameVariable, "develop")
+
+	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
+	if err == nil {
+		t.Fatal("Load() error = nil, want Git command timeout validation error")
+	}
+	if !strings.Contains(err.Error(), "invalid git.command_timeout") {
+		t.Fatalf("Load() error = %v, want Git command timeout validation error", err)
+	}
+}
+
 func TestLoadLocalOAuthConfig(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()

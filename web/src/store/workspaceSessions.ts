@@ -13,6 +13,8 @@ export type RemovedSessionSummary = Pick<SessionSummary, 'id' | 'workspace_id'>
 export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => {
   const workspaceTree = ref<WorkspaceTreeSummary[]>([])
   const loading = ref(false)
+  const workspaceTarget = ref<RuntimeTarget | null>(null)
+  let refreshSequence = 0
 
   const workspaces = computed<WorkspaceSummary[]>(() =>
     workspaceTree.value.map(workspaceSummaryFromTree),
@@ -23,24 +25,37 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
   )
 
   function reset() {
+    refreshSequence += 1
+    workspaceTarget.value = null
     workspaceTree.value = []
+    loading.value = false
   }
 
   async function refresh(target: RuntimeTarget | null, runtimeApi: SessionRuntimeApi) {
     if (!target) {
       return
     }
+    const requestId = ++refreshSequence
+    workspaceTarget.value = cloneTarget(target)
     loading.value = true
     try {
       const response = await runtimeApi.listWorkspaceTree()
-      applyWorkspaceTree(response.data)
+      if (requestId === refreshSequence) {
+        applyWorkspaceTree(response.data)
+      }
     } finally {
-      loading.value = false
+      if (requestId === refreshSequence) {
+        loading.value = false
+      }
     }
   }
 
   function applyWorkspaceTree(nextWorkspaceTree: WorkspaceTreeSummary[]) {
     workspaceTree.value = Array.isArray(nextWorkspaceTree) ? nextWorkspaceTree : []
+  }
+
+  function hasWorkspaceTarget(target: RuntimeTarget): boolean {
+    return targetKey(workspaceTarget.value) === targetKey(target)
   }
 
   function workspaceById(workspaceId: string): WorkspaceSummary | null {
@@ -167,11 +182,13 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
   return {
     workspaceTree,
     loading,
+    workspaceTarget,
     workspaces,
     sessions,
     reset,
     refresh,
     applyWorkspaceTree,
+    hasWorkspaceTarget,
     workspaceById,
     sessionById,
     sessionTitle,
@@ -183,6 +200,17 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
     reorderSessions,
   }
 })
+
+function cloneTarget(target: RuntimeTarget): RuntimeTarget {
+  return target.mode === 'local' ? { mode: 'local' } : { mode: 'cloud', deviceId: target.deviceId }
+}
+
+function targetKey(target: RuntimeTarget | null): string {
+  if (!target) {
+    return ''
+  }
+  return target.mode === 'local' ? 'local' : `cloud:${target.deviceId}`
+}
 
 function sessionsForWorkspace(workspace: WorkspaceTreeSummary): SessionSummary[] {
   return workspace.children.map((session) => ({

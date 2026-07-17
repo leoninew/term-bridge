@@ -8,59 +8,131 @@
 
 export const protobufPackage = "termbridge.agent";
 
-export enum GitState {
-  GIT_STATE_UNSPECIFIED = 0,
-  GIT_STATE_AVAILABLE = 1,
-  GIT_STATE_NOT_REPOSITORY = 2,
-  GIT_STATE_EXECUTABLE_UNAVAILABLE = 3,
-  GIT_STATE_BINARY = 4,
-  GIT_STATE_TOO_LARGE = 5,
-  GIT_STATE_UNMERGED = 6,
-  GIT_STATE_SUBMODULE = 7,
-  GIT_STATE_LAYER_UNAVAILABLE = 8,
-  GIT_STATE_UNAVAILABLE = 9,
+export enum ScmState {
+  SCM_STATE_UNSPECIFIED = 0,
+  SCM_STATE_AVAILABLE = 1,
+  SCM_STATE_NOT_REPOSITORY = 2,
+  SCM_STATE_EXECUTABLE_UNAVAILABLE = 3,
+  SCM_STATE_UNAVAILABLE = 4,
   UNRECOGNIZED = -1,
 }
 
-export enum GitLayer {
-  GIT_LAYER_UNSPECIFIED = 0,
-  GIT_LAYER_STAGED = 1,
-  GIT_LAYER_UNSTAGED = 2,
-  GIT_LAYER_UNTRACKED = 3,
+export enum ScmResourceState {
+  SCM_RESOURCE_STATE_UNSPECIFIED = 0,
+  SCM_RESOURCE_STATE_AVAILABLE = 1,
+  SCM_RESOURCE_STATE_BINARY = 2,
+  SCM_RESOURCE_STATE_TOO_LARGE = 3,
+  SCM_RESOURCE_STATE_UNMERGED = 4,
+  SCM_RESOURCE_STATE_SUBMODULE = 5,
+  SCM_RESOURCE_STATE_UNAVAILABLE = 6,
   UNRECOGNIZED = -1,
 }
 
-export interface GitChange {
+export enum ScmCommand {
+  SCM_COMMAND_UNSPECIFIED = 0,
+  SCM_COMMAND_STAGE = 1,
+  SCM_COMMAND_UNSTAGE = 2,
+  SCM_COMMAND_DISCARD = 3,
+  SCM_COMMAND_COMMIT = 4,
+  SCM_COMMAND_CREATE_BRANCH = 5,
+  SCM_COMMAND_SWITCH_BRANCH = 6,
+  UNRECOGNIZED = -1,
+}
+
+export enum ScmOperationState {
+  SCM_OPERATION_STATE_UNSPECIFIED = 0,
+  SCM_OPERATION_STATE_OK = 1,
+  SCM_OPERATION_STATE_CLEAN_WORKTREE_REQUIRED = 2,
+  SCM_OPERATION_STATE_NO_STAGED_CHANGES = 3,
+  SCM_OPERATION_STATE_BRANCH_EXISTS = 4,
+  SCM_OPERATION_STATE_BRANCH_NOT_FOUND = 5,
+  SCM_OPERATION_STATE_INVALID_BRANCH_NAME = 6,
+  SCM_OPERATION_STATE_INVALID_COMMIT_MESSAGE = 7,
+  SCM_OPERATION_STATE_CONFLICT = 8,
+  SCM_OPERATION_STATE_FAILED = 9,
+  SCM_OPERATION_STATE_UNAVAILABLE = 10,
+  UNRECOGNIZED = -1,
+}
+
+export interface ScmResourceDecorations {
+  strike_through: boolean;
+  faded: boolean;
+  tooltip: string;
+  letter: string;
+  color_id: string;
+}
+
+export interface ScmResource {
   path: string;
   original_path: string;
-  index_status: string;
-  worktree_status: string;
-  untracked: boolean;
-  unmerged: boolean;
-  available_layers: GitLayer[];
+  group_id: string;
+  decorations: ScmResourceDecorations | undefined;
+  resource_state: ScmResourceState;
 }
 
-export interface GitStatusReq {
+export interface ScmResourceGroup {
+  id: string;
+  label: string;
+  resources: ScmResource[];
+  hide_when_empty: boolean;
+}
+
+export interface ScmStatusReq {
   workspace_id: string;
 }
 
-export interface GitStatusResp {
-  state: GitState;
-  changes: GitChange[];
+export interface ScmStatusResp {
+  state: ScmState;
+  groups: ScmResourceGroup[];
+  count: number;
   message: string;
 }
 
-export interface GitDiffReq {
+/** Original content for quickDiff / open diff (left side). */
+export interface ScmOriginalContentReq {
   workspace_id: string;
   path: string;
-  layer: GitLayer;
+  group_id: string;
 }
 
-export interface GitDiffResp {
-  state: GitState;
-  original_path: string;
-  modified_path: string;
-  original_text: string;
-  modified_text: string;
+export interface ScmOriginalContentResp {
+  resource_state: ScmResourceState;
+  content: Uint8Array;
+  message: string;
+}
+
+export interface ScmExecuteReq {
+  workspace_id: string;
+  command: ScmCommand;
+  path: string;
+  group_id: string;
+  message: string;
+  branch_name: string;
+}
+
+export interface ScmExecuteResp {
+  operation_state: ScmOperationState;
+  message: string;
+  status: ScmStatusResp | undefined;
+  repository: ScmRepositoryResp | undefined;
+}
+
+export interface ScmHistoryEntry {
+  id: string;
+  short_id: string;
+  subject: string;
+  author_name: string;
+  authored_at: string | undefined;
+}
+
+export interface ScmRepositoryReq {
+  workspace_id: string;
+}
+
+export interface ScmRepositoryResp {
+  state: ScmState;
+  current_branch: string;
+  local_branches: string[];
+  history: ScmHistoryEntry[];
   message: string;
 }

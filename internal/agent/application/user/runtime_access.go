@@ -26,16 +26,17 @@ type RuntimeAccess interface {
 	UpdateShortcut(ctx context.Context, shortcutId string, request *agent.UpdateShortcutReq) (*agent.Shortcut, error)
 	UpdateShortcutOrder(ctx context.Context, shortcutIds []string) ([]*agent.Shortcut, error)
 	DeleteShortcut(ctx context.Context, shortcutId string) error
-	ListFiles(ctx context.Context, request *agent.ListFilesReq) (*agent.ListFilesResp, error)
-	ReadFile(ctx context.Context, request *agent.ReadFileReq) (*agent.ReadFileResp, error)
-	CreateFile(ctx context.Context, request *agent.CreateFileReq) (*agent.CreateFileResp, error)
-	CreateDirectory(ctx context.Context, request *agent.CreateDirectoryReq) (*agent.CreateDirectoryResp, error)
-	WriteFile(ctx context.Context, request *agent.WriteFileReq) (*agent.WriteFileResp, error)
-	RenameEntry(ctx context.Context, request *agent.RenameEntryReq) (*agent.RenameEntryResp, error)
-	MoveEntry(ctx context.Context, request *agent.MoveEntryReq) (*agent.MoveEntryResp, error)
-	DeleteEntry(ctx context.Context, request *agent.DeleteEntryReq) (*agent.DeleteEntryResp, error)
-	GitStatus(ctx context.Context, workspaceId string) (*agent.GitStatusResp, error)
-	GitDiff(ctx context.Context, request *agent.GitDiffReq) (*agent.GitDiffResp, error)
+	FsStat(ctx context.Context, request *agent.FsStatReq) (*agent.FsStatResp, error)
+	FsReadDirectory(ctx context.Context, request *agent.FsReadDirectoryReq) (*agent.FsReadDirectoryResp, error)
+	FsReadFile(ctx context.Context, request *agent.FsReadFileReq) (*agent.FsReadFileResp, error)
+	FsWriteFile(ctx context.Context, request *agent.FsWriteFileReq) (*agent.FsWriteFileResp, error)
+	FsCreateDirectory(ctx context.Context, request *agent.FsCreateDirectoryReq) (*agent.FsCreateDirectoryResp, error)
+	FsDelete(ctx context.Context, request *agent.FsDeleteReq) (*agent.FsDeleteResp, error)
+	FsRename(ctx context.Context, request *agent.FsRenameReq) (*agent.FsRenameResp, error)
+	ScmStatus(ctx context.Context, request *agent.ScmStatusReq) (*agent.ScmStatusResp, error)
+	ScmOriginalContent(ctx context.Context, request *agent.ScmOriginalContentReq) (*agent.ScmOriginalContentResp, error)
+	ScmExecute(ctx context.Context, request *agent.ScmExecuteReq) (*agent.ScmExecuteResp, error)
+	ScmRepository(ctx context.Context, request *agent.ScmRepositoryReq) (*agent.ScmRepositoryResp, error)
 	DeleteSession(ctx context.Context, workspaceId string, sessionId string) error
 	CloseSession(ctx context.Context, workspaceId string, sessionId string) (*agent.SessionSummary, error)
 	ReadHistory(ctx context.Context, workspaceId string, sessionId string) ([]byte, error)
@@ -189,3 +190,4 @@ func (a WebTerminalAccess) Attach(ctx context.Context, workspaceId string, sessi
 	}
 	return a.Registry.Attach(workspaceId, sessionId)
 }
+

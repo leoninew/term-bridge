@@ -304,28 +304,12 @@ func (s *Handler) handleWorkspaceRoute(w http.ResponseWriter, r *http.Request, e
 		s.handleWorkspaceSessionRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
 		return
 	}
-	if len(parts) >= 4 && parts[3] == "files" {
-		s.handleWorkspaceFileRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+	if len(parts) >= 4 && parts[3] == "fs" {
+		s.handleWorkspaceFsRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
 		return
 	}
-	if len(parts) >= 4 && parts[3] == "directories" {
-		s.handleWorkspaceDirectoryRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
-		return
-	}
-	if len(parts) >= 4 && parts[3] == "entries:rename" {
-		s.handleWorkspaceEntryRenameRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
-		return
-	}
-	if len(parts) >= 4 && parts[3] == "entries:move" {
-		s.handleWorkspaceEntryMoveRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
-		return
-	}
-	if len(parts) >= 4 && parts[3] == "entries" {
-		s.handleWorkspaceEntryRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
-		return
-	}
-	if len(parts) >= 4 && parts[3] == "git" {
-		s.handleWorkspaceGitRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
+	if len(parts) >= 4 && parts[3] == "scm" {
+		s.handleWorkspaceScmRoute(w, r, endpoint, deviceId, parts[2], parts[4:])
 		return
 	}
 	s.writeNotFound(w, r)
@@ -621,3 +605,4 @@ func normalizeConfig(config Config) Config {
 	config.CORSAllowedOrigins = cleanOrigins(config.CORSAllowedOrigins)
 	return config
 }
+

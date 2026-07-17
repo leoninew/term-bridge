@@ -13,9 +13,13 @@ import (
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 	tunnel "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
+	sharedconfig "gitee.com/leoninew/TermBridge-go/internal/shared/infrastructure/config"
 )
 
-const requestTimeout = 5 * time.Second
+const (
+	requestTransportAllowance = 5 * time.Second
+	requestTimeout            = sharedconfig.MaxGitCommandTimeout + requestTransportAllowance
+)
 
 type agentRoute struct {
 	deviceId string
@@ -174,16 +178,17 @@ func isRuntimeResponse(frame *shared.TunnelFrame) bool {
 		*shared.TunnelFrame_UpdateShortcutResp,
 		*shared.TunnelFrame_UpdateShortcutOrderResp,
 		*shared.TunnelFrame_DeleteShortcutResp,
-		*shared.TunnelFrame_ListFilesResp,
-		*shared.TunnelFrame_ReadFileResp,
-		*shared.TunnelFrame_CreateFileResp,
-		*shared.TunnelFrame_CreateDirectoryResp,
-		*shared.TunnelFrame_WriteFileResp,
-		*shared.TunnelFrame_RenameEntryResp,
-		*shared.TunnelFrame_MoveEntryResp,
-		*shared.TunnelFrame_DeleteEntryResp,
-		*shared.TunnelFrame_GitStatusResp,
-		*shared.TunnelFrame_GitDiffResp:
+		*shared.TunnelFrame_FsStatResp,
+		*shared.TunnelFrame_FsReadDirectoryResp,
+		*shared.TunnelFrame_FsReadFileResp,
+		*shared.TunnelFrame_FsWriteFileResp,
+		*shared.TunnelFrame_FsCreateDirectoryResp,
+		*shared.TunnelFrame_FsDeleteResp,
+		*shared.TunnelFrame_FsRenameResp,
+		*shared.TunnelFrame_ScmStatusResp,
+		*shared.TunnelFrame_ScmOriginalContentResp,
+		*shared.TunnelFrame_ScmExecuteResp,
+		*shared.TunnelFrame_ScmRepositoryResp:
 		return true
 	default:
 		return false

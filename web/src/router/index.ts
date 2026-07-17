@@ -1,4 +1,7 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import {
+  createRouter,
+  createWebHistory,
+} from 'vue-router'
 import type { LocalMode } from '../config'
 import { useCloudAuthStore } from '../store/cloudAuth'
 import { useRuntimeConfigStore } from '../store/runtimeConfig'
@@ -102,9 +105,21 @@ export const router = createRouter({
       meta: { mode: 'local' },
     },
     {
+      path: '/workspaces/:workspaceId/code',
+      name: 'local-workspace-code',
+      component: () => import('../views/local/WorkspaceCodeView.vue'),
+      meta: { mode: 'local' },
+    },
+    {
       path: '/workspaces/:workspaceId/files',
       name: 'local-workspace-files',
       component: () => import('../views/local/WorkspaceFilesView.vue'),
+      meta: { mode: 'local' },
+    },
+    {
+      path: '/workspaces/:workspaceId/git',
+      name: 'local-workspace-git',
+      component: () => import('../views/local/WorkspaceGitView.vue'),
       meta: { mode: 'local' },
     },
     {
@@ -126,9 +141,21 @@ export const router = createRouter({
       meta: { mode: 'cloud' },
     },
     {
+      path: '/devices/:deviceId/workspaces/:workspaceId/code',
+      name: 'cloud-workspace-code',
+      component: () => import('../views/cloud/WorkspaceCodeView.vue'),
+      meta: { mode: 'cloud' },
+    },
+    {
       path: '/devices/:deviceId/workspaces/:workspaceId/files',
       name: 'cloud-workspace-files',
       component: () => import('../views/cloud/WorkspaceFilesView.vue'),
+      meta: { mode: 'cloud' },
+    },
+    {
+      path: '/devices/:deviceId/workspaces/:workspaceId/git',
+      name: 'cloud-workspace-git',
+      component: () => import('../views/cloud/WorkspaceGitView.vue'),
       meta: { mode: 'cloud' },
     },
     {
