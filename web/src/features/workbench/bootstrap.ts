@@ -75,6 +75,13 @@ import '@codingame/monaco-vscode-html-default-extension'
 import '@codingame/monaco-vscode-css-default-extension'
 import 'vscode/localExtensionHost'
 
+import EditorWorker from '@codingame/monaco-vscode-api/workers/editor.worker?worker'
+import ExtensionHostWorker from '@codingame/monaco-vscode-api/workers/extensionHost.worker?worker'
+import TextMateWorker from '@codingame/monaco-vscode-textmate-service-override/worker?worker'
+import editorWorkerUrl from '@codingame/monaco-vscode-api/workers/editor.worker?worker&url'
+import extensionHostWorkerUrl from '@codingame/monaco-vscode-api/workers/extensionHost.worker?worker&url'
+import textMateWorkerUrl from '@codingame/monaco-vscode-textmate-service-override/worker?worker&url'
+
 export type CodeWorkbenchContext = {
   runtimeTarget: RuntimeTarget
   workspaceId: string
@@ -198,34 +205,40 @@ function workspaceKey(ctx: CodeWorkbenchContext): string {
 }
 
 /**
- * Workers — same labels as demo setup.common.ts (editor / extensionHost / TextMate).
- * Demo stores url+options descriptors; runtime creates workers via getWorkerUrl/getWorkerOptions.
+ * Workers must be Vite `?worker` entries so production emits real bundled chunks.
+ * `new URL(pkg, import.meta.url)` collapses to data: URLs of bare source (breaks blob import).
+ * Prefer getWorker (Worker ctor). getWorkerUrl is still required by extension-host iframe bootstrap.
  */
 function configureWorkers(): void {
-  type WorkerDescriptor = { url: string | URL; options?: WorkerOptions }
-  const moduleWorker = (url: string | URL): WorkerDescriptor => ({
-    url,
-    options: { type: 'module' },
-  })
-  const editorWorker = moduleWorker(
-    new URL('monaco-editor/esm/vs/editor/editor.worker.js', import.meta.url),
-  )
-  const workers: Partial<Record<string, WorkerDescriptor>> = {
-    editorWorkerService: editorWorker,
-    TextEditorWorker: editorWorker,
-    extensionHostWorkerMain: moduleWorker(
-      new URL('@codingame/monaco-vscode-api/workers/extensionHost.worker', import.meta.url),
-    ),
-    TextMateWorker: moduleWorker(
-      new URL('@codingame/monaco-vscode-textmate-service-override/worker', import.meta.url),
-    ),
+  const workerUrls: Partial<Record<string, string>> = {
+    editorWorkerService: editorWorkerUrl,
+    TextEditorWorker: editorWorkerUrl,
+    extensionHostWorkerMain: extensionHostWorkerUrl,
+    TextMateWorker: textMateWorkerUrl,
   }
+
   window.MonacoEnvironment = {
-    getWorkerUrl(_moduleId: string, label: string) {
-      return workers[label]?.url.toString()
+    getWorker(_moduleId: string, label: string): Worker | undefined {
+      switch (label) {
+        case 'TextMateWorker':
+          return new TextMateWorker()
+        case 'extensionHostWorkerMain':
+          return new ExtensionHostWorker()
+        case 'editorWorkerService':
+        case 'TextEditorWorker':
+          return new EditorWorker()
+        default:
+          return undefined
+      }
     },
-    getWorkerOptions(_moduleId: string, label: string) {
-      return workers[label]?.options
+    getWorkerUrl(_moduleId: string, label: string): string | undefined {
+      return workerUrls[label]
+    },
+    getWorkerOptions(_moduleId: string, label: string): WorkerOptions | undefined {
+      if (workerUrls[label]) {
+        return { type: 'module' }
+      }
+      return undefined
     },
   }
 }
