@@ -1,60 +1,11 @@
 <template>
-  <SplitterGroup
+  <div
     v-if="isLocalMode || cloudAuth.authenticated"
-    direction="horizontal"
     class="sessions-shell flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
+    :class="{ 'sessions-shell-narrow': isNarrow }"
   >
-    <SplitterPanel
-      id="workspace-sidebar"
-      class="workspace-sidebar-panel"
-      collapsible
-      :collapsed-size="0"
-      :default-size="20"
-      :min-size="18"
-      :max-size="24"
-    >
-      <WorkspaceSessionSidebar
-        :workspace-tree="workspaceSessions.workspaceTree"
-        :active-session-id="workbench.activeSessionId"
-        :active-workspace="activeWorkspaceForViewSwitch"
-        :stopping-session-id="stoppingSessionId"
-        :rerunning-session-id="rerunningSessionId"
-        :deleting-session-id="deletingSessionId"
-        :removing-workspace-id="removingWorkspaceId"
-        :loading="workspaceSessions.loading"
-        :load-error="workspaceTreeError"
-        :help-href="helpHref"
-        :home-route-name="props.homeRouteName"
-        @select="openSessionTab"
-        @refresh="refresh"
-        @new-session="openCreateSessionForm"
-        @copy-session="openCopiedSessionForm"
-        @edit-session="openEditSessionDialog"
-        @stop-session="stopSessionFromSidebar"
-        @rerun-session="rerunSessionFromSidebar"
-        @delete-session="openDeleteSessionDialog"
-        @remove-workspace="dialogs.openRemoveWorkspaceDialog"
-        @open-files="openWorkspaceFiles"
-        @open-git="openWorkspaceGit"
-        @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
-        @reorder-workspaces="reorderWorkspaces"
-        @reorder-sessions="reorderSessions"
-        @logout="handleLogout"
-        @open-dashboard="openDashboard"
-        @open-shortcuts="openShortcuts"
-      />
-    </SplitterPanel>
-
-    <SplitterResizeHandle
-      class="sessions-resize-handle group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[var(--color-app-bg)] outline-none"
-    >
-      <span
-        class="w-px bg-[var(--color-border)] transition group-hover:bg-[var(--color-border-strong)]"
-      />
-    </SplitterResizeHandle>
-
-    <SplitterPanel id="terminal-workbench" :min-size="55">
-      <div class="relative h-full min-h-0 min-w-0">
+    <template v-if="isNarrow">
+      <div class="sessions-mobile-main relative flex min-h-0 min-w-0 flex-1 flex-col">
         <SessionWorkbench
           class="session-workbench-stage"
           :opened-tabs="workbench.openedTabs"
@@ -70,6 +21,9 @@
           :session-lifecycle-state="sessionLifecycleState"
           :session-command-source="sessionCommandSource"
           :session-source-label="sessionSourceLabel"
+          :show-sidebar-toggle="true"
+          :disable-tab-reorder="disableReorder"
+          @toggle-sidebar="mobileSidebarOpen = true"
           @activate-tab="activateOpenedTab"
           @close-tab="closeTab"
           @close-terminal-tabs="closeTerminalTabs"
@@ -81,8 +35,135 @@
           @terminal-error="handleTerminalError"
         />
       </div>
-    </SplitterPanel>
-  </SplitterGroup>
+
+      <div
+        v-if="mobileSidebarOpen"
+        class="sessions-mobile-sidebar-backdrop"
+        aria-hidden="true"
+        @click="mobileSidebarOpen = false"
+      />
+      <div
+        class="sessions-mobile-sidebar"
+        :data-state="mobileSidebarOpen ? 'open' : 'closed'"
+        :aria-hidden="mobileSidebarOpen ? 'false' : 'true'"
+      >
+        <WorkspaceSessionSidebar
+          :workspace-tree="workspaceSessions.workspaceTree"
+          :active-session-id="workbench.activeSessionId"
+          :active-workspace="activeWorkspaceForViewSwitch"
+          :stopping-session-id="stoppingSessionId"
+          :rerunning-session-id="rerunningSessionId"
+          :deleting-session-id="deletingSessionId"
+          :removing-workspace-id="removingWorkspaceId"
+          :loading="workspaceSessions.loading"
+          :load-error="workspaceTreeError"
+          :help-href="helpHref"
+          :home-route-name="props.homeRouteName"
+          :disable-reorder="disableReorder"
+          :show-close="true"
+          @close="mobileSidebarOpen = false"
+          @select="selectSessionFromMobileSidebar"
+          @refresh="refresh"
+          @new-session="openCreateSessionForm"
+          @copy-session="openCopiedSessionForm"
+          @edit-session="openEditSessionDialog"
+          @stop-session="stopSessionFromSidebar"
+          @rerun-session="rerunSessionFromSidebar"
+          @delete-session="openDeleteSessionDialog"
+          @remove-workspace="dialogs.openRemoveWorkspaceDialog"
+          @open-files="openWorkspaceFiles"
+          @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
+          @reorder-workspaces="reorderWorkspaces"
+          @reorder-sessions="reorderSessions"
+          @logout="handleLogout"
+          @open-dashboard="openDashboard"
+          @open-shortcuts="openShortcuts"
+        />
+      </div>
+    </template>
+
+    <SplitterGroup v-else direction="horizontal" class="flex min-h-0 min-w-0 flex-1">
+      <SplitterPanel
+        id="workspace-sidebar"
+        class="workspace-sidebar-panel"
+        collapsible
+        :collapsed-size="0"
+        :default-size="20"
+        :min-size="18"
+        :max-size="24"
+      >
+        <WorkspaceSessionSidebar
+          :workspace-tree="workspaceSessions.workspaceTree"
+          :active-session-id="workbench.activeSessionId"
+          :active-workspace="activeWorkspaceForViewSwitch"
+          :stopping-session-id="stoppingSessionId"
+          :rerunning-session-id="rerunningSessionId"
+          :deleting-session-id="deletingSessionId"
+          :removing-workspace-id="removingWorkspaceId"
+          :loading="workspaceSessions.loading"
+          :load-error="workspaceTreeError"
+          :help-href="helpHref"
+          :home-route-name="props.homeRouteName"
+          :disable-reorder="disableReorder"
+          @select="openSessionTab"
+          @refresh="refresh"
+          @new-session="openCreateSessionForm"
+          @copy-session="openCopiedSessionForm"
+          @edit-session="openEditSessionDialog"
+          @stop-session="stopSessionFromSidebar"
+          @rerun-session="rerunSessionFromSidebar"
+          @delete-session="openDeleteSessionDialog"
+          @remove-workspace="dialogs.openRemoveWorkspaceDialog"
+          @open-files="openWorkspaceFiles"
+          @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
+          @reorder-workspaces="reorderWorkspaces"
+          @reorder-sessions="reorderSessions"
+          @logout="handleLogout"
+          @open-dashboard="openDashboard"
+          @open-shortcuts="openShortcuts"
+        />
+      </SplitterPanel>
+
+      <SplitterResizeHandle
+        class="sessions-resize-handle group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[var(--color-app-bg)] outline-none"
+      >
+        <span
+          class="w-px bg-[var(--color-border)] transition group-hover:bg-[var(--color-border-strong)]"
+        />
+      </SplitterResizeHandle>
+
+      <SplitterPanel id="terminal-workbench" :min-size="55">
+        <div class="relative h-full min-h-0 min-w-0">
+          <SessionWorkbench
+            class="session-workbench-stage"
+            :opened-tabs="workbench.openedTabs"
+            :active-session-id="workbench.activeSessionId"
+            :active-tab="workbench.activeTab"
+            :active-session="activeSession"
+            :current-device="workbenchDevice"
+            :terminal-ws-url="activeTerminalWsUrl"
+            :loading="workspaceSessions.loading && workbench.openedTabs.length === 0"
+            :has-terminal-tabs="terminalTabs.length > 0"
+            :has-background-running-sessions="hasRunningSessions"
+            :session-title="sessionTitle"
+            :session-lifecycle-state="sessionLifecycleState"
+            :session-command-source="sessionCommandSource"
+            :session-source-label="sessionSourceLabel"
+            :disable-tab-reorder="disableReorder"
+            @activate-tab="activateOpenedTab"
+            @close-tab="closeTab"
+            @close-terminal-tabs="closeTerminalTabs"
+            @open-close-background-sessions-drawer="openCloseBackgroundSessionsDrawer"
+            @reorder-tabs="workbench.openedTabs = $event"
+            @open-create="() => openCreateSessionForm()"
+            @workbench="terminalWorkbench = $event"
+            @terminal-state="handleTerminalState"
+            @terminal-error="handleTerminalError"
+          />
+        </div>
+      </SplitterPanel>
+    </SplitterGroup>
+  </div>
 
   <CreateSessionDialog
     :open="dialogs.createSessionDialogOpen"
@@ -139,7 +220,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue'
+  import { computed, onMounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRouter } from 'vue-router'
   import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
@@ -155,6 +236,7 @@
   import { useCreateSessionDraft } from '../../composable/useCreateSessionDraft'
   import { useSessionDialogs } from '../../composable/useSessionDialogs'
   import { useTerminalSize } from '../../composable/useTerminalSize'
+  import { useSessionsLayoutMode } from '../../composable/useSessionsLayoutMode'
   import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useCloudDevicesStore } from '../../store/cloudDevices'
   import { useCloudSessionStore } from '../../store/cloudSession'
@@ -207,6 +289,19 @@
 
   const terminalWorkbench = ref<HTMLElement | null>(null)
   const { measureInitialTerminalSize } = useTerminalSize(terminalWorkbench)
+  const { isNarrow, disableReorder } = useSessionsLayoutMode()
+  const mobileSidebarOpen = ref(false)
+
+  function selectSessionFromMobileSidebar(session: SessionSummary) {
+    void openSessionTab(session)
+    mobileSidebarOpen.value = false
+  }
+
+  watch(isNarrow, (narrow) => {
+    if (!narrow) {
+      mobileSidebarOpen.value = false
+    }
+  })
 
   const shortcuts = ref<Shortcut[]>([])
   const enabledShortcuts = computed(() =>
@@ -306,23 +401,6 @@
   }
 
   async function openWorkspaceFiles(workspace: WorkspaceSummary) {
-    if (props.runtimeTarget.mode === 'local') {
-      await router.push({
-        name: 'local-workspace-code',
-        params: { workspaceId: workspace.id },
-      })
-      return
-    }
-    await router.push({
-      name: 'cloud-workspace-code',
-      params: {
-        deviceId: props.runtimeTarget.deviceId,
-        workspaceId: workspace.id,
-      },
-    })
-  }
-
-  async function openWorkspaceGit(workspace: WorkspaceSummary) {
     if (props.runtimeTarget.mode === 'local') {
       await router.push({
         name: 'local-workspace-code',

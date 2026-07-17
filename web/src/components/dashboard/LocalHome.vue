@@ -1,5 +1,5 @@
 <template>
-  <AppPageShell main-class="flex items-center justify-center px-8 py-8 text-sm 2xl:px-12">
+  <AppPageShell main-class="flex items-start justify-center overflow-y-auto px-3 py-4 text-sm sm:px-5 sm:py-6 md:items-center md:px-6 md:py-8">
     <template #actions>
       <CloudAccountMenu
         :authenticated="cloudAuth.authenticated"
@@ -9,20 +9,20 @@
         @logout="logoutCloud"
       />
     </template>
-    <div class="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
+    <div class="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-5">
       <section
         class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
       >
         <div
-          class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
+          class="flex flex-col gap-2 border-b border-[var(--color-border)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3.5"
         >
-          <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
+          <h1 class="text-base font-semibold text-[var(--color-text-strong)] sm:text-lg">
             {{ t('dashboard.localHomeTitle') }}
           </h1>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-1 sm:gap-2">
             <button
               type="button"
-              class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-subtle)]"
+              class="inline-flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-subtle)] sm:h-8 sm:px-1.5"
               :disabled="
                 connectingCloud ||
                 (!cloudSession.cloudSession && !cloudAuth.cloudToken && !cloudConnectEnabled)
@@ -43,7 +43,7 @@
             </button>
             <button
               type="button"
-              class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
+              class="inline-flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
               @click="openCloudPage"
             >
               {{ t('dashboard.openCloudPage') }}
@@ -51,15 +51,15 @@
           </div>
         </div>
 
-        <div class="grid gap-4 p-5 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-3 p-3 sm:p-4 md:grid-cols-3 md:gap-3">
           <div
-            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4"
+            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 sm:p-4"
           >
             <div class="flex items-center gap-3">
               <span
-                class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 sm:size-10"
               >
-                <Monitor class="size-5" />
+                <Monitor class="size-4 sm:size-5" />
               </span>
               <div class="min-w-0">
                 <p class="text-sm text-[var(--color-text-strong)]">
@@ -73,13 +73,13 @@
           </div>
 
           <div
-            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4"
+            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 sm:p-4"
           >
             <div class="flex items-center gap-3">
               <span
-                class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 sm:size-10"
               >
-                <User class="size-5" />
+                <User class="size-4 sm:size-5" />
               </span>
               <div class="min-w-0">
                 <p class="text-sm text-[var(--color-text-strong)]">
@@ -93,13 +93,13 @@
           </div>
 
           <div
-            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4"
+            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 sm:p-4"
           >
             <div class="flex items-center gap-3">
               <span
-                class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 sm:size-10"
               >
-                <Package class="size-5" />
+                <Package class="size-4 sm:size-5" />
               </span>
               <div class="min-w-0">
                 <p class="text-sm text-[var(--color-text-strong)]">
@@ -118,14 +118,14 @@
         class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
       >
         <div
-          class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
+          class="flex flex-col gap-2 border-b border-[var(--color-border)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3.5"
         >
-          <h2 class="text-lg font-semibold text-[var(--color-text-strong)]">
+          <h2 class="text-base font-semibold text-[var(--color-text-strong)] sm:text-lg">
             {{ t('dashboard.localWorkspaceListTitle') }}
           </h2>
           <RouterLink
             :to="{ name: 'local-sessions' }"
-            class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
+            class="inline-flex h-10 w-fit items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
           >
             <FolderOpen class="size-3.5" />
             {{ t('dashboard.openWorkspaceList') }}
@@ -141,15 +141,15 @@
           :empty-text="t('dashboard.emptyWorkspaces')"
         >
           <template #loading>
-            <div class="p-5 text-sm text-[var(--color-text-muted)]">
+            <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
               {{ t('dashboard.loadingWorkspaces') }}
             </div>
           </template>
           <template #error>
-            <div class="p-5 text-sm text-[var(--color-danger-text)]">{{ workspaceError }}</div>
+            <div class="px-3 py-4 text-sm text-[var(--color-danger-text)] sm:px-4 sm:py-5">{{ workspaceError }}</div>
           </template>
           <template #empty>
-            <div class="p-5 text-sm text-[var(--color-text-muted)]">
+            <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
               {{ t('dashboard.emptyWorkspaces') }}
             </div>
           </template>
@@ -157,7 +157,7 @@
             <li
               v-for="workspace in workspaces"
               :key="workspace.id"
-              class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
+              class="flex min-w-0 items-center justify-between gap-2 px-3 py-3 sm:gap-3 sm:px-4 sm:py-3.5"
             >
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
@@ -167,10 +167,10 @@
                   </span>
                 </div>
                 <div
-                  class="mt-1 flex min-w-0 items-center gap-3 pl-6 text-sm text-[var(--color-text-muted)]"
+                  class="mt-1 flex min-w-0 flex-col gap-0.5 pl-6 text-sm text-[var(--color-text-muted)] sm:flex-row sm:items-center sm:gap-3"
                 >
                   <span class="truncate">{{ workspace.path }}</span>
-                  <span class="shrink-0">
+                  <span class="shrink-0 text-xs sm:text-sm">
                     {{ workspaceUpdatedAt(workspace.updated_at) }}
                   </span>
                 </div>
@@ -188,14 +188,14 @@
         class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
       >
         <div
-          class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
+          class="flex flex-col gap-2 border-b border-[var(--color-border)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3.5"
         >
-          <h2 class="text-lg font-semibold text-[var(--color-text-strong)]">
+          <h2 class="text-base font-semibold text-[var(--color-text-strong)] sm:text-lg">
             {{ t('shortcut.title') }}
           </h2>
           <RouterLink
             :to="{ name: 'local-shortcuts' }"
-            class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
+            class="inline-flex h-10 w-fit items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
           >
             <Command class="size-3.5" />
             {{ t('common.more') }}
@@ -211,21 +211,21 @@
           :empty-text="t('shortcut.empty')"
         >
           <template #loading>
-            <div class="p-5 text-sm text-[var(--color-text-muted)]">
+            <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
               {{ t('shortcut.loading') }}
             </div>
           </template>
           <template #error>
-            <div class="p-5 text-sm text-[var(--color-danger-text)]">{{ shortcutError }}</div>
+            <div class="px-3 py-4 text-sm text-[var(--color-danger-text)] sm:px-4 sm:py-5">{{ shortcutError }}</div>
           </template>
           <template #empty>
-            <div class="p-5 text-sm text-[var(--color-text-muted)]">{{ t('shortcut.empty') }}</div>
+            <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">{{ t('shortcut.empty') }}</div>
           </template>
-          <ul class="grid gap-px bg-[var(--color-border)] sm:grid-cols-2 lg:grid-cols-4">
+          <ul class="grid grid-cols-1 gap-px bg-[var(--color-border)] sm:grid-cols-2">
             <li
               v-for="shortcut in shortcuts"
               :key="shortcut.id"
-              class="min-w-0 bg-[var(--color-surface)] px-4 py-3 text-center"
+              class="min-w-0 bg-[var(--color-surface)] px-3 py-3.5 text-left sm:px-4 sm:py-3"
             >
               <p class="truncate text-sm font-semibold text-[var(--color-text-strong)]">
                 {{ shortcut.name }}

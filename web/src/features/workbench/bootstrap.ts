@@ -56,6 +56,7 @@ import { TermBridgePlatformFileSystemProvider } from './platformFileSystemProvid
 import { termBridgeWorkbenchExtensionManifest } from './scmExtensionManifest'
 import { registerTermBridgeScm, type ScmController } from './scmProvider'
 import { WORKBENCH_SCHEME, workspaceRootUri } from './uri'
+import { ensureWorkbenchAppIconStyles } from './titlebarAppIcon'
 
 // Themes + file icons (demo: theme-defaults + theme-seti)
 import '@codingame/monaco-vscode-theme-defaults-default-extension'
@@ -297,6 +298,7 @@ export function createWorkbenchMountRoot(container: HTMLElement): HTMLElement {
   workbenchElement.style.position = 'relative'
   workbenchElement.style.overflow = 'hidden'
   shadowRoot.appendChild(workbenchElement)
+  ensureWorkbenchAppIconStyles(shadowRoot)
   return workbenchElement
 }
 

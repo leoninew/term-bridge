@@ -1,5 +1,5 @@
 <template>
-  <AppPageShell main-class="flex items-center justify-center px-8 py-8 text-sm 2xl:px-12">
+  <AppPageShell main-class="flex items-start justify-center px-4 py-5 text-sm sm:items-center sm:px-6 sm:py-8 lg:px-8 2xl:px-12">
     <template #actions>
       <CloudAccountMenu
         :authenticated="cloudAuth.authenticated"
@@ -11,26 +11,26 @@
         @change-password="openChangePassword"
       />
     </template>
-    <div class="flex w-full max-w-[1200px] flex-col gap-5">
+    <div class="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
       <section
         class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
       >
         <div
-          class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"
+          class="flex flex-col gap-3 border-b border-[var(--color-border)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
         >
-          <h1 class="text-lg font-semibold text-[var(--color-text-strong)]">
+          <h1 class="text-base font-semibold text-[var(--color-text-strong)] sm:text-lg">
             {{ t('dashboard.devicesTitle') }}
           </h1>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-1 sm:gap-2">
             <RouterLink
               :to="{ name: 'home' }"
-              class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)]"
+              class="inline-flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
             >
               {{ t('dashboard.home') }}
             </RouterLink>
             <button
               type="button"
-              class="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]"
+              class="inline-flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)] sm:h-8 sm:px-1.5"
               :disabled="devicesAction.running"
               @click="refreshDevices"
             >
@@ -51,15 +51,15 @@
           :empty-text="t('dashboard.emptyTitle')"
         >
           <template #loading>
-            <div class="p-5 text-sm text-[var(--color-text-muted)]">
+            <div class="p-4 text-sm text-[var(--color-text-muted)] sm:p-5">
               {{ t('dashboard.loadingDevices') }}
             </div>
           </template>
           <template #error>
-            <div class="p-5 text-sm text-[var(--color-danger-text)]">{{ deviceError }}</div>
+            <div class="p-4 text-sm text-[var(--color-danger-text)] sm:p-5">{{ deviceError }}</div>
           </template>
           <template #empty>
-            <div class="p-5 text-sm text-[var(--color-text-muted)]">
+            <div class="p-4 text-sm text-[var(--color-text-muted)] sm:p-5">
               {{ t('dashboard.emptyTitle') }}
             </div>
           </template>
@@ -67,29 +67,29 @@
             <li
               v-for="device in cloudDevices.devices"
               :key="device.id"
-              class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
+              class="flex min-w-0 items-center justify-between gap-3 px-4 py-3.5 sm:gap-4 sm:px-5 sm:py-4"
             >
               <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
+                <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                   <span
                     class="size-2 shrink-0 rounded-full"
                     :class="device.online ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
                   />
                   <Monitor class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
-                  <span class="truncate text-sm text-[var(--color-text-strong)]">
+                  <span class="min-w-0 truncate text-sm text-[var(--color-text-strong)]">
                     {{ device.name }}
                   </span>
-                  <span class="shrink-0 text-sm text-[var(--color-text-muted)]">
+                  <span class="shrink-0 text-xs text-[var(--color-text-muted)] sm:text-sm">
                     {{ device.online ? t('cloud.online') : t('cloud.offline') }}
                   </span>
                 </div>
-                <p class="mt-1 truncate pl-8 text-sm text-[var(--color-text-muted)]">
+                <p class="mt-1 truncate pl-6 text-xs text-[var(--color-text-muted)] sm:pl-8 sm:text-sm">
                   {{ deviceActivity(device) }}
                 </p>
               </div>
               <button
                 type="button"
-                class="inline-flex size-8 shrink-0 items-center justify-center rounded-md outline-none disabled:cursor-not-allowed"
+                class="inline-flex size-10 shrink-0 items-center justify-center rounded-md outline-none disabled:cursor-not-allowed sm:size-8"
                 :disabled="!device.online"
                 :aria-label="t('dashboard.openWorkbench')"
                 @click="openCloudSessions(device.id)"

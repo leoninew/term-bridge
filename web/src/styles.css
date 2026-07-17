@@ -77,6 +77,8 @@
 }
 
 :root {
+  /* Desktop layout floor. Horizontal scroll is limited to this width only. */
+  --app-layout-min-width: 960px;
   color: var(--color-text);
   background: var(--color-app-bg);
   font-family:
@@ -93,15 +95,34 @@
   box-sizing: border-box;
 }
 
-html,
+html {
+  margin: 0;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--color-app-bg);
+}
+
 body,
 #app {
   margin: 0;
-  min-width: 1024px;
+  min-width: var(--app-layout-min-width);
   min-height: 100vh;
   height: 100%;
   overflow: hidden;
   background: var(--color-app-bg);
+}
+
+/* Narrow / overlay layout: no forced min-width, no page-level horizontal scroll. */
+@media (max-width: 768px) {
+  html {
+    overflow-x: hidden;
+  }
+
+  body,
+  #app {
+    min-width: 0;
+  }
 }
 
 button,
@@ -497,6 +518,10 @@ p {
   margin-top: 4px;
 }
 
+.sessions-shell:not(.sessions-shell-narrow) {
+  min-width: var(--app-layout-min-width);
+}
+
 .sessions-shell .workspace-sidebar-panel {
   overflow: hidden;
   transition:
@@ -530,6 +555,70 @@ p {
   pointer-events: none;
   overflow: hidden;
 }
+
+/* Sessions mobile shell (Phase 1) */
+.sessions-mobile-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  background: rgb(0 0 0 / 0.45);
+}
+
+.sessions-mobile-sidebar {
+  position: fixed;
+  inset-block: 0;
+  left: 0;
+  z-index: 40;
+  display: flex;
+  width: min(320px, 88vw);
+  flex-direction: column;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-sidebar-bg);
+  box-shadow: 12px 0 32px rgb(0 0 0 / 0.28);
+  transform: translateX(-105%);
+  transition: transform 200ms ease;
+  pointer-events: none;
+}
+
+.sessions-mobile-sidebar[data-state='open'] {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.sessions-mobile-sidebar > aside,
+.sessions-mobile-sidebar > * {
+  height: 100%;
+  min-height: 0;
+}
+
+.workspace-tree-node-actions {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.group:hover > .workspace-tree-node-actions,
+.group:focus-within > .workspace-tree-node-actions,
+.workspace-tree-node-actions:focus-within {
+  opacity: 1;
+}
+
+@media (hover: none), (max-width: 768px) {
+  .workspace-tree-node-actions {
+    opacity: 1;
+  }
+
+  .workspace-tree-node-action,
+  .file-workbench-tree-action {
+    width: 28px;
+    min-width: 28px;
+    min-height: 28px;
+  }
+
+  .sessions-shell-narrow .session-workbench-stage {
+    min-width: 0;
+  }
+}
+
 .session-workbench-stage {
   min-width: 0;
   min-height: 0;

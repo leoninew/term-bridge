@@ -35,6 +35,16 @@
         >
           <Plus class="size-3.5" />
         </button>
+        <button
+          v-if="showClose"
+          type="button"
+          class="button button-secondary button-icon file-workbench-small-button"
+          :aria-label="t('common.close')"
+          :title="t('common.close')"
+          @click="emit('close')"
+        >
+          <X class="size-3.5" />
+        </button>
       </div>
     </header>
 
@@ -96,7 +106,7 @@
           chosen-class="workspace-sortable-chosen"
           drag-class="workspace-sortable-dragging"
           :animation="150"
-          :disabled="Boolean(normalizedSearchQuery)"
+          :disabled="Boolean(normalizedSearchQuery) || disableReorder"
           @update:model-value="updateWorkspaceOrder"
         >
           <div
@@ -107,7 +117,7 @@
             <div
               role="button"
               tabindex="0"
-              class="workspace-drag-handle group flex h-7 w-full min-w-0 items-center gap-1 border-0 bg-transparent px-1 py-0.5 text-left text-[var(--color-text)] hover:bg-[var(--color-control-hover)]"
+              class="workspace-drag-handle group flex min-h-10 w-full min-w-0 items-center gap-1 border-0 bg-transparent px-1 py-1 text-left text-[var(--color-text)] hover:bg-[var(--color-control-hover)] sm:min-h-7 sm:py-0.5"
               :class="!normalizedSearchQuery ? 'cursor-pointer' : ''"
               :style="{ paddingLeft: '6px' }"
               @click="handleWorkspaceClick($event, workspace.value)"
@@ -128,7 +138,7 @@
                 workspace.workspace.name
               }}</span>
               <span
-                class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
+                class="workspace-tree-node-actions flex shrink-0 items-center gap-0.5"
               >
                 <button
                   type="button"
@@ -138,15 +148,6 @@
                   @click.stop="emit('openFiles', workspace.workspace, $event.currentTarget)"
                 >
                   <FileCode2 class="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  class="workspace-tree-node-action"
-                  :aria-label="t('sidebar.openGitAria', { name: workspace.workspace.name })"
-                  :title="t('sidebar.openGitAria', { name: workspace.workspace.name })"
-                  @click.stop="emit('openGit', workspace.workspace, $event.currentTarget)"
-                >
-                  <GitCompare class="size-3.5" />
                 </button>
                 <button
                   type="button"
@@ -195,7 +196,7 @@
               chosen-class="session-sortable-chosen"
               drag-class="session-sortable-dragging"
               :animation="150"
-              :disabled="Boolean(normalizedSearchQuery)"
+              :disabled="Boolean(normalizedSearchQuery) || disableReorder"
               @start="startSessionDrag"
               @update:model-value="updateSessionOrder(workspace, $event)"
               @end="finishSessionDrag"
@@ -205,7 +206,7 @@
                 :key="session.value"
                 role="button"
                 tabindex="0"
-                class="session-sortable-item group flex h-7 w-full min-w-0 items-center gap-1 border-0 px-1 py-0.5 text-left transition"
+                class="session-sortable-item group flex min-h-10 w-full min-w-0 items-center gap-1 border-0 px-1 py-1 text-left transition sm:min-h-7 sm:py-0.5"
                 :class="[
                   isActiveSessionSelection(session.session.id)
                     ? 'bg-[var(--color-control-active)] text-[var(--color-text-strong)]'
@@ -230,7 +231,7 @@
                 >
                   <button
                     type="button"
-                    class="workspace-tree-node-action opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100"
+                    class="workspace-tree-node-action"
                     :aria-label="
                       t('sidebar.copySessionAria', {
                         name: session.session.name || session.session.command,
@@ -258,7 +259,7 @@
                 </span>
                 <span
                   v-if="isEditableSession(session.session)"
-                  class="flex size-5 shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
+                  class="workspace-tree-node-actions flex shrink-0 items-center gap-0.5"
                 >
                   <button
                     type="button"
@@ -498,16 +499,6 @@
       >
         <FileCode2 class="size-4" />
       </button>
-      <button
-        type="button"
-        class="flex size-6 shrink-0 items-center justify-center rounded text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus-visible:bg-[var(--color-control-hover)] focus-visible:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
-        :disabled="!props.activeWorkspace"
-        :aria-label="switchToGitAria"
-        :title="switchToGitAria"
-        @click="switchToGit"
-      >
-        <GitCompare class="size-4" />
-      </button>
     </footer>
   </aside>
 </template>
@@ -526,7 +517,6 @@
     Copy,
     FileCode2,
     Folder,
-    GitCompare,
     FolderOpen,
     Languages,
     LayoutDashboard,
@@ -539,6 +529,7 @@
     Settings,
     Sun,
     Trash2,
+    X,
   } from '@lucide/vue'
   import {
     DropdownMenuContent,
@@ -602,9 +593,12 @@
     loadError?: string | null
     helpHref?: string
     homeRouteName: string
+    disableReorder?: boolean
+    showClose?: boolean
   }>()
 
   const emit = defineEmits<{
+    close: []
     select: [session: SessionSummary]
     refresh: []
     newSession: [workspace?: WorkspaceSummary]
@@ -615,7 +609,6 @@
     deleteSession: [session: SessionSummary]
     removeWorkspace: [workspace: WorkspaceSummary]
     openFiles: [workspace: WorkspaceSummary, trigger: EventTarget | null]
-    openGit: [workspace: WorkspaceSummary, trigger: EventTarget | null]
     unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
     reorderWorkspaces: [workspaceIds: string[]]
     reorderSessions: [workspaceId: string, sessionIds: string[]]
@@ -650,19 +643,9 @@
     if (!props.activeWorkspace) return t('sidebar.switchToFilesDisabled')
     return t('sidebar.switchToFilesAria', { name: props.activeWorkspace.name })
   })
-  const switchToGitAria = computed(() => {
-    if (!props.activeWorkspace) return t('sidebar.switchToGitDisabled')
-    return t('sidebar.switchToGitAria', { name: props.activeWorkspace.name })
-  })
-
   function switchToFiles() {
     if (!props.activeWorkspace) return
     emit('openFiles', props.activeWorkspace, null)
-  }
-
-  function switchToGit() {
-    if (!props.activeWorkspace) return
-    emit('openGit', props.activeWorkspace, null)
   }
 
   function changeLocale(value: unknown) {

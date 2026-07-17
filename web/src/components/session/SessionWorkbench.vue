@@ -11,6 +11,16 @@
       <div
         class="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2"
       >
+        <button
+          v-if="showSidebarToggle"
+          type="button"
+          class="button button-secondary button-icon shrink-0"
+          :aria-label="t('workbench.openSidebarAria')"
+          :title="t('workbench.openSidebarAria')"
+          @click="emit('toggleSidebar')"
+        >
+          <PanelLeft class="size-4" />
+        </button>
         <TabsList as-child>
           <VueDraggable
             :model-value="openedTabs"
@@ -22,6 +32,7 @@
             :animation="150"
             handle=".tab-drag-handle"
             item-key="sessionId"
+            :disabled="disableTabReorder"
             @update:model-value="emit('reorderTabs', $event)"
           >
             <div
@@ -190,7 +201,10 @@
 <script setup lang="ts">
   import { useTemplateRef, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { CircleStop, MoreHorizontal, SquareTerminal, X } from '@lucide/vue'
+  import {
+    PanelLeft,
+    CircleStop, MoreHorizontal, SquareTerminal, X
+  } from '@lucide/vue'
   import {
     DropdownMenuContent,
     DropdownMenuItem,
@@ -228,8 +242,10 @@
       sessionCommandSource: (workspaceId: string, sessionId: string) => string
       sessionSourceLabel: (workspaceId: string, sessionId: string) => string
       loading?: boolean
+      showSidebarToggle?: boolean
+      disableTabReorder?: boolean
     }>(),
-    { loading: false },
+    { loading: false, showSidebarToggle: false, disableTabReorder: false },
   )
 
   const emit = defineEmits<{
@@ -239,6 +255,7 @@
     openCloseBackgroundSessionsDrawer: []
     reorderTabs: [tabs: OpenSessionTab[]]
     openCreate: []
+    toggleSidebar: []
     workbench: [element: HTMLElement | null]
     terminalState: [message: ServerControlMessage]
     terminalError: [message: string]

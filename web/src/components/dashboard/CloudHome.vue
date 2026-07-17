@@ -1,5 +1,5 @@
 <template>
-  <AppPageShell main-class="px-8 py-8 text-sm 2xl:px-12">
+  <AppPageShell main-class="px-4 py-6 text-sm sm:px-6 sm:py-8 lg:px-8 2xl:px-12">
     <template #actions>
       <CloudAccountMenu
         :authenticated="cloudAuth.authenticated"
@@ -13,23 +13,23 @@
     </template>
     <div class="mx-auto flex w-full max-w-[1440px] flex-col gap-5">
       <section
-        class="grid min-h-[min(680px,calc(100vh-8rem))] items-center gap-12 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] 2xl:gap-16"
+        class="grid items-center gap-8 lg:min-h-[min(680px,calc(100vh-8rem))] lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] lg:gap-12 2xl:gap-16"
       >
-        <div class="flex flex-col justify-center gap-6">
+        <div class="flex flex-col justify-center gap-5 sm:gap-6">
           <div>
-            <h1 class="mt-3 text-lg font-semibold text-[var(--color-text-strong)]">
+            <h1 class="text-xl font-semibold leading-tight text-[var(--color-text-strong)] sm:mt-3 sm:text-lg">
               {{ t('dashboard.cloudLandingTitle') }}
             </h1>
-            <p class="mt-3 max-w-md text-sm text-[var(--color-text-muted)]">
+            <p class="mt-3 max-w-md text-sm leading-6 text-[var(--color-text-muted)]">
               {{ t('dashboard.cloudLandingCopy') }}
             </p>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2">
+          <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               v-if="!cloudAuth.authenticated"
               type="button"
-              class="inline-flex h-8 items-center gap-1.5 rounded-md border border-blue-700 bg-blue-600 px-3 text-sm text-slate-50 outline-none hover:bg-blue-500 focus:bg-blue-500 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-[var(--color-control-bg)] disabled:text-[var(--color-text-muted)]"
+              class="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-md border border-blue-700 bg-blue-600 px-4 text-sm text-slate-50 outline-none hover:bg-blue-500 focus:bg-blue-500 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-[var(--color-control-bg)] disabled:text-[var(--color-text-muted)] sm:h-9 sm:w-auto sm:px-3"
               :disabled="cloudAuthLoading"
               @click="openCloudLogin"
             >
@@ -39,7 +39,7 @@
             <RouterLink
               v-else
               :to="{ name: 'cloud-dashboard' }"
-              class="inline-flex h-8 items-center gap-1.5 rounded-md border border-blue-700 bg-blue-600 px-3 text-sm text-slate-50 outline-none hover:bg-blue-500 focus:bg-blue-500"
+              class="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-md border border-blue-700 bg-blue-600 px-4 text-sm text-slate-50 outline-none hover:bg-blue-500 focus:bg-blue-500 sm:h-9 sm:w-auto sm:px-3"
             >
               {{ t('dashboard.viewDeviceStatus') }}
               <ArrowRight class="size-3.5 text-slate-100" />
@@ -47,7 +47,7 @@
             <button
               v-if="runtimeConfig.config.local.mode === 'hybrid'"
               type="button"
-              class="button button-secondary h-8 gap-1.5 px-3 text-sm"
+              class="button button-secondary h-11 w-full justify-center gap-1.5 px-4 text-sm sm:h-9 sm:w-auto sm:px-3"
               @click="openLocalEntry"
             >
               {{ t('dashboard.openLocalPage') }}
@@ -56,13 +56,13 @@
         </div>
 
         <div
-          class="flex min-h-[480px] items-center 2xl:min-h-[540px]"
+          class="flex min-h-0 items-center lg:min-h-[420px] 2xl:min-h-[540px]"
           :aria-label="t('dashboard.cloudHeroImageAlt')"
         >
           <img
             :src="cloudHomeHeroUrl"
             :alt="t('dashboard.cloudHeroImageAlt')"
-            class="h-auto max-h-[calc(100vh-9rem)] w-full rounded-2xl object-cover shadow-2xl shadow-blue-950/30"
+            class="h-auto max-h-[42vh] w-full rounded-2xl object-cover shadow-2xl shadow-blue-950/30 sm:max-h-[min(520px,calc(100vh-10rem))] lg:max-h-[calc(100vh-9rem)]"
           />
         </div>
       </section>

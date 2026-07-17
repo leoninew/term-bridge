@@ -12,7 +12,7 @@
 
   <DropdownMenuRoot v-else>
     <DropdownMenuTrigger
-      class="inline-flex h-9 max-w-56 items-center gap-1.5 rounded-md px-3 text-sm text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
+      class="inline-flex h-9 max-w-[9.5rem] items-center gap-1.5 rounded-md px-2 text-sm text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)] sm:max-w-56 sm:px-3"
       :title="userTitle"
       :aria-label="userTitle"
     >
