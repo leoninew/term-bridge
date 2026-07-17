@@ -62,10 +62,10 @@ func TestLoadDefaults(t *testing.T) {
 	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(wantStateDir) {
 		t.Fatalf("StateDir = %q, want %q", cfg.Runtime.StateDir, wantStateDir)
 	}
-	if cfg.History.MaxLines != 10000 || cfg.History.MaxBytes != 5242880 || cfg.History.MaxLineBytes != 65536 {
+	if cfg.History.MaxLines != 2000 || cfg.History.MaxBytes != 1048576 || cfg.History.MaxLineBytes != 65536 {
 		t.Fatalf("History = %#v", cfg.History)
 	}
-	if cfg.Terminal.Replay.MaxBytes != 1048576 || cfg.Terminal.Replay.ChunkBytes != 65536 {
+	if cfg.Terminal.Replay.MaxBytes != 262144 || cfg.Terminal.Replay.ChunkBytes != 65536 {
 		t.Fatalf("Terminal.Replay = %#v", cfg.Terminal.Replay)
 	}
 	if cfg.Terminal.Client.Queue.MaxMessages != 64 || cfg.Terminal.Client.Queue.MaxBytes != 4194304 {

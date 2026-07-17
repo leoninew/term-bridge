@@ -38,7 +38,7 @@ const (
 
 	DefaultClientQueueSize  = 64
 	DefaultClientQueueBytes = 4 * 1024 * 1024
-	DefaultReplayMaxBytes   = 1024 * 1024
+	DefaultReplayMaxBytes   = 256 * 1024
 	DefaultReplayChunkBytes = 64 * 1024
 )
 

@@ -43,15 +43,15 @@ log:
 
 # 历史记录
 history:
-  max_lines: 10000
-  max_bytes: 5242880
+  max_lines: 2000
+  max_bytes: 1048576
   max_line_bytes: 65536
 
 # Web Terminal 输出、回放与单客户端背压配置。
 # history 控制持久化容量；terminal.replay 只控制 attach 时回放的最近历史。
 terminal:
   replay:
-    max_bytes: 1048576
+    max_bytes: 262144
     chunk_bytes: 65536
   client:
     queue:
