@@ -58,23 +58,10 @@ import { termBridgeWorkbenchExtensionManifest } from './scmExtensionManifest'
 import { registerTermBridgeScm, type ScmController } from './scmProvider'
 import { workspaceRootUri } from './uri'
 import { ensureWorkbenchAppIconStyles } from './titlebarAppIcon'
-
-// Themes + file icons (demo: theme-defaults + theme-seti)
-import '@codingame/monaco-vscode-theme-defaults-default-extension'
-import '@codingame/monaco-vscode-theme-seti-default-extension'
-import '@codingame/monaco-vscode-media-preview-default-extension'
-// Grammar basics for common workspace languages (subset of demo language extensions)
-import '@codingame/monaco-vscode-javascript-default-extension'
-import '@codingame/monaco-vscode-typescript-basics-default-extension'
-import '@codingame/monaco-vscode-json-default-extension'
-import '@codingame/monaco-vscode-markdown-basics-default-extension'
-import '@codingame/monaco-vscode-python-default-extension'
-import '@codingame/monaco-vscode-go-default-extension'
-import '@codingame/monaco-vscode-yaml-default-extension'
-import '@codingame/monaco-vscode-shellscript-default-extension'
-import '@codingame/monaco-vscode-html-default-extension'
-import '@codingame/monaco-vscode-css-default-extension'
-import 'vscode/localExtensionHost'
+import {
+  loadCoreWorkbenchExtensions,
+  scheduleDeferredWorkbenchExtensions,
+} from './workbenchExtensions'
 
 import EditorWorker from '@codingame/monaco-vscode-api/workers/editor.worker?worker'
 import ExtensionHostWorker from '@codingame/monaco-vscode-api/workers/extensionHost.worker?worker'
@@ -343,6 +330,8 @@ async function waitForWorkspaceFolderUri(
 
 async function initializeWorkbench(container: HTMLElement): Promise<void> {
   configureWorkers()
+  // Themes/icons + high-frequency grammars before initialize; other langs deferred after mount.
+  await loadCoreWorkbenchExtensions()
   await createIndexedDBProviders()
 
   if (!state.customProviderRegistered) {
@@ -624,6 +613,8 @@ async function mountWorkbenchAttempt(
     }
 
     window.dispatchEvent(new window.Event('resize'))
+    // Load remaining language/media extensions after first workbench paint.
+    void scheduleDeferredWorkbenchExtensions()
     state.mounted = {
       workspaceKey: attempt.key,
       disposables,

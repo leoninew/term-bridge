@@ -37,12 +37,12 @@ export default defineConfig({
       '@codingame/monaco-vscode-api/extensions',
       '@codingame/monaco-vscode-api/monaco',
     ],
-    esbuildOptions: {
-      target: 'esnext',
-    },
   },
   build: {
     target: 'esnext',
+    // Avoid manualChunks for monaco-vscode-*: Rolldown may co-locate Vite's
+    // module-preload helper with that mega chunk, forcing route shells to
+    // statically import ~11MB before the dynamic bootstrap import runs.
     rolldownOptions: {
       checks: {
         invalidAnnotation: false,

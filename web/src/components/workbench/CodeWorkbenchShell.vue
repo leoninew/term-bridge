@@ -19,7 +19,6 @@
   import { RouterLink, useRouter } from 'vue-router'
   import type { RouteLocationRaw } from 'vue-router'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
-  import { disposeMountedWorkbench, mountCodeWorkbench } from '../../features/workbench/bootstrap'
   import { bindWorkbenchAppIconNavigation } from '../../features/workbench/titlebarAppIcon'
 
   const props = defineProps<{
@@ -35,6 +34,7 @@
   const error = ref<string | null>(null)
   let resizeObserver: ResizeObserver | null = null
   let unbindAppIcon: (() => void) | null = null
+  let disposeMountedWorkbench: (() => void) | null = null
 
   function notifyLayout() {
     window.dispatchEvent(new window.Event('resize'))
@@ -62,7 +62,10 @@
     loading.value = true
     error.value = null
     try {
-      await mountCodeWorkbench(hostEl.value, {
+      // Keep the route shell tiny; pull the full monaco-vscode graph only on mount.
+      const workbench = await import('../../features/workbench/bootstrap')
+      disposeMountedWorkbench = workbench.disposeMountedWorkbench
+      await workbench.mountCodeWorkbench(hostEl.value, {
         runtimeTarget: props.runtimeTarget,
         workspaceId: props.workspaceId,
       })
@@ -109,7 +112,7 @@
     resizeObserver = null
     // Workbench services are process-global; release only this workspace's
     // subscription and disposable hooks when its route unmounts.
-    disposeMountedWorkbench()
+    disposeMountedWorkbench?.()
   })
 </script>
 
