@@ -307,6 +307,8 @@ export const messages = {
       devicesTitle: '设备列表',
       devicesDescription: '只有在线设备可以进入工作台。离线设备会保留在列表中，便于确认绑定状态。',
       openWorkbench: '进入工作台',
+      deleteOfflineDevice: '删除离线设备',
+      deleteDeviceAria: '删除设备 {name}',
       localDeviceTitle: '当前本机设备',
       localDeviceDescription:
         '本地模式不要求浏览器登录。你可以直接进入本地工作台，或连接云端后让云端账号看到这台设备。',
@@ -402,6 +404,9 @@ export const messages = {
       fallbackSession: '此会话',
       removeWorkspaceTitle: '移除工作区',
       removeWorkspaceDescription: '移除 "{name}" 及其所有会话。本地文件不受影响。',
+      deleteDeviceTitle: '删除设备',
+      deleteDeviceDescription: '删除离线设备 "{name}" 的绑定记录。设备重新上线后需要重新授权。',
+      deleteOnlineDeviceBlocked: '在线设备不能删除，请先让设备离线。',
       closeBackgroundSessionsTitle: '关闭运行中会话',
       closeBackgroundSessionsDescription:
         '选择要关闭的运行中会话；未打开的会话默认勾选。确认后将按顺序关闭所选会话。',
@@ -417,6 +422,8 @@ export const messages = {
       sessionDeleted: '会话已删除',
       removeWorkspaceFailed: '移除工作区失败',
       workspaceRemoved: '工作区已移除',
+      deleteDeviceFailed: '删除设备失败',
+      deviceDeleted: '设备已删除',
       updateWorkspaceOrderFailed: '更新工作区排序失败',
       updateSessionOrderFailed: '更新会话排序失败',
       readHistoryFailed: '读取历史失败',
@@ -460,6 +467,7 @@ export const messages = {
       createdSessionMissing: '会话已新建，但刷新后的会话列表中没有返回该会话。',
       nameRequired: '名称为必填项。',
       workspaceRemoved: '{name} 记录已移除。磁盘上的文件没有被删除。',
+      deviceDeleted: '已删除设备 {name} 的绑定记录。',
       closeSessionBeforeDelete: '请先关闭终端会话再删除。',
       directoryDeleteUnsupported: 'TermBridge 可以移除工作区记录，但后端没有文件系统目录删除 API。',
     },
@@ -769,6 +777,8 @@ export const messages = {
       devicesDescription:
         'Only online devices can open the workbench. Offline devices stay visible so you can confirm their binding status.',
       openWorkbench: 'Open workbench',
+      deleteOfflineDevice: 'Delete offline device',
+      deleteDeviceAria: 'Delete device {name}',
       localDeviceTitle: 'Current local device',
       localDeviceDescription:
         'Local mode does not require browser sign-in. Open the local workbench directly, or connect Cloud so your cloud account can see this device.',
@@ -878,6 +888,11 @@ export const messages = {
       removeWorkspaceTitle: 'Remove workspace',
       removeWorkspaceDescription:
         'Remove "{name}" and all its sessions. Local files are unaffected.',
+      deleteDeviceTitle: 'Delete device',
+      deleteDeviceDescription:
+        'Remove the binding for offline device "{name}". The device must re-authorize after it comes back online.',
+      deleteOnlineDeviceBlocked:
+        'Online devices cannot be deleted. Wait until the device is offline.',
       closeBackgroundSessionsTitle: 'Close running sessions',
       closeBackgroundSessionsDescription:
         'Select running sessions to close. Unopened sessions are selected by default and selected sessions close in order.',
@@ -893,6 +908,8 @@ export const messages = {
       sessionDeleted: 'Session deleted',
       removeWorkspaceFailed: 'Remove workspace failed',
       workspaceRemoved: 'Workspace removed',
+      deleteDeviceFailed: 'Delete device failed',
+      deviceDeleted: 'Device deleted',
       updateWorkspaceOrderFailed: 'Update workspace order failed',
       updateSessionOrderFailed: 'Update session order failed',
       readHistoryFailed: 'Read history failed',
@@ -937,6 +954,7 @@ export const messages = {
         'Session was created, but it was not returned by the refreshed session list.',
       nameRequired: 'Name is required.',
       workspaceRemoved: '{name} record was removed. Files on disk were not deleted.',
+      deviceDeleted: 'Removed the binding for device {name}.',
       closeSessionBeforeDelete: 'Close the terminal session before deleting it.',
       directoryDeleteUnsupported:
         'TermBridge can remove workspace records, but the backend has no filesystem directory delete API.',

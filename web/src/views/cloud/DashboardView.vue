@@ -91,39 +91,62 @@
                   {{ deviceActivity(device) }}
                 </p>
               </div>
-              <button
-                type="button"
-                class="inline-flex size-10 shrink-0 items-center justify-center rounded-md outline-none disabled:cursor-not-allowed sm:size-8"
-                :disabled="!device.online"
-                :aria-label="t('dashboard.openWorkbench')"
-                @click="openCloudSessions(device.id)"
-              >
-                <ArrowRight
-                  class="size-5"
-                  :class="
-                    device.online
-                      ? 'text-[var(--color-text-subtle)]'
-                      : 'text-[var(--color-text-muted)]'
-                  "
-                />
-              </button>
+              <div class="flex shrink-0 items-center gap-1">
+                <button
+                  v-if="!device.online"
+                  type="button"
+                  class="inline-flex size-10 items-center justify-center rounded-md text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-danger-text)] focus:bg-[var(--color-surface-muted)] focus:text-[var(--color-danger-text)] disabled:cursor-not-allowed disabled:opacity-60 sm:size-8"
+                  :disabled="deletingDeviceId === device.id || deleteDeviceAction.running"
+                  :aria-label="t('dashboard.deleteDeviceAria', { name: device.name })"
+                  :title="t('dashboard.deleteOfflineDevice')"
+                  @click.stop="openDeleteDevice(device)"
+                >
+                  <Trash2 class="size-4" />
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex size-10 items-center justify-center rounded-md outline-none disabled:cursor-not-allowed sm:size-8"
+                  :disabled="!device.online"
+                  :aria-label="t('dashboard.openWorkbench')"
+                  @click="openCloudSessions(device.id)"
+                >
+                  <ArrowRight
+                    class="size-5"
+                    :class="
+                      device.online
+                        ? 'text-[var(--color-text-subtle)]'
+                        : 'text-[var(--color-text-muted)]'
+                    "
+                  />
+                </button>
+              </div>
             </li>
           </ul>
         </PageStatus>
       </section>
     </div>
+
   </AppPageShell>
+
+  <DeleteDeviceDialog
+    :open="deleteDeviceDialogOpen"
+    :device="selectedDevice"
+    :deleting="!!deletingDeviceId || deleteDeviceAction.running"
+    @update:open="setDeleteDeviceDialogOpen"
+    @confirm="deleteSelectedDevice"
+  />
 </template>
 
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { ArrowRight, Monitor, RefreshCw } from '@lucide/vue'
+  import { ArrowRight, Monitor, RefreshCw, Trash2 } from '@lucide/vue'
   import { RouterLink, useRouter } from 'vue-router'
   import AppPageShell from '../../components/layout/AppPageShell.vue'
   import PageStatus from '../../components/layout/PageStatus.vue'
   import { useAsyncAction } from '../../composable/useAsyncAction'
   import CloudAccountMenu from '../../components/dashboard/CloudAccountMenu.vue'
+  import DeleteDeviceDialog from '../../components/dashboard/DeleteDeviceDialog.vue'
   import { authLogout } from '../../features/cloud/api'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
   import { useCloudAuthStore } from '../../store/cloudAuth'
@@ -136,10 +159,18 @@
   const cloudDevices = useCloudDevicesStore()
   const notifications = useNotificationsStore()
   const deviceError = ref('')
+  const deleteDeviceDialogOpen = ref(false)
+  const selectedDevice = ref<DeviceSummary | null>(null)
+  const deletingDeviceId = ref<string | null>(null)
   const devicesAction = useAsyncAction({
     onError: (err) => {
       deviceError.value = t('dashboard.loadDevicesFailed')
       notifications.notifyError(t('dashboard.loadDevicesFailed'), err)
+    },
+  })
+  const deleteDeviceAction = useAsyncAction({
+    onError: (err) => {
+      notifications.notifyError(t('toast.deleteDeviceFailed'), err)
     },
   })
 
@@ -180,6 +211,58 @@
       return
     }
     await router.push({ name: 'cloud-sessions', params: { deviceId } })
+  }
+
+  function openDeleteDevice(device: DeviceSummary) {
+    if (device.online || deletingDeviceId.value || deleteDeviceAction.running) {
+      return
+    }
+    selectedDevice.value = device
+    deleteDeviceDialogOpen.value = true
+  }
+
+  function setDeleteDeviceDialogOpen(open: boolean) {
+    deleteDeviceDialogOpen.value = open
+    // Keep selectedDevice while confirming: AlertDialogAction closes the dialog
+    // before the parent confirm handler finishes reading the device.
+    if (!open && !deletingDeviceId.value && !deleteDeviceAction.running) {
+      selectedDevice.value = null
+    }
+  }
+
+  async function deleteSelectedDevice() {
+    const device = selectedDevice.value
+    if (!device || device.online || deletingDeviceId.value || deleteDeviceAction.running) {
+      return
+    }
+    // Capture first so dialog close from AlertDialogAction cannot clear the target.
+    const target = device
+    deletingDeviceId.value = target.id
+    try {
+      await deleteDeviceAction.run(
+        async () => {
+          const removed = await cloudDevices.removeDevice(target.id)
+          if (!removed) {
+            throw new Error(t('dialog.deleteOnlineDeviceBlocked'))
+          }
+          deleteDeviceDialogOpen.value = false
+          selectedDevice.value = null
+          notifications.pushToast(
+            'success',
+            t('toast.deviceDeleted'),
+            t('message.deviceDeleted', { name: target.name }),
+          )
+        },
+        { rethrow: true },
+      )
+    } catch {
+      // notify handled by deleteDeviceAction.onError
+    } finally {
+      deletingDeviceId.value = null
+      if (!deleteDeviceDialogOpen.value) {
+        selectedDevice.value = null
+      }
+    }
   }
 
   function deviceActivity(device: DeviceSummary) {

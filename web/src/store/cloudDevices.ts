@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { listDevices } from '../features/cloud/api'
+import { deleteDevice, listDevices } from '../features/cloud/api'
 import type { DeviceSummary } from '../gen/proto/termbridge/cloud/v1/device'
 
 export const useCloudDevicesStore = defineStore('cloudDevices', () => {
@@ -25,6 +25,20 @@ export const useCloudDevicesStore = defineStore('cloudDevices', () => {
     return true
   }
 
+  async function removeDevice(deviceId: string) {
+    const device = devices.value.find((candidate) => candidate.id === deviceId)
+    if (!device || device.online) {
+      return false
+    }
+    await deleteDevice(deviceId)
+    devices.value = devices.value.filter((candidate) => candidate.id !== deviceId)
+    if (selectedDeviceId.value === deviceId) {
+      const onlineDevices = devices.value.filter((candidate) => candidate.online)
+      selectedDeviceId.value = onlineDevices.length === 1 ? onlineDevices[0].id : ''
+    }
+    return true
+  }
+
   function reset() {
     devices.value = []
     selectedDeviceId.value = ''
@@ -35,6 +49,7 @@ export const useCloudDevicesStore = defineStore('cloudDevices', () => {
     selectedDeviceId,
     loadDevices,
     selectDeviceId,
+    removeDevice,
     reset,
   }
 })

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   fetchCloudIdentityViaLocalApi: vi.fn(),
   fetchCloudIdentityViaCloudApi: vi.fn(),
   listDevices: vi.fn(),
+  deleteDevice: vi.fn(),
 }))
 
 vi.mock('../features/local/api', () => ({
@@ -18,6 +19,7 @@ vi.mock('../features/local/api', () => ({
 vi.mock('../features/cloud/api', () => ({
   fetchCloudIdentityViaCloudApi: mocks.fetchCloudIdentityViaCloudApi,
   listDevices: mocks.listDevices,
+  deleteDevice: mocks.deleteDevice,
 }))
 
 function runtimeConfig(mode: 'local' | 'cloud' | 'hybrid' = 'cloud'): BrowserRuntimeConfig {
@@ -233,5 +235,39 @@ describe('cloud devices store', () => {
     await cloudDevices.loadDevices()
 
     expect(cloudDevices.selectedDeviceId).toBe('dev-1')
+  })
+
+  it('removes only offline devices from the dashboard list', async () => {
+    mocks.listDevices.mockResolvedValueOnce([
+      {
+        id: 'dev-online',
+        name: 'Online laptop',
+        online: true,
+        status: 'online',
+        connected_at: '2026-06-28T10:00:00Z',
+        last_seen: '2026-06-28T10:00:00Z',
+      },
+      {
+        id: 'dev-offline',
+        name: 'Offline laptop',
+        online: false,
+        status: 'offline',
+        connected_at: '',
+        last_seen: '2026-06-27T10:00:00Z',
+      },
+    ])
+    mocks.deleteDevice.mockResolvedValueOnce(undefined)
+    const cloudDevices = useCloudDevicesStore()
+
+    await cloudDevices.loadDevices()
+    cloudDevices.selectedDeviceId = 'dev-offline'
+
+    await expect(cloudDevices.removeDevice('dev-online')).resolves.toBe(false)
+    expect(mocks.deleteDevice).not.toHaveBeenCalled()
+
+    await expect(cloudDevices.removeDevice('dev-offline')).resolves.toBe(true)
+    expect(mocks.deleteDevice).toHaveBeenCalledWith('dev-offline')
+    expect(cloudDevices.devices.map((device) => device.id)).toEqual(['dev-online'])
+    expect(cloudDevices.selectedDeviceId).toBe('dev-online')
   })
 })
