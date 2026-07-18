@@ -665,6 +665,8 @@ func (s *Handler) writeAuthError(w http.ResponseWriter, r *http.Request, err err
 		s.writeAPIError(w, r, http.StatusTooManyRequests, "code_cooldown", "Please wait before requesting another code.", nil)
 	case errors.Is(err, authmodel.ErrPasswordInvalid):
 		s.writeAPIError(w, r, http.StatusBadRequest, "password_invalid", "Password does not meet the required policy.", nil)
+	case errors.Is(err, authmodel.ErrPasswordUnchanged):
+		s.writeAPIError(w, r, http.StatusBadRequest, "password_unchanged", "New password must differ from the current password.", nil)
 	case errors.Is(err, authmodel.ErrProviderUnsupported):
 		s.writeAPIError(w, r, http.StatusBadRequest, "provider_unsupported", "Provider is unsupported for this operation.", nil)
 	case errors.Is(err, authmodel.ErrOAuthDisabled):

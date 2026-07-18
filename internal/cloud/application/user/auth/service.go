@@ -195,6 +195,9 @@ func (s *Service) ChangePassword(ctx context.Context, userId, currentPassword, n
 	if !checkPassword(identity.PasswordHash.String, currentPassword) {
 		return authmodel.ErrInvalidCredentials
 	}
+	if currentPassword == newPassword {
+		return authmodel.ErrPasswordUnchanged
+	}
 	if err := s.validatePassword(newPassword); err != nil {
 		return err
 	}

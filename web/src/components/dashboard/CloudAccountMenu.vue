@@ -27,9 +27,11 @@
         class="z-50 min-w-40 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
       >
         <DropdownMenuItem
-          v-if="showChangePassword"
-          class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
-          @select="emit('changePassword')"
+          :disabled="!canChangePassword"
+          class="flex items-center gap-2 rounded px-2 py-1.5 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45 data-[highlighted]:bg-[var(--color-control-hover)] data-[disabled]:data-[highlighted]:bg-transparent"
+          :class="canChangePassword ? 'cursor-pointer' : 'cursor-not-allowed'"
+          :title="changePasswordTitle"
+          @select="onChangePasswordSelect"
         >
           <KeyRound class="size-4 text-[var(--color-text-subtle)]" />
           {{ t('cloud.changePassword') }}
@@ -58,12 +60,17 @@
     DropdownMenuTrigger,
   } from 'reka-ui'
 
-  const props = defineProps<{
-    authenticated: boolean
-    userDisplayName: string
-    userEmail: string
-    showChangePassword?: boolean
-  }>()
+  const props = withDefaults(
+    defineProps<{
+      authenticated: boolean
+      userDisplayName: string
+      userEmail: string
+      canChangePassword?: boolean
+    }>(),
+    {
+      canChangePassword: false,
+    },
+  )
 
   const emit = defineEmits<{
     login: []
@@ -74,4 +81,15 @@
   const { t } = useI18n()
 
   const userTitle = computed(() => props.userEmail || props.userDisplayName)
+  const changePasswordTitle = computed(() =>
+    props.canChangePassword ? t('cloud.changePassword') : t('cloud.changePasswordUnavailable'),
+  )
+
+  function onChangePasswordSelect(event: Event) {
+    if (!props.canChangePassword) {
+      event.preventDefault()
+      return
+    }
+    emit('changePassword')
+  }
 </script>

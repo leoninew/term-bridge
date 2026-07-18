@@ -155,6 +155,33 @@ func TestConfirmPasswordResetMarksCodeUsed(t *testing.T) {
 	}
 }
 
+func TestChangePasswordRejectsUnchangedPassword(t *testing.T) {
+	db := openAuthServiceTestDB(t)
+	sender := &recordingSender{result: EmailResult{MessageId: "msg-change-password", Success: true}}
+	service := newAuthServiceForTest(db, sender)
+	ctx := context.Background()
+
+	if err := service.Register(ctx, "User@Example.Test", "valid-password"); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	if err := service.VerifyEmail(ctx, "user@example.test", codeFromLatestEmail(t, sender)); err != nil {
+		t.Fatalf("VerifyEmail() error = %v", err)
+	}
+	user, err := service.repo.FindUserByEmail(ctx, "user@example.test")
+	if err != nil {
+		t.Fatalf("FindUserByEmail() error = %v", err)
+	}
+	err = service.ChangePassword(ctx, user.Id, "valid-password", "valid-password")
+	if !errors.Is(err, authmodel.ErrPasswordUnchanged) {
+		t.Fatalf("ChangePassword() error = %v, want %v", err, authmodel.ErrPasswordUnchanged)
+	}
+	if err := service.ChangePassword(ctx, user.Id, "valid-password", "another-valid-password"); err != nil {
+		t.Fatalf("ChangePassword() error = %v", err)
+	}
+	if _, err := service.Login(ctx, "user@example.test", "another-valid-password"); err != nil {
+		t.Fatalf("Login() with changed password error = %v", err)
+	}
+}
 func TestLoginReturnsLastLoginUpdateError(t *testing.T) {
 	db := openAuthServiceTestDB(t)
 	sender := &recordingSender{result: EmailResult{MessageId: "msg-5", Success: true}}
