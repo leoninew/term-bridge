@@ -1,12 +1,85 @@
-# TermBridge-go
+# TermBridge
 
-TermBridge-go 是 TermBridge 的 Go 重写版本，当前主要服务于本地开发和产品验证。
+**TermBridge** 是一个本地优先、可远程访问的 Workspace Runtime 平台。
 
-核心模型：
+它把你在某一台设备上运行的 CLI、Shell、构建与调试任务，整理成可管理、可恢复、可在浏览器中继续操作的工作流。浏览器负责查看与交互，命令仍然真实运行在设备本地的 runtime 上。
 
-```text
-Browser -> Gate -> Agent -> Runtime -> PTY / Process
-User -> Device -> Workspace -> Session -> Terminal
+
+## 适合谁
+
+- **本地开发者**：在本机运行 Claude Code、Codex、Shell、构建命令，希望在浏览器里统一查看、恢复和管理这些会话。
+- **多设备用户**：把 Home PC、笔记本、VPS 等设备放进同一工作台，并始终清楚当前操作的是哪一台。
+- **远程访问用户**：本地 Agent 主动连接云端，浏览器经云端访问本机 runtime，无需给设备开放入站端口。
+
+## 能力概览
+
+- **设备与工作区**：按 Device → Workspace → Session 组织任务，状态归属清晰。
+- **浏览器工作台**：在 Web 中管理 session、查看历史、attach 终端。
+- **远程终端**：基于 PTY 的交互体验，支持重连、resize 等常见终端行为。
+- **代码工作台**：在在线设备上使用类 VS Code 的编辑与文件浏览能力。
+- **云端入口**：账号、设备在线状态与路由，从浏览器选择可达设备进入工作台。
+- **本地与远程一致**：同一套产品模型覆盖本机直连与经云端访问。
+
+## 架构
+
+![](./assets/arch.png)
+
+数据面始终落在设备侧；Cloud 只做账号、在线状态与路由，不接管进程生命周期。
+
+| 角色 | 作用 |
+| --- | --- |
+| **Browser** | 工作台 UI：设备、工作区、会话、终端与代码编辑 |
+| **Cloud / Gate** | 账号、设备注册与路由，将浏览器请求转到目标设备 |
+| **Agent** | 运行在用户设备上，持有本机 runtime 与 PTY |
+| **Runtime** | 真实执行命令与进程，所有权始终在设备侧 |
+
+Agent 出站连接 Cloud；浏览器不直连用户设备，也无需为设备开放入站端口。
+
+## 快速开始
+
+### 环境要求
+
+- Go 1.25+
+- Node.js 与 Yarn
+- [Task](https://taskfile.dev/)
+
+### 安装依赖
+
+```bash
+task install
+```
+
+### 本地开发
+
+同时启动 Web、本机 Agent 与 Cloud：
+
+```bash
+task run
+```
+
+默认地址：
+
+| 服务 | 地址 |
+| --- | --- |
+| Web | http://localhost:9030 |
+| Agent | http://127.0.0.1:9031 |
+| Cloud | http://127.0.0.1:9032 |
+
+也可分别启动：`task web` / `task agent` / `task cloud`。
+
+### 常用命令
+
+```bash
+task test    # 测试
+task check   # 检查
+task build   # 构建
+```
+
+运行角色：
+
+```bash
+termbridge agent   # 本机 Agent
+termbridge cloud   # Cloud 服务
 ```
 
 ## 文档
@@ -14,121 +87,10 @@ User -> Device -> Workspace -> Session -> Terminal
 - [产品设计](docs/design/design.md)
 - [产品路线图](docs/design/roadmap.md)
 
-![](./assets/sketch.png)
+## 状态
 
-## 当前形态
+项目处于活跃开发中，API 与交互仍可能变化。欢迎通过 Issue 反馈问题与想法。
 
-- `termbridge agent` 启动本地 Agent 后端、本机 runtime 与 PTY 能力。
-- `termbridge cloud` 启动 Cloud 门户后端。
-- Browser 通过 `/sessions` 进入 workspace、session 和 terminal。
-- 本地开发使用一个 Vite dev server 同时代理 agent 与 cloud。
-- 镜像交付使用 Go 后端提供 API 和已构建的前端静态资源。
+## License
 
-## 开发依赖
-
-- Go 1.25+
-- Node.js / Yarn
-- [Task](https://taskfile.dev/)
-- [Air](https://github.com/air-verse/air)
-
-安装依赖：
-
-```bash
-task install
-```
-
-## 本地开发
-
-同时启动 Web、agent 与 cloud：
-
-```bash
-task run
-```
-
-也可以分别启动：
-
-```bash
-task agent
-task cloud
-task web
-```
-
-默认本地联调地址：
-
-```text
-web:   http://localhost:9030
-agent: http://127.0.0.1:9031
-cloud: http://127.0.0.1:9032
-```
-
-Vite dev proxy：
-
-```text
-/local-api/* -> http://127.0.0.1:9031
-/cloud-api/* -> http://127.0.0.1:9032
-```
-
-## 常用命令
-
-```bash
-task test    # 运行测试
-task check   # 运行完整检查
-task build   # 构建本地二进制
-```
-
-## 构建版本
-
-`task build`、`task package` 与 `task docker` 会把同一组构建元数据写入二进制；通过 `termbridge version` 查看。
-
-- 正式发布使用不可变的 SemVer Git tag，例如 `v1.2.3` 或 `v1.2.3-rc.1`。
-- tag 对应提交使用 tag 本身；tag 后提交使用 `v1.2.3-N-g<短hash>`；没有可达 release tag 时使用 `dev-N-g<短hash>`。
-- 工作区有未提交变更时版本会追加 `-dirty`，不能将其视为正式发布产物。
-- Commit 固定为当前 Git HEAD 的 12 位短 hash，构建时间为 UTC `YYYYMMDD-HHMMSS`。
-- 只有 CI 或源码归档无法读取 Git 元数据时才设置 `TERMBRIDGE_BUILD_VERSION`；它是编译期覆盖，不是运行时配置。
-
-```bash
-termbridge version
-```
-
-## 配置
-
-后端配置从 `configs/config.yaml` 开始加载，并可被环境配置、`.env` 和 OS env 覆盖。环境变量命名规则：
-
-```text
-TERMBRIDGE_ + 配置 key 大写，并将 . 转为 __
-```
-
-加载顺序：
-
-```text
-configs/config.yaml
-  < configs/config.<TERMBRIDGE_ENV>.yaml
-  < .env
-  < .env.<TERMBRIDGE_ENV>
-  < OS env
-```
-
-`TERMBRIDGE_ENV` 只从 OS env 读取；`.env` / `.env.<env>` 不覆盖已存在的 OS env。根目录 `.env` / `.env.<env>` 是本机运行覆盖文件，默认不提交；可从 `.env.example` 复制后按环境维护。
-
-`task agent`、`task cloud` 和 `task run` 会设置 `TERMBRIDGE_ENV=development`，Air 启动时读取 `configs/config.development.yaml` 和根目录 `.env.development`。
-
-前端仅保留 `web/.env.development` 作为 Vite 本地联调配置，使用 `TERMBRIDGE_LOCAL__MODE=hybrid`。生产、镜像和 portable package 都使用同一个不含部署地址的静态制品；测试和正式部署的公开配置由 Go 服务在运行时提供。
-
-```bash
-yarn --cwd web build
-```
-
-Docker 镜像不固化任何 `TERMBRIDGE_*` 运行时环境变量，部署时必须显式提供 Cloud 服务配置。
-
-Windows portable package 是本地 Agent 包：`task package` 使用 `build` 构建前端，并同时包含 `.env.prod` 和 `.env.test`。启动脚本默认选择 `.env.prod`（Preflite HTTPS）；调用方设置 `TERMBRIDGE_ENV=test` 时选择 `.env.test`（lvh HTTP）。两个 profile 都是 Go 后端运行时配置，负责本地静态目录、本机访问地址、云端地址和 Agent OAuth client secret；不要与前端开发环境文件混淆。
-
-## 运行角色
-
-运行角色由 CLI 子命令选择：
-
-```bash
-termbridge agent
-termbridge cloud
-```
-
-设备身份由 `termbridge agent` 在 `<runtime.state_dir>/device.json` 中生成并读取。Cloud 绑定摘要只记录非 token 的 public URL、device id、device name 和连接时间。
+License 待定。

@@ -85,19 +85,12 @@
             </div>
           </div>
 
-          <div
-            class="relative border-t border-[var(--color-border)] p-3 sm:p-4 lg:border-t-0 lg:p-5"
-            :aria-label="t('dashboard.cloudHeroImageAlt')"
-          >
-            <div
-              class="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]"
-            >
-              <img
-                :src="cloudHomeHeroUrl"
-                :alt="t('dashboard.cloudHeroImageAlt')"
-                class="block h-[200px] w-full object-cover object-center sm:h-[240px] lg:h-[260px]"
-              />
-            </div>
+          <div class="relative border-t border-[var(--color-border)] p-3 sm:p-4 lg:border-t-0 lg:p-5">
+            <ImageCarousel
+              :slides="heroSlides"
+              :aria-label="t('dashboard.cloudHeroImageAlt')"
+              frame-class="relative h-[200px] w-full sm:h-[240px] lg:h-[260px]"
+            />
           </div>
         </div>
       </section>
@@ -157,7 +150,9 @@
   import { ArrowRight, Cloud, Monitor, SquareTerminal } from '@lucide/vue'
   import { RouterLink, useRouter } from 'vue-router'
   import AppPageShell from '../layout/AppPageShell.vue'
-  import cloudHomeHeroUrl from '../../assets/cloud-home-hero-candidate.png'
+  import ImageCarousel from '../layout/ImageCarousel.vue'
+  import cloudHomeHero1Url from '../../assets/cloud-home-hero-1.jpg'
+  import cloudHomeHero2Url from '../../assets/cloud-home-hero-2.jpg'
   import CloudAccountMenu from './CloudAccountMenu.vue'
   import { authLogout } from '../../features/cloud/api'
   import { useCloudAuthStore } from '../../store/cloudAuth'
@@ -176,6 +171,11 @@
   )
 
   const projectVersionLabel = computed(() => runtimeConfig.config.version.trim())
+
+  const heroSlides = computed(() => [
+    { src: cloudHomeHero1Url },
+    { src: cloudHomeHero2Url },
+  ])
 
   const landingTitle = computed(() =>
     cloudAuth.authenticated

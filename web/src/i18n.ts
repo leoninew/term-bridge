@@ -17,6 +17,8 @@ const initialLocale: AppLocale = locales.includes(savedLocale as AppLocale)
 export const messages = {
   'zh-CN': {
     common: {
+      carousel: '轮播图',
+      carouselGoTo: '前往第 {index} 张',
       cancel: '取消',
       confirm: '确定',
       create: '新建',
@@ -489,6 +491,8 @@ export const messages = {
   },
   'en-US': {
     common: {
+      carousel: 'Carousel',
+      carouselGoTo: 'Go to slide {index}',
       cancel: 'Cancel',
       confirm: 'Confirm',
       create: 'Create',

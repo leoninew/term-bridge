@@ -6,8 +6,9 @@
         {{ t('workbench.backToSessions') }}
       </RouterLink>
     </div>
-    <div v-else-if="loading" class="termbridge-code-page-loading">
-      {{ t('workbench.startingWorkbench') }}
+    <div v-else-if="loading" class="termbridge-code-page-loading" role="status" aria-live="polite">
+      <Loader2 class="termbridge-code-page-loading-spinner" aria-hidden="true" />
+      <span>{{ t('workbench.startingWorkbench') }}</span>
     </div>
     <div ref="hostEl" class="termbridge-code-page-host" />
   </div>
@@ -19,6 +20,7 @@
   import { RouterLink, useRouter } from 'vue-router'
   import type { RouteLocationRaw } from 'vue-router'
   import type { RuntimeTarget } from '../../features/runtimeTarget'
+  import { Loader2 } from '@lucide/vue'
   import { bindWorkbenchAppIconNavigation } from '../../features/workbench/titlebarAppIcon'
 
   const props = defineProps<{
@@ -152,7 +154,34 @@
     overflow: hidden;
   }
 
-  .termbridge-code-page-loading,
+  .termbridge-code-page-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    background: #1e1e1e;
+    color: #cccccc;
+    font-size: 13px;
+    pointer-events: none;
+  }
+
+  .termbridge-code-page-loading-spinner {
+    width: 1.75rem;
+    height: 1.75rem;
+    color: #cccccc;
+    animation: termbridge-code-spin 0.8s linear infinite;
+  }
+
+  @keyframes termbridge-code-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   .termbridge-code-page-error {
     position: absolute;
     top: 8px;
@@ -167,14 +196,6 @@
     padding: 0.5rem 0.75rem;
     font-size: 12px;
     pointer-events: auto;
-  }
-
-  .termbridge-code-page-loading {
-    background: rgb(37 37 38 / 0.92);
-    color: #cccccc;
-  }
-
-  .termbridge-code-page-error {
     color: #f48771;
     background: rgb(58 29 29 / 0.95);
   }

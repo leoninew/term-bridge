@@ -1,244 +1,161 @@
-# TermBridge-go 产品设计
+# TermBridge 产品设计
 
-最后修改时间: 2026-06-26 21:02:12
+## 定位
 
-## 1. 项目定位
+**TermBridge** 是本地优先、可远程访问的 **Workspace Runtime 平台**。
 
-TermBridge-go 是面向本地与远程工作流的 **Workspace Runtime Platform**。
+开发者的 CLI agent、Shell、构建与调试任务通常跑在某一台具体设备上。TermBridge 把这些工作整理成可管理、可恢复、可在浏览器中继续操作的会话，而**不把进程所有权搬到云端**。
 
-它要解决的问题是：用户的 CLI agent、shell、构建任务和调试命令通常运行在某一台具体设备上，但用户希望用统一的 Browser workbench 查看、管理、继续这些工作，而不被本地窗口、单次终端或设备边界限制。
+产品承诺：
 
-TermBridge-go 的产品承诺是：
+- 在设备上启动的会话可记录、可恢复、可管理。
+- 浏览器中能按设备、工作区、会话查看与操作。
+- 可从其他设备安全访问本机 runtime（Agent 出站连接，无需入站端口）。
+- 命令真实运行位置始终清晰：Browser / Cloud 负责管理与交互，Runtime 留在设备侧。
 
-- 用户可以在本地快速启动一个可记录、可恢复、可管理的 terminal session。
-- 用户可以在 Browser 中看到自己的 device、workspace、session 和 terminal。
-- 用户可以在未来从其他设备安全访问本地 runtime。
-- 命令真实运行的位置始终清晰，Browser 负责管理和交互，不改变 runtime ownership。
+## 目标用户
 
----
+| 角色 | 典型诉求 |
+| --- | --- |
+| **本地开发者** | 在本机跑 Claude Code、Codex、Shell、构建命令，在浏览器里统一查看、恢复、管理会话。 |
+| **多设备用户** | Home PC、笔记本、VPS 出现在同一工作台，并始终知道当前操作哪一台。 |
+| **远程访问用户** | 人不在设备旁时，经云端进入本机终端与代码工作台，且体验与本地直连一致。 |
 
-## 2. 目标用户与使用场景
+## 资源模型
 
-### 本地开发者
-
-用户在自己的开发机上运行 Claude Code、Codex、Shell、构建命令或调试命令，希望：
-
-- 用 CLI 快速启动任务。
-- 在 Browser 中查看正在运行和已经结束的 session。
-- 查看历史输出。
-- 重新 attach terminal。
-- 对 session 做 close、delete、rerun 等管理操作。
-
-### 多设备用户
-
-用户拥有多台设备，例如 Home-PC、Laptop、VPS，希望：
-
-- 在一个 Browser workbench 中区分这些设备。
-- 明确知道当前正在操作哪台 device。
-- 从一台设备访问另一台设备上的 workspace/session。
-- 不需要给本地设备开放入站端口。
-
-### 远程访问用户
-
-用户把 Gate 发布到远端后，希望：
-
-- 本地 Agent 主动连接远端 Gate。
-- Browser 通过远端 Gate 访问本地 runtime。
-- 远程 terminal 行为与本地 self-connected 行为保持一致。
-- 身份、凭据、授权和敏感数据边界是清晰的。
-
----
-
-## 3. 产品模型
-
-TermBridge-go 使用统一资源模型组织产品体验：
-
-```text
-User
-  -> Device
-    -> Workspace
-      -> Session
-        -> Terminal
+```mermaid
+flowchart LR
+  User[User] --> Device[Device]
+  Device --> Workspace[Workspace]
+  Workspace --> Session[Session]
+  Session --> Terminal[Terminal]
 ```
 
-### User
+| 概念 | 含义 |
+| --- | --- |
+| **User** | 使用产品的人；账号、设备绑定与授权的主体。 |
+| **Device** | 运行 Agent 与本机 runtime 的机器；工作台第一层选择对象。 |
+| **Workspace** | 一个项目/工作目录；组织该目录下的会话。 |
+| **Session** | 一次命令运行记录；管理与继续工作的基本单位。 |
+| **Terminal** | 与 session 背后 PTY/进程交互的界面：输入、输出、resize、attach、历史。 |
 
-访问产品的人，也是后续授权、设备绑定和审计的主体。
+补充能力（挂在 Device / Workspace 上，不改变上述主模型）：
 
-### Device
+- **代码工作台**：在在线设备上以类 VS Code 的方式浏览与编辑文件。
+- **文件 / Git 视图**：围绕同一 workspace 的文件与版本信息（随产品演进）。
 
-运行 Agent 和 local runtime 的机器。Device 是 Browser workbench 的第一层选择对象。
+## 系统架构
 
-### Workspace
-
-一个项目目录或工作目录。Workspace 用来组织同一目录下的 sessions。
-
-### Session
-
-一次命令运行记录，也是用户在 Browser 中管理和继续工作的基本单位。
-
-### Terminal
-
-用户与 session 背后的 PTY / Process 交互的界面，负责输入、输出、resize、attach、detach 和历史回放体验。
-
----
-
-## 4. 产品入口
-
-### CLI
-
-CLI 是本地启动任务的入口。
-
-典型使用：
-
-```text
-termbridge exec -- claude
-termbridge exec -- codex
-termbridge exec -- pwsh
-termbridge --cwd D:\project exec -- npm run dev
+```mermaid
+flowchart LR
+  Browser[Browser<br/>工作台 UI] --> Cloud[Cloud / Gate<br/>账号 · 路由]
+  Cloud --> Agent[Agent<br/>设备侧]
+  Agent --> Runtime[Runtime / PTY<br/>真实执行]
 ```
 
-CLI 的产品价值是：让一次命令运行天然进入 TermBridge 的 workspace/session 管理体系。
+| 角色 | 职责 |
+| --- | --- |
+| **Browser** | 云端入口、设备列表、会话工作台、终端与代码编辑 UI。 |
+| **Cloud / Gate** | 账号与鉴权、设备注册/在线状态、将浏览器请求路由到目标设备。 |
+| **Agent** | 部署在用户设备上；出站连接云端；持有本机 runtime。 |
+| **Runtime** | 在本机执行进程与 PTY；生命周期归属设备，不归属浏览器或云端。 |
 
-### Serve
+### 两种使用形态
 
-`termbridge serve` 是本地统一工作台入口。
+**本机 / 混合**
 
-它让本机同时具备：
-
-- Browser workbench 服务。
-- 本地 device 连接。
-- workspace/session/terminal runtime。
-
-用户启动后打开 `/sessions`，即可进入统一工作台。
-
-### Browser Workbench
-
-`/sessions` 是核心产品表面。
-
-它承载：
-
-- device 选择。
-- workspace tree。
-- session list。
-- session create / edit / close / delete / rerun。
-- history。
-- terminal attach。
-
----
-
-## 5. 核心体验原则
-
-### Device 优先
-
-用户进入 Browser workbench 后，首先要知道当前选中哪台 device，以及这台 device 是否可操作。
-
-单 device 场景应尽量直达工作台；多 device 场景由用户明确选择，不在产品上猜测用户意图。
-
-### 状态可信
-
-workspace、session、tab、terminal 都必须属于当前 selected device。切换 device 时，旧 device 的状态不应污染新的工作台视图。
-
-### Runtime ownership 清晰
-
-用户命令真实运行在 Agent 所在设备的 local runtime 中。Gate 和 Browser 负责访问、管理和交互，但不拥有用户进程生命周期。
-
-### 本地与远程体验一致
-
-本地 self-connected 和远端 Gate 接入应共享同一套产品模型。部署位置可以变化，但 User / Device / Workspace / Session / Terminal 的理解方式不变。
-
-### 失败可理解
-
-当操作失败时，用户需要能区分：
-
-- device offline。
-- route unavailable。
-- auth error。
-- runtime error。
-- 输入或操作不合法。
-
----
-
-## 6. 当前产品能力
-
-当前已经具备的产品能力：
-
-- 本地 CLI command runner。
-- workspace/session/history 基础模型。
-- `/sessions` Browser workbench。
-- `termbridge serve` 统一启动本地 Gate、Agent 和 runtime。
-- device-scoped Browser API。
-- Gateway / Agent relay 基础链路。
-- 基础 Browser auth。
-- workspace/session mutation。
-- terminal attach、history 和 resize hardening。
-- 已具备镜像内前后端一体的基础交付面：同一运行单元可以提供 Browser 页面与后端服务。
-- 本地开发已收口为 loopback-only 的前后端分离模式。
-
-当前仍需要收口的能力：
-
-- `/sessions` device selector 状态表达。
-- device 切换隔离的验证闭环。
-- 真实 TUI、interrupt、backpressure、long-running 场景补证。
-- Remote Gate / Local Agent 的真实跨网络部署验证、身份、凭据、授权和安全边界。
-
----
-
-## 7. 本地与远端产品形态
-
-### 本地 self-connected
-
-```text
-Browser
-  -> Local Gate
-  -> Local Agent
-  -> Local Runtime
-  -> PTY / Process
+```mermaid
+flowchart LR
+  B[Browser] --> A[本机 Agent / 本地服务]
+  A --> R[Runtime / PTY]
 ```
 
-这是当前主要产品形态。用户在本机启动 `termbridge serve`，Browser 访问本机 `/sessions`，本机 device 出现在工作台中。开发环境保持前后端分离，交付镜像中则由同一运行单元承载 Browser 页面与后端服务。
+适合单机开发：浏览器访问本机服务，直接操作当前设备。
 
-### 远端 Gate 接入
+**经云端远程**
 
-```text
-Browser
-  -> Remote Gate
-  -> Local Agent
-  -> Local Runtime
-  -> PTY / Process
+```mermaid
+flowchart LR
+  B[Browser] --> C[Cloud / Gate]
+  C --> A[设备侧 Agent]
+  A --> R[Runtime / PTY]
 ```
 
-这是 M7 的目标形态。当前 Cloud Gate PoC 已完成镜像交付面的基础验证，但尚未验证 Remote Gate + separate Local Agent 的真实跨网络路径；M7 仍需要补齐本地 Agent 主动连接远端 Gate、Browser 从其他设备访问本地 runtime 的完整验证。
+适合多设备与外出场景：Agent 主动连云，浏览器从不直连用户设备。
 
-远端形态的产品重点不是改变 terminal 的使用方式，而是补齐：
+两种形态共用同一套资源模型与交互语义，差异主要在接入路径与鉴权边界。
 
-- PoC 临时认证向正式用户系统和 device 绑定模型迁移。
-- secure pairing。
-- device credential。
-- token rotation。
-- terminal websocket authorization。
-- disconnect / reconnect UX。
-- sensitive data boundary。
+## 产品表面
 
----
+### 云端入口
 
-## 8. 产品质量标准
+- 账号登录与身份。
+- 设备列表（在线 / 离线）、选择设备进入工作台。
+- 离线设备绑定的管理（例如移除绑定）。
 
-TermBridge-go 的产品质量不只看“能不能跑”，还要看用户路径是否稳定可信。
+### 会话工作台
 
-进入下一阶段前，至少需要满足：
+核心路径：
 
-1. 用户能清楚知道自己正在操作哪个 device。
-2. workspace/session/terminal 状态不会跨 device 污染。
-3. terminal attach、history、resize、interrupt 等关键交互有真实场景验证。
-4. 失败状态能被用户理解，并能被开发者定位。
-5. 远程访问能力必须先完成身份、凭据、授权和安全边界设计。
-6. 每个 milestone 都有可复查的验证结论。
+```mermaid
+flowchart LR
+  D[选择 Device] --> W[Workspace]
+  W --> S[Session 列表 / 操作]
+  S --> T[Terminal attach]
+```
 
----
+承载：工作区树、会话创建/关闭/删除/重跑、历史、终端 attach。
 
-## 9. 与路线图的关系
+### 代码工作台
 
-本文描述 TermBridge-go 是什么、服务谁、提供什么产品体验，以及当前能力边界。
+在在线设备上打开 workspace 的编辑器体验（类 VS Code），与会话/终端互补：一个偏「跑命令」，一个偏「看改代码」。
 
-阶段优先级、进入条件、当前主线和后续规划以 `docs/design/roadmap.md` 为准。
+### CLI（设备侧）
+
+本机用 CLI 把一次命令跑进 TermBridge 的 session 体系，例如启动 shell 或 agent CLI，使其可在浏览器中继续管理。
+
+## 体验原则
+
+1. **Device 优先**  
+   先明确「正在操作哪台设备、是否可操作」。单设备尽量直达工作台；多设备由用户明确选择。
+
+2. **状态可信**  
+   Workspace / Session / Terminal 必须属于当前选中设备；切换设备时不得串状态。
+
+3. **Runtime 所有权清晰**  
+   进程跑在 Agent 所在设备；Cloud 与 Browser 只做访问与管理，不拥有用户进程生命周期。
+
+4. **本地与远程一致**  
+   资源模型与主路径交互一致；部署位置可变，产品概念不变。
+
+5. **失败可理解**  
+   用户能区分：设备离线、路由不可用、鉴权失败、runtime 错误、非法操作。
+
+## 边界与非目标
+
+**TermBridge 做：**
+
+- 把设备上的会话与工作区变成可远程管理的工作流。
+- 在浏览器中提供终端与代码工作台。
+- 以出站 Agent + 云端路由实现安全远程访问。
+
+**TermBridge 不做（当前定位）：**
+
+- 不把用户开发机变成云端托管的完整 CI/CD 平台。
+- 不替代通用云 IDE 的全部协作/多租户企业能力（除非后续单独规划）。
+- 不隐瞒命令实际执行位置；「像本地一样」指体验一致，不是进程搬迁。
+
+## 质量标准
+
+进入更广泛使用前，产品路径至少应满足：
+
+1. 用户始终知道当前 device 与是否可操作。
+2. 跨 device 无状态污染。
+3. 终端 attach、历史、resize、中断等主路径有真实场景验证。
+4. 失败状态对用户可读、对排障可定位。
+5. 远程访问具备明确的身份、凭据、授权与敏感数据边界。
+
+## 与路线图的关系
+
+本文说明 **产品是什么、服务谁、模型与原则**。  
+阶段优先级、当前重点与后续规划见 [产品路线图](./roadmap.md)。

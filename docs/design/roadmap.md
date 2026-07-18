@@ -1,250 +1,120 @@
-# TermBridge-go 产品路线图
+# TermBridge 产品路线图
 
-最后修改时间: 2026-06-26 21:02:12
+## 产品目标
 
-## 1. 产品目标
+提供一套 **本地优先、可远程访问** 的 workspace runtime：
 
-TermBridge-go 的产品目标是提供一套本地优先、可远程访问的 workspace runtime：
+1. 在设备上快速启动可管理的会话（CLI / Shell / agent 等）。
+2. 在浏览器工作台中管理设备、工作区、会话与终端。
+3. 从其他设备安全访问本机 runtime（Agent 出站，无需入站端口）。
+4. 终端、历史、重连、resize 等主路径在本地与远程下行为一致。
+5. 在同一设备模型上提供代码工作台（浏览/编辑），与会话能力互补。
 
-1. 用户可以在本地通过 CLI 快速启动任意命令。
-2. 用户可以在 Browser workbench 中管理设备、工作区、会话和终端。
-3. 用户可以从其他设备安全访问本地 runtime。
-4. 终端交互、历史、重连、resize 和 session 操作在本地与远程路径下保持一致。
+长期形态可以概括为：
 
-长期产品形态：
-
-```text
-CLI runtime
-Browser workbench
-Device registry
-Remote access
-Secure pairing
-Release package
+```mermaid
+flowchart TB
+  CLI[CLI Runtime] --> WB[Browser Workbench]
+  WB --> DR[Device Registry / Cloud]
+  DR --> RA[Remote Access]
+  RA --> SEC[Secure Pairing & Auth]
+  SEC --> REL[Release & Packaging]
 ```
 
----
+## 当前重点
 
-## 2. 当前产品状态
+当前方向：**把「云端选设备 → 会话/终端 → 代码工作台」收成稳定、可日常使用的主路径**，并补齐远程场景下的可信度与安全边界。
 
-当前阶段：**M6.2 Unified Device Workbench Closeout**。
+已具备的能力基线（产品视角）：
 
-已经具备：
+- 本机 Agent + Runtime / PTY，会话与工作区模型。
+- 浏览器会话工作台：工作区、会话管理、终端 attach / 历史。
+- 云端账号、设备列表与路由；设备在线状态；离线设备绑定管理。
+- 在线设备上的代码工作台（类 VS Code）。
+- 本地开发与镜像/包交付等工程形态（细节见仓库构建说明）。
 
-- CLI command runner。
-- Workspace / Session runtime model。
-- Browser `/sessions` workbench。
-- Gateway service + Agent connector unified serve。
-- Device-scoped Browser API。
-- Gateway / Agent relay。
-- 基础 Browser auth。
-- 基础 workspace/session mutation。
-- Terminal attach、history、resize hardening。
+仍在加强：
 
-当前还不应进入 Multi-device Beta，原因是：
+- 多设备切换时状态隔离与失败提示的一致性。
+- 真实 TUI（如 Claude Code / Codex）、大输出、长运行、中断等终端场景的可靠性。
+- 经公网/反向代理的 WebSocket 与鉴权路径验证。
+- 设备信任、配对、凭据轮换与更清晰的安全模型。
+- 面向普通用户的安装、升级与文档。
 
-- `/sessions` device workbench 还需要完成状态表达与验证闭环。
-- Device 切换隔离已有实现基础，但还缺面向用户路径的验证结论。
-- Claude Code / Codex TUI 启动、Ctrl+C 退出和进程出现/消失已有人工 smoke 观察；backpressure、long-running、压力场景等 runtime 风险仍需补证。
-- Cloud Gate 镜像交付面已完成 PoC，支持镜像内前后端一体交付。
-- Remote Gate / Local Agent 形态仍需要完成真实跨网络路径验证、身份、凭据、授权、重连和安全边界设计。
+## 阶段规划
 
----
+不按历史里程碑编号展开，而按 **用户能获得什么** 划分。完成标准以「可演示的用户路径 + 可复查的验证」为准，而不是「代码合入即完成」。
 
-## 3. 路线图总览
+### 阶段 A — 单设备工作台可靠
 
-| 阶段 | 名称 | 状态 | 产品结果 |
-| --- | --- | --- | --- |
-| M0 | Runtime 技术决策 | 完成 | 明确 Go + PTY abstraction 方向。 |
-| M1 | CLI Skeleton | 完成 | `termbridge` CLI 可启动、可解析命令、可加载配置。 |
-| M2 | PTY Command Runner MVP | 完成核心能力 | CLI 能运行用户命令并接入 PTY。 |
-| M2.5 | Web Terminal Spike | 完成核心能力 | Browser terminal 链路可用，风险进入 hardening。 |
-| M3 | Session / Workspace Runtime Model | 完成主体 | workspace/session/history 模型可支撑产品化。 |
-| M4 | Local Product Surface | 基本完成 | CLI 与本地 workbench 具备日常使用基础。 |
-| M5 | Runtime Hardening | 部分完成 | 代码 hardening 推进中，真实场景验证仍需补证。 |
-| M6 | Gateway Web Terminal MVP | 完成工程链路 | Gate / Agent / Browser workbench 打通。 |
-| M6.1 | Serve Entry Consolidation | 完成 | 统一入口为 `termbridge serve`。 |
-| M6.2 | Unified Device Workbench Closeout | 当前主线 | 收口 `/sessions` 统一 device workbench；Cloud Gate 镜像交付面已完成 PoC。 |
-| M7 | Multi-device Beta | 未开始 | 多设备远程访问进入可测试 beta；仍需真实 Remote Gate + Local Agent 验证和正式安全模型。 |
-| M8 | Security / Packaging / Release | 未开始 | 安全模型、发布包、安装升级和发布文档。 |
+**目标**：本机或单设备路径下，会话工作台日常可用、状态可信。
 
----
-
-## 4. 当前主线：M6.2 Unified Device Workbench Closeout
-
-### 产品目标
-
-让 `/sessions` 成为稳定、可理解、可验证的统一工作台：
-
-```text
-Device selector
-  -> Workspace tree
-  -> Session actions
-  -> Terminal attach
-```
-
-用户应该能清楚知道：
-
-- 当前选中哪个 device。
-- 当前 device 是否可操作。
-- 当前 workspace / session / terminal 是否属于当前 device。
-- 操作失败是 route unavailable、runtime error、auth error 还是输入错误。
-
-### P0 工作项
-
-| 工作项 | 状态 | 路线图目标 |
-| --- | --- | --- |
-| Device selector 状态收口 | 待收口 | 工作台能清楚表达 device 可用性和不可用原因。 |
-| Device 默认选择 | 基本具备，待验证 | 单 device 直达工作台；多 device 由用户明确选择。 |
-| Device 切换隔离 | 实现基础已具备，待验证 | 切换 device 不产生 workspace、session、tab、terminal 状态污染。 |
-| Device-scoped 操作验证 | 待补 | 证明主要 workspace / session / terminal 操作都命中 selected device。 |
-
-### Cloud Gate / container PoC 进度
-
-已完成：
-
-- 镜像交付面已打通，支持将 Browser workbench 与后端服务放入同一交付单元。
-- 本地开发仍保持前后端分离，交付镜像采用前后端一体形态。
-- PoC 认证与 device 上报链路已收口到当前最小可验证形态。
-
-尚未完成：
-
-- 容器运行态 smoke 未作为本轮验证项执行。
-- 真实 HTTPS 反向代理与 WebSocket upgrade 未做部署验证。
-- Remote Gate + separate Local Agent 的真实跨网络路径未验证。
-- 用户系统、用户-device 绑定、pairing、credential rotation 仍属于 M7/M8 前置设计。
-
-### 阶段验收
-
-- 单 device 与多 device 场景下，`/sessions` 的状态和操作路径可预测。
-- 切换 device 不遗留旧 device 的会话状态或 terminal 输出。
-- offline / route unavailable / auth error 有明确用户反馈。
-- M6.2 P0 主路径有自动化测试或人工验证记录。
-
-### P1 工作项
-
-| 工作项 | 路线图目标 |
+| 结果 | 说明 |
 | --- | --- |
-| Browser 断线 / 重连体验 | 用户能理解 Agent disconnect / reconnect 后工作台处于什么状态，以及如何恢复。 |
-| Terminal 真实交互补证 | 在进入 M7 前确认 Claude Code、Codex、Shell、IME、resize、大输出等关键交互风险。 |
+| 工作台可预测 | 选中设备、在线状态、不可用原因表达清楚。 |
+| 会话主路径稳定 | 创建、attach、历史、关闭/删除/重跑等操作可靠。 |
+| 终端关键交互 | Shell / 常见 TUI、resize、中断在真实浏览器下可接受。 |
+| 失败可理解 | 离线、鉴权、runtime 错误有明确反馈。 |
 
----
+### 阶段 B — 云端多设备可用
 
-## 5. 并行主线：M5 Runtime Hardening 补证
+**目标**：用户在浏览器中管理多台设备，并进入在线设备工作台。
 
-M5 的当前重点是补真实验证结论，不是继续堆新功能。
-
-当前已有人工 smoke 观察：
-
-- Claude Code TUI 可以启动。
-- Codex TUI 可以启动。
-- Ctrl+C 可以退出。
-- 进程有出现和消失。
-
-进入 M7 前仍需形成结论：
-
-| 补证项 | 需要回答的问题 |
+| 结果 | 说明 |
 | --- | --- |
-| Browser attach 下的真实 TUI | Claude Code / Codex / Shell 是否能稳定交互。 |
-| interrupt / close / kill escalation | 不同 shell / TUI 下退出语义是否清晰可靠。 |
-| backpressure / large output | 慢客户端或大量输出是否有保护或明确降级。 |
-| long-running stability | 长时间运行后状态、history、attach 是否仍可信。 |
-| resize / IME | 真实浏览器下 resize hardening 与输入体验是否满足日常使用。 |
+| 设备列表与路由 | 在线/离线、进入会话/代码工作台路径清晰。 |
+| 切换不串状态 | 换设备不污染 workspace / session / terminal 视图。 |
+| 绑定可管理 | 离线设备解绑等管理动作安全、可撤销或可再绑定。 |
+| 云端与本地语义一致 | 同一资源模型，不因入口不同而产生两套概念。 |
 
----
+### 阶段 C — 远程访问 Beta
 
-## 6. M7 Multi-device Beta
+**目标**：人在其他网络时，经 Cloud 安全使用家里/办公室设备上的 runtime。
 
-M7 的核心变化是 Gate 从本机发布到远端，Agent 从用户本机主动连接远端 Gate，Browser 通过远端 Gate 访问本地 runtime。
-
-目标链路：
-
-```text
-Browser
-  -> Remote Gate
-  -> Local Agent outbound tunnel
-  -> Local Runtime
-  -> PTY / Process
+```mermaid
+flowchart LR
+  Laptop[Laptop Browser] --> Cloud[Cloud / Gate]
+  Cloud --> Home[Home-PC Agent]
+  Home --> RT[Runtime / PTY]
 ```
 
-### 核心工作包
-
-| 工作包 | 产品结果 |
+| 结果 | 说明 |
 | --- | --- |
-| Remote Gate 部署基线 | 镜像交付面已具备；仍需真实 HTTPS reverse proxy、WebSocket upgrade、runtime smoke 和远端服务安全边界验证。 |
-| Device trust / pairing | 用户可以把本地 Agent 可信地绑定到自己的 Gate 账号或访问主体。 |
-| Agent outbound tunnel | 本地 Agent 不需要入站端口，也能稳定连接远端 Gate。 |
-| Remote terminal path | 远端链路下 attach、input、output、resize、interrupt、history 与本地路径保持一致。 |
-| Auth / authorization boundary | Browser auth、device credential、terminal websocket 授权边界一致。 |
-| Beta verification | 至少在 Remote Gate + Local Agent 分离部署下完成真实路径验证。 |
+| Agent 出站隧道 | 设备无需入站端口即可保持可达。 |
+| 远程终端主路径 | attach / 输入输出 / resize / 历史与本地一致。 |
+| 信任与鉴权 | 用户—设备绑定、会话与 WebSocket 授权边界明确。 |
+| 断线可恢复 | 断连、重连、路由不可用、token 失效有明确 UX。 |
 
-### 进入条件
+**进入条件（建议）**：阶段 A 主路径稳定；阶段 B 多设备状态可信；安全边界（配对/凭据/授权）设计落地并可测。
 
-进入 M7 前必须满足：
+### 阶段 D — 安全、打包与发布
 
-1. M6.2 P0 完成。
-2. M5 关键补证形成结论。
-3. Remote Gate 真实部署验证与安全边界设计完成。
-4. Device credential / pairing / rotation 策略明确。
-5. Terminal websocket auth 与 route unavailable 策略明确。
+**目标**：可被真实用户按文档安装使用，默认配置安全可用。
 
-### 产品目标
+| 结果 | 说明 |
+| --- | --- |
+| 安全模型 | 威胁模型、默认暴露面、敏感数据边界成文且可执行。 |
+| 发布物 | 可重复构建的安装包/便携包/镜像。 |
+| 升级 | 配置与状态迁移、回滚策略清楚。 |
+| 文档 | 安装、连接设备、远程访问、排障的最小用户文档。 |
 
-让用户可以从另一台设备访问本地 runtime。
+## 优先级原则
 
-用户故事：
+1. **先单设备稳定，再多设备远程。**
+2. **先工作台状态可信，再堆新表面。**
+3. **先真实终端/TUI 验证，再承诺 Beta 可用。**
+4. **先配对/凭据/授权设计，再扩大公网暴露。**
+5. **每个阶段以可验证用户路径收口，而不是仅完成内部实现。**
 
-```text
-用户在 Home-PC 启动 TermBridge Agent。
-用户在 Laptop Browser 登录 Gate。
-用户看到 Home-PC device。
-用户选择 workspace/session。
-用户 attach terminal 并查看或继续操作。
-```
+## 近期不优先
 
-### Beta 验收
+以下方向有价值，但不抢当前主路径的带宽：
 
-- Remote Gate 可以通过 HTTPS 对 Browser 和 Agent 提供服务，并已完成真实 reverse proxy / WebSocket upgrade 验证。
-- 至少两个设备可以访问同一个 Gate。
-- Agent 不需要入站端口。
-- Browser 能区分多个 device。
-- Remote attach 不改变 local runtime ownership。
-- 断线、重连、route unavailable、token 失效有明确 UX。
-- 远端链路下 terminal 主路径与本地 self-connected 保持一致。
+- 重型多人实时协作 / 企业多租户治理。
+- 把 TermBridge 做成通用云端 CI 或完整云 IDE 替代品。
+- 与主路径无关的边缘集成与过度配置项。
 
----
+## 与产品设计的关系
 
-## 7. M8 Security / Packaging / Release
-
-### 产品目标
-
-准备真实用户发布。
-
-### 交付范围
-
-- Security model。
-- Threat model。
-- Release package。
-- Installer / portable archive。
-- Config migration。
-- Upgrade / rollback。
-- Public network exposure warning。
-- Minimal CI / release checks。
-- User-facing docs。
-
-### 验收标准
-
-- 用户可以按文档安装并启动。
-- 默认配置安全可用。
-- 远程访问有明确认证和授权边界。
-- 升级不会破坏已有 state/config。
-- Release artifact 可重复构建。
-
----
-
-## 8. 产品优先级原则
-
-1. 先保证单机 self-connected 体验稳定，再进入多设备 beta。
-2. 先保证 `/sessions` 工作台状态可信，再增加复杂远程能力。
-3. 先补真实 TUI / interrupt / backpressure 验证，再承诺 beta 可用。
-4. 先设计 credential / pairing / token rotation，再开放多设备远程访问。
-5. 每个阶段都必须有可验证的用户路径，而不是只完成内部代码。
+资源模型、架构与体验原则见 [产品设计](./design.md)。  
+本路线图只回答 **先做什么、后做什么、怎样算阶段完成**。
