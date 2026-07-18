@@ -39,7 +39,6 @@ func ValidateStaticDir(staticDir string, runtimeConfig browserdto.RuntimeConfig)
 }
 
 func StaticHandler(staticDir string, runtimeConfig browserdto.RuntimeConfig) http.Handler {
-	fileServer := http.FileServer(http.Dir(staticDir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			http.NotFound(w, r)
@@ -52,7 +51,7 @@ func StaticHandler(staticDir string, runtimeConfig browserdto.RuntimeConfig) htt
 		if urlPath != "" {
 			fullPath := filepath.Join(staticDir, filepath.FromSlash(urlPath))
 			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
-				fileServer.ServeHTTP(w, r)
+				serveStaticFile(w, r, fullPath, urlPath, info)
 				return
 			}
 			if path.Ext(urlPath) != "" {
@@ -71,12 +70,7 @@ func StaticHandler(staticDir string, runtimeConfig browserdto.RuntimeConfig) htt
 			http.Error(w, "invalid runtime config entry", http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-store")
-		if r.Method == http.MethodHead {
-			return
-		}
-		_, _ = w.Write(content)
+		writeHTMLResponse(w, r, content)
 	})
 }
 
