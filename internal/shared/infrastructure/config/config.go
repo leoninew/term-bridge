@@ -38,16 +38,12 @@ type Config struct {
 	LogFormat         string
 	LogDir            string
 	LogHTTP           LogHTTPConfig
-	History           HistoryConfig
 	Terminal          TerminalConfig
 	File              FileConfig
 	Git               GitConfig
 	Runtime           RuntimeConfig
 	Local             LocalConfig
 	Cloud             CloudConfig
-	Auth              AuthConfig
-	Jwt               JwtConfig
-	Resend            ResendConfig
 	DefaultConfigFile string
 	EnvConfigFile     string
 	EnvFile           string
@@ -56,6 +52,7 @@ type Config struct {
 
 type JwtConfig struct {
 	SecretKey string `json:"secret_key"`
+	Ttl       time.Duration
 }
 
 type DatabaseConfig struct {
@@ -70,26 +67,6 @@ type SQLiteConfig struct {
 
 type MySQLConfig struct {
 	Dsn string
-}
-
-type AuthConfig struct {
-	JwtTTL         time.Duration
-	PasswordPolicy PasswordPolicy
-	Code           CodePolicy
-	Google         GoogleConfig
-	GitHub         GitHubConfig
-}
-
-type PasswordPolicy struct {
-	MinLength int
-	MaxLength int
-}
-
-type CodePolicy struct {
-	Length         int
-	Ttl            time.Duration
-	ResendCooldown time.Duration
-	MaxAttempts    int
 }
 
 type GoogleConfig struct {
@@ -110,10 +87,10 @@ type ResendConfig struct {
 }
 
 type LogHTTPConfig struct {
-	RequestBodyLimit    int
-	ResponseBodyLimit   int
-	SkipAssetEnabled    bool
-	SkipAssetExtensions []string
+	Enabled           bool
+	RequestBodyLimit  int
+	ResponseBodyLimit int
+	SkipAssetEnabled  bool
 }
 
 type HistoryConfig struct {
@@ -123,8 +100,9 @@ type HistoryConfig struct {
 }
 
 type TerminalConfig struct {
-	Replay TerminalReplayConfig
-	Client TerminalClientConfig
+	History HistoryConfig
+	Replay  TerminalReplayConfig
+	Client  TerminalClientConfig
 }
 
 type TerminalReplayConfig struct {
@@ -186,6 +164,10 @@ type CloudConfig struct {
 	ApiBaseUrl         string
 	CorsAllowedOrigins []string
 	ExposeErrors       bool
+	Jwt                JwtConfig
+	Google             GoogleConfig
+	GitHub             GitHubConfig
+	Resend             ResendConfig
 	Turnstile          TurnstileConfig
 	OAuth              CloudOAuthConfig
 	Database           DatabaseConfig
@@ -296,17 +278,17 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 		LogFormat:   strings.ToLower(v.GetString("log.format")),
 		LogDir:      logDir,
 		LogHTTP: LogHTTPConfig{
-			RequestBodyLimit:    v.GetInt("log.http.request_body_limit"),
-			ResponseBodyLimit:   v.GetInt("log.http.response_body_limit"),
-			SkipAssetEnabled:    v.GetBool("log.http.skip_asset_enabled"),
-			SkipAssetExtensions: getStringSlice(v, "log.http.skip_asset_extensions"),
-		},
-		History: HistoryConfig{
-			MaxLines:     v.GetInt("history.max_lines"),
-			MaxBytes:     v.GetInt64("history.max_bytes"),
-			MaxLineBytes: v.GetInt("history.max_line_bytes"),
+			Enabled:           v.GetBool("log.http.enabled"),
+			RequestBodyLimit:  v.GetInt("log.http.request_body_limit"),
+			ResponseBodyLimit: v.GetInt("log.http.response_body_limit"),
+			SkipAssetEnabled:  v.GetBool("log.http.skip_asset_enabled"),
 		},
 		Terminal: TerminalConfig{
+			History: HistoryConfig{
+				MaxLines:     v.GetInt("terminal.history.max_lines"),
+				MaxBytes:     v.GetInt64("terminal.history.max_bytes"),
+				MaxLineBytes: v.GetInt("terminal.history.max_line_bytes"),
+			},
 			Replay: TerminalReplayConfig{
 				MaxBytes:   v.GetInt64("terminal.replay.max_bytes"),
 				ChunkBytes: v.GetInt("terminal.replay.chunk_bytes"),
@@ -353,42 +335,30 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			ApiBaseUrl:         strings.TrimSpace(v.GetString("cloud.api_base_url")),
 			CorsAllowedOrigins: getStringSlice(v, "cloud.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("cloud.expose_errors"),
+			Jwt: JwtConfig{
+				SecretKey: v.GetString("cloud.jwt.secret_key"),
+				Ttl:       v.GetDuration("cloud.jwt.ttl"),
+			},
+			Google: GoogleConfig{
+				ClientId:     strings.TrimSpace(v.GetString("cloud.google.client_id")),
+				ClientSecret: strings.TrimSpace(v.GetString("cloud.google.client_secret")),
+				RedirectUrl:  strings.TrimSpace(v.GetString("cloud.google.redirect_url")),
+			},
+			GitHub: GitHubConfig{
+				ClientId:     strings.TrimSpace(v.GetString("cloud.github.client_id")),
+				ClientSecret: strings.TrimSpace(v.GetString("cloud.github.client_secret")),
+				RedirectUrl:  strings.TrimSpace(v.GetString("cloud.github.redirect_url")),
+			},
+			Resend: ResendConfig{
+				ApiKey:    strings.TrimSpace(v.GetString("cloud.resend.api_key")),
+				FromEmail: strings.TrimSpace(v.GetString("cloud.resend.from_email")),
+			},
 			Turnstile: TurnstileConfig{
 				SiteKey:   strings.TrimSpace(v.GetString("cloud.turnstile.site_key")),
 				SecretKey: strings.TrimSpace(v.GetString("cloud.turnstile.secret_key")),
 			},
 			OAuth:    loadCloudOAuthConfig(v),
 			Database: cloudDatabase,
-		},
-		Auth: AuthConfig{
-			JwtTTL: v.GetDuration("auth.jwt_ttl"),
-			PasswordPolicy: PasswordPolicy{
-				MinLength: v.GetInt("auth.password.min_length"),
-				MaxLength: v.GetInt("auth.password.max_length"),
-			},
-			Code: CodePolicy{
-				Length:         v.GetInt("auth.code.length"),
-				Ttl:            v.GetDuration("auth.code.ttl"),
-				ResendCooldown: v.GetDuration("auth.code.resend_cooldown"),
-				MaxAttempts:    v.GetInt("auth.code.max_attempts"),
-			},
-			Google: GoogleConfig{
-				ClientId:     strings.TrimSpace(v.GetString("auth.google.client_id")),
-				ClientSecret: strings.TrimSpace(v.GetString("auth.google.client_secret")),
-				RedirectUrl:  strings.TrimSpace(v.GetString("auth.google.redirect_url")),
-			},
-			GitHub: GitHubConfig{
-				ClientId:     strings.TrimSpace(v.GetString("auth.github.client_id")),
-				ClientSecret: strings.TrimSpace(v.GetString("auth.github.client_secret")),
-				RedirectUrl:  strings.TrimSpace(v.GetString("auth.github.redirect_url")),
-			},
-		},
-		Jwt: JwtConfig{
-			SecretKey: v.GetString("jwt.secret_key"),
-		},
-		Resend: ResendConfig{
-			ApiKey:    strings.TrimSpace(v.GetString("resend.api_key")),
-			FromEmail: strings.TrimSpace(v.GetString("resend.from_email")),
 		},
 		DefaultConfigFile: defaultConfigFile,
 		EnvConfigFile:     envConfigFile,
@@ -453,7 +423,7 @@ func validateScopeConfig(scope ValidationScope, cfg Config) error {
 }
 
 func validateAgentConfig(cfg Config) error {
-	if err := validateHistory(cfg.History); err != nil {
+	if err := validateHistory(cfg.Terminal.History); err != nil {
 		return err
 	}
 	if err := validateTerminal(cfg.Terminal); err != nil {
@@ -481,10 +451,7 @@ func validateCloudRuntimeConfig(cfg Config) error {
 	if err := validateCloud(cfg); err != nil {
 		return err
 	}
-	if err := validateJwt(cfg.Jwt); err != nil {
-		return err
-	}
-	if err := validateAuth(cfg.Auth); err != nil {
+	if err := validateJwt(cfg.Cloud.Jwt); err != nil {
 		return err
 	}
 	return validateIntegrationConfig(cfg)
@@ -547,23 +514,10 @@ func validateDatabaseConfig(prefix string, cfg DatabaseConfig) error {
 
 func validateJwt(cfg JwtConfig) error {
 	if _, err := security.ParseBase64Key(cfg.SecretKey, 32); err != nil {
-		return apperrors.Config("invalid jwt.secret_key", err)
+		return apperrors.Config("invalid cloud.jwt.secret_key", err)
 	}
-	return nil
-}
-
-func validateAuth(cfg AuthConfig) error {
-	if cfg.JwtTTL <= 0 {
-		return apperrors.Config("invalid auth.jwt_ttl", fmt.Errorf("must be positive"))
-	}
-	if cfg.PasswordPolicy.MinLength < 1 || cfg.PasswordPolicy.MaxLength < cfg.PasswordPolicy.MinLength {
-		return apperrors.Config("invalid auth.password", fmt.Errorf("invalid length range"))
-	}
-	if cfg.Code.Length != 6 {
-		return apperrors.Config("invalid auth.code.length", fmt.Errorf("must be 6"))
-	}
-	if cfg.Code.Ttl <= 0 || cfg.Code.ResendCooldown <= 0 || cfg.Code.MaxAttempts < 1 {
-		return apperrors.Config("invalid auth.code", fmt.Errorf("ttl, resend cooldown and max attempts must be positive"))
+	if cfg.Ttl <= 0 {
+		return apperrors.Config("invalid cloud.jwt.ttl", fmt.Errorf("must be positive"))
 	}
 	return nil
 }
@@ -574,13 +528,13 @@ func validateOAuthProviderConfig(provider, clientId, clientSecret, redirectUrl s
 	}
 	missing := []string{}
 	if clientId == "" {
-		missing = append(missing, envNameForKey("auth."+provider+".client_id"))
+		missing = append(missing, envNameForKey("cloud."+provider+".client_id"))
 	}
 	if clientSecret == "" {
-		missing = append(missing, envNameForKey("auth."+provider+".client_secret"))
+		missing = append(missing, envNameForKey("cloud."+provider+".client_secret"))
 	}
 	if redirectUrl == "" {
-		missing = append(missing, envNameForKey("auth."+provider+".redirect_url"))
+		missing = append(missing, envNameForKey("cloud."+provider+".redirect_url"))
 	}
 	if len(missing) > 0 {
 		return apperrors.Config("incomplete "+provider+" auth configuration", errors.New(strings.Join(missing, ", ")))
@@ -589,19 +543,19 @@ func validateOAuthProviderConfig(provider, clientId, clientSecret, redirectUrl s
 }
 
 func validateIntegrationConfig(cfg Config) error {
-	if err := validateOAuthProviderConfig("google", cfg.Auth.Google.ClientId, cfg.Auth.Google.ClientSecret, cfg.Auth.Google.RedirectUrl); err != nil {
+	if err := validateOAuthProviderConfig("google", cfg.Cloud.Google.ClientId, cfg.Cloud.Google.ClientSecret, cfg.Cloud.Google.RedirectUrl); err != nil {
 		return err
 	}
-	if err := validateOAuthProviderConfig("github", cfg.Auth.GitHub.ClientId, cfg.Auth.GitHub.ClientSecret, cfg.Auth.GitHub.RedirectUrl); err != nil {
+	if err := validateOAuthProviderConfig("github", cfg.Cloud.GitHub.ClientId, cfg.Cloud.GitHub.ClientSecret, cfg.Cloud.GitHub.RedirectUrl); err != nil {
 		return err
 	}
-	if cfg.Resend.ApiKey != "" || cfg.Resend.FromEmail != "" {
+	if cfg.Cloud.Resend.ApiKey != "" || cfg.Cloud.Resend.FromEmail != "" {
 		missing := []string{}
-		if cfg.Resend.ApiKey == "" {
-			missing = append(missing, envNameForKey("resend.api_key"))
+		if cfg.Cloud.Resend.ApiKey == "" {
+			missing = append(missing, envNameForKey("cloud.resend.api_key"))
 		}
-		if cfg.Resend.FromEmail == "" {
-			missing = append(missing, envNameForKey("resend.from_email"))
+		if cfg.Cloud.Resend.FromEmail == "" {
+			missing = append(missing, envNameForKey("cloud.resend.from_email"))
 		}
 		if len(missing) > 0 {
 			return apperrors.Config("incomplete resend configuration", errors.New(strings.Join(missing, ", ")))
@@ -738,13 +692,13 @@ func configKeys() []string {
 		"log.level",
 		"log.format",
 		"log.dir",
+		"log.http.enabled",
 		"log.http.request_body_limit",
 		"log.http.response_body_limit",
 		"log.http.skip_asset_enabled",
-		"log.http.skip_asset_extensions",
-		"history.max_lines",
-		"history.max_bytes",
-		"history.max_line_bytes",
+		"terminal.history.max_lines",
+		"terminal.history.max_bytes",
+		"terminal.history.max_line_bytes",
 		"terminal.replay.max_bytes",
 		"terminal.replay.chunk_bytes",
 		"terminal.client.queue.max_messages",
@@ -779,27 +733,21 @@ func configKeys() []string {
 		"cloud.api_base_url",
 		"cloud.cors_allowed_origins",
 		"cloud.expose_errors",
+		"cloud.jwt.secret_key",
+		"cloud.jwt.ttl",
+		"cloud.google.client_id",
+		"cloud.google.client_secret",
+		"cloud.google.redirect_url",
+		"cloud.github.client_id",
+		"cloud.github.client_secret",
+		"cloud.github.redirect_url",
+		"cloud.resend.api_key",
+		"cloud.resend.from_email",
 		"cloud.turnstile.site_key",
 		"cloud.turnstile.secret_key",
 		"cloud.database.driver",
 		"cloud.database.sqlite.path",
 		"cloud.database.mysql.dsn",
-		"auth.jwt_ttl",
-		"auth.password.min_length",
-		"auth.password.max_length",
-		"auth.code.length",
-		"auth.code.ttl",
-		"auth.code.resend_cooldown",
-		"auth.code.max_attempts",
-		"auth.google.client_id",
-		"auth.google.client_secret",
-		"auth.google.redirect_url",
-		"auth.github.client_id",
-		"auth.github.client_secret",
-		"auth.github.redirect_url",
-		"jwt.secret_key",
-		"resend.api_key",
-		"resend.from_email",
 	}
 }
 
@@ -881,41 +829,17 @@ func normalizeLogHTTPConfig(cfg *Config) {
 	if cfg.LogHTTP.ResponseBodyLimit <= 0 {
 		cfg.LogHTTP.ResponseBodyLimit = 0
 	}
-	cfg.LogHTTP.SkipAssetExtensions = normalizeLogHTTPAssetExtensions(cfg.LogHTTP.SkipAssetExtensions)
-}
-
-func normalizeLogHTTPAssetExtensions(values []string) []string {
-	out := make([]string, 0, len(values))
-	seen := map[string]struct{}{}
-	for _, value := range values {
-		value = strings.ToLower(strings.TrimSpace(value))
-		if value == "" {
-			continue
-		}
-		if !strings.HasPrefix(value, ".") {
-			value = "." + value
-		}
-		if value == "." {
-			continue
-		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		out = append(out, value)
-	}
-	return out
 }
 
 func validateHistory(cfg HistoryConfig) error {
 	if cfg.MaxLines < 1 {
-		return apperrors.Config("invalid history.max_lines", fmt.Errorf("must be positive"))
+		return apperrors.Config("invalid terminal.history.max_lines", fmt.Errorf("must be positive"))
 	}
 	if cfg.MaxBytes < 1 {
-		return apperrors.Config("invalid history.max_bytes", fmt.Errorf("must be positive"))
+		return apperrors.Config("invalid terminal.history.max_bytes", fmt.Errorf("must be positive"))
 	}
 	if cfg.MaxLineBytes < 1 {
-		return apperrors.Config("invalid history.max_line_bytes", fmt.Errorf("must be positive"))
+		return apperrors.Config("invalid terminal.history.max_line_bytes", fmt.Errorf("must be positive"))
 	}
 	return nil
 }
@@ -1063,6 +987,9 @@ func normalizeHttpOrigins(values []string) []string {
 }
 
 func normalizeCloudConfig(cfg *Config) {
+	if cfg.Cloud.Jwt.Ttl <= 0 {
+		cfg.Cloud.Jwt.Ttl = 24 * time.Hour
+	}
 	cfg.Cloud.ListenUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.ListenUrl), "/")
 	cfg.Cloud.PublicUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.PublicUrl), "/")
 	cfg.Cloud.ApiBaseUrl = strings.TrimRight(strings.TrimSpace(cfg.Cloud.ApiBaseUrl), "/")

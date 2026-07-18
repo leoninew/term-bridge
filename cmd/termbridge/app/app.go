@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -116,7 +117,7 @@ func Run(ctx context.Context, options Options) (Result, error) {
 		return Result{}, err
 	}
 	defer func() { _ = logger.Close() }()
-	logLoadedConfigFiles(logger.Slog, loadedConfigFiles)
+	logLoadedConfigFiles(logger.Slog, cfg.Cwd, loadedConfigFiles)
 
 	switch options.Command.Kind {
 	case CommandExec:
@@ -127,10 +128,8 @@ func Run(ctx context.Context, options Options) (Result, error) {
 	case CommandSession:
 		return runSessionList(ctx, cfg, options.Stdout)
 	case CommandAgent:
-		logger.Info("termbridge agent command parsed", "cwd", cfg.Cwd, "server_listen_url", cfg.Local.ListenUrl, "config", cfg.DefaultConfigFile)
 		return runAgent(ctx, cfg, logger.Slog, options)
 	case CommandCloud:
-		logger.Info("termbridge cloud command parsed", "cwd", cfg.Cwd, "server_listen_url", cfg.Cloud.ListenUrl, "config", cfg.DefaultConfigFile)
 		return runCloud(ctx, cfg, logger.Slog, options)
 	case CommandMigrate:
 		logger.Info("termbridge migrate command parsed", "cwd", cfg.Cwd, "config", cfg.DefaultConfigFile, "role", options.Command.MigrateRole)
@@ -160,13 +159,28 @@ func validationScopeForCommand(command Command) (config.ValidationScope, error) 
 	}
 }
 
-func logLoadedConfigFiles(logger *slog.Logger, paths []string) {
+func logLoadedConfigFiles(logger *slog.Logger, cwd string, paths []string) {
 	for _, path := range paths {
 		if strings.TrimSpace(path) == "" {
 			continue
 		}
-		logger.Info("加载配置文件", "path", path)
+		logger.Info("加载配置文件", "path", displayConfigPath(cwd, path))
 	}
+}
+
+func displayConfigPath(cwd string, path string) string {
+	path = filepath.Clean(path)
+	if strings.TrimSpace(cwd) == "" {
+		return path
+	}
+	rel, err := filepath.Rel(filepath.Clean(cwd), path)
+	if err != nil {
+		return path
+	}
+	if rel == "." {
+		return filepath.Base(path)
+	}
+	return filepath.ToSlash(rel)
 }
 
 func runMigrate(ctx context.Context, cfg config.Config, role string) (Result, error) {
@@ -252,12 +266,12 @@ func agentConfig(cfg config.Config) agentserver.Config {
 		Command: append([]string(nil), cfg.Command...),
 		LogDir:  cfg.LogDir,
 		LogHTTP: cfg.LogHTTP,
-		History: history.Config{
-			MaxLines:     cfg.History.MaxLines,
-			MaxBytes:     cfg.History.MaxBytes,
-			MaxLineBytes: cfg.History.MaxLineBytes,
-		},
 		Terminal: agentserver.TerminalConfig{
+			History: history.Config{
+				MaxLines:     cfg.Terminal.History.MaxLines,
+				MaxBytes:     cfg.Terminal.History.MaxBytes,
+				MaxLineBytes: cfg.Terminal.History.MaxLineBytes,
+			},
 			Replay: agentserver.TerminalReplayConfig{
 				MaxBytes:   cfg.Terminal.Replay.MaxBytes,
 				ChunkBytes: cfg.Terminal.Replay.ChunkBytes,
@@ -321,37 +335,27 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 			SQLite: cloudserver.SQLiteConfig{Path: cfg.Cloud.Database.SQLite.Path},
 			MySQL:  cloudserver.MySQLConfig{Dsn: cfg.Cloud.Database.MySQL.Dsn},
 		},
-		Auth: cloudserver.AuthConfig{
-			JwtTTL: cfg.Auth.JwtTTL,
-			PasswordPolicy: cloudserver.PasswordPolicy{
-				MinLength: cfg.Auth.PasswordPolicy.MinLength,
-				MaxLength: cfg.Auth.PasswordPolicy.MaxLength,
-			},
-			Code: cloudserver.CodePolicy{
-				Length:         cfg.Auth.Code.Length,
-				Ttl:            cfg.Auth.Code.Ttl,
-				ResendCooldown: cfg.Auth.Code.ResendCooldown,
-				MaxAttempts:    cfg.Auth.Code.MaxAttempts,
-			},
-			Google: cloudserver.GoogleConfig{
-				ClientId:     cfg.Auth.Google.ClientId,
-				ClientSecret: cfg.Auth.Google.ClientSecret,
-				RedirectUrl:  cfg.Auth.Google.RedirectUrl,
-			},
-			GitHub: cloudserver.GitHubConfig{
-				ClientId:     cfg.Auth.GitHub.ClientId,
-				ClientSecret: cfg.Auth.GitHub.ClientSecret,
-				RedirectUrl:  cfg.Auth.GitHub.RedirectUrl,
-			},
-		},
-		Jwt: cloudserver.JwtConfig{SecretKey: cfg.Jwt.SecretKey},
-		Resend: cloudserver.ResendConfig{
-			ApiKey:    cfg.Resend.ApiKey,
-			FromEmail: cfg.Resend.FromEmail,
-		},
 		Cloud: cloudserver.CloudConfig{
 			PublicURL:  cfg.Cloud.PublicUrl,
 			ApiBaseUrl: cfg.Cloud.ApiBaseUrl,
+			Jwt: cloudserver.JwtConfig{
+				SecretKey: cfg.Cloud.Jwt.SecretKey,
+				Ttl:       cfg.Cloud.Jwt.Ttl,
+			},
+			Google: cloudserver.GoogleConfig{
+				ClientId:     cfg.Cloud.Google.ClientId,
+				ClientSecret: cfg.Cloud.Google.ClientSecret,
+				RedirectUrl:  cfg.Cloud.Google.RedirectUrl,
+			},
+			GitHub: cloudserver.GitHubConfig{
+				ClientId:     cfg.Cloud.GitHub.ClientId,
+				ClientSecret: cfg.Cloud.GitHub.ClientSecret,
+				RedirectUrl:  cfg.Cloud.GitHub.RedirectUrl,
+			},
+			Resend: cloudserver.ResendConfig{
+				ApiKey:    cfg.Cloud.Resend.ApiKey,
+				FromEmail: cfg.Cloud.Resend.FromEmail,
+			},
 			Turnstile: cloudserver.TurnstileConfig{
 				SiteKey:   cfg.Cloud.Turnstile.SiteKey,
 				SecretKey: cfg.Cloud.Turnstile.SecretKey,

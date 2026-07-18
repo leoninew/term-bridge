@@ -22,15 +22,13 @@ func TestBuildBrowserRuntimeConfigProjectsPublicConfiguration(t *testing.T) {
 		Cloud: CloudConfig{
 			PublicUrl:  "https://termbridge.preflite.cn",
 			ApiBaseUrl: "https://api.termbridge.preflite.cn",
+			Jwt:        JwtConfig{SecretKey: "must-not-be-exposed"},
+			Google:     GoogleConfig{ClientId: "google-client", ClientSecret: "must-not-be-exposed", RedirectUrl: "https://example.test/oauth2/google/callback"},
+			GitHub:     GitHubConfig{ClientId: "github-client", ClientSecret: "must-not-be-exposed", RedirectUrl: "https://example.test/oauth2/github/callback"},
 			Turnstile: TurnstileConfig{
 				SecretKey: "must-not-be-exposed",
 			},
 		},
-		Auth: AuthConfig{
-			Google: GoogleConfig{ClientId: "google-client", ClientSecret: "must-not-be-exposed", RedirectUrl: "https://example.test/oauth2/google/callback"},
-			GitHub: GitHubConfig{ClientId: "github-client", ClientSecret: "must-not-be-exposed", RedirectUrl: "https://example.test/oauth2/github/callback"},
-		},
-		Jwt: JwtConfig{SecretKey: "must-not-be-exposed"},
 	}
 
 	runtimeConfig, err := BuildBrowserRuntimeConfig(cfg, "cloud")

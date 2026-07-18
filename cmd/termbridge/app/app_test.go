@@ -141,14 +141,14 @@ func TestPortableAgentProfilesStartWithoutCloudJWT(t *testing.T) {
 				t.Fatalf("WriteFile(profile) error = %v", err)
 			}
 			t.Setenv("TERMBRIDGE_ENV", profile)
-			t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "")
+			t.Setenv("TERMBRIDGE_CLOUD__JWT__SECRET_KEY", "")
 
 			cfg, err := config.Load(config.Options{Cwd: cwd, ValidationScope: config.ValidationScopeAgent})
 			if err != nil {
 				t.Fatalf("Load(agent profile) error = %v", err)
 			}
-			if cfg.Jwt.SecretKey != "" {
-				t.Fatalf("agent profile JWT secret = %q", cfg.Jwt.SecretKey)
+			if cfg.Cloud.Jwt.SecretKey != "" {
+				t.Fatalf("agent profile JWT secret = %q", cfg.Cloud.Jwt.SecretKey)
 			}
 		})
 	}
@@ -323,7 +323,7 @@ func TestRunExecUsesConfiguredStateDirAndHistoryLimits(t *testing.T) {
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
 	configuredStateDir := filepath.Join(cwd, "runtime-state")
-	configContent := "history:\n  max_lines: 1\n  max_bytes: 8\n  max_line_bytes: 4\nruntime:\n  state_dir: " + filepath.ToSlash(configuredStateDir) + "\n"
+	configContent := "terminal:\n  history:\n    max_lines: 1\n    max_bytes: 8\n    max_line_bytes: 4\nruntime:\n  state_dir: " + filepath.ToSlash(configuredStateDir) + "\n"
 	t.Setenv("TERMBRIDGE_ENV", "develop")
 	writeEnvConfig(t, cwd, "develop", configContent)
 	oldRunRuntime := runRuntime
@@ -418,8 +418,8 @@ func TestPortablePackageShipsSelectableRuntimeProfiles(t *testing.T) {
 	taskfile := readRepoFile(t, "Taskfile.yml")
 	envExample := readRepoFile(t, ".env.example")
 	config := readRepoFile(t, "configs", "config.yaml")
-	startCmd := readRepoFile(t, "scripts", "package", "start.cmd")
-	startSh := readRepoFile(t, "scripts", "package", "start.sh")
+	startCmd := readRepoFile(t, "scripts", "package", "termbridge.cmd")
+	startSh := readRepoFile(t, "scripts", "package", "termbridge.sh")
 	prodEnv := readRepoFile(t, "scripts", "package", ".env.prod")
 	testEnv := readRepoFile(t, "scripts", "package", ".env.test")
 
@@ -430,7 +430,7 @@ func TestPortablePackageShipsSelectableRuntimeProfiles(t *testing.T) {
 	assertContains(t, envExample, "TERMBRIDGE_BUILD_VERSION=v1.2.3", ".env.example must document the build version override")
 	assertContains(t, envExample, "-dirty", ".env.example must document dirty build versions")
 	assertNotContains(t, envExample, "TERMBRIDGE_BUILD_COMMIT=", ".env.example must not imply that the build commit is configurable")
-	assertContains(t, config, "TERMBRIDGE_BUILD_VERSION 是 Taskfile/CI 编译元数据", "runtime config must document the build metadata boundary")
+	assertContains(t, config, "TERMBRIDGE_BUILD_VERSION �?Taskfile/CI 编译元数�?, "runtime config must document the build metadata boundary")
 	assertNotContains(t, config, "build_version:", "runtime config must not advertise build version as a YAML key")
 	assertContains(t, taskfile, "cd web && yarn build", "portable package must use the neutral bundle build")
 	assertNotContains(t, taskfile, "yarn build:", "portable package must not use a product-line build alias")
@@ -439,7 +439,7 @@ func TestPortablePackageShipsSelectableRuntimeProfiles(t *testing.T) {
 	}
 	assertNotContains(t, taskfile, "scripts/package/.env.local", "portable package must not include the obsolete local runtime profile")
 
-	for scriptName, script := range map[string]string{"start.cmd": startCmd, "start.sh": startSh} {
+	for scriptName, script := range map[string]string{"termbridge.cmd": startCmd, "termbridge.sh": startSh} {
 		assertContains(t, script, "TERMBRIDGE_ENV", scriptName+" must inspect the caller-selected environment")
 		assertContains(t, script, ".env.prod", scriptName+" must default to the production runtime profile")
 		assertContains(t, script, ".env.test", scriptName+" must select the test runtime profile")
@@ -515,7 +515,7 @@ func restorePackageProfileEnvironment(t *testing.T, profile string) {
 
 func restoreTermBridgeEnvironment(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"TERMBRIDGE_ENV", "TERMBRIDGE_JWT__SECRET_KEY"} {
+	for _, key := range []string{"TERMBRIDGE_ENV", "TERMBRIDGE_CLOUD__JWT__SECRET_KEY"} {
 		previous, existed := os.LookupEnv(key)
 		if err := os.Unsetenv(key); err != nil {
 			t.Fatalf("Unsetenv(%s) error = %v", key, err)
@@ -543,7 +543,7 @@ func writeDefaultConfig(t *testing.T, dir string) {
 	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), content, 0o644); err != nil {
 		t.Fatalf("WriteFile(default config) error = %v", err)
 	}
-	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+	t.Setenv("TERMBRIDGE_CLOUD__JWT__SECRET_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
 }
 
 func writeEnvConfig(t *testing.T, dir string, environment string, content string) {

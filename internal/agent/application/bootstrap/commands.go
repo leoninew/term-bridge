@@ -76,7 +76,7 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 		Name:      commandText,
 		LaunchCwd: cfg.Cwd,
 		Command:   commandRecord,
-		History:   session.HistoryRecord{Path: "history.log", MaxLines: cfg.History.MaxLines, MaxBytes: cfg.History.MaxBytes, MaxLineBytes: cfg.History.MaxLineBytes},
+		History:   session.HistoryRecord{Path: "history.log", MaxLines: cfg.Terminal.History.MaxLines, MaxBytes: cfg.Terminal.History.MaxBytes, MaxLineBytes: cfg.Terminal.History.MaxLineBytes},
 	})
 	if err != nil {
 		logger.Error("exec session create failed", "source", "cli", "cwd", cfg.Cwd, "stage", "create_session", "error_kind", apperrors.KindOf(err))
@@ -84,7 +84,7 @@ func RunExec(ctx context.Context, cfg Config, logger *slog.Logger, options Optio
 	}
 	logger.Info("exec session created", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "command_length", len(commandText))
 
-	historyWriter, err := history.NewWriter(store.HistoryPath(sess.WorkspaceId, sess.Id), history.Config{MaxLines: cfg.History.MaxLines, MaxBytes: cfg.History.MaxBytes, MaxLineBytes: cfg.History.MaxLineBytes})
+	historyWriter, err := history.NewWriter(store.HistoryPath(sess.WorkspaceId, sess.Id), history.Config{MaxLines: cfg.Terminal.History.MaxLines, MaxBytes: cfg.Terminal.History.MaxBytes, MaxLineBytes: cfg.Terminal.History.MaxLineBytes})
 	if err != nil {
 		_ = store.SaveState(sess.WorkspaceId, sess.Id, session.StateRecord{SchemaVersion: session.SchemaVersion, State: session.StateFailed, Reason: "history_create_failed", UpdatedAt: time.Now().UTC()})
 		logger.Error("exec history writer create failed", "source", "cli", "session_id", sess.Id, "workspace_id", sess.WorkspaceId, "cwd", cfg.Cwd, "stage", "create_history", "error_kind", apperrors.KindOf(err))

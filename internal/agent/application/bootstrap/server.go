@@ -250,7 +250,7 @@ func newWebTerminalRegistry(cfg Config, logger *slog.Logger, store state.DbStore
 		Store:            store,
 		ShortcutStore:    store,
 		LogDir:           cfg.LogDir,
-		History:          cfg.History,
+		History:          cfg.Terminal.History,
 		Manager:          gopty.NewManager(),
 		Logger:           logger,
 		ReplayMaxBytes:   cfg.Terminal.Replay.MaxBytes,

@@ -44,12 +44,12 @@ func BuildBrowserRuntimeConfig(cfg Config, mode string) (browserdto.RuntimeConfi
 		Cloud: browserdto.RuntimeCloudConfig{
 			PublicUrl:               cfg.Cloud.PublicUrl,
 			ApiBaseUrl:              cfg.Cloud.ApiBaseUrl,
-			ExternalAuthProviderIds: enabledExternalAuthProviderIds(cfg.Auth),
+			ExternalAuthProviderIds: enabledExternalAuthProviderIds(cfg.Cloud),
 		},
 	}, nil
 }
 
-func enabledExternalAuthProviderIds(cfg AuthConfig) []string {
+func enabledExternalAuthProviderIds(cfg CloudConfig) []string {
 	providerIds := make([]string, 0, 2)
 	if IsGoogleAuthEnabled(cfg.Google) {
 		providerIds = append(providerIds, "google")

@@ -13,9 +13,6 @@ type Config struct {
 	Server      ServerConfig
 	Gate        GateConfig
 	Database    DatabaseConfig
-	Auth        AuthConfig
-	Jwt         JwtConfig
-	Resend      ResendConfig
 	Cloud       CloudConfig
 }
 
@@ -48,24 +45,9 @@ type MySQLConfig struct {
 	Dsn string
 }
 
-type AuthConfig struct {
-	JwtTTL         time.Duration
-	PasswordPolicy PasswordPolicy
-	Code           CodePolicy
-	Google         GoogleConfig
-	GitHub         GitHubConfig
-}
-
-type PasswordPolicy struct {
-	MinLength int
-	MaxLength int
-}
-
-type CodePolicy struct {
-	Length         int
-	Ttl            time.Duration
-	ResendCooldown time.Duration
-	MaxAttempts    int
+type JwtConfig struct {
+	SecretKey string
+	Ttl       time.Duration
 }
 
 type GoogleConfig struct {
@@ -80,10 +62,6 @@ type GitHubConfig struct {
 	RedirectUrl  string
 }
 
-type JwtConfig struct {
-	SecretKey string
-}
-
 type ResendConfig struct {
 	ApiKey    string
 	FromEmail string
@@ -92,6 +70,10 @@ type ResendConfig struct {
 type CloudConfig struct {
 	PublicURL  string
 	ApiBaseUrl string
+	Jwt        JwtConfig
+	Google     GoogleConfig
+	GitHub     GitHubConfig
+	Resend     ResendConfig
 	Turnstile  TurnstileConfig
 	OAuth      CloudOAuthConfig
 }

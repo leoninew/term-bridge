@@ -31,7 +31,11 @@ func Middleware(logger *slog.Logger, config sharedconfig.LogHTTPConfig) func(htt
 	if logger == nil {
 		panic("request logger is required")
 	}
-	assetExtensions := assetExtensionSet(config.SkipAssetExtensions)
+	if !config.Enabled {
+		return func(next http.Handler) http.Handler {
+			return next
+		}
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			startedAt := time.Now()
@@ -49,7 +53,7 @@ func Middleware(logger *slog.Logger, config sharedconfig.LogHTTPConfig) func(htt
 			if bodyErr != nil {
 				startedAttrs = append(startedAttrs, "body_read_error", bodyErr.Error())
 			}
-			deferStartedLog := config.SkipAssetEnabled && isSkippableAssetPath(r.URL.Path, assetExtensions)
+			deferStartedLog := config.SkipAssetEnabled && isSkippableAssetPath(r.URL.Path)
 			if !deferStartedLog {
 				logger.Info("request started", startedAttrs...)
 			}
@@ -79,30 +83,9 @@ func Middleware(logger *slog.Logger, config sharedconfig.LogHTTPConfig) func(htt
 	}
 }
 
-func isSkippableAssetPath(requestPath string, assetExtensions map[string]struct{}) bool {
-	if len(assetExtensions) == 0 {
-		return false
-	}
+func isSkippableAssetPath(requestPath string) bool {
 	requestPath = path.Clean("/" + requestPath)
-	if !strings.HasPrefix(requestPath, assetsPathPrefix) {
-		return false
-	}
-	_, ok := assetExtensions[strings.ToLower(path.Ext(requestPath))]
-	return ok
-}
-
-func assetExtensionSet(values []string) map[string]struct{} {
-	if len(values) == 0 {
-		return nil
-	}
-	out := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		if value == "" {
-			continue
-		}
-		out[value] = struct{}{}
-	}
-	return out
+	return strings.HasPrefix(requestPath, assetsPathPrefix)
 }
 
 func requestLogAttrs(r *http.Request, requestId string) []any {

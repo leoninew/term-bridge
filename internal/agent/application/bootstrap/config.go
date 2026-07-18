@@ -13,7 +13,6 @@ type Config struct {
 	Command  []string
 	LogDir   string
 	LogHTTP  sharedconfig.LogHTTPConfig
-	History  history.Config
 	Terminal TerminalConfig
 	File     FileConfig
 	Git      GitConfig
@@ -25,8 +24,9 @@ type Config struct {
 }
 
 type TerminalConfig struct {
-	Replay TerminalReplayConfig
-	Client TerminalClientConfig
+	History history.Config
+	Replay  TerminalReplayConfig
+	Client  TerminalClientConfig
 }
 
 type TerminalReplayConfig struct {

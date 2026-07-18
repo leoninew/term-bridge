@@ -15,6 +15,20 @@ import (
 
 const testBodyMaxBytes = 32
 
+func TestMiddlewareDisabledSkipsAllLogs(t *testing.T) {
+	config := sharedconfig.LogHTTPConfig{Enabled: false, RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes}
+	entries, recorder := runLoggedRequestWithConfig(t, config, http.MethodGet, "/api/test", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	if len(entries) != 0 {
+		t.Fatalf("expected no log entries when log.http.enabled is false, got %d: %+v", len(entries), entries)
+	}
+	if recorder.Code != http.StatusCreated || recorder.Body.String() != `{"ok":true}` {
+		t.Fatalf("response = %d %q, want unchanged when logging disabled", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestMiddlewareIncludesMetadata(t *testing.T) {
 	entries, recorder := runLoggedRequest(t, http.MethodGet, "/api/test?x=1", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -97,7 +111,7 @@ func TestMiddlewareRecordsWriteHeaderWithoutBody(t *testing.T) {
 }
 
 func TestMiddlewareSkipsConfiguredAssetSuccessLogs(t *testing.T) {
-	config := sharedconfig.LogHTTPConfig{RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: true, SkipAssetExtensions: []string{".js", ".css", ".jpg"}}
+	config := sharedconfig.LogHTTPConfig{Enabled: true, RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: true}
 	for _, target := range []string{"/assets/app.js", "/assets/theme.css?v=1", "/assets/logo.jpg"} {
 		entries, recorder := runLoggedRequestWithConfig(t, config, http.MethodGet, target, "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("asset"))
@@ -112,7 +126,7 @@ func TestMiddlewareSkipsConfiguredAssetSuccessLogs(t *testing.T) {
 }
 
 func TestMiddlewareKeepsAssetLogsWhenSkipDisabled(t *testing.T) {
-	config := sharedconfig.LogHTTPConfig{RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: false, SkipAssetExtensions: []string{".js"}}
+	config := sharedconfig.LogHTTPConfig{Enabled: true, RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: false}
 	entries, _ := runLoggedRequestWithConfig(t, config, http.MethodGet, "/assets/app.js", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("asset"))
 	}))
@@ -121,7 +135,7 @@ func TestMiddlewareKeepsAssetLogsWhenSkipDisabled(t *testing.T) {
 }
 
 func TestMiddlewareKeepsFailedAssetAndAPILogs(t *testing.T) {
-	config := sharedconfig.LogHTTPConfig{RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: true, SkipAssetExtensions: []string{".js"}}
+	config := sharedconfig.LogHTTPConfig{Enabled: true, RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: true}
 	entries, _ := runLoggedRequestWithConfig(t, config, http.MethodGet, "/assets/missing.js", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	}))
@@ -135,18 +149,15 @@ func TestMiddlewareKeepsFailedAssetAndAPILogs(t *testing.T) {
 	assertLogNumber(t, completed, "status", http.StatusOK)
 }
 
-func TestMiddlewareUsesConfiguredAssetExtensions(t *testing.T) {
-	config := sharedconfig.LogHTTPConfig{RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: true, SkipAssetExtensions: []string{".css"}}
-	entries, _ := runLoggedRequestWithConfig(t, config, http.MethodGet, "/assets/app.js", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("script"))
-	}))
-	assertStartedAndCompleted(t, entries)
-
-	entries, _ = runLoggedRequestWithConfig(t, config, http.MethodGet, "/assets/app.css", "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("style"))
-	}))
-	if len(entries) != 0 {
-		t.Fatalf("configured css asset produced logs: %+v", entries)
+func TestMiddlewareSkipsAnyAssetPathOnSuccess(t *testing.T) {
+	config := sharedconfig.LogHTTPConfig{Enabled: true, RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes, SkipAssetEnabled: true}
+	for _, target := range []string{"/assets/app.js", "/assets/nested/theme.css", "/assets/font.woff2"} {
+		entries, _ := runLoggedRequestWithConfig(t, config, http.MethodGet, target, "", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("asset"))
+		}))
+		if len(entries) != 0 {
+			t.Fatalf("%s produced logs, want skipped: %+v", target, entries)
+		}
 	}
 }
 
@@ -233,7 +244,7 @@ func TestLoggingResponseWriterExposesOptionalInterfaces(t *testing.T) {
 
 func runLoggedRequest(t *testing.T, method string, target string, contentType string, body string, handler http.Handler) ([]map[string]any, *httptest.ResponseRecorder) {
 	t.Helper()
-	config := sharedconfig.LogHTTPConfig{RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes}
+	config := sharedconfig.LogHTTPConfig{Enabled: true, RequestBodyLimit: testBodyMaxBytes, ResponseBodyLimit: testBodyMaxBytes}
 	return runLoggedRequestWithConfig(t, config, method, target, contentType, body, handler)
 }
 

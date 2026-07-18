@@ -36,11 +36,11 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Base.Base != nil {
 		t.Fatalf("Base.Base = %#v, want nil", cfg.Base.Base)
 	}
-	if cfg.Base.Jwt.SecretKey != "" {
-		t.Fatalf("Base.Jwt.SecretKey = %q, want default YAML value", cfg.Base.Jwt.SecretKey)
+	if cfg.Base.Cloud.Jwt.SecretKey != "" {
+		t.Fatalf("Base.Cloud.Jwt.SecretKey = %q, want default YAML value", cfg.Base.Cloud.Jwt.SecretKey)
 	}
-	if cfg.Jwt.SecretKey != "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" {
-		t.Fatalf("Jwt.SecretKey = %q, want env value", cfg.Jwt.SecretKey)
+	if cfg.Cloud.Jwt.SecretKey != "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" {
+		t.Fatalf("Cloud.Jwt.SecretKey = %q, want env value", cfg.Cloud.Jwt.SecretKey)
 	}
 	if cfg.LogLevel != "info" {
 		t.Fatalf("LogLevel = %q, want info", cfg.LogLevel)
@@ -52,18 +52,18 @@ func TestLoadDefaults(t *testing.T) {
 	if filepath.Clean(cfg.LogDir) != filepath.Clean(wantLogDir) {
 		t.Fatalf("LogDir = %q, want %q", cfg.LogDir, wantLogDir)
 	}
-	if cfg.LogHTTP.RequestBodyLimit != 4096 || cfg.LogHTTP.ResponseBodyLimit != 4096 || !cfg.LogHTTP.SkipAssetEnabled {
-		t.Fatalf("LogHTTP = %#v", cfg.LogHTTP)
+	if cfg.LogHTTP.Enabled {
+		t.Fatalf("LogHTTP.Enabled = true, want false")
 	}
-	if !reflect.DeepEqual(cfg.LogHTTP.SkipAssetExtensions, wantDefaultSkipAssetExtensions()) {
-		t.Fatalf("LogHTTP.SkipAssetExtensions = %#v", cfg.LogHTTP.SkipAssetExtensions)
+	if cfg.LogHTTP.RequestBodyLimit != 0 || cfg.LogHTTP.ResponseBodyLimit != 0 || !cfg.LogHTTP.SkipAssetEnabled {
+		t.Fatalf("LogHTTP = %#v", cfg.LogHTTP)
 	}
 	wantStateDir := filepath.Join(cwd, "data")
 	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(wantStateDir) {
 		t.Fatalf("StateDir = %q, want %q", cfg.Runtime.StateDir, wantStateDir)
 	}
-	if cfg.History.MaxLines != 2000 || cfg.History.MaxBytes != 1048576 || cfg.History.MaxLineBytes != 65536 {
-		t.Fatalf("History = %#v", cfg.History)
+	if cfg.Terminal.History.MaxLines != 2000 || cfg.Terminal.History.MaxBytes != 1048576 || cfg.Terminal.History.MaxLineBytes != 65536 {
+		t.Fatalf("Terminal.History = %#v", cfg.Terminal.History)
 	}
 	if cfg.Terminal.Replay.MaxBytes != 262144 || cfg.Terminal.Replay.ChunkBytes != 65536 {
 		t.Fatalf("Terminal.Replay = %#v", cfg.Terminal.Replay)
@@ -122,7 +122,7 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "configured-logs")
 	stateDir := filepath.Join(cwd, "configured-state")
-	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nhistory:\n  max_lines: 42\n  max_bytes: 2048\n  max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\nlocal:\n  expose_errors: true\n  listen_url: http://0.0.0.0:9090\n  static_dir: web/dist\n  public_url: https://configured.example.com/app/\n  api_base_path: /configured-api/\n  cors_allowed_origins:\n    - https://configured.example.com/\n    - https://preview.configured.example.com\n")
+	writeEnvConfig(t, cwd, "develop", "log:\n  level: debug\n  format: json\n  dir: "+filepath.ToSlash(logDir)+"\n  http:\n    request_body_limit: 128\n    response_body_limit: 256\nterminal:\n  history:\n    max_lines: 42\n    max_bytes: 2048\n    max_line_bytes: 128\nruntime:\n  state_dir: "+filepath.ToSlash(stateDir)+"\nlocal:\n  expose_errors: true\n  listen_url: http://0.0.0.0:9090\n  static_dir: web/dist\n  public_url: https://configured.example.com/app/\n  api_base_path: /configured-api/\n  cors_allowed_origins:\n    - https://configured.example.com/\n    - https://preview.configured.example.com\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
@@ -158,8 +158,8 @@ func TestLoadMergesEnvironmentConfig(t *testing.T) {
 	if !reflect.DeepEqual(cfg.Local.CorsAllowedOrigins, wantOrigins) {
 		t.Fatalf("Local.CorsAllowedOrigins = %#v, want %#v", cfg.Local.CorsAllowedOrigins, wantOrigins)
 	}
-	if cfg.History.MaxLines != 42 || cfg.History.MaxBytes != 2048 || cfg.History.MaxLineBytes != 128 {
-		t.Fatalf("History = %#v", cfg.History)
+	if cfg.Terminal.History.MaxLines != 42 || cfg.Terminal.History.MaxBytes != 2048 || cfg.Terminal.History.MaxLineBytes != 128 {
+		t.Fatalf("Terminal.History = %#v", cfg.Terminal.History)
 	}
 	if cfg.Local.ListenUrl != "http://0.0.0.0:9090" {
 		t.Fatalf("Local.ListenUrl = %q", cfg.Local.ListenUrl)
@@ -179,7 +179,7 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	writeDefaultConfig(t, cwd)
 	logDir := filepath.Join(cwd, "dotenv-logs")
 	stateDir := filepath.Join(cwd, "dotenv-state")
-	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_ENABLED=false\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_EXTENSIONS=js,CSS,,.webp\nTERMBRIDGE_HISTORY__MAX_LINES=20\nTERMBRIDGE_HISTORY__MAX_BYTES=4096\nTERMBRIDGE_HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_LOCAL__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_LOCAL__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_LOCAL__CORS_ALLOWED_ORIGINS=https://dotenv.example.com,https://preview.dotenv.example.com\nTERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_LOCAL__EXPOSE_ERRORS=true\n")
+	writeDotEnv(t, cwd, "TERMBRIDGE_LOG__LEVEL=debug\nTERMBRIDGE_LOG__FORMAT=json\nTERMBRIDGE_LOG__DIR="+filepath.ToSlash(logDir)+"\nTERMBRIDGE_LOG__HTTP__ENABLED=true\nTERMBRIDGE_LOG__HTTP__REQUEST_BODY_LIMIT=512\nTERMBRIDGE_LOG__HTTP__RESPONSE_BODY_LIMIT=1024\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_ENABLED=false\nTERMBRIDGE_LOG__HTTP__SKIP_ASSET_EXTENSIONS=js,CSS,,.webp\nTERMBRIDGE_TERMINAL__HISTORY__MAX_LINES=20\nTERMBRIDGE_TERMINAL__HISTORY__MAX_BYTES=4096\nTERMBRIDGE_TERMINAL__HISTORY__MAX_LINE_BYTES=256\nTERMBRIDGE_RUNTIME__STATE_DIR="+filepath.ToSlash(stateDir)+"\nTERMBRIDGE_LOCAL__STATIC_DIR=/opt/termbridge/web/dist\nTERMBRIDGE_LOCAL__PUBLIC_URL=https://dotenv.example.com\nTERMBRIDGE_LOCAL__CORS_ALLOWED_ORIGINS=https://dotenv.example.com,https://preview.dotenv.example.com\nTERMBRIDGE_LOCAL__LISTEN_URL=http://127.0.0.1:9091\nTERMBRIDGE_LOCAL__EXPOSE_ERRORS=true\n")
 
 	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
 	if err != nil {
@@ -191,15 +191,12 @@ func TestLoadDotEnvOverridesDefaultYAMLAndBaseIgnoresEnv(t *testing.T) {
 	if filepath.Clean(cfg.LogDir) != filepath.Clean(logDir) || filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(stateDir) {
 		t.Fatalf("paths = %q/%q", cfg.LogDir, cfg.Runtime.StateDir)
 	}
-	if cfg.LogHTTP.RequestBodyLimit != 512 || cfg.LogHTTP.ResponseBodyLimit != 1024 || cfg.LogHTTP.SkipAssetEnabled {
+	if !cfg.LogHTTP.Enabled || cfg.LogHTTP.RequestBodyLimit != 512 || cfg.LogHTTP.ResponseBodyLimit != 1024 || cfg.LogHTTP.SkipAssetEnabled {
 		t.Fatalf("LogHTTP = %#v", cfg.LogHTTP)
 	}
-	wantAssetExtensions := []string{".js", ".css", ".webp"}
-	if !reflect.DeepEqual(cfg.LogHTTP.SkipAssetExtensions, wantAssetExtensions) {
-		t.Fatalf("LogHTTP.SkipAssetExtensions = %#v, want %#v", cfg.LogHTTP.SkipAssetExtensions, wantAssetExtensions)
-	}
-	if cfg.History.MaxLines != 20 || cfg.History.MaxBytes != 4096 || cfg.History.MaxLineBytes != 256 {
-		t.Fatalf("History = %#v", cfg.History)
+
+	if cfg.Terminal.History.MaxLines != 20 || cfg.Terminal.History.MaxBytes != 4096 || cfg.Terminal.History.MaxLineBytes != 256 {
+		t.Fatalf("Terminal.History = %#v", cfg.Terminal.History)
 	}
 	if cfg.Local.StaticDir != filepath.Clean("/opt/termbridge/web/dist") {
 		t.Fatalf("Local.StaticDir = %q", cfg.Local.StaticDir)
@@ -407,7 +404,7 @@ func TestLoadRejectsInvalidHistoryLimit(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	writeEnvConfig(t, cwd, "develop", "history:\n  max_lines: 0\n")
+	writeEnvConfig(t, cwd, "develop", "terminal:\n  history:\n    max_lines: 0\n")
 	t.Setenv(EnvNameVariable, "develop")
 
 	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
@@ -535,7 +532,7 @@ func TestAgentScopeAcceptsMissingJWTSecretKey(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "")
+	t.Setenv("TERMBRIDGE_CLOUD__JWT__SECRET_KEY", "")
 
 	if _, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent}); err != nil {
 		t.Fatalf("Load(agent) error = %v", err)
@@ -546,7 +543,7 @@ func TestMigrateScopesValidateOnlyTheirDatabase(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "")
+	t.Setenv("TERMBRIDGE_CLOUD__JWT__SECRET_KEY", "")
 	writeEnvConfig(t, cwd, "develop", "cloud:\n  database:\n    driver: sqlite\n    sqlite:\n      path: cloud-migration.db\n")
 	t.Setenv(EnvNameVariable, "develop")
 
@@ -562,13 +559,13 @@ func TestCloudScopeRejectsInvalidJWTSecretKey(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "test-secret")
+	t.Setenv("TERMBRIDGE_CLOUD__JWT__SECRET_KEY", "test-secret")
 
 	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeCloud})
 	if err == nil {
 		t.Fatal("Load(cloud) error = nil, want error")
 	}
-	if !strings.Contains(err.Error(), "invalid jwt.secret_key") {
+	if !strings.Contains(err.Error(), "invalid cloud.jwt.secret_key") {
 		t.Fatalf("Load(cloud) error = %v, want jwt secret key error", err)
 	}
 }
@@ -577,13 +574,13 @@ func TestCloudScopeRejectsIncompleteIntegrationConfig(t *testing.T) {
 	isolateHome(t)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
-	t.Setenv("TERMBRIDGE_RESEND__API_KEY", "resend-key")
+	t.Setenv("TERMBRIDGE_CLOUD__RESEND__API_KEY", "resend-key")
 
 	_, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeCloud})
 	if err == nil {
 		t.Fatal("Load(cloud) error = nil, want error")
 	}
-	if !strings.Contains(err.Error(), "TERMBRIDGE_RESEND__FROM_EMAIL") {
+	if !strings.Contains(err.Error(), "TERMBRIDGE_CLOUD__RESEND__FROM_EMAIL") {
 		t.Fatalf("Load(cloud) error = %v, want missing resend from email", err)
 	}
 }
@@ -736,17 +733,13 @@ func TestDefaultConfigFileExists(t *testing.T) {
 	}
 }
 
-func wantDefaultSkipAssetExtensions() []string {
-	return []string{".js", ".mjs", ".css", ".map", ".jpg", ".jpeg", ".png", ".gif", ".svg", ".ico", ".webp", ".avif", ".woff", ".woff2", ".ttf", ".otf", ".eot", ".wasm"}
-}
-
 func isolateHome(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	clearTermBridgeEnv(t)
-	t.Setenv("TERMBRIDGE_JWT__SECRET_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+	t.Setenv("TERMBRIDGE_CLOUD__JWT__SECRET_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
 	return home
 }
 
@@ -781,11 +774,11 @@ func clearTermBridgeEnv(t *testing.T) {
 
 func configureRemoteAuth(t *testing.T) {
 	t.Helper()
-	t.Setenv("TERMBRIDGE_AUTH__GOOGLE__CLIENT_ID", "google-client-id")
-	t.Setenv("TERMBRIDGE_AUTH__GOOGLE__CLIENT_SECRET", "google-client-secret")
-	t.Setenv("TERMBRIDGE_AUTH__GOOGLE__REDIRECT_URL", "https://gate.example.com/oauth/callback")
-	t.Setenv("TERMBRIDGE_RESEND__API_KEY", "resend-key")
-	t.Setenv("TERMBRIDGE_RESEND__FROM_EMAIL", "noreply@example.com")
+	t.Setenv("TERMBRIDGE_CLOUD__GOOGLE__CLIENT_ID", "google-client-id")
+	t.Setenv("TERMBRIDGE_CLOUD__GOOGLE__CLIENT_SECRET", "google-client-secret")
+	t.Setenv("TERMBRIDGE_CLOUD__GOOGLE__REDIRECT_URL", "https://gate.example.com/oauth/callback")
+	t.Setenv("TERMBRIDGE_CLOUD__RESEND__API_KEY", "resend-key")
+	t.Setenv("TERMBRIDGE_CLOUD__RESEND__FROM_EMAIL", "noreply@example.com")
 }
 
 func writeEnvConfig(t *testing.T, dir string, environment string, content string) {

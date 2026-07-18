@@ -7,49 +7,24 @@
 # TERMBRIDGE_ENV 只从 OS env 读取，不从 .env / .env.<env> 读取。
 # TERMBRIDGE_BUILD_VERSION 是 Taskfile/CI 编译元数据，不是 YAML 或 Viper 运行时配置键；不要添加 build_version。
 
-# Cloud JWT 认证密钥。Cloud runtime 必须提供 base64 编码的 32 字节随机 key，普通明文 secret 会被拒绝。
-# python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
-jwt:
-  secret_key: ""
-
 # 日志
 log:
   level: info
   format: text
   dir: logs
   http:
+    enabled: false
     request_body_limit: 4096
     response_body_limit: 4096
     skip_asset_enabled: true
-    skip_asset_extensions:
-      - .js
-      - .mjs
-      - .css
-      - .map
-      - .jpg
-      - .jpeg
-      - .png
-      - .gif
-      - .svg
-      - .ico
-      - .webp
-      - .avif
-      - .woff
-      - .woff2
-      - .ttf
-      - .otf
-      - .eot
-      - .wasm
-
-# 历史记录
-history:
-  max_lines: 2000
-  max_bytes: 1048576
-  max_line_bytes: 65536
 
 # Web Terminal 输出、回放与单客户端背压配置。
-# history 控制持久化容量；terminal.replay 只控制 attach 时回放的最近历史。
+# terminal.history 控制持久化容量；terminal.replay 只控制 attach 时回放的最近历史。
 terminal:
+  history:
+    max_lines: 2000
+    max_bytes: 1048576
+    max_line_bytes: 65536
   replay:
     max_bytes: 262144
     chunk_bytes: 65536
@@ -131,6 +106,27 @@ cloud:
   # 仅建议本地调试打开；生产保持 false。
   expose_errors: false
 
+  # Cloud JWT 认证密钥。Cloud runtime 必须提供 base64 编码的 32 字节随机 key，普通明文 secret 会被拒绝。
+  # python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+  jwt:
+    secret_key: ""
+    ttl: 24h
+
+  # External identity providers for Cloud browser login.
+  google:
+    client_id: ""
+    client_secret: ""
+    redirect_url: ""
+  github:
+    client_id: ""
+    client_secret: ""
+    redirect_url: ""
+
+  # Transactional email via Resend for verification and password reset codes.
+  resend:
+    api_key: ""
+    from_email: ""
+
   # Cloudflare Turnstile protects public email/password login and registration.
   # Production must supply non-empty credentials and a public HTTPS hostname via environment-specific configuration.
   turnstile:
@@ -154,27 +150,3 @@ cloud:
     mysql:
       dsn: ""
 
-# Auth
-auth:
-  jwt_ttl: 24h
-  password:
-    min_length: 8
-    max_length: 128
-  code:
-    length: 6
-    ttl: 2m
-    resend_cooldown: 1m
-    max_attempts: 3
-  google:
-    client_id: ""
-    client_secret: ""
-    redirect_url: ""
-  github:
-    client_id: ""
-    client_secret: ""
-    redirect_url: ""
-
-# Resend
-resend:
-  api_key: ""
-  from_email: ""

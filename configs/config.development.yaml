@@ -1,16 +1,12 @@
+log:
+  http:
+    enabled: true
+
 local:
-  static_dir: 
   listen_url: http://127.0.0.1:9031
-  public_url: http://localhost:9030
-  api_base_path: /api
   expose_errors: true
   cors_allowed_origins:
     - http://localhost:9030
-  oauth:
-    client_id: termbridge-agent
-    client_secret: agent-secret
-    redirect_url: http://localhost:9030/oauth/callback
-    scopes: [openid, email, profile]
 
 cloud:
   listen_url: http://127.0.0.1:9032
@@ -19,13 +15,7 @@ cloud:
   expose_errors: true
   cors_allowed_origins:
     - http://localhost:9030
-  # Cloudflare's official test credentials; never use these outside development.
+  # Cloudflare official always-pass test keys; never use outside development.
   turnstile:
     site_key: 1x00000000000000000000AA
     secret_key: 1x0000000000000000000000000000000AA
-  oauth:
-    clients:
-      - client_id: termbridge-agent
-        client_secret: agent-secret
-        redirect_url: http://localhost:9030/oauth/callback
-        scopes: [openid, email, profile]
