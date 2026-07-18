@@ -27,6 +27,7 @@
     sessionsRoute: RouteLocationRaw
   }>()
 
+
   const { t } = useI18n()
   const router = useRouter()
   const hostEl = ref<HTMLElement | null>(null)
@@ -35,6 +36,7 @@
   let resizeObserver: ResizeObserver | null = null
   let unbindAppIcon: (() => void) | null = null
   let disposeMountedWorkbench: (() => void) | null = null
+  let previousDocumentTitle: string | null = null
 
   function notifyLayout() {
     window.dispatchEvent(new window.Event('resize'))
@@ -58,6 +60,9 @@
   async function mount() {
     if (!hostEl.value || !props.workspaceId) {
       return
+    }
+    if (previousDocumentTitle === null) {
+      previousDocumentTitle = document.title
     }
     loading.value = true
     error.value = null
@@ -113,6 +118,11 @@
     // Workbench services are process-global; release only this workspace's
     // subscription and disposable hooks when its route unmounts.
     disposeMountedWorkbench?.()
+    // Monaco workbench rewrites document.title via window.title; restore pre-route title.
+    if (previousDocumentTitle !== null) {
+      document.title = previousDocumentTitle
+      previousDocumentTitle = null
+    }
   })
 </script>
 

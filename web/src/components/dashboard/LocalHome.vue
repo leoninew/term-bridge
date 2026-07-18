@@ -1,6 +1,6 @@
 <template>
   <AppPageShell
-    main-class="flex items-start justify-center overflow-y-auto px-3 py-4 text-sm sm:px-5 sm:py-6 md:items-center md:px-6 md:py-8"
+    main-class="flex flex-col overflow-y-auto px-3 py-4 text-sm sm:px-5 sm:py-6 md:px-6 md:py-8"
   >
     <template #actions>
       <CloudAccountMenu
@@ -11,239 +11,235 @@
         @logout="logoutCloud"
       />
     </template>
-    <div class="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-5">
+
+    <div class="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-4 sm:gap-5">
       <section
-        class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+        class="relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
       >
         <div
-          class="flex flex-col gap-2 border-b border-[var(--color-border)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3.5"
-        >
-          <h1 class="text-base font-semibold text-[var(--color-text-strong)] sm:text-lg">
-            {{ t('dashboard.localHomeTitle') }}
-          </h1>
-          <div class="flex flex-wrap items-center gap-1 sm:gap-2">
-            <button
-              type="button"
-              class="inline-flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-subtle)] sm:h-8 sm:px-1.5"
-              :disabled="
-                connectingCloud ||
-                (!cloudSession.cloudSession && !cloudAuth.cloudToken && !cloudConnectEnabled)
-              "
-              :title="cloudConnectionActionTitle"
-              @click="
-                cloudSession.cloudSession
-                  ? disconnectLocalDeviceFromCloud()
-                  : connectLocalDeviceToCloud()
-              "
+          class="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-blue-500/10 blur-3xl"
+          aria-hidden="true"
+        />
+        <div
+          class="pointer-events-none absolute -bottom-24 -left-10 size-56 rounded-full bg-cyan-400/5 blur-3xl"
+          aria-hidden="true"
+        />
+
+        <div class="relative flex flex-col gap-5 p-4 sm:gap-6 sm:p-6 lg:p-8">
+            <p
+              v-if="projectVersionLabel"
+              class="absolute right-4 top-4 text-xs text-[var(--color-text-subtle)] sm:right-6 sm:top-6 lg:right-8 lg:top-8"
             >
-              <Unplug
-                v-if="cloudSession.cloudSession"
-                class="size-3.5 text-[var(--color-text-subtle)]"
-              />
-              <Plug v-else class="size-3.5 text-[var(--color-text-subtle)]" />
-              {{ cloudConnectionActionLabel }}
-            </button>
-            <button
-              type="button"
-              class="inline-flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
-              @click="openCloudPage"
-            >
-              {{ t('dashboard.openCloudPage') }}
-            </button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-3 p-3 sm:p-4 md:grid-cols-3 md:gap-3">
-          <div
-            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 sm:p-4"
-          >
-            <div class="flex items-center gap-3">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 sm:size-10"
+              {{ t('dashboard.cloudCurrentVersion', { version: projectVersionLabel }) }}
+            </p>
+            <div class="pr-24 sm:pr-28">
+              <h1
+                class="text-2xl font-semibold leading-tight tracking-tight text-[var(--color-text-strong)] sm:text-3xl"
               >
-                <Monitor class="size-4 sm:size-5" />
-              </span>
-              <div class="min-w-0">
-                <p class="text-sm text-[var(--color-text-strong)]">
-                  {{ t('dashboard.cloudConnectionDevice') }}
-                </p>
-                <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
-                  {{ deviceName || t('dashboard.localDeviceUnavailable') }}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div
-            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 sm:p-4"
-          >
-            <div class="flex items-center gap-3">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 sm:size-10"
+                {{ t('dashboard.localHomeTitle') }}
+              </h1>
+              <p
+                class="mt-3 max-w-xl text-sm leading-6 text-[var(--color-text-muted)] sm:text-[15px] sm:leading-7"
               >
-                <User class="size-4 sm:size-5" />
-              </span>
-              <div class="min-w-0">
-                <p class="text-sm text-[var(--color-text-strong)]">
-                  {{ t('dashboard.localUser') }}
-                </p>
-                <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
-                  {{ localUserLabel }}
-                </p>
-              </div>
+                {{ t('dashboard.localLandingCopy') }}
+              </p>
             </div>
-          </div>
 
-          <div
-            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 sm:p-4"
-          >
-            <div class="flex items-center gap-3">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 sm:size-10"
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <RouterLink
+                :to="{ name: 'local-sessions' }"
+                class="button button-primary !rounded-xl h-11 w-full justify-center gap-1.5 px-4 text-sm sm:h-9 sm:w-auto sm:px-3"
               >
-                <Package class="size-4 sm:size-5" />
-              </span>
-              <div class="min-w-0">
-                <p class="text-sm text-[var(--color-text-strong)]">
-                  {{ t('dashboard.projectVersion') }}
-                </p>
-                <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
-                  {{ projectVersionLabel }}
-                </p>
-              </div>
+                {{ t('dashboard.localOpenWorkbench') }}
+                <ArrowRight class="size-3.5" />
+              </RouterLink>
+              <button
+                type="button"
+                class="button button-secondary !rounded-xl h-11 w-full justify-center gap-1.5 px-4 text-sm sm:h-9 sm:w-auto sm:px-3"
+                :disabled="
+                  connectingCloud ||
+                  (!cloudSession.cloudSession && !cloudAuth.cloudToken && !cloudConnectEnabled)
+                "
+                :title="cloudConnectionActionTitle"
+                @click="
+                  cloudSession.cloudSession
+                    ? disconnectLocalDeviceFromCloud()
+                    : connectLocalDeviceToCloud()
+                "
+              >
+                <Unplug v-if="cloudSession.cloudSession" class="size-3.5" />
+                <Plug v-else class="size-3.5" />
+                {{ cloudConnectionActionLabel }}
+              </button>
+              <button
+                type="button"
+                class="button button-secondary !rounded-xl h-11 w-full justify-center gap-1.5 px-4 text-sm sm:h-9 sm:w-auto sm:px-3"
+                @click="openCloudPage"
+              >
+                {{ t('dashboard.openCloudPage') }}
+              </button>
             </div>
-          </div>
+
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--color-text-muted)]">
+              <span class="inline-flex min-w-0 items-center gap-1.5">
+                <Monitor class="size-3.5 shrink-0 text-[var(--color-text-subtle)]" />
+                <span class="truncate">{{ deviceName || t('dashboard.localDeviceUnavailable') }}</span>
+              </span>
+              <span class="inline-flex min-w-0 items-center gap-1.5">
+                <span
+                  class="size-2 shrink-0 rounded-full"
+                  :class="cloudSession.cloudSession ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
+                />
+                <span class="truncate">
+                  {{
+                    cloudSession.cloudSession
+                      ? t('dashboard.localCloudConnected')
+                      : t('dashboard.localCloudDisconnected')
+                  }}
+                </span>
+              </span>
+            </div>
         </div>
       </section>
 
-      <section
-        class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
-      >
-        <div
-          class="flex flex-col gap-2 border-b border-[var(--color-border)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3.5"
+      <section class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
+        <section
+          class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
         >
-          <h2 class="text-base font-semibold text-[var(--color-text-strong)] sm:text-lg">
-            {{ t('dashboard.localWorkspaceListTitle') }}
-          </h2>
-          <RouterLink
-            :to="{ name: 'local-sessions' }"
-            class="inline-flex h-10 w-fit items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
+          <div
+            class="flex flex-col gap-2 border-b border-[var(--color-border)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3.5"
           >
-            <FolderOpen class="size-3.5" />
-            {{ t('dashboard.openWorkspaceList') }}
-          </RouterLink>
-        </div>
-
-        <PageStatus
-          class="min-w-0"
-          :loading="workspacesLoading"
-          :error="workspaceError || null"
-          :empty="!workspacesLoading && !workspaceError && workspaces.length === 0"
-          :loading-text="t('dashboard.loadingWorkspaces')"
-          :empty-text="t('dashboard.emptyWorkspaces')"
-        >
-          <template #loading>
-            <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
-              {{ t('dashboard.loadingWorkspaces') }}
-            </div>
-          </template>
-          <template #error>
-            <div class="px-3 py-4 text-sm text-[var(--color-danger-text)] sm:px-4 sm:py-5">
-              {{ workspaceError }}
-            </div>
-          </template>
-          <template #empty>
-            <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
-              {{ t('dashboard.emptyWorkspaces') }}
-            </div>
-          </template>
-          <ul class="divide-y divide-[var(--color-border)]">
-            <li
-              v-for="workspace in workspaces"
-              :key="workspace.id"
-              class="flex min-w-0 items-center justify-between gap-2 px-3 py-3 sm:gap-3 sm:px-4 sm:py-3.5"
+            <h2 class="text-base font-semibold text-[var(--color-text-strong)] sm:text-lg">
+              {{ t('dashboard.localWorkspaceListTitle') }}
+            </h2>
+            <RouterLink
+              :to="{ name: 'local-sessions' }"
+              class="inline-flex h-10 w-fit items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
             >
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                  <Folder class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
-                  <span class="truncate text-sm text-[var(--color-text-strong)]">
-                    {{ workspace.name }}
-                  </span>
-                </div>
-                <div
-                  class="mt-1 flex min-w-0 flex-col gap-0.5 pl-6 text-sm text-[var(--color-text-muted)] sm:flex-row sm:items-center sm:gap-3"
+              <FolderOpen class="size-3.5" />
+              {{ t('dashboard.openWorkspaceList') }}
+            </RouterLink>
+          </div>
+
+          <PageStatus
+            class="min-w-0"
+            :loading="workspacesLoading"
+            :error="workspaceError || null"
+            :empty="!workspacesLoading && !workspaceError && workspaces.length === 0"
+            :loading-text="t('dashboard.loadingWorkspaces')"
+            :empty-text="t('dashboard.emptyWorkspaces')"
+          >
+            <template #loading>
+              <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
+                {{ t('dashboard.loadingWorkspaces') }}
+              </div>
+            </template>
+            <template #error>
+              <div class="px-3 py-4 text-sm text-[var(--color-danger-text)] sm:px-4 sm:py-5">
+                {{ workspaceError }}
+              </div>
+            </template>
+            <template #empty>
+              <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
+                {{ t('dashboard.emptyWorkspaces') }}
+              </div>
+            </template>
+            <ul class="divide-y divide-[var(--color-border)]">
+              <li v-for="workspace in workspaces" :key="workspace.id">
+                <RouterLink
+                  :to="{ name: 'local-sessions' }"
+                  class="flex min-w-0 items-center justify-between gap-2 px-3 py-3 outline-none transition-colors hover:bg-[var(--color-control-hover)] focus-visible:bg-[var(--color-control-hover)] sm:gap-3 sm:px-4 sm:py-3.5"
                 >
-                  <span class="truncate">{{ workspace.path }}</span>
-                  <span class="shrink-0 text-xs sm:text-sm">
-                    {{ workspaceUpdatedAt(workspace.updated_at) }}
-                  </span>
-                </div>
-              </div>
-              <ArrowRight
-                class="size-5 shrink-0 text-[var(--color-text-subtle)]"
-                aria-hidden="true"
-              />
-            </li>
-          </ul>
-        </PageStatus>
-      </section>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <Folder class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
+                      <span class="truncate text-sm text-[var(--color-text-strong)]">
+                        {{ workspace.name }}
+                      </span>
+                    </div>
+                    <div
+                      class="mt-1 flex min-w-0 flex-col gap-0.5 pl-6 text-sm text-[var(--color-text-muted)] sm:flex-row sm:items-center sm:gap-3"
+                    >
+                      <span class="truncate">{{ workspace.path }}</span>
+                      <span class="shrink-0 text-xs sm:text-sm">
+                        {{ workspaceUpdatedAt(workspace.updated_at) }}
+                      </span>
+                    </div>
+                  </div>
+                  <ArrowRight
+                    class="size-5 shrink-0 text-[var(--color-text-subtle)]"
+                    aria-hidden="true"
+                  />
+                </RouterLink>
+              </li>
+            </ul>
+          </PageStatus>
+        </section>
 
-      <section
-        class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
-      >
-        <div
-          class="flex flex-col gap-2 border-b border-[var(--color-border)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3.5"
+        <section
+          class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
         >
-          <h2 class="text-base font-semibold text-[var(--color-text-strong)] sm:text-lg">
-            {{ t('shortcut.title') }}
-          </h2>
-          <RouterLink
-            :to="{ name: 'local-shortcuts' }"
-            class="inline-flex h-10 w-fit items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
+          <div
+            class="flex flex-col gap-2 border-b border-[var(--color-border)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3.5"
           >
-            <Command class="size-3.5" />
-            {{ t('common.more') }}
-          </RouterLink>
-        </div>
-
-        <PageStatus
-          class="min-w-0"
-          :loading="shortcutsLoading"
-          :error="shortcutError || null"
-          :empty="!shortcutsLoading && !shortcutError && shortcuts.length === 0"
-          :loading-text="t('shortcut.loading')"
-          :empty-text="t('shortcut.empty')"
-        >
-          <template #loading>
-            <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
-              {{ t('shortcut.loading') }}
-            </div>
-          </template>
-          <template #error>
-            <div class="px-3 py-4 text-sm text-[var(--color-danger-text)] sm:px-4 sm:py-5">
-              {{ shortcutError }}
-            </div>
-          </template>
-          <template #empty>
-            <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
-              {{ t('shortcut.empty') }}
-            </div>
-          </template>
-          <ul class="grid grid-cols-1 gap-px bg-[var(--color-border)] sm:grid-cols-2">
-            <li
-              v-for="shortcut in shortcuts"
-              :key="shortcut.id"
-              class="min-w-0 bg-[var(--color-surface)] px-3 py-3.5 text-left sm:px-4 sm:py-3"
+            <h2 class="text-base font-semibold text-[var(--color-text-strong)] sm:text-lg">
+              {{ t('shortcut.title') }}
+            </h2>
+            <RouterLink
+              :to="{ name: 'local-shortcuts' }"
+              class="inline-flex h-10 w-fit items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
             >
-              <p class="truncate text-sm font-semibold text-[var(--color-text-strong)]">
-                {{ shortcut.name }}
-              </p>
-              <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
-                {{ shortcut.command }}
-              </p>
-            </li>
-          </ul>
-        </PageStatus>
+              <Command class="size-3.5" />
+              {{ t('common.more') }}
+            </RouterLink>
+          </div>
+
+          <PageStatus
+            class="min-w-0"
+            :loading="shortcutsLoading"
+            :error="shortcutError || null"
+            :empty="!shortcutsLoading && !shortcutError && shortcuts.length === 0"
+            :loading-text="t('shortcut.loading')"
+            :empty-text="t('shortcut.empty')"
+          >
+            <template #loading>
+              <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
+                {{ t('shortcut.loading') }}
+              </div>
+            </template>
+            <template #error>
+              <div class="px-3 py-4 text-sm text-[var(--color-danger-text)] sm:px-4 sm:py-5">
+                {{ shortcutError }}
+              </div>
+            </template>
+            <template #empty>
+              <div class="px-3 py-4 text-sm text-[var(--color-text-muted)] sm:px-4 sm:py-5">
+                {{ t('shortcut.empty') }}
+              </div>
+            </template>
+            <ul class="divide-y divide-[var(--color-border)]">
+              <li v-for="shortcut in shortcuts" :key="shortcut.id">
+                <RouterLink
+                  :to="{ name: 'local-shortcuts' }"
+                  class="flex min-w-0 items-center justify-between gap-2 px-3 py-3 outline-none transition-colors hover:bg-[var(--color-control-hover)] focus-visible:bg-[var(--color-control-hover)] sm:gap-3 sm:px-4 sm:py-3.5"
+                >
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-semibold text-[var(--color-text-strong)]">
+                      {{ shortcut.name }}
+                    </p>
+                    <p class="mt-1 truncate text-sm text-[var(--color-text-muted)]">
+                      {{ shortcut.command }}
+                    </p>
+                  </div>
+                  <ArrowRight
+                    class="size-5 shrink-0 text-[var(--color-text-subtle)]"
+                    aria-hidden="true"
+                  />
+                </RouterLink>
+              </li>
+            </ul>
+          </PageStatus>
+        </section>
       </section>
     </div>
   </AppPageShell>
@@ -258,10 +254,8 @@
     Folder,
     FolderOpen,
     Monitor,
-    Package,
     Plug,
     Unplug,
-    User,
   } from '@lucide/vue'
   import { RouterLink } from 'vue-router'
   import AppPageShell from '../layout/AppPageShell.vue'
@@ -297,7 +291,6 @@
   const cloudAuth = useCloudAuthStore()
   const cloudSession = useCloudSessionStore()
   const notifications = useNotificationsStore()
-  const localUser = ref('')
   const localDevice = ref<DeviceSummary | null>(null)
   const workspaces = ref<Workspace[]>([])
   const workspaceError = ref('')
@@ -334,8 +327,7 @@
   const cloudUserDisplayName = computed(
     () => cloudAuth.user?.display_name || cloudAuth.user?.email || t('dashboard.signedIn'),
   )
-  const localUserLabel = computed(() => localUser.value || t('dashboard.todoLocalUser'))
-  const projectVersionLabel = computed(() => runtimeConfig.config.version)
+  const projectVersionLabel = computed(() => runtimeConfig.config.version.trim())
   const deviceName = computed(() => localDevice.value?.name || localDevice.value?.id || '')
 
   async function loadLocalHome() {
@@ -343,7 +335,6 @@
     shortcutError.value = ''
     try {
       const me = await agentStatus()
-      localUser.value = me.user?.display_name || me.user?.email || ''
       localDevice.value = me.device ?? null
       try {
         await reconcileCloudConnection(me.cloud_session ?? null)

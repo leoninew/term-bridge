@@ -113,8 +113,7 @@ const USER_CONFIGURATION = {
   'files.exclude': {
     '**/.git': true,
   },
-  // 'window.title': 'TermBridge${separator}${dirty}${activeEditorShort}',
-  'window.title': '${activeEditorShort}',
+  'window.title': 'TermBridge${separator}${dirty}${activeEditorShort}',
 }
 
 type WorkbenchBootstrapState = WorkbenchInitializationState & {
@@ -341,7 +340,7 @@ async function initializeWorkbench(container: HTMLElement): Promise<void> {
   }
 
   await Promise.all([
-    initUserConfiguration(JSON.stringify(USER_CONFIGURATION, null, 2)),
+    initUserConfiguration(JSON.stringify(USER_CONFIGURATION, null, 2), { overwrite: true }),
     initUserKeybindings('[]'),
   ])
 
