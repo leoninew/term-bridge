@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	clouddb "gitee.com/leoninew/TermBridge-go/internal/cloud/infrastructure/database"
 	authmodel "gitee.com/leoninew/TermBridge-go/internal/cloud/model/user/auth"
@@ -179,7 +178,7 @@ func TestLoginReturnsLastLoginUpdateError(t *testing.T) {
 
 func newAuthServiceForTest(db *sql.DB, sender EmailSender) *Service {
 	repo := repository.New(db, "sqlite")
-	return New(repo, sharedauth.NewTokenService([]byte("0123456789abcdef0123456789abcdef")), Config{PasswordPolicy: PasswordPolicy{MinLength: 8, MaxLength: 128}, Code: CodePolicy{Length: 6, Ttl: 2 * time.Minute, ResendCooldown: 0, MaxAttempts: 5}}, sender, NewProviderRegistry())
+	return New(repo, sharedauth.NewTokenService([]byte("0123456789abcdef0123456789abcdef")), DefaultConfig(), sender, NewProviderRegistry())
 }
 
 func openAuthServiceTestDB(t *testing.T) *sql.DB {
@@ -262,7 +261,7 @@ func TestExternalLoginAllowsSameEmailAcrossProviders(t *testing.T) {
 	repo := repository.New(db, "sqlite")
 	github := testExternalProvider{id: repository.ProviderGitHub, identity: ExternalIdentity{Provider: repository.ProviderGitHub, Subject: "1001", Email: "same@example.test", EmailVerified: true}}
 	google := testExternalProvider{id: repository.ProviderGoogle, identity: ExternalIdentity{Provider: repository.ProviderGoogle, Subject: "google-subject", Email: "same@example.test", EmailVerified: true}}
-	service := New(repo, sharedauth.NewTokenService([]byte("0123456789abcdef0123456789abcdef")), Config{PasswordPolicy: PasswordPolicy{MinLength: 8, MaxLength: 128}, Code: CodePolicy{Length: 6, Ttl: 2 * time.Minute, MaxAttempts: 5}}, nil, NewProviderRegistry(github, google))
+	service := New(repo, sharedauth.NewTokenService([]byte("0123456789abcdef0123456789abcdef")), DefaultConfig(), nil, NewProviderRegistry(github, google))
 
 	githubState := externalProviderState(t, service, repository.ProviderGitHub)
 	githubLogin, err := service.ExternalCallback(context.Background(), repository.ProviderGitHub, "github-code", githubState)

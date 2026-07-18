@@ -1,7 +1,6 @@
 package shortcut
 
 import (
-	"errors"
 	"strings"
 	"time"
 )
@@ -26,10 +25,10 @@ func (value *Shortcut) Normalize() error {
 	value.Id = strings.TrimSpace(value.Id)
 	value.Name = strings.TrimSpace(value.Name)
 	if value.Name == "" {
-		return errors.New("shortcut name is required")
+		return NameRequired()
 	}
 	if strings.TrimSpace(value.Command) == "" {
-		return errors.New("shortcut command is required")
+		return CommandRequired()
 	}
 	value.Description = normalizeOptionalText(value.Description)
 	value.Icon = normalizeOptionalText(value.Icon)

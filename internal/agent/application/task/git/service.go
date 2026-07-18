@@ -209,7 +209,7 @@ func validLayer(value gitmodel.Layer) bool {
 
 func validatePathMutationRequest(request gitmodel.PathMutationRequest) error {
 	if _, err := filemodel.ParseRelativePath(request.Path, false); err != nil || !validLayer(request.Layer) {
-		return errors.New("invalid Git path mutation")
+		return gitmodel.InvalidOperation()
 	}
 	switch request.Mutation {
 	case gitmodel.MutationStage:
@@ -229,7 +229,7 @@ func validatePathMutationRequest(request gitmodel.PathMutationRequest) error {
 			return nil
 		}
 	}
-	return errors.New("invalid Git path mutation")
+	return gitmodel.InvalidOperation()
 }
 
 func (s *Service) repositoryLock(ctx context.Context, root string) (repositoryLock, gitmodel.State, error) {

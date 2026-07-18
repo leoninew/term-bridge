@@ -56,7 +56,7 @@ func (r *SessionRuntime) attach() (*Client, error) {
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
-		return nil, fmt.Errorf("session is closed")
+		return nil, session.Closed()
 	}
 	id, err := idgen.New()
 	if err != nil {
@@ -77,7 +77,7 @@ func (r *SessionRuntime) attach() (*Client, error) {
 	if r.closed {
 		r.mu.Unlock()
 		client.closeQueue()
-		return nil, fmt.Errorf("session is closed")
+		return nil, session.Closed()
 	}
 	r.clients[id] = client
 	r.attachment = attachment
@@ -87,7 +87,7 @@ func (r *SessionRuntime) attach() (*Client, error) {
 }
 
 func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentState) error {
-	r.registry.logger.Info("terminal replay enqueue start", "session_id", r.session.Id, "client_id", client.Id())
+	r.registry.logger.Debug("terminal replay enqueue start", "session_id", r.session.Id, "client_id", client.Id())
 	if !client.enqueue(Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeStarted, SessionId: r.session.Id, WorkspaceId: r.session.WorkspaceId, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(attachment)}}) {
 		return fmt.Errorf("client queue full")
 	}
@@ -104,7 +104,7 @@ func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentStat
 	}
 	replayFinished := Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeReplayFinished, Truncated: &truncated}}
 	if len(data) > 0 {
-		r.registry.logger.Info("terminal replay enqueue history", "session_id", r.session.Id, "client_id", client.Id(), "bytes", len(data), "truncated", truncated)
+		r.registry.logger.Debug("terminal replay enqueue history", "session_id", r.session.Id, "client_id", client.Id(), "bytes", len(data), "truncated", truncated)
 		if !r.enqueueReplayChunks(client, data, replayFinished) {
 			truncated = true
 			r.registry.logger.Warn("terminal replay truncated by client queue", "session_id", r.session.Id, "client_id", client.Id(), "queued_bytes", client.QueuedBytes(), "queue_bytes", r.registry.clientQueueBytes)
@@ -113,7 +113,7 @@ func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentStat
 	if !client.enqueue(replayFinished) {
 		return fmt.Errorf("client queue full")
 	}
-	r.registry.logger.Info("terminal replay enqueue finish", "session_id", r.session.Id, "client_id", client.Id(), "queued_bytes", client.QueuedBytes(), "truncated", truncated)
+	r.registry.logger.Debug("terminal replay enqueue finish", "session_id", r.session.Id, "client_id", client.Id(), "queued_bytes", client.QueuedBytes(), "truncated", truncated)
 	return nil
 }
 

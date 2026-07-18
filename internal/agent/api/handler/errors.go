@@ -15,6 +15,8 @@ import (
 
 	filemodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/file"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
+	runtimeerr "gitee.com/leoninew/TermBridge-go/internal/shared/common/runtimeerr"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 	tunnel "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
@@ -111,27 +113,44 @@ func (h *Handler) writeRuntimeError(w http.ResponseWriter, r *http.Request, err 
 func runtimeErrorResponse(err error) (int, string, string) {
 	var remote *tunnel.RemoteError
 	if errors.As(err, &remote) && remote.Response != nil {
-		return fileErrorResponse(remote.Response.GetCode(), remote.Response.GetError())
+		return domainErrorResponse(remote.Response.GetCode(), remote.Response.GetError())
 	}
-	var fileErr *filemodel.Error
-	if errors.As(err, &fileErr) {
-		return fileErrorResponse(fileErr.Code, fileErr.Message)
+	var typed runtimeerr.Error
+	if errors.As(err, &typed) {
+		return domainErrorResponse(typed.RuntimeErrorCode(), typed.RuntimeErrorMessage())
+	}
+	var appErr *apperrors.Error
+	if errors.As(err, &appErr) {
+		switch appErr.Kind {
+		case apperrors.KindNotFound:
+			return http.StatusNotFound, errorCodeNotFound, errorMessageNotFound
+		case apperrors.KindUsage:
+			message := strings.TrimSpace(appErr.Msg)
+			if message == "" {
+				message = errorMessageBadRequest
+			}
+			return http.StatusBadRequest, errorCodeBadRequest, message
+		case apperrors.KindConfig:
+			return http.StatusBadRequest, errorCodeBadRequest, errorMessageBadRequest
+		}
 	}
 	return http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream
 }
 
-func fileErrorResponse(code string, message string) (int, string, string) {
+func domainErrorResponse(code string, message string) (int, string, string) {
 	if message == "" {
 		message = errorMessageInternal
 	}
 	switch code {
-	case "invalid_file_path", "invalid_git_layer", "invalid_operation", "root_protected":
+	case "invalid_file_path", "invalid_git_layer", "invalid_git_operation", "invalid_operation", "root_protected", "missing_session_name", "missing_session_command", "shortcut_id_required", "shortcut_name_required", "shortcut_command_required", "invalid_session_command_shape", "invalid_session_command_source", "session_command_source_requires_command", "session_update_requires_fields", "invalid_terminal_size", "invalid_session_cwd", "session_ids_required", "workspace_ids_required", "duplicate_session_id", "duplicate_workspace_id":
 		return http.StatusBadRequest, code, message
-	case "workspace_not_found", "file_not_found":
+	case "workspace_not_found", "file_not_found", "session_not_found", "session_not_attachable", "shortcut_not_found":
 		return http.StatusNotFound, code, message
+	case "session_closed", "session_not_editable", "session_already_running", "cannot_rerun_running_session", "cannot_delete_running_session", "cannot_delete_workspace_with_running_sessions", "shortcut_disabled":
+		return http.StatusConflict, code, message
 	case "revision_conflict", "already_exists", "directory_not_empty":
 		return http.StatusConflict, code, message
-	case "workspace_root_unavailable", "file_not_text", "file_too_large", "type_mismatch", "symlink_unsupported":
+	case "workspace_root_unavailable", "file_not_text", "file_too_large", "type_mismatch", "symlink_unsupported", "precondition_required":
 		return http.StatusUnprocessableEntity, code, message
 	default:
 		return http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream

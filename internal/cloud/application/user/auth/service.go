@@ -30,6 +30,13 @@ import (
 const (
 	PurposeEmailVerification = "email_verification"
 	PurposePasswordReset     = "password_reset"
+
+	defaultPasswordMinLength  = 8
+	defaultPasswordMaxLength  = 128
+	defaultCodeLength         = 6
+	defaultCodeTTL            = 2 * time.Minute
+	defaultCodeResendCooldown = 1 * time.Minute
+	defaultCodeMaxAttempts    = 3
 )
 
 var (
@@ -71,7 +78,25 @@ type Service struct {
 	providers ProviderRegistry
 }
 
+func DefaultConfig() Config {
+	return Config{
+		PasswordPolicy: PasswordPolicy{MinLength: defaultPasswordMinLength, MaxLength: defaultPasswordMaxLength},
+		Code: CodePolicy{
+			Length:         defaultCodeLength,
+			Ttl:            defaultCodeTTL,
+			ResendCooldown: defaultCodeResendCooldown,
+			MaxAttempts:    defaultCodeMaxAttempts,
+		},
+	}
+}
+
 func New(repo *repository.Repository, tokens sharedauth.TokenService, cfg Config, sender EmailSender, providers ProviderRegistry) *Service {
+	if cfg.PasswordPolicy.MinLength == 0 && cfg.PasswordPolicy.MaxLength == 0 {
+		cfg.PasswordPolicy = DefaultConfig().PasswordPolicy
+	}
+	if cfg.Code.Length == 0 {
+		cfg.Code = DefaultConfig().Code
+	}
 	return &Service{repo: repo, tokens: tokens, cfg: cfg, sender: sender, providers: providers}
 }
 

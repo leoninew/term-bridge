@@ -18,6 +18,7 @@ import (
 	filemodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/file"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	runtimeerr "gitee.com/leoninew/TermBridge-go/internal/shared/common/runtimeerr"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 	tunnel "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
@@ -403,16 +404,16 @@ func HandleRuntimeRequest(ctx context.Context, runtimeAccess RuntimeAccess, fram
 	}
 }
 
-type RuntimeError interface {
-	error
-	RuntimeErrorCode() string
-}
-
 func runtimeErrorFrame(streamId string, requestId string, err error) *shared.TunnelFrame {
 	response := &shared.ErrorResp{Code: "runtime_error", Error: "Runtime request failed.", RequestId: requestId}
-	var typed RuntimeError
+	var typed runtimeerr.Error
 	if errors.As(err, &typed) {
-		response.Code = typed.RuntimeErrorCode()
+		if code := strings.TrimSpace(typed.RuntimeErrorCode()); code != "" {
+			response.Code = code
+		}
+		if message := strings.TrimSpace(typed.RuntimeErrorMessage()); message != "" {
+			response.Error = message
+		}
 	}
 	response.Details = fileConflictDetails(err)
 	return &shared.TunnelFrame{StreamId: streamId, RequestId: requestId, Payload: &shared.TunnelFrame_Error{Error: response}}

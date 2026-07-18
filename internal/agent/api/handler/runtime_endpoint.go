@@ -252,7 +252,7 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 	cols, rows, hasAttachSize, sizeErr := terminalAttachSizeFromQuery(r)
 	if sizeErr != nil {
 		s.config.Logger.Warn("terminal attach size invalid", "workspace_id", workspaceId, "session_id", sessionId, "error", sizeErr)
-		_ = writeTerminalControl(conn, &agent.ServerControlMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: sizeErr.Error()})
+		_ = writeTerminalControl(conn, &agent.ServerControlMessage{Type: terminalproto.TypeError, Code: terminalproto.ErrorCodeBadControl, Message: terminalproto.ErrorMessageBadControl})
 		return nil
 	}
 
@@ -283,7 +283,8 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 			case websocket.MessageText:
 				message, err := terminalproto.DecodeClient(data)
 				if err != nil {
-					_ = writeTerminalControl(conn, &agent.ServerControlMessage{Type: terminalproto.TypeError, Code: "bad_control", Message: err.Error()})
+					s.config.Logger.Warn("terminal control decode failed", "workspace_id", workspaceId, "session_id", sessionId, "error", err)
+					_ = writeTerminalControl(conn, &agent.ServerControlMessage{Type: terminalproto.TypeError, Code: terminalproto.ErrorCodeBadControl, Message: terminalproto.ErrorMessageBadControl})
 					continue
 				}
 				switch message.Type {

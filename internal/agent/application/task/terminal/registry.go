@@ -175,7 +175,7 @@ func (r *Registry) workspaceForCreateSession(workspaceId string, cwd string) (wo
 		ws, err := r.store.LoadWorkspace(workspaceId)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				return workspace.Workspace{}, apperrors.NotFound("workspace not found", err)
+				return workspace.Workspace{}, session.WorkspaceNotFound()
 			}
 			return workspace.Workspace{}, apperrors.Runtime("load workspace", err)
 		}
@@ -192,14 +192,14 @@ func (r *Registry) workspaceForCreateSession(workspaceId string, cwd string) (wo
 func (r *Registry) CreateSession(ctx context.Context, request *agent.CreateSessionReq) (*agent.CreateSessionResp, error) {
 	name := strings.TrimSpace(request.GetName())
 	if name == "" {
-		return nil, apperrors.Usage("missing session name")
+		return nil, session.MissingName()
 	}
 	command := request.GetCommand()
 	if len(command) != 1 {
-		return nil, apperrors.Usage("session command must contain one raw command text")
+		return nil, session.InvalidCommandShape()
 	}
 	if strings.TrimSpace(command[0]) == "" {
-		return nil, apperrors.Usage("missing session command")
+		return nil, session.MissingCommand()
 	}
 	commandText := command[0]
 	cwd := request.GetCwd()
@@ -211,13 +211,13 @@ func (r *Registry) CreateSession(ctx context.Context, request *agent.CreateSessi
 		return nil, err
 	}
 	if info, err := os.Stat(absCwd); err != nil {
-		return nil, apperrors.Config("invalid session cwd", err)
+		return nil, session.InvalidCwd()
 	} else if !info.IsDir() {
-		return nil, apperrors.Config("invalid session cwd", fmt.Errorf("not a directory"))
+		return nil, session.InvalidCwd()
 	}
 	size := process.TerminalSize{Cols: int(request.GetCols()), Rows: int(request.GetRows())}.OrDefault()
 	if err := terminalproto.ValidateSize(size.Cols, size.Rows); err != nil {
-		return nil, apperrors.Usage(err.Error())
+		return nil, session.InvalidSize()
 	}
 	r.logger.Info("terminal session create request", "name", name, "cwd", absCwd, "command_length", len(commandText), "cols", size.Cols, "rows", size.Rows)
 
@@ -237,7 +237,7 @@ func (r *Registry) CreateSession(ctx context.Context, request *agent.CreateSessi
 		ShortcutNameSnapshot: request.GetShortcutNameSnapshot(),
 	}
 	if !commandRecord.ValidSource() {
-		return nil, apperrors.Usage("invalid session command source")
+		return nil, session.InvalidCommandSource()
 	}
 	if err := r.validateShortcutCommand(commandRecord); err != nil {
 		return nil, err
@@ -276,12 +276,12 @@ func (r *Registry) RerunSession(ctx context.Context, workspaceId string, session
 		return nil, err
 	}
 	if !session.Terminal(view.State.State) {
-		return nil, apperrors.Usage("cannot rerun running session")
+		return nil, session.CannotRerunRunning()
 	}
 	commandText := commandTextFromSession(view.Session)
 	if strings.TrimSpace(commandText) == "" {
 		r.saveSessionFailed(view.Session, "missing_rerun_command")
-		return nil, apperrors.Usage("missing session command")
+		return nil, session.MissingCommand()
 	}
 	if err := validateSessionCwd(view.Session.LaunchCwd); err != nil {
 		r.saveSessionFailed(view.Session, "invalid_rerun_cwd")
@@ -289,7 +289,7 @@ func (r *Registry) RerunSession(ctx context.Context, workspaceId string, session
 	}
 	size := process.TerminalSize{Cols: int(request.GetCols()), Rows: int(request.GetRows())}.OrDefault()
 	if err := terminalproto.ValidateSize(size.Cols, size.Rows); err != nil {
-		return nil, apperrors.Usage(err.Error())
+		return nil, session.InvalidSize()
 	}
 	if err := r.claimSessionStart(sessionId); err != nil {
 		return nil, err
@@ -382,7 +382,7 @@ func (r *Registry) claimSessionStart(sessionId string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.runtimes[sessionId] != nil || r.launching[sessionId] {
-		return apperrors.Usage("session already running")
+		return session.AlreadyRunning()
 	}
 	r.launching[sessionId] = true
 	return nil
@@ -424,12 +424,12 @@ func commandTextFromSession(sess session.Session) string {
 
 func validateSessionCwd(cwd string) error {
 	if strings.TrimSpace(cwd) == "" {
-		return apperrors.Config("invalid session cwd", fmt.Errorf("missing cwd"))
+		return session.InvalidCwd()
 	}
 	if info, err := os.Stat(cwd); err != nil {
-		return apperrors.Config("invalid session cwd", err)
+		return session.InvalidCwd()
 	} else if !info.IsDir() {
-		return apperrors.Config("invalid session cwd", fmt.Errorf("not a directory"))
+		return session.InvalidCwd()
 	}
 	return nil
 }
@@ -477,7 +477,7 @@ func (r *Registry) Attach(workspaceId string, sessionId string) (*Client, error)
 	runtime := r.runtimes[sessionId]
 	r.mu.Unlock()
 	if runtime == nil || runtime.session.WorkspaceId != workspaceId {
-		return nil, apperrors.Runtime("session not attachable", fmt.Errorf("live PTY handle not found for %s/%s", workspaceId, sessionId))
+		return nil, session.NotAttachable()
 	}
 	return runtime.attach()
 }
@@ -558,7 +558,7 @@ func (r *Registry) ListSessionsByWorkspaceId(workspaceId string) ([]*agent.Sessi
 	views, _, err := r.store.ListSessionsByWorkspaceId(workspaceId)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, apperrors.NotFound("workspace not found", err)
+			return nil, session.WorkspaceNotFound()
 		}
 		return nil, apperrors.Runtime("list workspace sessions", err)
 	}
@@ -567,18 +567,18 @@ func (r *Registry) ListSessionsByWorkspaceId(workspaceId string) ([]*agent.Sessi
 
 func (r *Registry) UpdateSessionOrder(workspaceId string, sessionIds []string) ([]*agent.SessionSummary, error) {
 	if len(sessionIds) == 0 {
-		return nil, apperrors.Usage("session_ids is required")
+		return nil, session.SessionIDsRequired()
 	}
 	views, _, err := r.store.UpdateSessionOrder(workspaceId, sessionIds, time.Now().UTC())
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			if strings.Contains(err.Error(), "session_id") {
-				return nil, apperrors.NotFound("session not found", err)
+				return nil, session.NotFound()
 			}
-			return nil, apperrors.NotFound("workspace not found", err)
+			return nil, session.WorkspaceNotFound()
 		}
 		if strings.Contains(err.Error(), "duplicate session_id") {
-			return nil, apperrors.Usage(err.Error())
+			return nil, session.DuplicateSessionID()
 		}
 		return nil, apperrors.Runtime("update session order", err)
 	}
@@ -587,24 +587,24 @@ func (r *Registry) UpdateSessionOrder(workspaceId string, sessionIds []string) (
 
 func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *agent.UpdateSessionReq) (*agent.SessionSummary, error) {
 	if request == nil || (request.Name == nil && request.Command == nil) {
-		return nil, apperrors.Usage("session update requires name or command")
+		return nil, session.UpdateRequiresFields()
 	}
 	var name string
 	if request.Name != nil {
 		name = strings.TrimSpace(request.GetName())
 		if name == "" {
-			return nil, apperrors.Usage("missing session name")
+			return nil, session.MissingName()
 		}
 	}
 	commandSourceProvided := request.CommandSource != nil || request.ShortcutIdSnapshot != nil || request.ShortcutNameSnapshot != nil
 	if request.Command == nil && commandSourceProvided {
-		return nil, apperrors.Usage("session command source requires command")
+		return nil, session.CommandSourceRequiresCommand()
 	}
 	var commandText string
 	if request.Command != nil {
 		commandText = request.GetCommand()
 		if strings.TrimSpace(commandText) == "" {
-			return nil, apperrors.Usage("missing session command")
+			return nil, session.MissingCommand()
 		}
 	}
 	view, err := r.sessionView(workspaceId, sessionId)
@@ -612,7 +612,7 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 		return nil, err
 	}
 	if !session.Terminal(view.State.State) {
-		return nil, apperrors.Usage("only stopped or failed sessions can be edited")
+		return nil, session.NotEditable()
 	}
 	if request.Command != nil && commandSourceProvided {
 		if err := r.validateShortcutCommand(session.CommandRecord{
@@ -632,7 +632,7 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 				value.Command.ShortcutIdSnapshot = request.GetShortcutIdSnapshot()
 				value.Command.ShortcutNameSnapshot = request.GetShortcutNameSnapshot()
 				if !value.Command.ValidSource() {
-					return apperrors.Usage("invalid session command source")
+					return session.InvalidCommandSource()
 				}
 			}
 			value.Command.Command = commandText
@@ -642,7 +642,7 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "no longer terminal") {
-			return nil, apperrors.Usage("only stopped or failed sessions can be edited")
+			return nil, session.NotEditable()
 		}
 		return nil, apperrors.Runtime("update session", err)
 	}
@@ -657,7 +657,7 @@ func (r *Registry) validateShortcutCommand(command session.CommandRecord) error 
 	}
 	shortcutId := strings.TrimSpace(command.ShortcutIdSnapshot)
 	if shortcutId == "" {
-		return apperrors.Usage("shortcut id is required")
+		return shortcutmodel.IDRequired()
 	}
 	if r.shortcutStore == nil {
 		return apperrors.Runtime("list shortcuts", errors.New("shortcut store is required"))
@@ -673,9 +673,9 @@ func (r *Registry) validateShortcutCommand(command session.CommandRecord) error 
 		if shortcut.Enabled == nil || *shortcut.Enabled {
 			return nil
 		}
-		return apperrors.Usage("shortcut is disabled")
+		return shortcutmodel.Disabled()
 	}
-	return apperrors.Usage("shortcut not found")
+	return shortcutmodel.NotFound()
 }
 
 func (r *Registry) DeleteSession(workspaceId string, sessionId string) error {
@@ -684,7 +684,7 @@ func (r *Registry) DeleteSession(workspaceId string, sessionId string) error {
 		return err
 	}
 	if r.hasRuntime(sessionId) || !session.Terminal(view.State.State) {
-		return apperrors.Usage("cannot delete running session")
+		return session.CannotDeleteRunning()
 	}
 	if err := r.store.DeleteSession(workspaceId, sessionId); err != nil {
 		return apperrors.Runtime("delete session", err)
@@ -694,15 +694,15 @@ func (r *Registry) DeleteSession(workspaceId string, sessionId string) error {
 
 func (r *Registry) UpdateWorkspaceOrder(workspaceIds []string) ([]*agent.Workspace, error) {
 	if len(workspaceIds) == 0 {
-		return nil, apperrors.Usage("workspace_ids is required")
+		return nil, workspace.IDsRequired()
 	}
 	updated, err := r.store.UpdateWorkspaceOrder(workspaceIds, time.Now().UTC())
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, apperrors.NotFound("workspace not found", err)
+			return nil, session.WorkspaceNotFound()
 		}
 		if strings.Contains(err.Error(), "duplicate workspace_id") {
-			return nil, apperrors.Usage(err.Error())
+			return nil, workspace.DuplicateID()
 		}
 		return nil, apperrors.Runtime("update workspace order", err)
 	}
@@ -717,7 +717,7 @@ func (r *Registry) DeleteWorkspace(workspaceId string) error {
 	ws, err := r.store.FindWorkspaceById(workspaceId)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return apperrors.NotFound("workspace not found", err)
+			return session.WorkspaceNotFound()
 		}
 		return apperrors.Runtime("load workspace", err)
 	}
@@ -727,7 +727,7 @@ func (r *Registry) DeleteWorkspace(workspaceId string) error {
 	}
 	for _, view := range views {
 		if r.hasRuntime(view.Session.Id) || !session.Terminal(view.State.State) {
-			return apperrors.Usage("cannot delete workspace with running sessions")
+			return workspace.CannotDeleteWithRunningSessions()
 		}
 	}
 	if err := r.store.DeleteWorkspace(ws.Id); err != nil {
@@ -750,7 +750,7 @@ func (r *Registry) History(workspaceId string, sessionId string) ([]byte, error)
 	r.mu.Unlock()
 	if runtime != nil {
 		if runtime.session.WorkspaceId != workspaceId {
-			return nil, apperrors.NotFound("session not found", os.ErrNotExist)
+			return nil, session.NotFound()
 		}
 		if err := runtime.history.Flush(); err != nil {
 			return nil, apperrors.Runtime("flush history", err)
@@ -772,15 +772,15 @@ func (r *Registry) History(workspaceId string, sessionId string) ([]byte, error)
 func resolveSessionCwd(path string) (string, error) {
 	path, err := expandHome(path)
 	if err != nil {
-		return "", apperrors.Config("resolve session cwd", err)
+		return "", session.InvalidCwd()
 	}
 	abs, err := filepath.Abs(path)
 	if err != nil {
-		return "", apperrors.Config("resolve session cwd", err)
+		return "", session.InvalidCwd()
 	}
 	resolved, err := filepath.EvalSymlinks(abs)
 	if err != nil {
-		return "", apperrors.Config("resolve session cwd", err)
+		return "", session.InvalidCwd()
 	}
 	return filepath.Clean(resolved), nil
 }
@@ -818,7 +818,7 @@ func (r *Registry) sessionView(workspaceId string, sessionId string) (session.Vi
 	views, _, err := r.store.ListSessionsByWorkspaceId(workspaceId)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return session.View{}, apperrors.NotFound("workspace not found", err)
+			return session.View{}, session.WorkspaceNotFound()
 		}
 		return session.View{}, apperrors.Runtime("list workspace sessions", err)
 	}
@@ -827,7 +827,7 @@ func (r *Registry) sessionView(workspaceId string, sessionId string) (session.Vi
 			return view, nil
 		}
 	}
-	return session.View{}, apperrors.NotFound("session not found", nil)
+	return session.View{}, session.NotFound()
 }
 
 func (r *Registry) summariesFromViews(views []session.View) []*agent.SessionSummary {

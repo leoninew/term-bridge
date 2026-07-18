@@ -44,19 +44,19 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 
 	deviceRepository := clouddevice.NewRepository(db.DB, db.Driver)
 	repo := cloudauthrepo.New(db.DB, db.Driver)
-	tokens, err := sharedauth.NewTokenServiceFromBase64Key(cfg.Jwt.SecretKey, cfg.Auth.JwtTTL)
+	tokens, err := sharedauth.NewTokenServiceFromBase64Key(cfg.Cloud.Jwt.SecretKey, cfg.Cloud.Jwt.Ttl)
 	if err != nil {
-		return apperrors.Config("invalid jwt.secret_key", err)
+		return apperrors.Config("invalid cloud.jwt.secret_key", err)
 	}
 	expectedHostname, err := validateTurnstileConfig(cfg.Environment, cfg.Cloud)
 	if err != nil {
 		return apperrors.Config("invalid cloud.turnstile", err)
 	}
 	providers := cloudauth.NewProviderRegistry(
-		cloudauth.NewOAuthGoogleClient(cloudauth.GoogleConfig{ClientId: cfg.Auth.Google.ClientId, ClientSecret: cfg.Auth.Google.ClientSecret, RedirectUrl: cfg.Auth.Google.RedirectUrl}),
-		cloudauth.NewOAuthGitHubClient(cloudauth.GitHubConfig{ClientId: cfg.Auth.GitHub.ClientId, ClientSecret: cfg.Auth.GitHub.ClientSecret, RedirectUrl: cfg.Auth.GitHub.RedirectUrl}),
+		cloudauth.NewOAuthGoogleClient(cloudauth.GoogleConfig{ClientId: cfg.Cloud.Google.ClientId, ClientSecret: cfg.Cloud.Google.ClientSecret, RedirectUrl: cfg.Cloud.Google.RedirectUrl}),
+		cloudauth.NewOAuthGitHubClient(cloudauth.GitHubConfig{ClientId: cfg.Cloud.GitHub.ClientId, ClientSecret: cfg.Cloud.GitHub.ClientSecret, RedirectUrl: cfg.Cloud.GitHub.RedirectUrl}),
 	)
-	authService := cloudauth.New(repo, tokens, cloudauth.Config{PasswordPolicy: cloudauth.PasswordPolicy{MinLength: cfg.Auth.PasswordPolicy.MinLength, MaxLength: cfg.Auth.PasswordPolicy.MaxLength}, Code: cloudauth.CodePolicy{Length: cfg.Auth.Code.Length, Ttl: cfg.Auth.Code.Ttl, ResendCooldown: cfg.Auth.Code.ResendCooldown, MaxAttempts: cfg.Auth.Code.MaxAttempts}}, cloudemail.NewResendSender(cloudemail.Config{ApiKey: cfg.Resend.ApiKey, FromEmail: cfg.Resend.FromEmail}), providers)
+	authService := cloudauth.New(repo, tokens, cloudauth.DefaultConfig(), cloudemail.NewResendSender(cloudemail.Config{ApiKey: cfg.Cloud.Resend.ApiKey, FromEmail: cfg.Cloud.Resend.FromEmail}), providers)
 	cloudHandler := cloudapi.New(cloudapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, AgentTunnelAudience: cfg.Cloud.ApiBaseUrl, DeviceRepository: cloudapi.NewDeviceRepository(deviceRepository), CloudPublicURL: cfg.Cloud.PublicURL, CloudOAuth: cloudapi.CloudOAuthConfig{Clients: cloudOAuthClients(cfg.Cloud.OAuth.Clients)}, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, Turnstile: cloudapi.TurnstileConfig{SiteKey: cfg.Cloud.Turnstile.SiteKey, SecretKey: cfg.Cloud.Turnstile.SecretKey, ExpectedHostname: expectedHostname, Verify: cloudapi.NewTurnstileVerifier(cfg.Cloud.Turnstile.SecretKey, expectedHostname, nil)}, CSRF: cloudapi.CSRFConfig{Tokens: cloudapi.NewCSRFTokens(10*time.Minute, 1024)}})
 	return serveHTTP(ctx, cfg, logger, options, cloudHandler, stdout)
 }

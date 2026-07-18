@@ -21,7 +21,6 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/agent/model/task/workspace"
 	"gitee.com/leoninew/TermBridge-go/internal/agent/repository/task/state"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
-	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 )
 
@@ -108,8 +107,8 @@ func TestCreateSessionRejectsDisabledShortcut(t *testing.T) {
 		ShortcutIdSnapshot:   "shortcut-1",
 		ShortcutNameSnapshot: "Disabled shortcut",
 	})
-	if err == nil || apperrors.KindOf(err) != apperrors.KindUsage {
-		t.Fatalf("CreateSession() error = %v, want usage error", err)
+	if err == nil || shortcutmodel.CodeOf(err) != shortcutmodel.CodeDisabled {
+		t.Fatalf("CreateSession() error = %v, want shortcut_disabled", err)
 	}
 }
 
@@ -124,8 +123,8 @@ func TestCreateSessionRejectsMissingShortcut(t *testing.T) {
 		ShortcutIdSnapshot:   "shortcut-1",
 		ShortcutNameSnapshot: "Missing shortcut",
 	})
-	if err == nil || apperrors.KindOf(err) != apperrors.KindUsage {
-		t.Fatalf("CreateSession() error = %v, want usage error", err)
+	if err == nil || shortcutmodel.CodeOf(err) != shortcutmodel.CodeNotFound {
+		t.Fatalf("CreateSession() error = %v, want shortcut_not_found", err)
 	}
 }
 
@@ -138,8 +137,8 @@ func TestCreateSessionRejectsInvalidCommandSourceSnapshot(t *testing.T) {
 		Command:       []string{"go version"},
 		CommandSource: string(session.CommandSourceShortcut),
 	})
-	if err == nil || apperrors.KindOf(err) != apperrors.KindUsage {
-		t.Fatalf("CreateSession() error = %v, want usage error", err)
+	if err == nil || session.CodeOf(err) != session.CodeInvalidCommandSource {
+		t.Fatalf("CreateSession() error = %v, want invalid_session_command_source", err)
 	}
 }
 
@@ -505,10 +504,10 @@ func TestCreateSessionRejectsMultipleCommandElements(t *testing.T) {
 
 	_, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{Name: "Split command", Command: []string{"ccs", "list"}})
 	if err == nil {
-		t.Fatal("CreateSession() error = nil, want usage error")
+		t.Fatal("CreateSession() error = nil, want invalid command shape")
 	}
-	if !apperrors.IsUsage(err) {
-		t.Fatalf("CreateSession() error kind = %s, want usage", apperrors.KindOf(err))
+	if session.CodeOf(err) != session.CodeInvalidCommandShape {
+		t.Fatalf("CreateSession() error = %v, want invalid_session_command_shape", err)
 	}
 }
 
@@ -576,8 +575,8 @@ func TestUpdateSessionRejectsDisabledShortcut(t *testing.T) {
 	commandSource := string(session.CommandSourceShortcut)
 	shortcutId := "shortcut-1"
 	_, err = registry.UpdateSession(created.WorkspaceId, created.SessionId, &agent.UpdateSessionReq{Command: &command, CommandSource: &commandSource, ShortcutIdSnapshot: &shortcutId})
-	if err == nil || apperrors.KindOf(err) != apperrors.KindUsage {
-		t.Fatalf("UpdateSession() error = %v, want usage error", err)
+	if err == nil || shortcutmodel.CodeOf(err) != shortcutmodel.CodeDisabled {
+		t.Fatalf("UpdateSession() error = %v, want shortcut_disabled", err)
 	}
 	stored, err := state.NewStore(root).LoadSession(created.WorkspaceId, created.SessionId)
 	if err != nil {

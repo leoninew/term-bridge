@@ -23,6 +23,19 @@ const (
 	TypeError          = "error"
 	TypePong           = "pong"
 
+	ErrorCodeBadControl    = "bad_control"
+	ErrorMessageBadControl = "Terminal control message is invalid."
+
+	// Device disconnect reasons observed by Cloud and mapped to browser-safe terminal errors.
+	DisconnectReasonDeviceDisconnected = "device disconnected"
+	DisconnectReasonDeviceReconnected  = "device reconnected"
+	DisconnectReasonDeviceDeleted      = "device deleted"
+
+	ErrorCodeDeviceDisconnected    = "device_disconnected"
+	ErrorMessageDeviceDisconnected = "Device disconnected."
+	ErrorMessageDeviceReconnected  = "Device reconnected."
+	ErrorMessageDeviceDeleted      = "Device was removed."
+
 	MaxJSONMessageBytes = 16 * 1024
 	MaxBinaryFrameBytes = 1024 * 1024
 	MinCols             = 1
@@ -124,5 +137,17 @@ func validateServer(message *terminal.ServerControlMessage) error {
 		return nil
 	default:
 		return fmt.Errorf("unknown server message type %q", message.Type)
+	}
+}
+
+// BrowserDisconnectError maps an internal disconnect reason to a browser-safe terminal error.
+func BrowserDisconnectError(reason string) (code string, message string) {
+	switch reason {
+	case DisconnectReasonDeviceReconnected:
+		return ErrorCodeDeviceDisconnected, ErrorMessageDeviceReconnected
+	case DisconnectReasonDeviceDeleted:
+		return ErrorCodeDeviceDisconnected, ErrorMessageDeviceDeleted
+	default:
+		return ErrorCodeDeviceDisconnected, ErrorMessageDeviceDisconnected
 	}
 }

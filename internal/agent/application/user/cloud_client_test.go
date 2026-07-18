@@ -2,10 +2,17 @@ package application
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	terminalapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/task/terminal"
+	filemodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/file"
+	gitmodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/git"
+	sessionmodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/session"
+	shortcutmodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/shortcut"
+	workspacemodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/workspace"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	tunnel "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
@@ -183,5 +190,92 @@ func TestTunnelUrlUsesConfiguredAPIBasePath(t *testing.T) {
 				t.Fatalf("tunnelUrl(%q) = %q, want %q", tc.base, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestRuntimeErrorFramePreservesFileBusinessMessage(t *testing.T) {
+	err := filemodel.NewError("directory_not_empty", "The directory is not empty.")
+	frame := runtimeErrorFrame("stream-1", "request-1", err)
+	response := frame.GetError()
+	if response == nil {
+		t.Fatal("expected error payload")
+	}
+	if response.GetCode() != "directory_not_empty" {
+		t.Fatalf("code = %q, want directory_not_empty", response.GetCode())
+	}
+	if response.GetError() != "The directory is not empty." {
+		t.Fatalf("error = %q, want business message", response.GetError())
+	}
+	if response.GetRequestId() != "request-1" || frame.GetStreamId() != "stream-1" {
+		t.Fatalf("correlation = stream=%q request=%q", frame.GetStreamId(), response.GetRequestId())
+	}
+}
+
+func TestRuntimeErrorFrameKeepsGenericMessageForUntypedErrors(t *testing.T) {
+	frame := runtimeErrorFrame("stream-2", "request-2", fmt.Errorf("open /secret/path: access denied"))
+	response := frame.GetError()
+	if response == nil {
+		t.Fatal("expected error payload")
+	}
+	if response.GetCode() != "runtime_error" {
+		t.Fatalf("code = %q, want runtime_error", response.GetCode())
+	}
+	if response.GetError() != "Runtime request failed." {
+		t.Fatalf("error = %q, want generic message", response.GetError())
+	}
+	if strings.Contains(response.GetError(), "/secret/path") {
+		t.Fatalf("internal path leaked: %q", response.GetError())
+	}
+}
+
+func TestRuntimeErrorFramePreservesRevisionConflictDetails(t *testing.T) {
+	err := filemodel.Conflict(&filemodel.Entry{Path: filemodel.RelativePath("notes.txt"), Name: "notes.txt", Kind: filemodel.EntryKindFile, Size: 12, Revision: "rev-1"})
+	frame := runtimeErrorFrame("stream-3", "request-3", err)
+	response := frame.GetError()
+	if response == nil || response.GetCode() != "revision_conflict" {
+		t.Fatalf("response = %#v", response)
+	}
+	if response.GetError() != "The workspace entry changed." {
+		t.Fatalf("error = %q", response.GetError())
+	}
+	if response.GetDetails() == nil {
+		t.Fatal("expected revision conflict details")
+	}
+}
+
+func TestRuntimeErrorFramePreservesSessionBusinessMessage(t *testing.T) {
+	frame := runtimeErrorFrame("stream-session", "request-session", sessionmodel.NotAttachable())
+	response := frame.GetError()
+	if response.GetCode() != sessionmodel.CodeNotAttachable || response.GetError() != "Session is not attachable." {
+		t.Fatalf("response = %#v", response)
+	}
+}
+
+func TestRuntimeErrorFramePreservesGitBusinessMessage(t *testing.T) {
+	frame := runtimeErrorFrame("stream-git", "request-git", gitmodel.InvalidOperation())
+	response := frame.GetError()
+	if response.GetCode() != gitmodel.CodeInvalidOperation || response.GetError() != "The Git operation is invalid." {
+		t.Fatalf("response = %#v", response)
+	}
+}
+
+func TestRuntimeErrorFramePreservesSessionP1Catalog(t *testing.T) {
+	frame := runtimeErrorFrame("stream-p1", "request-p1", sessionmodel.CannotDeleteRunning())
+	response := frame.GetError()
+	if response.GetCode() != sessionmodel.CodeCannotDeleteRunning || response.GetError() != "A running session cannot be deleted." {
+		t.Fatalf("response = %#v", response)
+	}
+}
+
+func TestRuntimeErrorFramePreservesWorkspaceAndShortcutCatalog(t *testing.T) {
+	frame := runtimeErrorFrame("stream-ws", "request-ws", workspacemodel.CannotDeleteWithRunningSessions())
+	response := frame.GetError()
+	if response.GetCode() != workspacemodel.CodeCannotDeleteWithRunningSessions {
+		t.Fatalf("workspace response = %#v", response)
+	}
+	frame = runtimeErrorFrame("stream-sc", "request-sc", shortcutmodel.Disabled())
+	response = frame.GetError()
+	if response.GetCode() != shortcutmodel.CodeDisabled || response.GetError() != "Shortcut is disabled." {
+		t.Fatalf("shortcut response = %#v", response)
 	}
 }
