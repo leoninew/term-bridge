@@ -1,5 +1,7 @@
 # TermBridge
 
+**中文** | [English](README.en.md)
+
 **TermBridge** 是一个本地优先、可远程访问的 Workspace Runtime 平台。
 
 它把你在某一台设备上运行的 CLI、Shell、构建与调试任务，整理成可管理、可恢复、可在浏览器中继续操作的工作流。浏览器负责查看与交互，命令仍然真实运行在设备本地的 runtime 上。
@@ -93,4 +95,4 @@ termbridge cloud   # Cloud 服务
 
 ## License
 
-License 待定。
+[MIT](LICENSE)

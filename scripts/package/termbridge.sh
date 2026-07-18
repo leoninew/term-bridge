@@ -1,12 +1,9 @@
 #!/usr/bin/env sh
 set -eu
 cd "$(dirname "$0")"
-: "${TERMBRIDGE_ENV:=prod}"
+: "${TERMBRIDGE_ENV:=preflite}"
 export TERMBRIDGE_ENV
-profile=.env.prod
-if [ "$TERMBRIDGE_ENV" = test ]; then
-  profile=.env.test
-fi
+profile=.env.preflite
 
 if [ ! -f "$profile" ]; then
   printf '%s\n' "$profile is missing" >&2
@@ -17,10 +14,8 @@ set -a
 . "./$profile"
 set +a
 
-if [ -z "${TERMBRIDGE_LOCAL__PUBLIC_URL:-}" ]; then
-  printf '%s\n' "TERMBRIDGE_LOCAL__PUBLIC_URL is not set in $profile" >&2
-  exit 1
-fi
+: "${TERMBRIDGE_LOCAL__PUBLIC_URL:=http://localhost:9030}"
+export TERMBRIDGE_LOCAL__PUBLIC_URL
 
 if command -v cygstart >/dev/null 2>&1; then
   cygstart "$TERMBRIDGE_LOCAL__PUBLIC_URL" || true
