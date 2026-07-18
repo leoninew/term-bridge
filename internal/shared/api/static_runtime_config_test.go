@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/rand"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -184,6 +185,77 @@ func TestStaticHandlerCompressesAndCachesHashedAssets(t *testing.T) {
 	handler.ServeHTTP(nm, nmReq)
 	if nm.Code != http.StatusNotModified {
 		t.Fatalf("If-None-Match status = %d, want 304", nm.Code)
+	}
+}
+
+func TestStaticHandlerETagMatchesActualEncodingWhenGzipDoesNotShrink(t *testing.T) {
+	staticDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("<!doctype html><!-- __RUNTIME_CONFIG__ -->"), 0o644); err != nil {
+		t.Fatalf("WriteFile(index): %v", err)
+	}
+	assetsDir := filepath.Join(staticDir, "assets")
+	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	// High-entropy payload so runtime gzip does not shrink below the original size.
+	payload := make([]byte, minCompressBytes+256)
+	if _, err := rand.Read(payload); err != nil {
+		t.Fatalf("rand.Read: %v", err)
+	}
+	// Double-check the invariant this test relies on.
+	var check bytes.Buffer
+	zw, err := gzip.NewWriterLevel(&check, gzip.BestSpeed)
+	if err != nil {
+		t.Fatalf("gzip.NewWriterLevel: %v", err)
+	}
+	if _, err := zw.Write(payload); err != nil {
+		t.Fatalf("gzip write: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+	if check.Len() < len(payload) {
+		t.Fatalf("test setup: random payload unexpectedly compressible (%d < %d)", check.Len(), len(payload))
+	}
+	assetName := "noise-AbCdEf12.js"
+	if err := os.WriteFile(filepath.Join(assetsDir, assetName), payload, 0o644); err != nil {
+		t.Fatalf("WriteFile(asset): %v", err)
+	}
+
+	handler := StaticHandler(staticDir, browserdto.RuntimeConfig{})
+	req := httptest.NewRequest(http.MethodGet, "/assets/"+assetName, nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding = %q, want empty (identity)", got)
+	}
+	etag := rec.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("missing ETag")
+	}
+	if strings.Contains(etag, "-gzip") {
+		t.Fatalf("ETag = %q includes -gzip for identity body", etag)
+	}
+	if !bytes.Equal(rec.Body.Bytes(), payload) {
+		t.Fatal("identity body mismatch")
+	}
+
+	// Conditional request with the identity ETag must 304.
+	nmReq := httptest.NewRequest(http.MethodGet, "/assets/"+assetName, nil)
+	nmReq.Header.Set("Accept-Encoding", "gzip")
+	nmReq.Header.Set("If-None-Match", etag)
+	nm := httptest.NewRecorder()
+	handler.ServeHTTP(nm, nmReq)
+	if nm.Code != http.StatusNotModified {
+		t.Fatalf("If-None-Match status = %d, want 304", nm.Code)
+	}
+	if got := nm.Header().Get("ETag"); got != etag {
+		t.Fatalf("304 ETag = %q, want %q", got, etag)
 	}
 }
 

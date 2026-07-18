@@ -103,18 +103,36 @@ func contentTypeForPath(urlPath string) string {
 
 func serveStaticFile(w http.ResponseWriter, r *http.Request, fullPath, urlPath string, info os.FileInfo) {
 	// Range + gzip is awkward; keep identity for partial reads.
-	useGzip := r.Header.Get("Range") == "" &&
+	wantGzip := r.Header.Get("Range") == "" &&
 		acceptsGzip(r) &&
 		shouldCompressStatic(urlPath, info.Size())
 
 	modTime := info.ModTime()
-	etag := staticETag(info, useGzip)
+
+	// Resolve the encoding that will actually be served before computing ETag,
+	// so conditional requests match the body encoding.
+	var (
+		usingGzip         bool
+		gzipBody          []byte
+		precompressedPath string
+	)
+	if wantGzip {
+		if candidate := fullPath + ".gz"; fileExists(candidate) {
+			usingGzip = true
+			precompressedPath = candidate
+		} else if body, ok := loadOrBuildGzipBody(fullPath, info); ok {
+			usingGzip = true
+			gzipBody = body
+		}
+	}
+
+	etag := staticETag(info, usingGzip)
 
 	w.Header().Set("Cache-Control", cacheControlForStaticURLPath(urlPath))
 	w.Header().Set("Content-Type", contentTypeForPath(urlPath))
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Last-Modified", modTime.UTC().Format(http.TimeFormat))
-	if useGzip {
+	if usingGzip {
 		w.Header().Set("Vary", "Accept-Encoding")
 	}
 
@@ -127,21 +145,19 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, fullPath, urlPath s
 		return
 	}
 
-	if useGzip {
-		if precompressed := fullPath + ".gz"; fileExists(precompressed) {
-			servePrecompressedGzip(w, r, precompressed)
+	if usingGzip {
+		if precompressedPath != "" {
+			servePrecompressedGzip(w, r, precompressedPath)
 			return
 		}
-		if body, ok := loadOrBuildGzipBody(fullPath, info); ok {
-			w.Header().Set("Content-Encoding", "gzip")
-			w.Header().Set("Content-Length", strconv.Itoa(len(body)))
-			w.WriteHeader(http.StatusOK)
-			if r.Method == http.MethodHead {
-				return
-			}
-			_, _ = w.Write(body)
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Content-Length", strconv.Itoa(len(gzipBody)))
+		w.WriteHeader(http.StatusOK)
+		if r.Method == http.MethodHead {
 			return
 		}
+		_, _ = w.Write(gzipBody)
+		return
 	}
 
 	w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
@@ -154,7 +170,7 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, fullPath, urlPath s
 		http.Error(w, "file unavailable", http.StatusInternalServerError)
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, _ = io.Copy(w, f)
 }
 
@@ -174,7 +190,7 @@ func servePrecompressedGzip(w http.ResponseWriter, r *http.Request, gzPath strin
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, _ = io.Copy(w, f)
 }
 
