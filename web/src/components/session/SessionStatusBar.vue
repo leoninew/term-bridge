@@ -23,9 +23,23 @@
       </span>
     </template>
     <span v-else>{{ t('workbench.noActiveSession') }}</span>
-    <span v-if="deviceLabel" class="ml-auto min-w-0 truncate text-[var(--color-text)]">
-      {{ deviceLabel }}
-    </span>
+
+    <div class="ml-auto flex min-w-0 shrink-0 items-center gap-3">
+      <span v-if="deviceLabel" class="min-w-0 truncate text-[var(--color-text)]">
+        {{ deviceLabel }}
+      </span>
+      <span
+        v-if="showCloudConnection"
+        class="inline-flex shrink-0 items-center gap-1.5"
+        :title="cloudConnectionLabel"
+      >
+        <span
+          class="size-2 shrink-0 rounded-full"
+          :class="cloudConnected ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
+        />
+        <span class="truncate text-[var(--color-text)]">{{ cloudConnectionLabel }}</span>
+      </span>
+    </div>
   </footer>
 </template>
 
@@ -33,17 +47,26 @@
   import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
+  import { useCloudSessionStore } from '../../store/cloudSession'
   import SessionSourceIcon from './SessionSourceIcon.vue'
   import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
 
-  const props = defineProps<{
-    session: SessionSummary | null
-    device: DeviceSummary | CloudSessionSummary | null
-  }>()
+  const props = withDefaults(
+    defineProps<{
+      session: SessionSummary | null
+      device: DeviceSummary | CloudSessionSummary | null
+      showCloudConnection?: boolean
+    }>(),
+    {
+      showCloudConnection: false,
+    },
+  )
 
   const { t } = useI18n()
+  const cloudSession = useCloudSessionStore()
+
   const commandSourceLabel = computed(() =>
     props.session?.command_source === 'shortcut'
       ? t('dialog.shortcut')
@@ -55,4 +78,10 @@
     }
     return 'name' in props.device ? props.device.name : props.device.device_name
   })
+  const cloudConnected = computed(() => !!cloudSession.cloudSession)
+  const cloudConnectionLabel = computed(() =>
+    cloudConnected.value
+      ? t('dashboard.localCloudConnected')
+      : t('dashboard.localCloudDisconnected'),
+  )
 </script>

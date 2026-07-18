@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <AppPageShell
     main-class="flex flex-col overflow-y-auto px-3 py-4 text-sm sm:px-5 sm:py-6 md:px-6 md:py-8"
   >
@@ -7,7 +7,7 @@
         :authenticated="cloudAuth.authenticated"
         :user-display-name="cloudUserDisplayName"
         :user-email="cloudAuth.user?.email ?? ''"
-        :show-change-password="true"
+        :can-change-password="cloudAuth.user?.provider === 'email'"
         @login="openCloudLogin"
         @logout="logoutCloud"
         @change-password="openChangePassword"
@@ -16,81 +16,69 @@
 
     <div class="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-4 sm:gap-5">
       <section
-        class="relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+        class="relative min-h-[240px] overflow-hidden rounded-2xl border border-[var(--color-border)] shadow-xl sm:min-h-[280px]"
       >
         <div
-          class="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-blue-500/10 blur-3xl"
+          class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          :style="{ backgroundImage: `url(${cloudHomeBgUrl})` }"
           aria-hidden="true"
         />
         <div
-          class="pointer-events-none absolute -bottom-24 -left-10 size-56 rounded-full bg-cyan-400/5 blur-3xl"
+          class="absolute inset-0 bg-gradient-to-r from-[var(--color-surface)] via-[var(--color-surface)]/88 to-[var(--color-surface)]/35"
           aria-hidden="true"
         />
 
-        <div
-          class="relative grid items-stretch gap-0 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"
-        >
-          <div
-            class="relative flex min-h-[220px] items-center justify-center self-stretch p-4 sm:min-h-[260px] sm:p-6 lg:min-h-full lg:p-8"
+        <div class="relative flex min-h-[240px] items-center p-4 sm:min-h-[280px] sm:p-6 lg:p-8">
+          <span
+            v-if="projectVersionLabel"
+            class="home-version-tag absolute right-4 top-4 sm:right-6 sm:top-6 lg:right-8 lg:top-8"
+            :title="t('dashboard.cloudCurrentVersion', { version: projectVersionLabel })"
           >
-            <p
-              v-if="projectVersionLabel"
-              class="absolute right-4 top-4 text-xs text-[var(--color-text-subtle)] sm:right-6 sm:top-6 lg:right-8 lg:top-8"
-            >
-              {{ t('dashboard.cloudCurrentVersion', { version: projectVersionLabel }) }}
-            </p>
-
-            <div class="flex w-full max-w-sm flex-col items-start gap-5 text-left">
-              <div class="w-full">
-                <h1
-                  class="text-2xl font-semibold leading-tight tracking-tight text-[var(--color-text-strong)] sm:text-3xl"
-                >
-                  {{ landingTitle }}
-                </h1>
-                <p
-                  class="mt-3 text-sm leading-6 text-[var(--color-text-muted)] sm:text-[15px] sm:leading-7"
-                >
-                  {{ landingCopy }}
-                </p>
-              </div>
-
-              <div class="flex flex-row flex-wrap items-center justify-start gap-2">
-                <button
-                  v-if="!cloudAuth.authenticated"
-                  type="button"
-                  class="button button-primary !rounded-xl h-11 justify-center gap-1.5 px-4 text-sm sm:h-9 sm:px-3"
-                  :disabled="cloudAuthLoading"
-                  @click="openCloudLogin"
-                >
-                  {{ cloudAuthLoading ? t('cloud.checkingAuth') : t('dashboard.cloudSignInCta') }}
-                  <ArrowRight class="size-3.5" />
-                </button>
-                <RouterLink
-                  v-else
-                  :to="{ name: 'cloud-dashboard' }"
-                  class="button button-primary !rounded-xl h-11 justify-center gap-1.5 px-4 text-sm sm:h-9 sm:px-3"
-                >
-                  {{ t('dashboard.viewDeviceStatus') }}
-                  <ArrowRight class="size-3.5" />
-                </RouterLink>
-                <button
-                  v-if="runtimeConfig.config.local.mode === 'hybrid'"
-                  type="button"
-                  class="button button-secondary !rounded-xl h-11 justify-center gap-1.5 px-4 text-sm sm:h-9 sm:px-3"
-                  @click="openLocalEntry"
-                >
-                  {{ t('dashboard.openLocalPage') }}
-                </button>
-              </div>
+            <Tag class="home-version-tag-icon" aria-hidden="true" />
+            <span class="home-version-tag-text">{{ projectVersionLabel }}</span>
+          </span>
+          <div class="relative max-w-md flex flex-col items-start gap-5 text-left">
+            <div class="w-full">
+              <h1
+                class="text-2xl font-semibold leading-tight tracking-tight text-[var(--color-text-strong)] sm:text-3xl"
+              >
+                {{ landingTitle }}
+              </h1>
+              <p
+                class="mt-3 text-sm leading-6 text-[var(--color-text-muted)] sm:text-[15px] sm:leading-7"
+              >
+                {{ landingCopy }}
+              </p>
             </div>
-          </div>
 
-          <div class="relative border-t border-[var(--color-border)] p-3 sm:p-4 lg:border-t-0 lg:p-5">
-            <ImageCarousel
-              :slides="heroSlides"
-              :aria-label="t('dashboard.cloudHeroImageAlt')"
-              frame-class="relative h-[200px] w-full sm:h-[240px] lg:h-[260px]"
-            />
+            <div class="flex flex-row flex-wrap items-center justify-start gap-2">
+              <button
+                v-if="!cloudAuth.authenticated"
+                type="button"
+                class="button button-primary !rounded-xl h-11 justify-center gap-1.5 px-4 text-sm sm:h-9 sm:px-3"
+                :disabled="cloudAuthLoading"
+                @click="openCloudLogin"
+              >
+                {{ cloudAuthLoading ? t('cloud.checkingAuth') : t('dashboard.cloudSignInCta') }}
+                <ArrowRight class="size-3.5" />
+              </button>
+              <RouterLink
+                v-else
+                :to="{ name: 'cloud-dashboard' }"
+                class="button button-primary !rounded-xl h-11 justify-center gap-1.5 px-4 text-sm sm:h-9 sm:px-3"
+              >
+                {{ t('dashboard.viewDeviceStatus') }}
+                <ArrowRight class="size-3.5" />
+              </RouterLink>
+              <button
+                v-if="runtimeConfig.config.local.mode === 'hybrid'"
+                type="button"
+                class="button button-secondary !rounded-xl h-11 justify-center gap-1.5 px-4 text-sm sm:h-9 sm:px-3"
+                @click="openLocalEntry"
+              >
+                {{ t('dashboard.openLocalPage') }}
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -101,7 +89,7 @@
           :key="step.title"
           class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-xl sm:p-5"
         >
-          <div class="flex items-start gap-3">
+          <div class="inline-flex max-w-full flex-nowrap items-center gap-2">
             <span
               class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 sm:size-10"
             >
@@ -120,9 +108,7 @@
       </section>
     </div>
 
-    <footer
-      class="mt-6 shrink-0 pb-1 text-center text-xs text-[var(--color-text-subtle)] sm:mt-8"
-    >
+    <footer class="mt-6 shrink-0 pb-1 text-center text-xs text-[var(--color-text-subtle)] sm:mt-8">
       <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
         <span>{{ t('dashboard.cloudFooterCopyright', { year: 2026 }) }}</span>
         <a
@@ -147,12 +133,10 @@
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { ArrowRight, Cloud, Monitor, SquareTerminal } from '@lucide/vue'
+  import { ArrowRight, Cloud, Monitor, SquareTerminal, Tag } from '@lucide/vue'
   import { RouterLink, useRouter } from 'vue-router'
   import AppPageShell from '../layout/AppPageShell.vue'
-  import ImageCarousel from '../layout/ImageCarousel.vue'
-  import cloudHomeHero1Url from '../../assets/cloud-home-hero-1.jpg'
-  import cloudHomeHero2Url from '../../assets/cloud-home-hero-2.jpg'
+  import cloudHomeBgUrl from '../../assets/cloud-home-bg.jpg'
   import CloudAccountMenu from './CloudAccountMenu.vue'
   import { authLogout } from '../../features/cloud/api'
   import { useCloudAuthStore } from '../../store/cloudAuth'
@@ -172,15 +156,8 @@
 
   const projectVersionLabel = computed(() => runtimeConfig.config.version.trim())
 
-  const heroSlides = computed(() => [
-    { src: cloudHomeHero1Url },
-    { src: cloudHomeHero2Url },
-  ])
-
   const landingTitle = computed(() =>
-    cloudAuth.authenticated
-      ? t('dashboard.cloudLandingWelcome')
-      : t('dashboard.cloudLandingTitle'),
+    cloudAuth.authenticated ? t('dashboard.cloudLandingWelcome') : t('dashboard.cloudLandingTitle'),
   )
 
   const landingCopy = computed(() =>

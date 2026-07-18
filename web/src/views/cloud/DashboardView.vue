@@ -7,7 +7,7 @@
         :authenticated="cloudAuth.authenticated"
         :user-display-name="userDisplayName"
         :user-email="cloudAuth.user?.email ?? ''"
-        :show-change-password="true"
+        :can-change-password="cloudAuth.user?.provider === 'email'"
         @login="openCloudLogin"
         @logout="logoutCloud"
         @change-password="openChangePassword"
@@ -125,7 +125,6 @@
         </PageStatus>
       </section>
     </div>
-
   </AppPageShell>
 
   <DeleteDeviceDialog

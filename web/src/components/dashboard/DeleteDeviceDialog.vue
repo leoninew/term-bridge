@@ -4,7 +4,9 @@
       <AlertDialogOverlay class="dialog-overlay" />
       <AlertDialogContent class="dialog-content">
         <div class="dialog-header">
-          <AlertDialogTitle class="dialog-title">{{ t('dialog.deleteDeviceTitle') }}</AlertDialogTitle>
+          <AlertDialogTitle class="dialog-title">{{
+            t('dialog.deleteDeviceTitle')
+          }}</AlertDialogTitle>
           <AlertDialogDescription class="dialog-description">
             {{
               t('dialog.deleteDeviceDescription', {

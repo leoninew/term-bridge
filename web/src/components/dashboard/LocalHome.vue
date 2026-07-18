@@ -14,38 +14,42 @@
 
     <div class="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-4 sm:gap-5">
       <section
-        class="relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+        class="relative min-h-[240px] overflow-hidden rounded-2xl border border-[var(--color-border)] shadow-xl sm:min-h-[280px]"
       >
         <div
-          class="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-blue-500/10 blur-3xl"
+          class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          :style="{ backgroundImage: `url(${homeBgUrl})` }"
           aria-hidden="true"
         />
         <div
-          class="pointer-events-none absolute -bottom-24 -left-10 size-56 rounded-full bg-cyan-400/5 blur-3xl"
+          class="absolute inset-0 bg-gradient-to-r from-[var(--color-surface)] via-[var(--color-surface)]/88 to-[var(--color-surface)]/35"
           aria-hidden="true"
         />
 
-        <div class="relative flex flex-col gap-5 p-4 sm:gap-6 sm:p-6 lg:p-8">
-            <p
-              v-if="projectVersionLabel"
-              class="absolute right-4 top-4 text-xs text-[var(--color-text-subtle)] sm:right-6 sm:top-6 lg:right-8 lg:top-8"
+        <div
+          class="relative flex min-h-[240px] flex-col justify-center p-4 sm:min-h-[280px] sm:p-6 lg:p-8"
+        >
+          <span
+            v-if="projectVersionLabel"
+            class="home-version-tag absolute right-4 top-4 sm:right-6 sm:top-6 lg:right-8 lg:top-8"
+            :title="t('dashboard.cloudCurrentVersion', { version: projectVersionLabel })"
+          >
+            <Tag class="home-version-tag-icon" aria-hidden="true" />
+            <span class="home-version-tag-text">{{ projectVersionLabel }}</span>
+          </span>
+          <div class="relative max-w-md">
+            <h1
+              class="text-2xl font-semibold leading-tight tracking-tight text-[var(--color-text-strong)] sm:text-3xl"
             >
-              {{ t('dashboard.cloudCurrentVersion', { version: projectVersionLabel }) }}
+              {{ t('dashboard.localHomeTitle') }}
+            </h1>
+            <p
+              class="mt-3 text-sm leading-6 text-[var(--color-text-muted)] sm:text-[15px] sm:leading-7"
+            >
+              {{ t('dashboard.localLandingCopy') }}
             </p>
-            <div class="pr-24 sm:pr-28">
-              <h1
-                class="text-2xl font-semibold leading-tight tracking-tight text-[var(--color-text-strong)] sm:text-3xl"
-              >
-                {{ t('dashboard.localHomeTitle') }}
-              </h1>
-              <p
-                class="mt-3 max-w-xl text-sm leading-6 text-[var(--color-text-muted)] sm:text-[15px] sm:leading-7"
-              >
-                {{ t('dashboard.localLandingCopy') }}
-              </p>
-            </div>
 
-            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <div class="mt-5 flex flex-col gap-2 sm:mt-6 sm:flex-row sm:flex-wrap sm:items-center">
               <RouterLink
                 :to="{ name: 'local-sessions' }"
                 class="button button-primary !rounded-xl h-11 w-full justify-center gap-1.5 px-4 text-sm sm:h-9 sm:w-auto sm:px-3"
@@ -58,16 +62,16 @@
                 class="button button-secondary !rounded-xl h-11 w-full justify-center gap-1.5 px-4 text-sm sm:h-9 sm:w-auto sm:px-3"
                 :disabled="
                   connectingCloud ||
-                  (!cloudSession.cloudSession && !cloudAuth.cloudToken && !cloudConnectEnabled)
+                  (!localCloud.connected && !cloudAuth.cloudToken && !cloudConnectEnabled)
                 "
                 :title="cloudConnectionActionTitle"
                 @click="
-                  cloudSession.cloudSession
+                  localCloud.connected
                     ? disconnectLocalDeviceFromCloud()
                     : connectLocalDeviceToCloud()
                 "
               >
-                <Unplug v-if="cloudSession.cloudSession" class="size-3.5" />
+                <Unplug v-if="localCloud.connected" class="size-3.5" />
                 <Plug v-else class="size-3.5" />
                 {{ cloudConnectionActionLabel }}
               </button>
@@ -80,25 +84,30 @@
               </button>
             </div>
 
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--color-text-muted)]">
+            <div
+              class="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--color-text-muted)] sm:mt-6"
+            >
               <span class="inline-flex min-w-0 items-center gap-1.5">
                 <Monitor class="size-3.5 shrink-0 text-[var(--color-text-subtle)]" />
-                <span class="truncate">{{ deviceName || t('dashboard.localDeviceUnavailable') }}</span>
+                <span class="truncate">{{
+                  deviceName || t('dashboard.localDeviceUnavailable')
+                }}</span>
               </span>
               <span class="inline-flex min-w-0 items-center gap-1.5">
                 <span
                   class="size-2 shrink-0 rounded-full"
-                  :class="cloudSession.cloudSession ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
+                  :class="localCloud.connected ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
                 />
                 <span class="truncate">
                   {{
-                    cloudSession.cloudSession
+                    localCloud.connected
                       ? t('dashboard.localCloudConnected')
                       : t('dashboard.localCloudDisconnected')
                   }}
                 </span>
               </span>
             </div>
+          </div>
         </div>
       </section>
 
@@ -157,13 +166,8 @@
                         {{ workspace.name }}
                       </span>
                     </div>
-                    <div
-                      class="mt-1 flex min-w-0 flex-col gap-0.5 pl-6 text-sm text-[var(--color-text-muted)] sm:flex-row sm:items-center sm:gap-3"
-                    >
-                      <span class="truncate">{{ workspace.path }}</span>
-                      <span class="shrink-0 text-xs sm:text-sm">
-                        {{ workspaceUpdatedAt(workspace.updated_at) }}
-                      </span>
+                    <div class="mt-1 min-w-0 pl-6 text-sm text-[var(--color-text-muted)]">
+                      <span class="truncate block">{{ workspace.path }}</span>
                     </div>
                   </div>
                   <ArrowRight
@@ -248,48 +252,27 @@
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import {
-    ArrowRight,
-    Command,
-    Folder,
-    FolderOpen,
-    Monitor,
-    Plug,
-    Unplug,
-  } from '@lucide/vue'
+  import { ArrowRight, Command, Folder, FolderOpen, Monitor, Plug, Tag, Unplug } from '@lucide/vue'
   import { RouterLink } from 'vue-router'
   import AppPageShell from '../layout/AppPageShell.vue'
+  import homeBgUrl from '../../assets/cloud-home-bg.jpg'
   import PageStatus from '../layout/PageStatus.vue'
   import { useAsyncAction } from '../../composable/useAsyncAction'
+  import { useLocalCloudConnection } from '../../composable/useLocalCloudConnection'
   import CloudAccountMenu from './CloudAccountMenu.vue'
-  import {
-    agentStatus,
-    connectCloudWithToken,
-    disconnectCloud,
-    listShortcuts,
-    listWorkspaces,
-  } from '../../features/local/api'
-  import {
-    applyCloudConnectionTime,
-    clearCloudConnectionTime,
-    cloudOAuthConfigured,
-    hasCloudConnectionTime,
-    markCloudConnected,
-    startCloudOAuth,
-  } from '../../features/cloud/oauth'
+  import { listShortcuts, listWorkspaces } from '../../features/local/api'
+  import { startCloudOAuth } from '../../features/cloud/oauth'
   import type { Shortcut } from '../../gen/proto/termbridge/agent/v1/shortcut'
   import type { Workspace } from '../../gen/proto/termbridge/agent/v1/workspace'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
-  import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
   import { useCloudAuthStore } from '../../store/cloudAuth'
-  import { useCloudSessionStore } from '../../store/cloudSession'
   import { useRuntimeConfigStore } from '../../store/runtimeConfig'
   import { useNotificationsStore } from '../../store/notifications'
 
   const { t } = useI18n()
   const runtimeConfig = useRuntimeConfigStore()
   const cloudAuth = useCloudAuthStore()
-  const cloudSession = useCloudSessionStore()
+  const localCloud = useLocalCloudConnection()
   const notifications = useNotificationsStore()
   const localDevice = ref<DeviceSummary | null>(null)
   const workspaces = ref<Workspace[]>([])
@@ -308,19 +291,17 @@
       notifications.notifyError(t('toast.loadShortcutsFailed'), err)
     },
   })
-  const cloudAction = useAsyncAction()
   const workspacesLoading = computed(() => workspacesAction.running)
   const shortcutsLoading = computed(() => shortcutsAction.running)
-  const connectingCloud = computed(() => cloudAction.running)
-
-  const cloudConnectEnabled = computed(() => cloudOAuthConfigured())
+  const connectingCloud = computed(() => localCloud.connecting)
+  const cloudConnectEnabled = computed(() => localCloud.oauthConfigured)
   const cloudConnectionActionLabel = computed(() =>
-    cloudSession.cloudSession
+    localCloud.connected
       ? t('dashboard.disconnectCloudAccount')
       : t('dashboard.connectCloudAccount'),
   )
   const cloudConnectionActionTitle = computed(() =>
-    cloudSession.cloudSession || cloudAuth.cloudToken || cloudConnectEnabled.value
+    localCloud.connected || cloudAuth.cloudToken || cloudConnectEnabled.value
       ? ''
       : t('dashboard.cloudConnectionNotConfigured'),
   )
@@ -334,13 +315,8 @@
     workspaceError.value = ''
     shortcutError.value = ''
     try {
-      const me = await agentStatus()
-      localDevice.value = me.device ?? null
-      try {
-        await reconcileCloudConnection(me.cloud_session ?? null)
-      } catch (err) {
-        notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
-      }
+      const { device } = await localCloud.hydrateFromAgent()
+      localDevice.value = device
       try {
         await cloudAuth.initialize()
       } catch (err) {
@@ -370,48 +346,13 @@
     })
   }
 
-  async function reconcileCloudConnection(reportedSession: CloudSessionSummary | null) {
-    if (hasCloudConnectionTime()) {
-      const connectedSession = applyCloudConnectionTime(reportedSession)
-      if (connectedSession) {
-        setCloudConnection(connectedSession)
-        return
-      }
-      clearCloudConnectionTime()
-    }
-    if (await connectStoredCloudToken()) {
-      return
-    }
-    setCloudConnection(null)
-  }
-
-  async function connectStoredCloudToken(): Promise<boolean> {
-    const cloudToken = cloudAuth.cloudToken
-    if (!cloudToken || cloudAction.running) {
-      return false
-    }
-    const result = await cloudAction.run(async () => {
-      const response = await connectCloudWithToken(cloudToken)
-      const connectedSession = markCloudConnected(response.cloud_session)
-      if (!connectedSession) {
-        throw new Error('Cloud connect response missing cloud_session')
-      }
-      setCloudConnection(connectedSession)
-    })
-    return result.ok
-  }
-
-  function setCloudConnection(summary: CloudSessionSummary | null) {
-    cloudSession.setCloudSession(summary)
-  }
-
   function openCloudLogin() {
     startCloudOAuth('/')
   }
 
   async function logoutCloud() {
     try {
-      await disconnectCloudSession()
+      await localCloud.disconnectSession()
     } catch (err) {
       notifications.notifyError(t('dashboard.cloudDisconnectionFailed'), err)
     } finally {
@@ -419,76 +360,27 @@
     }
   }
 
-  async function disconnectCloudSession() {
-    await disconnectCloud()
-    clearCloudConnectionTime()
-    setCloudConnection(null)
-  }
-
   async function disconnectLocalDeviceFromCloud() {
-    if (cloudAction.running) {
-      return
-    }
-    await cloudAction.run(
-      async () => {
-        await disconnectCloudSession()
-      },
-      {
-        onError: (err) => notifications.notifyError(t('dashboard.cloudDisconnectionFailed'), err),
-      },
-    )
+    await localCloud.disconnectDevice({
+      onError: (err) => notifications.notifyError(t('dashboard.cloudDisconnectionFailed'), err),
+    })
   }
 
   async function connectLocalDeviceToCloud() {
-    if (cloudAction.running) {
-      return
-    }
-    if (cloudAuth.cloudToken) {
-      const result = await cloudAction.run(
-        async () => {
-          const response = await connectCloudWithToken(cloudAuth.cloudToken!)
-          const connectedSession = markCloudConnected(response.cloud_session)
-          if (!connectedSession) {
-            throw new Error('Cloud connect response missing cloud_session')
-          }
-          setCloudConnection(connectedSession)
-        },
-        {
-          onError: (err) => notifications.notifyError(t('dashboard.cloudConnectionFailed'), err),
-        },
-      )
-      void result
-      return
-    }
-    if (!cloudOAuthConfigured()) {
+    const result = await localCloud.connectDevice({
+      onError: (err) => notifications.notifyError(t('dashboard.cloudConnectionFailed'), err),
+    })
+    if (!result.ok && result.kind === 'not_configured') {
       notifications.notifyError(
         t('dashboard.cloudConnectionNotConfigured'),
         new Error('Cloud OAuth is not configured'),
       )
-      return
-    }
-    try {
-      startCloudOAuth('/')
-    } catch (err) {
-      notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
     }
   }
 
   function openCloudPage() {
     const cloudDashboardURL = new URL('/dashboard', runtimeConfig.config.cloud.publicUrl)
     window.open(cloudDashboardURL, '_blank', 'noopener,noreferrer')
-  }
-
-  function workspaceUpdatedAt(value: string | undefined) {
-    if (!value) {
-      return t('dashboard.noActivity')
-    }
-    return formatTime(value)
-  }
-
-  function formatTime(value: string) {
-    const date = new Date(value)
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
   }
 
   onMounted(() => {

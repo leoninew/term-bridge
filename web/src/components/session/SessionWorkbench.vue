@@ -178,30 +178,45 @@
 
       <section
         v-else-if="openedTabs.length === 0"
-        class="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-[var(--color-text-muted)]"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-[var(--color-text-muted)]"
       >
         <h3 class="text-lg font-semibold text-[var(--color-text)]">
           {{ t('workbench.noTabTitle') }}
         </h3>
         <p>{{ t('workbench.noTabDescription') }}</p>
-        <button
-          type="button"
-          class="button button-secondary min-h-8 px-2.5 py-1.5 text-sm"
-          @click="emit('openCreate')"
-        >
-          {{ t('workbench.newSession') }}
-        </button>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            class="inline-flex h-10 w-fit items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
+            @click="emit('openCreate')"
+          >
+            <SquareTerminal class="size-3.5" />
+            {{ t('workbench.newSession') }}
+          </button>
+          <RouterLink
+            :to="shortcutsRoute"
+            class="inline-flex h-10 w-fit items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
+          >
+            <Command class="size-3.5" />
+            {{ t('workbench.manageShortcuts') }}
+          </RouterLink>
+        </div>
       </section>
     </TabsRoot>
 
-    <SessionStatusBar :session="activeSession" :device="currentDevice" />
+    <SessionStatusBar
+      :session="activeSession"
+      :device="currentDevice"
+      :show-cloud-connection="showCloudConnection"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
   import { useTemplateRef, watch } from 'vue'
+  import { RouterLink } from 'vue-router'
   import { useI18n } from 'vue-i18n'
-  import { PanelLeft, CircleStop, MoreHorizontal, SquareTerminal, X } from '@lucide/vue'
+  import { PanelLeft, CircleStop, Command, MoreHorizontal, SquareTerminal, X } from '@lucide/vue'
   import {
     DropdownMenuContent,
     DropdownMenuItem,
@@ -241,8 +256,15 @@
       loading?: boolean
       showSidebarToggle?: boolean
       disableTabReorder?: boolean
+      showCloudConnection?: boolean
+      shortcutsRoute: { name: string; params?: Record<string, string> }
     }>(),
-    { loading: false, showSidebarToggle: false, disableTabReorder: false },
+    {
+      loading: false,
+      showSidebarToggle: false,
+      disableTabReorder: false,
+      showCloudConnection: false,
+    },
   )
 
   const emit = defineEmits<{

@@ -201,4 +201,7 @@ router.beforeEach(async (to) => {
       query: { redirect: to.fullPath },
     }
   }
+  if (routeName === 'cloud-change-password' && cloudAuth.user?.provider !== 'email') {
+    return { name: homeRoute }
+  }
 })

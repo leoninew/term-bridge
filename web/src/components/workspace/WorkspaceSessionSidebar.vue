@@ -373,38 +373,6 @@
               :side-offset="8"
               class="z-50 min-w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
             >
-              <DropdownMenuItem
-                class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
-                @select="emit('openDashboard')"
-              >
-                <LayoutDashboard class="size-4 text-[var(--color-text-subtle)]" />
-                {{ t('dashboard.home') }}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
-                @select="emit('openShortcuts')"
-              >
-                <Command class="size-4 text-[var(--color-text-subtle)]" />
-                {{ t('shortcut.title') }}
-              </DropdownMenuItem>
-              <DropdownMenuItem v-if="props.helpHref" as-child>
-                <a
-                  :href="props.helpHref"
-                  class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
-                >
-                  <CircleHelp class="size-4 text-[var(--color-text-subtle)]" />
-                  {{ t('common.help') }}
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem v-else as-child>
-                <RouterLink
-                  :to="{ name: 'cloud-help' }"
-                  class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
-                >
-                  <CircleHelp class="size-4 text-[var(--color-text-subtle)]" />
-                  {{ t('common.help') }}
-                </RouterLink>
-              </DropdownMenuItem>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger
                   class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
@@ -509,15 +477,12 @@
     Check,
     ChevronRight,
     CircleDot,
-    CircleHelp,
-    Command,
     CircleStop,
     Copy,
     FileCode2,
     Folder,
     FolderOpen,
     Languages,
-    LayoutDashboard,
     Loader2,
     LogOut,
     Pencil,
@@ -589,7 +554,6 @@
     removingWorkspaceId: string | null
     loading?: boolean
     loadError?: string | null
-    helpHref?: string
     homeRouteName: string
     disableReorder?: boolean
     showClose?: boolean
@@ -611,8 +575,6 @@
     reorderWorkspaces: [workspaceIds: string[]]
     reorderSessions: [workspaceId: string, sessionIds: string[]]
     logout: []
-    openDashboard: []
-    openShortcuts: []
   }>()
 
   const { t, locale } = useI18n()

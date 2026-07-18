@@ -4,7 +4,7 @@
     v-if="session && tab"
     :key="session.id"
     :value="tab.sessionId"
-    class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--color-panel-bg)] p-2"
+    class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--color-panel-bg)]"
   >
     <TerminalView
       v-if="session.lifecycle_state === 'running'"

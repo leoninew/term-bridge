@@ -29,7 +29,6 @@
     sessionsRoute: RouteLocationRaw
   }>()
 
-
   const { t } = useI18n()
   const router = useRouter()
   const hostEl = ref<HTMLElement | null>(null)

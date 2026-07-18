@@ -9,7 +9,9 @@
     @focusin="pause"
     @focusout="resume"
   >
-    <div class="relative overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]">
+    <div
+      class="relative overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]"
+    >
       <div :class="frameClass">
         <img
           v-for="(slide, index) in slides"
@@ -31,11 +33,7 @@
           :key="index"
           type="button"
           class="size-2 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-          :class="
-            index === activeIndex
-              ? 'bg-white/90'
-              : 'bg-white/35 hover:bg-white/55'
-          "
+          :class="index === activeIndex ? 'bg-white/90' : 'bg-white/35 hover:bg-white/55'"
           :aria-label="t('common.carouselGoTo', { index: index + 1 })"
           :aria-current="index === activeIndex ? 'true' : undefined"
           @click="goTo(index)"
@@ -73,13 +71,13 @@
   const { t } = useI18n()
   const activeIndex = ref(0)
   const paused = ref(false)
-  let timer: ReturnType<typeof setInterval> | null = null
+  let timer: ReturnType<typeof window.setInterval> | null = null
 
   const slideCount = computed(() => props.slides.length)
 
   function clearTimer() {
     if (timer) {
-      clearInterval(timer)
+      window.clearInterval(timer)
       timer = null
     }
   }
@@ -89,7 +87,7 @@
     if (!props.autoplay || props.intervalMs <= 0 || slideCount.value <= 1 || paused.value) {
       return
     }
-    timer = setInterval(() => {
+    timer = window.setInterval(() => {
       activeIndex.value = (activeIndex.value + 1) % slideCount.value
     }, props.intervalMs)
   }

@@ -430,7 +430,7 @@ func TestPortablePackageShipsSelectableRuntimeProfiles(t *testing.T) {
 	assertContains(t, envExample, "TERMBRIDGE_BUILD_VERSION=v1.2.3", ".env.example must document the build version override")
 	assertContains(t, envExample, "-dirty", ".env.example must document dirty build versions")
 	assertNotContains(t, envExample, "TERMBRIDGE_BUILD_COMMIT=", ".env.example must not imply that the build commit is configurable")
-	assertContains(t, config, "TERMBRIDGE_BUILD_VERSION �?Taskfile/CI 编译元数�?, "runtime config must document the build metadata boundary")
+	assertContains(t, config, "TERMBRIDGE_BUILD_VERSION 是 Taskfile/CI 编译元数据", "runtime config must document the build metadata boundary")
 	assertNotContains(t, config, "build_version:", "runtime config must not advertise build version as a YAML key")
 	assertContains(t, taskfile, "cd web && yarn build", "portable package must use the neutral bundle build")
 	assertNotContains(t, taskfile, "yarn build:", "portable package must not use a product-line build alias")

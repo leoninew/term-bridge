@@ -23,6 +23,8 @@
           :session-source-label="sessionSourceLabel"
           :show-sidebar-toggle="true"
           :disable-tab-reorder="disableReorder"
+          :show-cloud-connection="isLocalMode"
+          :shortcuts-route="shortcutsRoute"
           @toggle-sidebar="mobileSidebarOpen = true"
           @activate-tab="activateOpenedTab"
           @close-tab="closeTab"
@@ -57,7 +59,6 @@
           :removing-workspace-id="removingWorkspaceId"
           :loading="workspaceSessions.loading"
           :load-error="workspaceTreeError"
-          :help-href="helpHref"
           :home-route-name="props.homeRouteName"
           :disable-reorder="disableReorder"
           :show-close="true"
@@ -76,8 +77,6 @@
           @reorder-workspaces="reorderWorkspaces"
           @reorder-sessions="reorderSessions"
           @logout="handleLogout"
-          @open-dashboard="openDashboard"
-          @open-shortcuts="openShortcuts"
         />
       </div>
     </template>
@@ -102,7 +101,6 @@
           :removing-workspace-id="removingWorkspaceId"
           :loading="workspaceSessions.loading"
           :load-error="workspaceTreeError"
-          :help-href="helpHref"
           :home-route-name="props.homeRouteName"
           :disable-reorder="disableReorder"
           @select="openSessionTab"
@@ -119,8 +117,6 @@
           @reorder-workspaces="reorderWorkspaces"
           @reorder-sessions="reorderSessions"
           @logout="handleLogout"
-          @open-dashboard="openDashboard"
-          @open-shortcuts="openShortcuts"
         />
       </SplitterPanel>
 
@@ -150,6 +146,8 @@
             :session-command-source="sessionCommandSource"
             :session-source-label="sessionSourceLabel"
             :disable-tab-reorder="disableReorder"
+            :show-cloud-connection="isLocalMode"
+            :shortcuts-route="shortcutsRoute"
             @activate-tab="activateOpenedTab"
             @close-tab="closeTab"
             @close-terminal-tabs="closeTerminalTabs"
@@ -234,13 +232,13 @@
   import { terminalDebug } from '../terminal/diagnostics'
   import { useAsyncAction } from '../../composable/useAsyncAction'
   import { useCreateSessionDraft } from '../../composable/useCreateSessionDraft'
+  import { useLocalCloudConnection } from '../../composable/useLocalCloudConnection'
   import { useSessionDialogs } from '../../composable/useSessionDialogs'
   import { useTerminalSize } from '../../composable/useTerminalSize'
   import { useSessionsLayoutMode } from '../../composable/useSessionsLayoutMode'
   import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useCloudDevicesStore } from '../../store/cloudDevices'
   import { useCloudSessionStore } from '../../store/cloudSession'
-  import { useRuntimeConfigStore } from '../../store/runtimeConfig'
   import {
     closeSessionsSerially,
     normalizedSessionWorkspaceTree,
@@ -280,7 +278,7 @@
   const cloudAuth = useCloudAuthStore()
   const cloudDevices = useCloudDevicesStore()
   const cloudSession = useCloudSessionStore()
-  const runtimeConfig = useRuntimeConfigStore()
+  const localCloud = useLocalCloudConnection()
   const workspaceSessions = useWorkspaceSessionsStore()
   const workbench = useWorkbenchStore()
   const notifications = useNotificationsStore()
@@ -346,9 +344,6 @@
   const closingBackgroundSessions = computed(() => closeBackgroundAction.running)
   const isLocalMode = computed(() => props.runtimeTarget.mode === 'local')
   const workbenchDevice = computed(() => props.currentDevice ?? cloudSession.cloudSession)
-  const helpHref = computed(() =>
-    isLocalMode.value ? new URL('/help', runtimeConfig.config.cloud.publicUrl).toString() : '',
-  )
 
   const activeSession = computed(() => {
     const tab = workbench.activeTab
@@ -417,17 +412,11 @@
     })
   }
 
-  async function openDashboard() {
-    await router.push({ name: props.homeRouteName })
-  }
-
-  async function openShortcuts() {
-    await router.push(
-      props.runtimeTarget.mode === 'local'
-        ? { name: 'local-shortcuts' }
-        : { name: 'cloud-shortcuts', params: { deviceId: props.runtimeTarget.deviceId } },
-    )
-  }
+  const shortcutsRoute = computed(() =>
+    props.runtimeTarget.mode === 'local'
+      ? { name: 'local-shortcuts' }
+      : { name: 'cloud-shortcuts', params: { deviceId: props.runtimeTarget.deviceId } },
+  )
 
   function selectCreateShortcut(shortcutId: string | null) {
     createDraft.selectShortcut(enabledShortcuts.value.find((value) => value.id === shortcutId))
@@ -453,7 +442,7 @@
       }
     }
     if (isLocalMode.value) {
-      cloudSession.reset()
+      localCloud.clearLocalCloudSession()
     } else {
       cloudAuth.clearToken()
     }
@@ -922,7 +911,13 @@
 
   onMounted(async () => {
     try {
-      if (props.runtimeTarget.mode === 'cloud') {
+      if (isLocalMode.value) {
+        try {
+          await localCloud.hydrateFromAgent()
+        } catch (err) {
+          notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
+        }
+      } else {
         await cloudDevices.loadDevices()
       }
       await Promise.all([refresh(), refreshShortcuts()])

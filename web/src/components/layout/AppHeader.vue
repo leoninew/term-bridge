@@ -10,6 +10,16 @@
     </RouterLink>
 
     <div class="flex shrink-0 items-center gap-1.5 sm:gap-3">
+      <a
+        href="https://github.com/leoninew/TermBridge-go"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex size-9 items-center justify-center rounded-md text-[var(--color-text-subtle)] outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
+        :aria-label="t('dashboard.footerGitHub')"
+        :title="t('dashboard.footerGitHub')"
+      >
+        <GithubIcon class="size-4" />
+      </a>
       <DisplayControls />
       <slot name="actions" />
     </div>
@@ -17,7 +27,11 @@
 </template>
 
 <script setup lang="ts">
+  import { useI18n } from 'vue-i18n'
   import { RouterLink } from 'vue-router'
   import BrandMark from '../branding/BrandMark.vue'
+  import GithubIcon from '../branding/GithubIcon.vue'
   import DisplayControls from '../dashboard/DisplayControls.vue'
+
+  const { t } = useI18n()
 </script>

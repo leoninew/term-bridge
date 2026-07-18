@@ -85,7 +85,7 @@
     props.canChangePassword ? t('cloud.changePassword') : t('cloud.changePasswordUnavailable'),
   )
 
-  function onChangePasswordSelect(event: Event) {
+  function onChangePasswordSelect(event: { preventDefault: () => void }) {
     if (!props.canChangePassword) {
       event.preventDefault()
       return
