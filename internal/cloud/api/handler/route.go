@@ -20,6 +20,9 @@ import (
 const (
 	requestTransportAllowance = 5 * time.Second
 	requestTimeout            = sharedconfig.MaxGitCommandTimeout + requestTransportAllowance
+	// Bound browser relay writes so a stalled browser tab cannot block the
+	// single-threaded agent tunnel demux (keep-alive multiplies concurrent streams).
+	browserRelayWriteTimeout = 3 * time.Second
 )
 
 type agentRoute struct {
@@ -178,12 +181,16 @@ func (t *terminalRelay) dispatch(frame *shared.TunnelFrame) bool {
 	switch payload := frame.GetPayload().(type) {
 	case *shared.TunnelFrame_TerminalOutput:
 		data := payload.TerminalOutput.GetData()
-		if err := t.browser.Write(context.Background(), websocket.MessageBinary, data); err != nil && t.logger != nil {
-			t.logger.Warn("terminal websocket output write failed", "session_id", t.sessionId, "stream_id", frame.GetStreamId(), "error", err)
+		if err := writeBrowserBinary(t.browser, data); err != nil {
+			if t.logger != nil {
+				t.logger.Warn("terminal websocket output write failed", "session_id", t.sessionId, "stream_id", frame.GetStreamId(), "error", err)
+			}
+			_ = t.browser.Close(websocket.StatusInternalError, "terminal output relay failed")
+			closeOnce(t.done)
 		}
 		return true
 	case *shared.TunnelFrame_TerminalControl:
-		if err := writeTerminalControl(t.browser, payload.TerminalControl); err != nil {
+		if err := writeBrowserTerminalControl(t.browser, payload.TerminalControl); err != nil {
 			if t.logger != nil {
 				t.logger.Warn("terminal websocket control write failed", "session_id", t.sessionId, "stream_id", frame.GetStreamId(), "error", err)
 			}
@@ -196,7 +203,7 @@ func (t *terminalRelay) dispatch(frame *shared.TunnelFrame) bool {
 		if t.logger != nil {
 			t.logger.Warn("terminal stream error", "session_id", t.sessionId, "stream_id", frame.GetStreamId(), "message", message)
 		}
-		_ = writeTerminalControl(t.browser, &agent.ServerControlMessage{Type: terminalproto.TypeError, Code: "terminal_stream_error", Message: message})
+		_ = writeBrowserTerminalControl(t.browser, &agent.ServerControlMessage{Type: terminalproto.TypeError, Code: "terminal_stream_error", Message: message})
 		_ = t.browser.Close(websocket.StatusNormalClosure, "terminal closed")
 		closeOnce(t.done)
 		return true
@@ -207,6 +214,22 @@ func (t *terminalRelay) dispatch(frame *shared.TunnelFrame) bool {
 	default:
 		return false
 	}
+}
+
+func writeBrowserBinary(conn *websocket.Conn, data []byte) error {
+	ctx, cancel := context.WithTimeout(context.Background(), browserRelayWriteTimeout)
+	defer cancel()
+	return conn.Write(ctx, websocket.MessageBinary, data)
+}
+
+func writeBrowserTerminalControl(conn *websocket.Conn, message *agent.ServerControlMessage) error {
+	data, err := terminalproto.EncodeServer(message)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), browserRelayWriteTimeout)
+	defer cancel()
+	return conn.Write(ctx, websocket.MessageText, data)
 }
 
 func workspaceWatchJSON(frame *shared.TunnelFrame) ([]byte, error) {
@@ -222,7 +245,9 @@ func workspaceWatchJSON(frame *shared.TunnelFrame) ([]byte, error) {
 func (w *workspaceWatchRelay) writeBrowser(data []byte) error {
 	w.writeMu.Lock()
 	defer w.writeMu.Unlock()
-	return w.browser.Write(context.Background(), websocket.MessageText, data)
+	ctx, cancel := context.WithTimeout(context.Background(), browserRelayWriteTimeout)
+	defer cancel()
+	return w.browser.Write(ctx, websocket.MessageText, data)
 }
 
 func (w *workspaceWatchRelay) dispatch(frame *shared.TunnelFrame) bool {

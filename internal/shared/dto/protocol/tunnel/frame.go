@@ -3,6 +3,7 @@ package tunnel
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -15,6 +16,36 @@ const ProtocolVersion = 5
 const MaxFrameBytes = 32 * 1024 * 1024
 
 const ControlStreamID = "control"
+
+const (
+	// DefaultHeartbeatInterval is how often the agent sends control Ping frames.
+	DefaultHeartbeatInterval = 25 * time.Second
+	// DefaultHeartbeatIdleTimeout is the max silence before either side closes the tunnel.
+	// Kept at ~3 intervals so one missed round-trip does not flap the device online state.
+	DefaultHeartbeatIdleTimeout = 75 * time.Second
+)
+
+// HeartbeatInterval / HeartbeatIdleTimeout are overridable in tests.
+var (
+	HeartbeatInterval    = DefaultHeartbeatInterval
+	HeartbeatIdleTimeout = DefaultHeartbeatIdleTimeout
+)
+
+// PingFrame builds a control-stream Ping with the given nonce.
+func PingFrame(nonce string) *shared.TunnelFrame {
+	return &shared.TunnelFrame{
+		StreamId: ControlStreamID,
+		Payload:  &shared.TunnelFrame_Ping{Ping: &shared.Ping{Nonce: nonce}},
+	}
+}
+
+// PongFrame builds a control-stream Pong with the given nonce.
+func PongFrame(nonce string) *shared.TunnelFrame {
+	return &shared.TunnelFrame{
+		StreamId: ControlStreamID,
+		Payload:  &shared.TunnelFrame_Pong{Pong: &shared.Pong{Nonce: nonce}},
+	}
+}
 
 func MarshalFrame(frame *shared.TunnelFrame) ([]byte, error) {
 	if err := ValidateFrame(frame); err != nil {

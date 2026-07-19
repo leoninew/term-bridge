@@ -109,12 +109,38 @@ func (c *Client) Run(ctx context.Context) error {
 
 func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 	var writeMu sync.Mutex
+	var aliveMu sync.Mutex
+	lastAlive := time.Now()
+	touchAlive := func() {
+		aliveMu.Lock()
+		lastAlive = time.Now()
+		aliveMu.Unlock()
+	}
+	stale := func() bool {
+		aliveMu.Lock()
+		defer aliveMu.Unlock()
+		return time.Since(lastAlive) > tunnel.HeartbeatIdleTimeout
+	}
 	defer c.closeWatches()
+
+	hbCtx, hbCancel := context.WithCancel(ctx)
+	defer hbCancel()
+	hbErr := make(chan error, 1)
+	go c.runHeartbeat(hbCtx, conn, &writeMu, stale, hbErr)
+
 	for {
-		_, data, err := conn.Read(ctx)
+		readCtx, cancel := context.WithTimeout(ctx, tunnel.HeartbeatIdleTimeout)
+		_, data, err := conn.Read(readCtx)
+		cancel()
 		if err != nil {
+			select {
+			case heartbeatErr := <-hbErr:
+				return heartbeatErr
+			default:
+			}
 			return err
 		}
+		touchAlive()
 		frame, err := tunnel.UnmarshalFrame(data)
 		if err != nil {
 			continue
@@ -130,11 +156,42 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 		case *shared.TunnelFrame_TerminalAttach:
 			go c.handleTerminal(ctx, conn, &writeMu, frame)
 		case *shared.TunnelFrame_Ping:
-			pong := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Pong{Pong: &shared.Pong{Nonce: frame.GetPing().GetNonce()}}}
+			pong := tunnel.PongFrame(frame.GetPing().GetNonce())
 			_ = writeTunnelFrame(ctx, conn, &writeMu, pong)
+		case *shared.TunnelFrame_Pong:
+			continue
 		default:
 			if isRuntimeRequest(frame) {
 				go c.handleRequest(ctx, conn, &writeMu, frame)
+			}
+		}
+	}
+}
+
+func (c *Client) runHeartbeat(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, stale func() bool, errCh chan<- error) {
+	ticker := time.NewTicker(tunnel.HeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if stale() {
+				_ = conn.Close(websocket.StatusPolicyViolation, "tunnel heartbeat timeout")
+				select {
+				case errCh <- fmt.Errorf("tunnel heartbeat timeout"):
+				default:
+				}
+				return
+			}
+			nonce := fmt.Sprintf("%d", time.Now().UnixNano())
+			if err := writeTunnelFrame(ctx, conn, writeMu, tunnel.PingFrame(nonce)); err != nil {
+				_ = conn.CloseNow()
+				select {
+				case errCh <- err:
+				default:
+				}
+				return
 			}
 		}
 	}

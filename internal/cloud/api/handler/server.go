@@ -1265,7 +1265,13 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 	route := newAgentRoute(hello.GetDeviceId(), conn)
 	s.setRoute(hello.GetDeviceId(), route)
 	defer func() {
-		s.clearRoute(hello.GetDeviceId(), route)
+		// Only mark offline when this connection still owns the route.
+		// A replacement tunnel (reconnect) must not flip the device offline.
+		if !s.clearRoute(hello.GetDeviceId(), route) {
+			route.closeTerminals("device reconnected")
+			route.closeWorkspaceWatches("device reconnected")
+			return
+		}
 		route.closeTerminals("device disconnected")
 		route.closeWorkspaceWatches("device disconnected")
 		s.registry.MarkOffline(hello.GetDeviceId(), time.Now().UTC())
@@ -1275,7 +1281,9 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for {
-		_, data, err := conn.Read(r.Context())
+		readCtx, cancel := context.WithTimeout(r.Context(), tunnel.HeartbeatIdleTimeout)
+		_, data, err := conn.Read(readCtx)
+		cancel()
 		if err != nil {
 			return
 		}
@@ -1287,8 +1295,7 @@ func (s *Handler) handleAgentTunnel(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if ping := frame.GetPing(); ping != nil {
-			pong := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Pong{Pong: &shared.Pong{Nonce: ping.GetNonce()}}}
-			_ = route.writeFrame(r.Context(), pong)
+			_ = route.writeFrame(r.Context(), tunnel.PongFrame(ping.GetNonce()))
 		}
 	}
 }
@@ -1320,13 +1327,24 @@ func (s *Handler) devicesForRequest(r *http.Request) ([]*cloudproto.DeviceSummar
 }
 
 func (s *Handler) deviceSummary(device Device) *cloudproto.DeviceSummary {
+	online := s.routeFor(device.Id) != nil
 	if runtimeDevice, ok := s.registry.Get(device.Id); ok {
 		if runtimeDevice.Name == "" {
 			runtimeDevice.Name = device.Name
 		}
+		runtimeDevice.Online = online
+		if online {
+			runtimeDevice.Status = "online"
+		} else {
+			runtimeDevice.Status = "offline"
+		}
 		return normalizeDeviceStatus(runtimeDevice)
 	}
-	return &cloudproto.DeviceSummary{Id: device.Id, Name: device.Name, Online: false, Status: "offline", LastSeen: prototime.FromTime(device.UpdatedAt)}
+	status := "offline"
+	if online {
+		status = "online"
+	}
+	return &cloudproto.DeviceSummary{Id: device.Id, Name: device.Name, Online: online, Status: status, LastSeen: prototime.FromTime(device.UpdatedAt)}
 }
 
 func (s *Handler) disconnectDevice(deviceId string, reason string) {
@@ -1352,15 +1370,20 @@ func (s *Handler) setRoute(deviceId string, route *agentRoute) {
 	if old != nil {
 		old.closeTerminals("device reconnected")
 		old.closeWorkspaceWatches("device reconnected")
-		_ = old.conn.Close(websocket.StatusGoingAway, "device reconnected")
+		if old.conn != nil {
+			_ = old.conn.Close(websocket.StatusGoingAway, "device reconnected")
+		}
 	}
 }
-func (s *Handler) clearRoute(deviceId string, route *agentRoute) {
+func (s *Handler) clearRoute(deviceId string, route *agentRoute) bool {
 	s.routeMu.Lock()
 	if s.routes[deviceId] == route {
 		delete(s.routes, deviceId)
+		s.routeMu.Unlock()
+		return true
 	}
 	s.routeMu.Unlock()
+	return false
 }
 func (s *Handler) routeFor(deviceId string) *agentRoute {
 	s.routeMu.Lock()
