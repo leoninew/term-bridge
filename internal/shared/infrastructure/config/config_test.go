@@ -733,6 +733,65 @@ func TestLoadIgnoresUnknownConfigAndEnvironmentKeys(t *testing.T) {
 	}
 }
 
+
+func TestLoadResolvesHomeRelativeRuntimePaths(t *testing.T) {
+	home := isolateHome(t)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	writeDotEnv(t, cwd, strings.Join([]string{
+		"TERMBRIDGE_RUNTIME__STATE_DIR=~/.termbridge",
+		"TERMBRIDGE_LOCAL__DATABASE__SQLITE__PATH=~/.termbridge/agent.db",
+		"TERMBRIDGE_LOG__DIR=~/.termbridge/logs",
+	}, "\n")+"\n")
+
+	cfg, err := Load(Options{Cwd: cwd, ValidationScope: ValidationScopeAgent})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	wantStateDir := filepath.Join(home, ".termbridge")
+	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(wantStateDir) {
+		t.Fatalf("StateDir = %q, want %q", cfg.Runtime.StateDir, wantStateDir)
+	}
+	wantDB := filepath.Join(home, ".termbridge", "agent.db")
+	if filepath.Clean(cfg.Local.Database.SQLite.Path) != filepath.Clean(wantDB) {
+		t.Fatalf("Local.Database.SQLite.Path = %q, want %q", cfg.Local.Database.SQLite.Path, wantDB)
+	}
+	wantLogDir := filepath.Join(home, ".termbridge", "logs")
+	if filepath.Clean(cfg.LogDir) != filepath.Clean(wantLogDir) {
+		t.Fatalf("LogDir = %q, want %q", cfg.LogDir, wantLogDir)
+	}
+}
+
+func TestResolveConfigPath(t *testing.T) {
+	home := isolateHome(t)
+	cwd := t.TempDir()
+
+	got, err := resolveConfigPath(cwd, "~/.termbridge")
+	if err != nil {
+		t.Fatalf("resolveConfigPath(~/.termbridge) error = %v", err)
+	}
+	if filepath.Clean(got) != filepath.Clean(filepath.Join(home, ".termbridge")) {
+		t.Fatalf("resolveConfigPath(~/.termbridge) = %q", got)
+	}
+
+	got, err = resolveConfigPath(cwd, "data")
+	if err != nil {
+		t.Fatalf("resolveConfigPath(data) error = %v", err)
+	}
+	if filepath.Clean(got) != filepath.Clean(filepath.Join(cwd, "data")) {
+		t.Fatalf("resolveConfigPath(data) = %q", got)
+	}
+
+	abs := filepath.Join(cwd, "abs-state")
+	got, err = resolveConfigPath(cwd, abs)
+	if err != nil {
+		t.Fatalf("resolveConfigPath(abs) error = %v", err)
+	}
+	if filepath.Clean(got) != filepath.Clean(abs) {
+		t.Fatalf("resolveConfigPath(abs) = %q", got)
+	}
+}
 func TestDefaultConfigFileExists(t *testing.T) {
 	if _, err := os.ReadFile(repoDefaultConfigPath(t)); err != nil {
 		t.Fatalf("ReadFile(default config) error = %v", err)

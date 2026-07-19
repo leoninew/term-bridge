@@ -287,8 +287,14 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	if err != nil {
 		return Config{}, apperrors.Config("invalid cloud.static_dir", err)
 	}
-	localDatabase := loadDatabaseConfig(cwd, v, "local.database")
-	cloudDatabase := loadDatabaseConfig(cwd, v, "cloud.database")
+	localDatabase, err := loadDatabaseConfig(cwd, v, "local.database")
+	if err != nil {
+		return Config{}, err
+	}
+	cloudDatabase, err := loadDatabaseConfig(cwd, v, "cloud.database")
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
 		Cwd:         cwd,
@@ -518,16 +524,16 @@ func loadCloudOAuthConfig(v *viper.Viper) CloudOAuthConfig {
 	return CloudOAuthConfig{Clients: clients}
 }
 
-func loadDatabaseConfig(cwd string, v *viper.Viper, prefix string) DatabaseConfig {
-	path := strings.TrimSpace(v.GetString(prefix + ".sqlite.path"))
-	if path != "" && !isConfigAbsPath(path) {
-		path = filepath.Join(cwd, path)
+func loadDatabaseConfig(cwd string, v *viper.Viper, prefix string) (DatabaseConfig, error) {
+	path, err := resolveConfigPath(cwd, v.GetString(prefix+".sqlite.path"))
+	if err != nil {
+		return DatabaseConfig{}, apperrors.Config("invalid "+prefix+".sqlite.path", err)
 	}
 	return DatabaseConfig{
 		Driver: strings.ToLower(strings.TrimSpace(v.GetString(prefix + ".driver"))),
 		SQLite: SQLiteConfig{Path: path},
 		MySQL:  MySQLConfig{Dsn: strings.TrimSpace(v.GetString(prefix + ".mysql.dsn"))},
-	}
+	}, nil
 }
 
 func validateDatabaseConfig(prefix string, cfg DatabaseConfig) error {
@@ -793,29 +799,56 @@ func configKeys() []string {
 }
 
 func resolveLogDir(cwd string, path string) (string, error) {
-	if strings.TrimSpace(path) == "" {
+	resolved, err := resolveConfigPath(cwd, path)
+	if err != nil {
+		return "", apperrors.Config("invalid log dir", err)
+	}
+	if resolved == "" {
 		return "", apperrors.Config("invalid log dir", fmt.Errorf("empty path"))
 	}
-	if isConfigAbsPath(path) {
-		return filepath.Clean(path), nil
-	}
-	return filepath.Join(cwd, path), nil
+	return resolved, nil
 }
 
 func resolveStateDir(cwd string, path string) (string, error) {
-	if strings.TrimSpace(path) == "" {
+	resolved, err := resolveConfigPath(cwd, path)
+	if err != nil {
+		return "", apperrors.Config("invalid runtime state dir", err)
+	}
+	if resolved == "" {
 		return "", apperrors.Config("invalid runtime state dir", fmt.Errorf("empty path"))
 	}
-	if isConfigAbsPath(path) {
-		return filepath.Clean(path), nil
-	}
-	return filepath.Join(cwd, path), nil
+	return resolved, nil
 }
 
 func resolveOptionalDir(cwd string, path string) (string, error) {
+	resolved, err := resolveConfigPath(cwd, path)
+	if err != nil {
+		return "", err
+	}
+	return resolved, nil
+}
+
+// resolveConfigPath resolves a configured filesystem path.
+// Rules:
+//   - empty => empty
+//   - "~" or "~/..." / "~\\..." => user home (packaged: ~/.termbridge)
+//   - absolute path => cleaned absolute path
+//   - otherwise => cwd-relative path (dev: data, logs)
+func resolveConfigPath(cwd string, path string) (string, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return "", nil
+	}
+	if path == "~" || strings.HasPrefix(path, "~/") || strings.HasPrefix(path, `~\`) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve user home: %w", err)
+		}
+		home = filepath.Clean(home)
+		if path == "~" {
+			return home, nil
+		}
+		return filepath.Join(home, path[2:]), nil
 	}
 	if isConfigAbsPath(path) {
 		return filepath.Clean(path), nil
