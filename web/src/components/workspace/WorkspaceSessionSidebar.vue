@@ -225,7 +225,7 @@
                 }}</span>
                 <span
                   v-if="session.session.lifecycle_state === 'running'"
-                  class="flex size-5 shrink-0 items-center justify-center"
+                  class="workspace-tree-node-actions flex shrink-0 items-center gap-0.5"
                 >
                   <button
                     type="button"
