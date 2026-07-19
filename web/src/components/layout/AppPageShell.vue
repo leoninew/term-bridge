@@ -1,5 +1,5 @@
 <template>
-  <section class="flex min-h-screen flex-col bg-[var(--color-app-bg)] text-[var(--color-text)]">
+  <section class="flex h-full min-h-0 flex-col bg-[var(--color-app-bg)] text-[var(--color-text)]">
     <AppHeader>
       <template v-if="$slots.actions" #actions>
         <slot name="actions" />

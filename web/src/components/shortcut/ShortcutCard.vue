@@ -1,10 +1,16 @@
 <template>
   <article
     class="shortcut-card"
-    :class="{ 'shortcut-card-disabled': shortcut.enabled === false }"
+    :class="{
+      'shortcut-card-disabled': shortcut.enabled === false,
+      'shortcut-card-selected': selected,
+      'shortcut-card-selectable': selectionMode,
+    }"
     tabindex="0"
-    @dblclick="emit('edit', shortcut)"
-    @keydown.enter.prevent="emit('edit', shortcut)"
+    :aria-selected="selectionMode ? selected : undefined"
+    @click="onCardClick"
+    @keydown.enter.prevent="onCardActivate"
+    @keydown.space.prevent="onCardActivate"
   >
     <div class="shortcut-card-top">
       <h3 class="shortcut-card-name" :title="shortcut.name">
@@ -118,12 +124,17 @@
   import type { Shortcut } from '../../gen/proto/termbridge/agent/v1/shortcut'
   import { shortcutTagStyle } from './tagStyle'
 
-  const props = defineProps<{ shortcut: Shortcut }>()
+  const props = defineProps<{
+    shortcut: Shortcut
+    selectionMode?: boolean
+    selected?: boolean
+  }>()
   const emit = defineEmits<{
     edit: [shortcut: Shortcut]
     delete: [shortcut: Shortcut]
     copy: [shortcut: Shortcut]
     'toggle-enabled': [shortcut: Shortcut]
+    toggle: [shortcut: Shortcut]
   }>()
   const { t, locale } = useI18n()
 
@@ -135,6 +146,21 @@
 
   function tagStyle(tag: string) {
     return shortcutTagStyle(tag)
+  }
+
+  function onCardClick() {
+    if (!props.selectionMode) {
+      return
+    }
+    emit('toggle', props.shortcut)
+  }
+
+  function onCardActivate() {
+    if (props.selectionMode) {
+      emit('toggle', props.shortcut)
+      return
+    }
+    emit('edit', props.shortcut)
   }
 
   function parseTimestamp(value: string | undefined) {

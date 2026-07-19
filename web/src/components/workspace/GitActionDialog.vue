@@ -1,23 +1,21 @@
-<template>
-  <AlertDialogRoot :open="open" @update:open="emit('update:open', $event)">
-    <AlertDialogPortal>
-      <AlertDialogOverlay class="dialog-overlay" />
-      <AlertDialogContent class="dialog-content">
-        <AlertDialogTitle class="dialog-title">{{ title }}</AlertDialogTitle>
-        <AlertDialogDescription class="dialog-description">{{
-          description
-        }}</AlertDialogDescription>
+﻿<template>
+  <DialogRoot :open="open" @update:open="emit('update:open', $event)">
+    <DialogPortal>
+      <DialogOverlay class="dialog-overlay" />
+      <DialogContent class="dialog-content">
+        <DialogTitle class="dialog-title">{{ title }}</DialogTitle>
+        <DialogDescription class="dialog-description">{{ description }}</DialogDescription>
         <form v-if="requiresValue" class="dialog-form" @submit.prevent="confirmValue">
           <label>
             {{ label }}
             <input v-model="value" :disabled="pending" :placeholder="placeholder" autofocus />
           </label>
           <div class="dialog-actions">
-            <AlertDialogCancel as-child>
+            <DialogClose as-child>
               <button type="button" class="button button-secondary" :disabled="pending">
                 {{ t('common.cancel') }}
               </button>
-            </AlertDialogCancel>
+            </DialogClose>
             <button
               type="submit"
               class="button"
@@ -29,11 +27,11 @@
           </div>
         </form>
         <div v-else class="dialog-actions">
-          <AlertDialogCancel as-child>
+          <DialogClose as-child>
             <button type="button" class="button button-secondary" :disabled="pending">
               {{ t('common.cancel') }}
             </button>
-          </AlertDialogCancel>
+          </DialogClose>
           <button
             type="button"
             class="button"
@@ -44,22 +42,22 @@
             {{ pending ? t('files.gitOperationRunning') : confirmLabel }}
           </button>
         </div>
-      </AlertDialogContent>
-    </AlertDialogPortal>
-  </AlertDialogRoot>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 </template>
 
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import {
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogOverlay,
-    AlertDialogPortal,
-    AlertDialogRoot,
-    AlertDialogTitle,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogOverlay,
+    DialogPortal,
+    DialogRoot,
+    DialogTitle,
   } from 'reka-ui'
 
   const props = withDefaults(

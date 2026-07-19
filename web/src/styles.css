@@ -1557,19 +1557,51 @@ p {
 }
 
 .shortcut-page-main {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
   padding: 20px 32px 24px;
 }
 
-.shortcut-page-content {
-  gap: 16px;
+.shortcut-page {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-/* PageStatus defaults target fixed-height workbench panes. On this page the
-   root is content-sized, so flex:1 + min-height:0 collapses the list to 0. */
+.shortcut-page-content {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+/* Keep header fixed; let the list area scroll when content overflows. */
 .shortcut-page-status.page-status-root {
-  flex: 0 0 auto;
-  min-height: auto;
-  overflow: visible;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.shortcut-page-status.page-status-root > .shortcut-grid,
+.shortcut-page-status.page-status-root > .shortcut-empty,
+.shortcut-page-status.page-status-root > .shortcut-loading {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.shortcut-page-status.page-status-root > .shortcut-grid {
+  overflow: auto;
+}
+
+.shortcut-page-status.page-status-root > .page-status {
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .shortcut-page-header {
@@ -1613,7 +1645,7 @@ p {
 }
 
 .shortcut-search-input {
-  width: 340px;
+  width: 220px;
   max-width: 100%;
   height: 36px;
   flex-shrink: 0;
@@ -1880,9 +1912,23 @@ p {
 }
 
 .shortcut-create-button,
-.shortcut-return-button {
+.shortcut-return-button,
+.shortcut-select-button,
+.shortcut-export-button,
+.shortcut-batch-delete-button,
+.shortcut-import-button {
   min-height: 36px;
   padding: 0 14px;
+}
+
+.shortcut-select-button-active {
+  border-color: var(--color-primary-border);
+  background: color-mix(in srgb, var(--color-primary-border) 18%, var(--color-control-bg));
+  color: var(--color-text-strong);
+}
+
+.shortcut-import-input {
+  display: none;
 }
 
 .shortcut-loading {
@@ -1892,6 +1938,8 @@ p {
 .shortcut-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-content: start;
+  align-items: start;
   gap: 16px;
 }
 
@@ -1940,6 +1988,22 @@ p {
 
 .shortcut-card-disabled {
   opacity: 0.72;
+}
+
+.shortcut-card-selectable {
+  cursor: pointer;
+}
+
+.shortcut-card-selected {
+  border-color: var(--color-primary-border);
+  background: color-mix(in srgb, var(--color-primary-border) 14%, var(--color-surface-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary-border) 55%, transparent);
+}
+
+.shortcut-card-selected:hover,
+.shortcut-card-selected:focus-visible {
+  border-color: var(--color-primary-border);
+  background: color-mix(in srgb, var(--color-primary-border) 20%, var(--color-surface-raised));
 }
 
 .shortcut-card.shortcut-sortable-ghost {
