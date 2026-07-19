@@ -35,10 +35,7 @@
   import { useRoute, useRouter } from 'vue-router'
   import AuthPageFrame from '../../components/cloud/AuthPageFrame.vue'
   import AuthTextField from '../../components/cloud/AuthTextField.vue'
-  import {
-    authPrimaryButtonClass,
-    authSecondaryButtonClass,
-  } from '../../components/cloud/authUi'
+  import { authPrimaryButtonClass, authSecondaryButtonClass } from '../../components/cloud/authUi'
   import { useAsyncAction } from '../../composable/useAsyncAction'
   import { authResendVerification, authVerifyEmail } from '../../features/cloud/api'
   import { useNotificationsStore } from '../../store/notifications'

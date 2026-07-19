@@ -290,7 +290,6 @@
     ),
   )
 
-
   async function refresh() {
     workspaceTreeError.value = null
     await refreshAction.run(async () => {
@@ -305,21 +304,22 @@
     })
   }
 
-  async function openWorkspaceFiles(workspace: WorkspaceSummary) {
-    if (props.runtimeTarget.mode === 'local') {
-      await router.push({
-        name: 'local-workspace-code',
-        params: { workspaceId: workspace.id },
-      })
-      return
-    }
-    await router.push({
-      name: 'cloud-workspace-code',
-      params: {
-        deviceId: props.runtimeTarget.deviceId,
-        workspaceId: workspace.id,
-      },
-    })
+  function openWorkspaceFiles(workspace: WorkspaceSummary) {
+    const route =
+      props.runtimeTarget.mode === 'local'
+        ? {
+            name: 'local-workspace-code',
+            params: { workspaceId: workspace.id },
+          }
+        : {
+            name: 'cloud-workspace-code',
+            params: {
+              deviceId: props.runtimeTarget.deviceId,
+              workspaceId: workspace.id,
+            },
+          }
+    const { href } = router.resolve(route)
+    window.open(href, '_blank', 'noopener,noreferrer')
   }
 
   const shortcutsRoute = computed(() =>
@@ -844,7 +844,6 @@
     terminalState: handleTerminalState,
     terminalError: handleTerminalError,
   }
-
 
   onMounted(async () => {
     try {

@@ -23,11 +23,8 @@ export const treeNodeActionsClass =
 export const treeNodeActionClass =
   'inline-flex size-[18px] min-h-[18px] min-w-[18px] items-center justify-center rounded-sm border-0 bg-transparent p-0 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus-visible:bg-[var(--color-control-hover)] focus-visible:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-primary-border)] max-md:size-7 max-md:min-h-7 max-md:min-w-7'
 
-export const treeNodeActionDangerClass =
-  'hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger-text)] focus-visible:bg-[var(--color-danger-bg)] focus-visible:text-[var(--color-danger-text)]'
-
 export const sidebarStatusCardClass =
   'rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2 text-sm text-[var(--color-text-muted)]'
 
 export const sidebarHeaderIconButtonClass =
-  'button button-secondary button-icon size-7 min-h-7 min-w-7 p-0'
+  'inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-text-muted)] outline-none hover:border-[var(--color-border-strong)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus-visible:border-[var(--color-border-strong)] focus-visible:bg-[var(--color-control-hover)] focus-visible:text-[var(--color-text)]'

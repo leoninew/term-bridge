@@ -1,9 +1,5 @@
 <template>
-  <AuthPageFrame
-    :title="t('cloud.registerTitle')"
-    content-class="text-center"
-    @submit="submit"
-  >
+  <AuthPageFrame :title="t('cloud.registerTitle')" content-class="text-center" @submit="submit">
     <AuthTextField
       v-model="email"
       :label="t('cloud.email')"
@@ -154,5 +150,4 @@
       window.location.href = await authExternalUrl(providerId)
     })
   }
-
 </script>

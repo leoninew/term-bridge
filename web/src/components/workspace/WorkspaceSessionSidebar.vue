@@ -93,19 +93,17 @@
                 <button
                   type="button"
                   :class="treeNodeActionClass"
-                  :aria-label="t('sidebar.openFilesAria', { name: workspace.workspace.name })"
-                  :title="t('sidebar.openFilesAria', { name: workspace.workspace.name })"
+                  :aria-label="t('sidebar.openCodeAria')"
+                  :title="t('sidebar.openCodeAria')"
                   @click.stop="emit('openFiles', workspace.workspace, $event.currentTarget)"
                 >
-                  <FileCode2 class="size-3.5" />
+                  <VscodeCodicon size-class="size-3.5" />
                 </button>
                 <button
                   type="button"
                   :class="treeNodeActionClass"
-                  :aria-label="
-                    t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })
-                  "
-                  :title="t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })"
+                  :aria-label="t('sidebar.newSessionInWorkspaceAria')"
+                  :title="t('sidebar.newSessionInWorkspaceAria')"
                   @click.stop="emit('newSession', workspace.workspace)"
                 >
                   <Plus class="size-3.5" />
@@ -116,7 +114,7 @@
                     !canRemoveWorkspace(workspace) ||
                     props.removingWorkspaceId === workspace.workspace.id
                   "
-                  :class="[treeNodeActionClass, treeNodeActionDangerClass]"
+                  :class="treeNodeActionClass"
                   :aria-label="removeWorkspaceLabel(workspace)"
                   :title="removeWorkspaceLabel(workspace)"
                   @click.stop="emit('removeWorkspace', workspace.workspace)"
@@ -182,7 +180,8 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { FileCode2, Folder, FolderOpen, Loader2, Plus, Trash2 } from '@lucide/vue'
+  import { Folder, FolderOpen, Loader2, Plus, Trash2 } from '@lucide/vue'
+  import VscodeCodicon from '../branding/VscodeCodicon.vue'
   import { VueDraggable } from 'vue-draggable-plus'
   import type { SortableEvent } from 'sortablejs'
   import PageStatus from '../layout/PageStatus.vue'
@@ -194,7 +193,6 @@
   import {
     sidebarStatusCardClass,
     treeNodeActionClass,
-    treeNodeActionDangerClass,
     treeNodeActionsClass,
   } from '../session/sessionUi'
   import WorkspaceSidebarFooter from './WorkspaceSidebarFooter.vue'
@@ -271,15 +269,13 @@
 
   const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
   const switchToFilesAria = computed(() => {
-    if (!props.activeWorkspace) return t('sidebar.switchToFilesDisabled')
-    return t('sidebar.switchToFilesAria', { name: props.activeWorkspace.name })
+    if (!props.activeWorkspace) return t('sidebar.openCodeDisabled')
+    return t('sidebar.openCodeAria')
   })
   function switchToFiles() {
     if (!props.activeWorkspace) return
     emit('openFiles', props.activeWorkspace, null)
   }
-
-
 
   const treeItems = computed<WorkspaceTreeItem[]>(() => {
     return props.workspaceTree
@@ -468,17 +464,15 @@
     return session.lifecycle_state === 'running'
   }
 
-
-
   function canRemoveWorkspace(workspace: WorkspaceTreeItem) {
     return workspace.children.every((child) => !isActiveSession(child.session))
   }
 
   function removeWorkspaceLabel(workspace: WorkspaceTreeItem) {
     if (canRemoveWorkspace(workspace)) {
-      return t('sidebar.removeWorkspaceAria', { name: workspace.workspace.name })
+      return t('sidebar.removeWorkspaceAria')
     }
-    return t('sidebar.removeWorkspaceDisabledAria', { name: workspace.workspace.name })
+    return t('sidebar.removeWorkspaceDisabledAria')
   }
 
   function sessionsFor(workspace: WorkspaceTreeSummary): SessionSummary[] {

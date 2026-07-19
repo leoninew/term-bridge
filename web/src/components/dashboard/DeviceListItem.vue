@@ -1,7 +1,5 @@
 <template>
-  <li
-    class="flex min-w-0 items-center justify-between gap-3 px-3 py-3 sm:gap-4 sm:px-4 sm:py-3.5"
-  >
+  <li class="flex min-w-0 items-center justify-between gap-3 px-3 py-3 sm:gap-4 sm:px-4 sm:py-3.5">
     <div class="min-w-0 flex-1">
       <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <span

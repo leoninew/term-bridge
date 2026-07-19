@@ -10,7 +10,9 @@
       >
         <header class="flex min-h-14 min-w-0 items-center justify-between gap-4">
           <div class="flex min-w-0 flex-1 items-center gap-4">
-            <h1 class="shrink-0 text-[22px] font-semibold leading-tight text-[var(--color-text-strong)]">
+            <h1
+              class="shrink-0 text-[22px] font-semibold leading-tight text-[var(--color-text-strong)]"
+            >
               {{ t('shortcut.title') }}
             </h1>
 
@@ -187,7 +189,10 @@
             />
           </VueDraggable>
 
-          <div v-else-if="filteredShortcuts.length" class="shortcut-grid grid grid-cols-2 content-start items-start gap-4 md:grid-cols-3 xl:grid-cols-4">
+          <div
+            v-else-if="filteredShortcuts.length"
+            class="shortcut-grid grid grid-cols-2 content-start items-start gap-4 md:grid-cols-3 xl:grid-cols-4"
+          >
             <ShortcutCard
               v-for="shortcut in filteredShortcuts"
               :key="shortcut.id"
@@ -245,13 +250,7 @@
 </template>
 
 <script setup lang="ts">
-  import {
-    CheckSquare,
-    Download,
-    Plus,
-    Trash2,
-    Upload,
-  } from '@lucide/vue'
+  import { CheckSquare, Download, Plus, Trash2, Upload } from '@lucide/vue'
   import { computed, onMounted, onUnmounted, ref } from 'vue'
   import { storeToRefs } from 'pinia'
   import { VueDraggable } from 'vue-draggable-plus'
@@ -437,9 +436,7 @@
       shortcutTags.setShortcuts(shortcuts.value)
       selectedTags.value = selectedTags.value.filter((tag) => shortcutTags.tags.includes(tag))
       const availableIds = new Set(shortcuts.value.map((shortcut) => shortcut.id))
-      selectedIds.value = new Set(
-        [...selectedIds.value].filter((id) => availableIds.has(id)),
-      )
+      selectedIds.value = new Set([...selectedIds.value].filter((id) => availableIds.has(id)))
     })
     if (!result.ok) {
       shortcuts.value = []

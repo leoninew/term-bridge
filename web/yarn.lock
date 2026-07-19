@@ -1232,6 +1232,11 @@
     path-browserify "^1.0.1"
     vscode-uri "^3.0.8"
 
+"@vscode/codicons@^0.0.45":
+  version "0.0.45"
+  resolved "https://registry.npmmirror.com/@vscode/codicons/-/codicons-0.0.45.tgz#e5d0531d3c8d0ba26e7b9175ae2e0e579cc73d4f"
+  integrity sha512-1KAZ7XCMagp5Gdrlr4bbbcAqgcIL623iO1wW6rfcSVGAVUQvR0WP7bQx1SbJ11gmV3fdQTSEFIJQ/5C+HuVasw==
+
 "@vscode/diff@0.0.2-7":
   version "0.0.2-7"
   resolved "https://registry.npmmirror.com/@vscode/diff/-/diff-0.0.2-7.tgz"

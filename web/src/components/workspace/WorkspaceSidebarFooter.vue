@@ -93,7 +93,7 @@
       :title="switchToFilesAria"
       @click="emit('switchToFiles')"
     >
-      <FileCode2 class="size-4" />
+      <VscodeCodicon size-class="size-4" />
     </button>
   </footer>
 </template>
@@ -101,7 +101,8 @@
 <script setup lang="ts">
   import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { Check, ChevronRight, FileCode2, Languages, Settings, Sun } from '@lucide/vue'
+  import { Check, ChevronRight, Languages, Settings, Sun } from '@lucide/vue'
+  import VscodeCodicon from '../branding/VscodeCodicon.vue'
   import {
     DropdownMenuContent,
     DropdownMenuPortal,
@@ -116,10 +117,7 @@
   import { localeLabels, locales, setLocale, type AppLocale } from '../../i18n'
   import { themes, useThemeStore, type AppTheme } from '../../store/theme'
   import type { Workspace as WorkspaceSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
-  import {
-    sessionDropdownContentClass,
-    sessionMenuItemClass,
-  } from '../session/sessionUi'
+  import { sessionDropdownContentClass, sessionMenuItemClass } from '../session/sessionUi'
 
   defineProps<{
     activeWorkspace: WorkspaceSummary | null

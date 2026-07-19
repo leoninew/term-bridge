@@ -20,8 +20,8 @@
       <button
         type="button"
         :class="treeNodeActionClass"
-        :aria-label="t('sidebar.copySessionAria', { name: sessionLabel })"
-        :title="t('sidebar.copySessionAria', { name: sessionLabel })"
+        :aria-label="t('sidebar.copySessionAria')"
+        :title="t('sidebar.copySessionAria')"
         @click.stop="emit('copy')"
       >
         <Copy class="size-3.5" />
@@ -43,8 +43,8 @@
       <button
         type="button"
         :class="treeNodeActionClass"
-        :aria-label="t('sidebar.editSessionAria', { name: sessionLabel })"
-        :title="t('sidebar.editSessionAria', { name: sessionLabel })"
+        :aria-label="t('sidebar.editSessionAria')"
+        :title="t('sidebar.editSessionAria')"
         @click.stop="emit('edit')"
       >
         <Pencil class="size-3.5" />
@@ -56,8 +56,8 @@
       type="button"
       :disabled="rerunning"
       :class="treeNodeActionClass"
-      :aria-label="t('sidebar.rerunSessionAria', { name: sessionLabel })"
-      :title="t('sidebar.rerunSessionAria', { name: sessionLabel })"
+      :aria-label="t('sidebar.rerunSessionAria')"
+      :title="t('sidebar.rerunSessionAria')"
       @click.stop="emit('rerun')"
     >
       <Loader2 v-if="rerunning" class="size-3.5 animate-spin" />
@@ -68,9 +68,9 @@
       v-if="session.lifecycle_state === 'running'"
       type="button"
       :disabled="stopping"
-      :class="[treeNodeActionClass, treeNodeActionDangerClass]"
-      :aria-label="t('sidebar.stopSessionAria', { name: sessionLabel })"
-      :title="t('sidebar.stopSessionAria', { name: sessionLabel })"
+      :class="treeNodeActionClass"
+      :aria-label="t('sidebar.stopSessionAria')"
+      :title="t('sidebar.stopSessionAria')"
       @click.stop="emit('stop')"
     >
       <Loader2 v-if="stopping" class="size-3.5 animate-spin" />
@@ -81,9 +81,9 @@
       v-if="isEditable"
       type="button"
       :disabled="deleting"
-      :class="[treeNodeActionClass, treeNodeActionDangerClass]"
-      :aria-label="t('sidebar.deleteSessionAria', { name: sessionLabel })"
-      :title="t('sidebar.deleteSessionAria', { name: sessionLabel })"
+      :class="treeNodeActionClass"
+      :aria-label="t('sidebar.deleteSessionAria')"
+      :title="t('sidebar.deleteSessionAria')"
       @click.stop="emit('delete')"
     >
       <Loader2 v-if="deleting" class="size-3.5 animate-spin" />
@@ -107,11 +107,7 @@
   } from '@lucide/vue'
   import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
-  import {
-    treeNodeActionClass,
-    treeNodeActionDangerClass,
-    treeNodeActionsClass,
-  } from '../session/sessionUi'
+  import { treeNodeActionClass, treeNodeActionsClass } from '../session/sessionUi'
 
   const props = defineProps<{
     session: SessionSummary
@@ -133,6 +129,5 @@
 
   const { t } = useI18n()
 
-  const sessionLabel = computed(() => props.session.name || props.session.command)
   const isEditable = computed(() => ['stopped', 'failed'].includes(props.session.lifecycle_state))
 </script>

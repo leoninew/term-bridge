@@ -81,7 +81,10 @@
                   >
                     {{ shortcut.name }}
                   </span>
-                  <span v-if="shortcut.tags?.length" class="inline-flex max-w-[46%] shrink-0 items-center justify-end gap-1 overflow-hidden">
+                  <span
+                    v-if="shortcut.tags?.length"
+                    class="inline-flex max-w-[46%] shrink-0 items-center justify-end gap-1 overflow-hidden"
+                  >
                     <span
                       v-for="tag in visibleTags(shortcut)"
                       :key="tag"

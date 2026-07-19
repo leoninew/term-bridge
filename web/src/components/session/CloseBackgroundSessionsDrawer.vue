@@ -6,7 +6,9 @@
         class="background-sessions-drawer fixed inset-y-0 right-0 z-50 flex w-[min(680px,calc(100vw-32px))] flex-col border-l border-[var(--color-border)] bg-[var(--color-surface)] text-sm leading-normal text-[var(--color-text)] shadow-[-20px_0_48px_rgb(0_0_0/0.28)]"
         :class="{ 'background-sessions-drawer-closing': closing }"
       >
-        <header class="flex items-center justify-between gap-3 border-b border-[var(--color-border)] p-5">
+        <header
+          class="flex items-center justify-between gap-3 border-b border-[var(--color-border)] p-5"
+        >
           <DrawerTitle class="dialog-title">
             {{ t('dialog.closeBackgroundSessionsTitle') }}
           </DrawerTitle>
@@ -25,11 +27,7 @@
 
         <section class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <div v-if="runningWorkspaceTree.length > 0" class="flex flex-col gap-2">
-            <section
-              v-for="workspace in runningWorkspaceTree"
-              :key="workspace.id"
-              class="min-w-0"
-            >
+            <section v-for="workspace in runningWorkspaceTree" :key="workspace.id" class="min-w-0">
               <div class="flex h-7 min-w-0 items-center gap-1 px-1 py-0.5 text-[var(--color-text)]">
                 <FolderOpen
                   class="size-4 shrink-0 text-[var(--color-text-subtle)]"
@@ -121,7 +119,7 @@
     DrawerRoot,
     DrawerTitle,
   } from 'reka-ui'
-    import {
+  import {
     defaultBackgroundSessionSelectionKeys,
     sessionIdentityKey,
     type SessionIdentity,

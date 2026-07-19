@@ -1,9 +1,5 @@
 <template>
-  <AuthPageFrame
-    :title="t('cloud.forgotPassword')"
-    content-class="text-center"
-    @submit="submit"
-  >
+  <AuthPageFrame :title="t('cloud.forgotPassword')" content-class="text-center" @submit="submit">
     <AuthTextField
       v-model="email"
       :label="t('cloud.email')"

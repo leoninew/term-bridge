@@ -156,15 +156,7 @@
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import {
-    ArrowRight,
-    Folder,
-    FolderOpen,
-    Keyboard,
-    Monitor,
-    Plug,
-    Unplug,
-  } from '@lucide/vue'
+  import { ArrowRight, Folder, FolderOpen, Keyboard, Monitor, Plug, Unplug } from '@lucide/vue'
   import { RouterLink } from 'vue-router'
   import AppPageShell from '../layout/AppPageShell.vue'
   import homeBgUrl from '../../assets/cloud-home-bg.jpg'

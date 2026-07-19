@@ -12,7 +12,6 @@
       <p class="px-4 text-center">{{ bootOverlayLabel }}</p>
     </div>
 
-
     <p v-if="replaying" class="terminal-message warning">{{ t('workbench.replayingHistory') }}</p>
     <p v-if="socket.error.value" class="terminal-message error">{{ socket.error.value }}</p>
   </section>

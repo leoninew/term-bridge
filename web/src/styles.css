@@ -426,7 +426,6 @@ p {
     flex-basis 0.22s ease;
 }
 
-
 /* Sessions mobile sidebar slide */
 .sessions-mobile-sidebar {
   transform: translateX(-105%);
@@ -438,7 +437,6 @@ p {
   transform: translateX(0);
   pointer-events: auto;
 }
-
 
 @media (hover: none), (max-width: 768px) {
   .file-workbench-tree-action {

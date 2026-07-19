@@ -1,25 +1,26 @@
 <template>
   <div
-    class="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2"
+    class="flex h-11 shrink-0 items-stretch gap-1 border-b border-[var(--color-border)] bg-[var(--color-panel-header)] pr-1 pl-2"
   >
     <button
       v-if="showSidebarToggle"
       type="button"
-      class="button button-secondary button-icon shrink-0"
+      class="button button-secondary button-icon shrink-0 self-center"
       :aria-label="t('workbench.openSidebarAria')"
       :title="t('workbench.openSidebarAria')"
       @click="emit('toggleSidebar')"
     >
       <PanelLeft class="size-4" />
     </button>
+
     <TabsList as-child>
       <VueDraggable
         :model-value="openedTabs"
         tag="div"
-        class="tab-strip flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
-        ghost-class="tab-sortable-ghost"
-        chosen-class="tab-sortable-chosen"
-        drag-class="tab-sortable-dragging"
+        class="flex h-full min-w-0 flex-1 overflow-x-auto"
+        ghost-class="opacity-70 bg-[var(--color-surface-muted)]"
+        chosen-class="bg-[var(--color-control-hover)]"
+        drag-class="bg-[var(--color-control-active)] opacity-95 shadow-lg"
         :animation="150"
         handle=".tab-drag-handle"
         item-key="sessionId"
@@ -29,28 +30,31 @@
         <div
           v-for="tab in openedTabs"
           :key="tab.sessionId"
-          class="group relative flex max-w-56 shrink-0 items-center rounded-md border px-0.5 text-sm transition"
-          :class="
-            activeSessionId === tab.sessionId
-              ? 'border-[var(--color-border-strong)] bg-[var(--color-control-active)] text-[var(--color-text-strong)]'
-              : 'border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-control-hover)]'
-          "
+          class="group relative flex min-w-22 max-w-56 shrink-0 items-stretch border-0 border-r border-[var(--color-border)] text-[var(--color-text-muted)] data-[active=true]:bg-[var(--color-panel-bg)] data-[active=true]:text-[var(--color-text-strong)] data-[active=true]:shadow-[inset_0_2px_0_var(--color-primary-border),inset_0_-1px_0_var(--color-panel-bg)] data-[active=false]:hover:bg-[var(--color-control-hover)] data-[active=false]:hover:text-[var(--color-text)]"
+          :data-active="activeSessionId === tab.sessionId ? 'true' : 'false'"
         >
           <TabsTrigger
             :value="tab.sessionId"
-            class="tab-drag-handle flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 outline-none"
+            class="tab-drag-handle grid h-full w-full min-w-0 cursor-pointer grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-1 border-0 bg-transparent px-2 pr-6 text-left text-[13px] leading-tight text-inherit outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-primary-border)]"
           >
-            <SquareTerminal class="size-4 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
             <span
-              class="truncate"
-              :class="lifecycleStateClassName(sessionLifecycleState(tab.workspaceId, tab.sessionId))"
+              class="inline-flex size-5 items-center justify-center text-[var(--color-text-subtle)] group-data-[active=true]:text-[var(--color-text-muted)]"
+              aria-hidden="true"
+            >
+              <SquareTerminal class="size-3.5" />
+            </span>
+            <span
+              class="min-w-0 truncate"
+              :class="
+                lifecycleStateClassName(sessionLifecycleState(tab.workspaceId, tab.sessionId))
+              "
             >
               {{ sessionTitle(tab.workspaceId, tab.sessionId) }}
             </span>
           </TabsTrigger>
           <button
             type="button"
-            class="rounded-md p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)]"
+            class="absolute top-1/2 right-0.5 z-1 inline-flex size-5.5 -translate-y-1/2 items-center justify-center rounded border-0 bg-transparent p-0 text-inherit opacity-0 outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus-visible:bg-[var(--color-control-hover)] focus-visible:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-primary-border)] group-hover:opacity-100 group-focus-within:opacity-100 group-data-[active=true]:opacity-100 [@media(hover:none)]:opacity-100"
             :aria-label="
               t('workbench.closeTabAria', {
                 name: sessionTitle(tab.workspaceId, tab.sessionId),
@@ -68,9 +72,11 @@
         </div>
       </VueDraggable>
     </TabsList>
+
     <DropdownMenuRoot>
       <DropdownMenuTrigger
         :class="sessionIconButtonClass"
+        class="self-center"
         :aria-label="t('workbench.tabMenuAria')"
         :title="t('workbench.tabMenuAria')"
       >
@@ -88,7 +94,10 @@
             :class="sessionMenuItemInteractiveClass"
             @select="emit('closeTerminalTabs')"
           >
-            <CircleStop class="size-4 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
+            <CircleStop
+              class="size-4 shrink-0 text-[var(--color-text-subtle)]"
+              aria-hidden="true"
+            />
             {{ t('workbench.closeTerminalTabs') }}
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -113,10 +122,15 @@
             class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none data-[highlighted]:bg-[var(--color-control-hover)]"
             @select="emit('activateTab', tab.sessionId)"
           >
-            <SquareTerminal class="size-4 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
+            <SquareTerminal
+              class="size-4 shrink-0 text-[var(--color-text-subtle)]"
+              aria-hidden="true"
+            />
             <span
               class="min-w-0 flex-1 truncate"
-              :class="lifecycleStateClassName(sessionLifecycleState(tab.workspaceId, tab.sessionId))"
+              :class="
+                lifecycleStateClassName(sessionLifecycleState(tab.workspaceId, tab.sessionId))
+              "
             >
               {{ sessionTitle(tab.workspaceId, tab.sessionId) }}
             </span>
@@ -148,10 +162,7 @@
   import { VueDraggable } from 'vue-draggable-plus'
   import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import type { OpenSessionTab } from '../../store/workbench'
-    import {
-    sessionIconButtonClass,
-    sessionMenuItemInteractiveClass,
-  } from './sessionUi'
+  import { sessionIconButtonClass, sessionMenuItemInteractiveClass } from './sessionUi'
 
   withDefaults(
     defineProps<{
@@ -181,28 +192,3 @@
 
   const { t } = useI18n()
 </script>
-
-<style scoped>
-  .tab-sortable-ghost {
-    border-color: var(--color-border-strong) !important;
-    border-style: dashed;
-    background: var(--color-surface-muted) !important;
-    color: var(--color-text-subtle) !important;
-    opacity: 0.72;
-  }
-
-  .tab-sortable-chosen {
-    border-color: var(--color-border-strong) !important;
-    background: var(--color-control-hover) !important;
-    box-shadow: 0 0 0 1px var(--color-border-strong);
-    cursor: pointer;
-  }
-
-  .tab-sortable-dragging {
-    border-color: var(--color-border-strong) !important;
-    background: var(--color-control-active) !important;
-    box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 20%, transparent);
-    cursor: pointer;
-    opacity: 0.96;
-  }
-</style>
