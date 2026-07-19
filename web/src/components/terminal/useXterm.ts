@@ -64,9 +64,15 @@ export function xtermThemeFor(theme: AppTheme) {
   }
 }
 
-function terminalOptions(theme: AppTheme = 'dark') {
+/** Hide terminal cursor (DECTCEM). Used for read-only history replay. */
+const hideCursorSequence = new TextEncoder().encode('\u001b[?25l')
+
+function terminalOptions(theme: AppTheme = 'dark', mode: XtermDiagnostics['source'] = 'live') {
+  const readOnly = mode === 'history' || mode === 'measure'
   return {
-    cursorBlink: true,
+    cursorBlink: !readOnly,
+    cursorInactiveStyle: readOnly ? ('none' as const) : undefined,
+    disableStdin: readOnly,
     fontFamily: 'Cascadia Mono, Consolas, monospace',
     fontSize: 13,
     scrollback: 5000,
@@ -185,7 +191,7 @@ function describeUnsettledLayout(
 }
 
 export function measureXtermSize(element: HTMLElement): { cols: number; rows: number } | null {
-  const terminal = new Terminal(terminalOptions())
+  const terminal = new Terminal(terminalOptions('dark', 'measure'))
   const fitAddon = new FitAddon()
   terminal.loadAddon(fitAddon)
   try {
@@ -223,10 +229,13 @@ export function createXterm(
   diagnostics: XtermDiagnostics,
   theme: AppTheme = 'dark',
 ): XtermController {
-  const terminal = new Terminal(terminalOptions(theme))
+  const readOnly = diagnostics.source === 'history'
+  const terminal = new Terminal(terminalOptions(theme, diagnostics.source))
   const fitAddon = new FitAddon()
   const webLinksAddon = new WebLinksAddon()
-  const disposables = [terminal.onData(onData), terminal.onBinary(onBinary)]
+  const disposables = readOnly
+    ? []
+    : [terminal.onData(onData), terminal.onBinary(onBinary)]
   let hostElement: HTMLElement | undefined
   let observer: ResizeObserver | undefined
   let lastCols = 0
@@ -511,6 +520,9 @@ export function createXterm(
         },
         { sample: drainCount },
       )
+      if (writeQueue.length === 0 && readOnly) {
+        terminal.write(hideCursorSequence)
+      }
       drainWrites()
     })
   }
@@ -563,7 +575,11 @@ export function createXterm(
         scheduleResize('resize-observer')
       })
       observer.observe(element)
-      terminal.focus()
+      if (readOnly) {
+        terminal.write(hideCursorSequence)
+      } else {
+        terminal.focus()
+      }
     },
     fit(reason: FitReason = 'explicit') {
       emitResize(reason)

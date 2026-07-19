@@ -22,6 +22,8 @@
     if (props.history) {
       xterm?.write(new TextEncoder().encode(props.history))
     }
+    // History may contain CSI ? 25 h; always re-hide after replay.
+    xterm?.write(new TextEncoder().encode('\u001b[?25l'))
   }
 
   onMounted(() => {
