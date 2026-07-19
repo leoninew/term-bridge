@@ -1,13 +1,13 @@
 <template>
   <DialogRoot :open="open" @update:open="emit('update:open', $event)">
     <DialogPortal>
-      <DialogOverlay class="dialog-overlay shortcut-dialog-overlay" />
-      <DialogContent class="dialog-content shortcut-dialog-content">
+      <DialogOverlay class="dialog-overlay" />
+      <DialogContent class="dialog-content w-[min(576px,calc(100vw-32px))]">
         <DialogTitle class="dialog-title">
           {{ shortcut ? t('shortcut.editTitle') : t('shortcut.createTitle') }}
         </DialogTitle>
 
-        <form class="dialog-form shortcut-editor-form" @submit.prevent="submit">
+        <form class="dialog-form" @submit.prevent="submit">
           <label>
             <span>{{ t('dialog.name') }}</span>
             <input v-model="name" :disabled="saving" autocomplete="off" />

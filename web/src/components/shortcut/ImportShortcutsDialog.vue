@@ -1,8 +1,8 @@
 ﻿<template>
   <DialogRoot :open="open" @update:open="emit('update:open', $event)">
     <DialogPortal>
-      <DialogOverlay class="dialog-overlay shortcut-dialog-overlay" />
-      <DialogContent class="dialog-content shortcut-delete-dialog">
+      <DialogOverlay class="dialog-overlay" />
+      <DialogContent class="dialog-content w-[min(448px,calc(100vw-32px))]">
         <div class="dialog-header">
           <DialogTitle class="dialog-title">
             {{ t('shortcut.importConfirmTitle') }}

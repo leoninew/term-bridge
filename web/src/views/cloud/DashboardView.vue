@@ -1,7 +1,5 @@
 <template>
-  <AppPageShell
-    main-class="flex items-start justify-center px-4 py-5 text-sm sm:items-center sm:px-6 sm:py-8 lg:px-8 2xl:px-12"
-  >
+  <AppPageShell :main-class="dashboardPageMainClass">
     <template #actions>
       <CloudAccountMenu
         :authenticated="cloudAuth.authenticated"
@@ -13,26 +11,28 @@
         @change-password="openChangePassword"
       />
     </template>
-    <div class="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
-      <section
-        class="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+
+    <div :class="dashboardPageContentClass">
+      <HomePreviewPanel
+        heading="h1"
+        :title="t('dashboard.devicesTitle')"
+        :loading="devicesAction.running"
+        :error="deviceError || null"
+        :empty="!devicesAction.running && !deviceError && cloudDevices.devices.length === 0"
+        :loading-text="t('dashboard.loadingDevices')"
+        :empty-text="t('dashboard.emptyTitle')"
       >
-        <div
-          class="flex flex-col gap-3 border-b border-[var(--color-border)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
-        >
-          <h1 class="text-base font-semibold text-[var(--color-text-strong)] sm:text-lg">
-            {{ t('dashboard.devicesTitle') }}
-          </h1>
+        <template #action>
           <div class="flex flex-wrap items-center gap-1 sm:gap-2">
-            <RouterLink
-              :to="{ name: 'home' }"
-              class="inline-flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] sm:h-8 sm:px-1.5"
-            >
+            <RouterLink :to="{ name: 'home' }" :class="homePanelActionClass">
               {{ t('dashboard.home') }}
             </RouterLink>
             <button
               type="button"
-              class="inline-flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus:text-[var(--color-text)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)] sm:h-8 sm:px-1.5"
+              :class="[
+                homePanelActionClass,
+                'disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]',
+              ]"
               :disabled="devicesAction.running"
               @click="refreshDevices"
             >
@@ -42,88 +42,19 @@
               }}
             </button>
           </div>
-        </div>
+        </template>
 
-        <PageStatus
-          class="min-w-0"
-          :loading="devicesAction.running"
-          :error="deviceError || null"
-          :empty="!devicesAction.running && !deviceError && cloudDevices.devices.length === 0"
-          :loading-text="t('dashboard.loadingDevices')"
-          :empty-text="t('dashboard.emptyTitle')"
-        >
-          <template #loading>
-            <div class="p-4 text-sm text-[var(--color-text-muted)] sm:p-5">
-              {{ t('dashboard.loadingDevices') }}
-            </div>
-          </template>
-          <template #error>
-            <div class="p-4 text-sm text-[var(--color-danger-text)] sm:p-5">{{ deviceError }}</div>
-          </template>
-          <template #empty>
-            <div class="p-4 text-sm text-[var(--color-text-muted)] sm:p-5">
-              {{ t('dashboard.emptyTitle') }}
-            </div>
-          </template>
-          <ul class="divide-y divide-[var(--color-border)]">
-            <li
-              v-for="device in cloudDevices.devices"
-              :key="device.id"
-              class="flex min-w-0 items-center justify-between gap-3 px-4 py-3.5 sm:gap-4 sm:px-5 sm:py-4"
-            >
-              <div class="min-w-0 flex-1">
-                <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <span
-                    class="size-2 shrink-0 rounded-full"
-                    :class="device.online ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
-                  />
-                  <Monitor class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
-                  <span class="min-w-0 truncate text-sm text-[var(--color-text-strong)]">
-                    {{ device.name }}
-                  </span>
-                  <span class="shrink-0 text-xs text-[var(--color-text-muted)] sm:text-sm">
-                    {{ device.online ? t('cloud.online') : t('cloud.offline') }}
-                  </span>
-                </div>
-                <p
-                  class="mt-1 truncate pl-6 text-xs text-[var(--color-text-muted)] sm:pl-8 sm:text-sm"
-                >
-                  {{ deviceActivity(device) }}
-                </p>
-              </div>
-              <div class="flex shrink-0 items-center gap-1">
-                <button
-                  v-if="!device.online"
-                  type="button"
-                  class="inline-flex size-10 items-center justify-center rounded-md text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-danger-text)] focus:bg-[var(--color-surface-muted)] focus:text-[var(--color-danger-text)] disabled:cursor-not-allowed disabled:opacity-60 sm:size-8"
-                  :disabled="deletingDeviceId === device.id || deleteDeviceAction.running"
-                  :aria-label="t('dashboard.deleteDeviceAria', { name: device.name })"
-                  :title="t('dashboard.deleteOfflineDevice')"
-                  @click.stop="openDeleteDevice(device)"
-                >
-                  <Trash2 class="size-4" />
-                </button>
-                <button
-                  type="button"
-                  class="inline-flex size-10 items-center justify-center rounded-md outline-none disabled:cursor-not-allowed sm:size-8"
-                  :disabled="!device.online"
-                  :aria-label="t('dashboard.openWorkbench')"
-                  @click="openCloudSessions(device.id)"
-                >
-                  <ArrowRight
-                    class="size-5"
-                    :class="
-                      device.online
-                        ? 'text-[var(--color-text-subtle)]'
-                        : 'text-[var(--color-text-muted)]'
-                    "
-                  />
-                </button>
-              </div>
-            </li>
-          </ul>
-        </PageStatus>
-      </section>
+        <ul class="divide-y divide-[var(--color-border)]">
+          <DeviceListItem
+            v-for="device in cloudDevices.devices"
+            :key="device.id"
+            :device="device"
+            :deleting="deletingDeviceId === device.id || deleteDeviceAction.running"
+            @delete="openDeleteDevice"
+            @open="(item) => openCloudSessions(item.id)"
+          />
+        </ul>
+      </HomePreviewPanel>
     </div>
   </AppPageShell>
 
@@ -139,13 +70,19 @@
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { ArrowRight, Monitor, RefreshCw, Trash2 } from '@lucide/vue'
+  import { RefreshCw } from '@lucide/vue'
   import { RouterLink, useRouter } from 'vue-router'
   import AppPageShell from '../../components/layout/AppPageShell.vue'
-  import PageStatus from '../../components/layout/PageStatus.vue'
   import { useAsyncAction } from '../../composable/useAsyncAction'
   import CloudAccountMenu from '../../components/dashboard/CloudAccountMenu.vue'
   import DeleteDeviceDialog from '../../components/dashboard/DeleteDeviceDialog.vue'
+  import DeviceListItem from '../../components/dashboard/DeviceListItem.vue'
+  import HomePreviewPanel from '../../components/dashboard/HomePreviewPanel.vue'
+  import {
+    dashboardPageContentClass,
+    dashboardPageMainClass,
+    homePanelActionClass,
+  } from '../../components/dashboard/homeUi'
   import { authLogout } from '../../features/cloud/api'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
   import { useCloudAuthStore } from '../../store/cloudAuth'
@@ -195,7 +132,7 @@
     try {
       await authLogout()
     } catch {
-      // ignore logout API errors — clear local state anyway
+      // ignore logout API errors ? clear local state anyway
     }
     cloudAuth.clearToken()
     await router.replace({ name: 'home' })
@@ -262,21 +199,6 @@
         selectedDevice.value = null
       }
     }
-  }
-
-  function deviceActivity(device: DeviceSummary) {
-    if (device.online && device.connected_at) {
-      return t('dashboard.connectedAt', { value: formatTime(device.connected_at) })
-    }
-    if (device.last_seen) {
-      return t('dashboard.lastSeenAt', { value: formatTime(device.last_seen) })
-    }
-    return t('dashboard.noActivity')
-  }
-
-  function formatTime(value: string) {
-    const date = new Date(value)
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
   }
 
   onMounted(() => {

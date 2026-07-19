@@ -1,15 +1,16 @@
 <template>
-  <section
-    class="flex min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
-  >
-    {{ t('cloud.checkingAuth') }}
-  </section>
+  <AuthStatusScreen
+    status="loading"
+    :title="t('cloud.checkingAuth')"
+    :description="t('cloud.externalSigningInHint')"
+  />
 </template>
 
 <script setup lang="ts">
   import { onMounted } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRouter } from 'vue-router'
+  import AuthStatusScreen from '../../components/cloud/AuthStatusScreen.vue'
 
   const { t } = useI18n()
   const router = useRouter()

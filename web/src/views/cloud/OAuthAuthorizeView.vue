@@ -1,22 +1,18 @@
 <template>
-  <section
-    v-if="checkingAuth"
-    class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
-  >
-    {{ t('cloud.checkingAuth') }}
-  </section>
-  <section
-    v-else
-    class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
-  >
-    {{ t('dashboard.signInWithOAuth') }}
-  </section>
+  <AuthStatusScreen
+    :status="status"
+    :title="title"
+    :description="description"
+    :footer-to="status === 'error' ? { name: 'home' } : undefined"
+    :footer-label="status === 'error' ? t('dashboard.home') : ''"
+  />
 </template>
 
 <script setup lang="ts">
-  import { onMounted, ref } from 'vue'
+  import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
+  import AuthStatusScreen from '../../components/cloud/AuthStatusScreen.vue'
   import { cloudOAuthAuthorize } from '../../features/cloud/api'
   import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useNotificationsStore } from '../../store/notifications'
@@ -26,7 +22,14 @@
   const router = useRouter()
   const cloudAuth = useCloudAuthStore()
   const notifications = useNotificationsStore()
-  const checkingAuth = ref(true)
+  const status = ref<'loading' | 'error'>('loading')
+
+  const title = computed(() =>
+    status.value === 'error' ? t('cloud.loginFailed') : t('cloud.oauthAuthorizeWorking'),
+  )
+  const description = computed(() =>
+    status.value === 'error' ? t('cloud.oauthCallbackFailedHint') : t('cloud.oauthAuthorizeHint'),
+  )
 
   onMounted(async () => {
     try {
@@ -37,10 +40,8 @@
       }
       window.location.href = await cloudOAuthAuthorize(route.fullPath)
     } catch (err) {
+      status.value = 'error'
       notifications.notifyError(t('cloud.loginFailed'), err)
-      await router.replace({ name: 'home' })
-    } finally {
-      checkingAuth.value = false
     }
   })
 </script>

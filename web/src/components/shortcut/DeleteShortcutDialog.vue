@@ -1,8 +1,8 @@
 <template>
   <AlertDialogRoot :open="open" @update:open="emit('update:open', $event)">
     <AlertDialogPortal>
-      <AlertDialogOverlay class="dialog-overlay shortcut-dialog-overlay" />
-      <AlertDialogContent class="dialog-content shortcut-delete-dialog">
+      <AlertDialogOverlay class="dialog-overlay" />
+      <AlertDialogContent class="dialog-content w-[min(448px,calc(100vw-32px))]">
         <div class="dialog-header">
           <AlertDialogTitle class="dialog-title">{{ t('shortcut.deleteTitle') }}</AlertDialogTitle>
           <AlertDialogDescription class="dialog-description">

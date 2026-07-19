@@ -12,7 +12,8 @@
       <p class="px-4 text-center">{{ bootOverlayLabel }}</p>
     </div>
 
-    <p v-if="replaying" class="terminal-message warning">Replaying bounded history…</p>
+
+    <p v-if="replaying" class="terminal-message warning">{{ t('workbench.replayingHistory') }}</p>
     <p v-if="socket.error.value" class="terminal-message error">{{ socket.error.value }}</p>
   </section>
 </template>
@@ -91,7 +92,10 @@
       if (message.type === 'replay_finished') {
         replaying.value = false
         if (message.truncated) {
-          xterm?.terminal.writeln('\r\n[termbridge] 当前仅显示最近终端历史，较早输出已截断。')
+          console.warn(
+            '[termbridge] terminal history replay truncated; only recent output is shown',
+            { sessionId: props.sessionId },
+          )
         }
       }
       if (message.type === 'error') {
@@ -311,6 +315,7 @@
     () => {
       connectAttemptedForUrl = null
       sessionStarted.value = false
+      replaying.value = false
       connect('wsUrl-changed')
       void nextTick(() => scheduleTerminalFocus('wsUrl-changed'))
     },

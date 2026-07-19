@@ -1,19 +1,23 @@
 <template>
-  <AppPageShell main-class="shortcut-page-main">
-    <section class="shortcut-page bg-[var(--color-app-bg)] text-[var(--color-text)]">
-      <section class="shortcut-page-content mx-auto flex w-full max-w-[1440px] flex-col">
-        <header class="shortcut-page-header">
-          <div class="shortcut-toolbar-left">
-            <div class="shortcut-title-group">
-              <h1 class="shortcut-page-title">
-                {{ t('shortcut.title') }}
-              </h1>
-            </div>
+  <AppPageShell
+    main-class="shortcut-page-main flex min-h-0 flex-col overflow-hidden px-8 py-5 pb-6"
+  >
+    <section
+      class="shortcut-page flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--color-app-bg)] text-[var(--color-text)]"
+    >
+      <section
+        class="shortcut-page-content mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-4 overflow-hidden"
+      >
+        <header class="flex min-h-14 min-w-0 items-center justify-between gap-4">
+          <div class="flex min-w-0 flex-1 items-center gap-4">
+            <h1 class="shrink-0 text-[22px] font-semibold leading-tight text-[var(--color-text-strong)]">
+              {{ t('shortcut.title') }}
+            </h1>
 
-            <div class="shortcut-toolbar-filters">
+            <div class="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto">
               <input
                 v-model="filterQuery"
-                class="shortcut-search-input"
+                class="h-9 w-[220px] max-w-full shrink-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 text-sm leading-none text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)] focus:shadow-[0_0_0_3px_var(--color-surface-muted)]"
                 :placeholder="t('shortcut.filterPlaceholder')"
                 type="search"
               />
@@ -54,11 +58,11 @@
             </div>
           </div>
 
-          <div class="shortcut-toolbar-right">
+          <div class="flex shrink-0 items-center gap-3">
             <button
               type="button"
-              class="button button-secondary shortcut-select-button inline-flex items-center gap-1"
-              :class="{ 'shortcut-select-button-active': selectionMode }"
+              class="button button-secondary inline-flex items-center gap-1"
+              :class="{ 'shortcut-select-active': selectionMode }"
               :aria-pressed="selectionMode"
               :title="selectionMode ? t('shortcut.selectAllTip') : undefined"
               :aria-keyshortcuts="selectionMode ? 'Control+A Meta+A' : undefined"
@@ -71,7 +75,7 @@
             <button
               v-if="selectedCount > 0"
               type="button"
-              class="button button-secondary shortcut-export-button inline-flex items-center gap-1"
+              class="button button-secondary inline-flex items-center gap-1"
               :disabled="busy"
               @click="exportSelected"
             >
@@ -81,7 +85,7 @@
             <button
               v-if="selectedCount > 0"
               type="button"
-              class="button button-danger shortcut-batch-delete-button inline-flex items-center gap-1"
+              class="button button-danger inline-flex items-center gap-1"
               :disabled="busy"
               @click="openBatchDelete"
             >
@@ -90,7 +94,7 @@
             </button>
             <button
               type="button"
-              class="button button-secondary shortcut-import-button inline-flex items-center gap-1"
+              class="button button-secondary inline-flex items-center gap-1"
               :disabled="busy"
               @click="openImportPicker"
             >
@@ -99,16 +103,16 @@
             </button>
             <button
               type="button"
-              class="button button-primary shortcut-create-button inline-flex items-center gap-1"
+              class="button button-primary inline-flex items-center gap-1"
               :disabled="busy"
               @click="openCreate"
             >
               <Plus class="size-4" aria-hidden="true" />
-              {{ t('shortcut.createTitle') }}
+              {{ t('common.create') }}
             </button>
             <button
               type="button"
-              class="button button-secondary shortcut-return-button"
+              class="button button-secondary"
               :disabled="busy"
               @click="props.returnToWorkspace"
             >
@@ -116,7 +120,7 @@
             </button>
             <input
               ref="importInput"
-              class="shortcut-import-input"
+              class="hidden"
               type="file"
               accept="application/json,.json"
               @change="onImportFileChange"
@@ -125,7 +129,7 @@
         </header>
 
         <PageStatus
-          class="shortcut-page-status"
+          class="shortcut-page-status min-h-0 flex-1 overflow-hidden"
           :loading="loading"
           :error="loadError"
           :empty="!loading && !loadError && shortcuts.length === 0"
@@ -133,20 +137,20 @@
           :empty-text="t('shortcut.empty')"
         >
           <template #loading>
-            <p class="shortcut-loading text-center text-sm text-[var(--color-text-muted)]">
+            <p class="shortcut-loading py-8 text-center text-sm text-[var(--color-text-muted)]">
               {{ t('shortcut.loading') }}
             </p>
           </template>
           <template #error>
             <section
-              class="shortcut-empty border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] text-center text-sm text-[var(--color-danger-text)]"
+              class="shortcut-empty rounded-lg border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] p-11 text-center text-sm text-[var(--color-danger-text)]"
             >
               {{ loadError }}
             </section>
           </template>
           <template #empty>
             <section
-              class="shortcut-empty border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] text-center text-sm text-[var(--color-text-muted)]"
+              class="shortcut-empty rounded-lg border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] p-11 text-center text-sm text-[var(--color-text-muted)]"
             >
               {{ t('shortcut.empty') }}
             </section>
@@ -156,7 +160,7 @@
             v-if="!filtering"
             v-model="shortcuts"
             tag="div"
-            class="shortcut-grid"
+            class="shortcut-grid grid grid-cols-2 content-start items-start gap-4 md:grid-cols-3 xl:grid-cols-4"
             item-key="id"
             :animation="150"
             :disabled="reordering || selectionMode"
@@ -183,7 +187,7 @@
             />
           </VueDraggable>
 
-          <div v-else-if="filteredShortcuts.length" class="shortcut-grid">
+          <div v-else-if="filteredShortcuts.length" class="shortcut-grid grid grid-cols-2 content-start items-start gap-4 md:grid-cols-3 xl:grid-cols-4">
             <ShortcutCard
               v-for="shortcut in filteredShortcuts"
               :key="shortcut.id"
@@ -200,7 +204,7 @@
 
           <section
             v-else
-            class="shortcut-empty border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] text-center text-sm text-[var(--color-text-muted)]"
+            class="shortcut-empty rounded-lg border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] p-11 text-center text-sm text-[var(--color-text-muted)]"
           >
             {{ t('shortcut.noFilterMatches') }}
           </section>
@@ -241,7 +245,13 @@
 </template>
 
 <script setup lang="ts">
-  import { CheckSquare, Download, Plus, Trash2, Upload } from '@lucide/vue'
+  import {
+    CheckSquare,
+    Download,
+    Plus,
+    Trash2,
+    Upload,
+  } from '@lucide/vue'
   import { computed, onMounted, onUnmounted, ref } from 'vue'
   import { storeToRefs } from 'pinia'
   import { VueDraggable } from 'vue-draggable-plus'

@@ -1,7 +1,5 @@
 <template>
-  <AppPageShell
-    main-class="flex flex-col overflow-y-auto px-3 py-4 text-sm sm:px-5 sm:py-6 md:px-6 md:py-8"
-  >
+  <AppPageShell :main-class="homePageMainClass">
     <template #actions>
       <CloudAccountMenu
         :authenticated="cloudAuth.authenticated"
@@ -14,97 +12,65 @@
       />
     </template>
 
-    <div class="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-4 sm:gap-5">
-      <section
-        class="relative min-h-[240px] overflow-hidden rounded-2xl border border-[var(--color-border)] shadow-xl sm:min-h-[280px]"
+    <div :class="homePageContentClass">
+      <HomeHeroBanner
+        :background-url="cloudHomeBgUrl"
+        :version="projectVersionLabel"
+        content-class="flex items-center"
       >
-        <div
-          class="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          :style="{ backgroundImage: `url(${cloudHomeBgUrl})` }"
-          aria-hidden="true"
-        />
-        <div
-          class="absolute inset-0 bg-gradient-to-r from-[var(--color-surface)] via-[var(--color-surface)]/88 to-[var(--color-surface)]/35"
-          aria-hidden="true"
-        />
+        <div class="relative flex max-w-md flex-col items-start gap-5 text-left">
+          <div class="w-full">
+            <h1
+              class="text-2xl font-semibold leading-tight tracking-tight text-[var(--color-text-strong)] sm:text-3xl"
+            >
+              {{ landingTitle }}
+            </h1>
+            <p
+              class="mt-3 text-sm leading-6 text-[var(--color-text-muted)] sm:text-[15px] sm:leading-7"
+            >
+              {{ landingCopy }}
+            </p>
+          </div>
 
-        <div class="relative flex min-h-[240px] items-center p-4 sm:min-h-[280px] sm:p-6 lg:p-8">
-          <span
-            v-if="projectVersionLabel"
-            class="home-version-tag absolute right-4 top-4 sm:right-6 sm:top-6 lg:right-8 lg:top-8"
-            :title="t('dashboard.cloudCurrentVersion', { version: projectVersionLabel })"
-          >
-            <Tag class="home-version-tag-icon" aria-hidden="true" />
-            <span class="home-version-tag-text">{{ projectVersionLabel }}</span>
-          </span>
-          <div class="relative max-w-md flex flex-col items-start gap-5 text-left">
-            <div class="w-full">
-              <h1
-                class="text-2xl font-semibold leading-tight tracking-tight text-[var(--color-text-strong)] sm:text-3xl"
-              >
-                {{ landingTitle }}
-              </h1>
-              <p
-                class="mt-3 text-sm leading-6 text-[var(--color-text-muted)] sm:text-[15px] sm:leading-7"
-              >
-                {{ landingCopy }}
-              </p>
-            </div>
-
-            <div class="flex flex-row flex-wrap items-center justify-start gap-2">
-              <button
-                v-if="!cloudAuth.authenticated"
-                type="button"
-                class="button button-primary !rounded-xl h-11 justify-center gap-1.5 px-4 text-sm sm:h-9 sm:px-3"
-                :disabled="cloudAuthLoading"
-                @click="openCloudLogin"
-              >
-                {{ cloudAuthLoading ? t('cloud.checkingAuth') : t('dashboard.cloudSignInCta') }}
-                <ArrowRight class="size-3.5" />
-              </button>
-              <RouterLink
-                v-else
-                :to="{ name: 'cloud-dashboard' }"
-                class="button button-primary !rounded-xl h-11 justify-center gap-1.5 px-4 text-sm sm:h-9 sm:px-3"
-              >
-                {{ t('dashboard.viewDeviceStatus') }}
-                <ArrowRight class="size-3.5" />
-              </RouterLink>
-              <button
-                v-if="runtimeConfig.config.local.mode === 'hybrid'"
-                type="button"
-                class="button button-secondary !rounded-xl h-11 justify-center gap-1.5 px-4 text-sm sm:h-9 sm:px-3"
-                @click="openLocalEntry"
-              >
-                {{ t('dashboard.openLocalPage') }}
-              </button>
-            </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              v-if="!cloudAuth.authenticated"
+              type="button"
+              :class="[homeCtaClass, 'button-primary']"
+              :disabled="cloudAuthLoading"
+              @click="openCloudLogin"
+            >
+              {{ cloudAuthLoading ? t('cloud.checkingAuth') : t('dashboard.cloudSignInCta') }}
+              <ArrowRight class="size-3.5" />
+            </button>
+            <RouterLink
+              v-else
+              :to="{ name: 'cloud-dashboard' }"
+              :class="[homeCtaClass, 'button-primary']"
+            >
+              {{ t('dashboard.viewDeviceStatus') }}
+              <ArrowRight class="size-3.5" />
+            </RouterLink>
+            <button
+              v-if="runtimeConfig.config.local.mode === 'hybrid'"
+              type="button"
+              :class="[homeCtaClass, 'button-secondary']"
+              @click="openLocalEntry"
+            >
+              {{ t('dashboard.openLocalPage') }}
+            </button>
           </div>
         </div>
-      </section>
+      </HomeHeroBanner>
 
       <section class="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-        <article
+        <HomeFlowStepCard
           v-for="step in flowSteps"
           :key="step.title"
-          class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-xl sm:p-5"
-        >
-          <div class="inline-flex max-w-full flex-nowrap items-center gap-2">
-            <span
-              class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 sm:size-10"
-            >
-              <component :is="step.icon" class="size-4 sm:size-5" />
-            </span>
-            <div class="min-w-0">
-              <h2 class="text-sm font-semibold text-[var(--color-text-strong)] sm:text-base">
-                {{ step.title }}
-              </h2>
-              <p class="mt-1.5 text-sm leading-6 text-[var(--color-text-muted)]">
-                {{ step.copy }}
-              </p>
-            </div>
-          </div>
-        </article>
+          :icon="step.icon"
+          :title="step.title"
+          :copy="step.copy"
+        />
       </section>
     </div>
 
@@ -115,14 +81,11 @@
           href="https://beian.miit.gov.cn/"
           target="_blank"
           rel="noopener noreferrer"
-          class="outline-none transition-colors hover:text-[var(--color-text-muted)] focus-visible:text-[var(--color-text-muted)]"
+          :class="homeFooterLinkClass"
         >
-          鄂ICP备2026011519号-2
+          ?ICP?2026011519?-2
         </a>
-        <a
-          href="mailto:support@preflite.cn"
-          class="outline-none transition-colors hover:text-[var(--color-text-muted)] focus-visible:text-[var(--color-text-muted)]"
-        >
+        <a href="mailto:support@preflite.cn" :class="homeFooterLinkClass">
           {{ t('dashboard.cloudFooterSupport') }}
         </a>
       </div>
@@ -133,11 +96,19 @@
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { ArrowRight, Cloud, Monitor, SquareTerminal, Tag } from '@lucide/vue'
+  import { ArrowRight, Cloud, Monitor, SquareTerminal } from '@lucide/vue'
   import { RouterLink, useRouter } from 'vue-router'
   import AppPageShell from '../layout/AppPageShell.vue'
   import cloudHomeBgUrl from '../../assets/cloud-home-bg.jpg'
   import CloudAccountMenu from './CloudAccountMenu.vue'
+  import HomeFlowStepCard from './HomeFlowStepCard.vue'
+  import HomeHeroBanner from './HomeHeroBanner.vue'
+  import {
+    homeCtaClass,
+    homeFooterLinkClass,
+    homePageContentClass,
+    homePageMainClass,
+  } from './homeUi'
   import { authLogout } from '../../features/cloud/api'
   import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useRuntimeConfigStore } from '../../store/runtimeConfig'

@@ -2,51 +2,13 @@
   <aside
     class="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--color-sidebar-bg)] text-[var(--color-text)]"
   >
-    <header
-      class="flex h-11 shrink-0 items-center border-b border-[var(--color-border)] bg-[var(--color-panel-header)] px-2"
-    >
-      <div class="flex w-full items-center gap-1.5">
-        <RouterLink
-          :to="{ name: props.homeRouteName }"
-          class="flex size-8 shrink-0 items-center justify-center rounded-md bg-blue-600 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:bg-blue-500 focus:outline-none"
-          aria-label="TermBridge"
-          title="TermBridge"
-        >
-          TB
-        </RouterLink>
-        <label class="relative min-w-0 flex-1">
-          <span class="sr-only">{{ t('sidebar.searchSessions') }}</span>
-          <Search
-            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--color-text-subtle)]"
-          />
-          <input
-            v-model="searchQuery"
-            type="search"
-            :placeholder="t('sidebar.searchPlaceholder')"
-            class="h-7 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] py-1 pl-8 pr-2 text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)]"
-          />
-        </label>
-        <button
-          type="button"
-          class="button button-secondary button-icon file-workbench-small-button"
-          :aria-label="t('sidebar.newSession')"
-          :title="t('sidebar.newSession')"
-          @click="emit('newSession')"
-        >
-          <Plus class="size-3.5" />
-        </button>
-        <button
-          v-if="showClose"
-          type="button"
-          class="button button-secondary button-icon file-workbench-small-button"
-          :aria-label="t('common.close')"
-          :title="t('common.close')"
-          @click="emit('close')"
-        >
-          <X class="size-3.5" />
-        </button>
-      </div>
-    </header>
+    <WorkspaceSidebarHeader
+      v-model:search-query="searchQuery"
+      :home-route-name="homeRouteName"
+      :show-close="showClose"
+      @new-session="emit('newSession')"
+      @close="emit('close')"
+    />
 
     <div class="min-h-0 flex-1 overflow-y-auto p-1.5">
       <PageStatus
@@ -58,10 +20,7 @@
         :empty-text="t('sidebar.emptyWorkspaces')"
       >
         <template #loading>
-          <div
-            class="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2 text-sm text-[var(--color-text-muted)]"
-            role="status"
-          >
+          <div :class="sidebarStatusCardClass" role="status">
             {{ t('dashboard.loadingWorkspaces') }}
           </div>
         </template>
@@ -74,17 +33,10 @@
           </div>
         </template>
         <template #empty>
-          <div
-            class="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2 text-sm text-[var(--color-text-muted)]"
-          >
-            {{ t('sidebar.emptyWorkspaces') }}
-          </div>
+          <div :class="sidebarStatusCardClass">{{ t('sidebar.emptyWorkspaces') }}</div>
         </template>
 
-        <div
-          v-if="treeItems.length === 0"
-          class="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2 text-sm text-[var(--color-text-muted)]"
-        >
+        <div v-if="treeItems.length === 0" :class="sidebarStatusCardClass">
           {{
             normalizedSearchQuery
               ? t('sidebar.noSessionsMatch', { query: searchQuery })
@@ -117,7 +69,7 @@
             <div
               role="button"
               tabindex="0"
-              class="workspace-drag-handle group flex min-h-10 w-full min-w-0 items-center gap-1 border-0 bg-transparent px-1 py-1 text-left text-[var(--color-text)] hover:bg-[var(--color-control-hover)] sm:min-h-7 sm:py-0.5"
+              class="workspace-drag-handle group flex min-h-10 w-full min-w-0 items-center gap-1 border-0 bg-transparent px-1 py-1 text-left sm:min-h-8 sm:py-0.5"
               :class="!normalizedSearchQuery ? 'cursor-pointer' : ''"
               :style="{ paddingLeft: '6px' }"
               @click="handleWorkspaceClick($event, workspace.value)"
@@ -137,10 +89,10 @@
               <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{
                 workspace.workspace.name
               }}</span>
-              <span class="workspace-tree-node-actions flex shrink-0 items-center gap-0.5">
+              <span :class="treeNodeActionsClass">
                 <button
                   type="button"
-                  class="workspace-tree-node-action"
+                  :class="treeNodeActionClass"
                   :aria-label="t('sidebar.openFilesAria', { name: workspace.workspace.name })"
                   :title="t('sidebar.openFilesAria', { name: workspace.workspace.name })"
                   @click.stop="emit('openFiles', workspace.workspace, $event.currentTarget)"
@@ -149,13 +101,11 @@
                 </button>
                 <button
                   type="button"
-                  class="workspace-tree-node-action"
+                  :class="treeNodeActionClass"
                   :aria-label="
                     t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })
                   "
-                  :title="
-                    t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })
-                  "
+                  :title="t('sidebar.newSessionInWorkspaceAria', { name: workspace.workspace.name })"
                   @click.stop="emit('newSession', workspace.workspace)"
                 >
                   <Plus class="size-3.5" />
@@ -166,7 +116,7 @@
                     !canRemoveWorkspace(workspace) ||
                     props.removingWorkspaceId === workspace.workspace.id
                   "
-                  class="workspace-tree-node-action workspace-tree-node-action-danger"
+                  :class="[treeNodeActionClass, treeNodeActionDangerClass]"
                   :aria-label="removeWorkspaceLabel(workspace)"
                   :title="removeWorkspaceLabel(workspace)"
                   @click.stop="emit('removeWorkspace', workspace.workspace)"
@@ -199,325 +149,57 @@
               @update:model-value="updateSessionOrder(workspace, $event)"
               @end="finishSessionDrag"
             >
-              <div
+              <WorkspaceTreeSessionRow
                 v-for="session in workspace.children"
                 :key="session.value"
-                role="button"
-                tabindex="0"
-                class="session-sortable-item group flex min-h-10 w-full min-w-0 items-center gap-1 border-0 px-1 py-1 text-left transition sm:min-h-7 sm:py-0.5"
-                :class="[
-                  isActiveSessionSelection(session.session.id)
-                    ? 'bg-[var(--color-control-active)] text-[var(--color-text-strong)]'
-                    : 'bg-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)]',
-                  'cursor-pointer',
-                ]"
-                :style="{ paddingLeft: '24px' }"
-                @click="handleSessionClick($event, session.session)"
-                @keydown.enter="handleSessionKeydown($event, session.session)"
-                @keydown.space="handleSessionKeydown($event, session.session)"
-              >
-                <SessionSourceIcon
-                  :command-source="session.session.command_source"
-                  :label="sessionSourceLabel(session.session)"
-                />
-                <span class="min-w-0 flex-1 truncate text-sm">{{
-                  session.session.name || session.session.command
-                }}</span>
-                <span
-                  v-if="session.session.lifecycle_state === 'running'"
-                  class="workspace-tree-node-actions flex shrink-0 items-center gap-0.5"
-                >
-                  <button
-                    type="button"
-                    class="workspace-tree-node-action"
-                    :aria-label="
-                      t('sidebar.copySessionAria', {
-                        name: session.session.name || session.session.command,
-                      })
-                    "
-                    :title="
-                      t('sidebar.copySessionAria', {
-                        name: session.session.name || session.session.command,
-                      })
-                    "
-                    @click.stop="emit('copySession', session.session)"
-                  >
-                    <Copy class="size-3.5" />
-                  </button>
-                </span>
-                <span
-                  v-if="session.session.lifecycle_state === 'running'"
-                  class="flex size-5 shrink-0 items-center justify-center"
-                >
-                  <CircleDot
-                    class="size-3.5"
-                    :class="lifecycleStateClassName(session.session.lifecycle_state)"
-                    aria-hidden="true"
-                  />
-                </span>
-                <span
-                  v-if="isEditableSession(session.session)"
-                  class="workspace-tree-node-actions flex shrink-0 items-center gap-0.5"
-                >
-                  <button
-                    type="button"
-                    class="workspace-tree-node-action"
-                    :aria-label="
-                      t('sidebar.editSessionAria', {
-                        name: session.session.name || session.session.command,
-                      })
-                    "
-                    :title="
-                      t('sidebar.editSessionAria', {
-                        name: session.session.name || session.session.command,
-                      })
-                    "
-                    @click.stop="emit('editSession', session.session)"
-                  >
-                    <Pencil class="size-3.5" />
-                  </button>
-                </span>
-                <button
-                  v-if="['stopped', 'failed'].includes(session.session.lifecycle_state)"
-                  type="button"
-                  :disabled="props.rerunningSessionId === session.session.id"
-                  class="workspace-tree-node-action"
-                  :aria-label="
-                    t('sidebar.rerunSessionAria', {
-                      name: session.session.name || session.session.command,
-                    })
-                  "
-                  :title="
-                    t('sidebar.rerunSessionAria', {
-                      name: session.session.name || session.session.command,
-                    })
-                  "
-                  @click.stop="emit('rerunSession', session.session)"
-                >
-                  <Loader2
-                    v-if="props.rerunningSessionId === session.session.id"
-                    class="size-3.5 animate-spin"
-                  />
-                  <RotateCcw v-else class="size-3.5" />
-                </button>
-                <button
-                  v-if="session.session.lifecycle_state === 'running'"
-                  type="button"
-                  :disabled="props.stoppingSessionId === session.session.id"
-                  class="workspace-tree-node-action workspace-tree-node-action-danger"
-                  :aria-label="
-                    t('sidebar.stopSessionAria', {
-                      name: session.session.name || session.session.command,
-                    })
-                  "
-                  :title="
-                    t('sidebar.stopSessionAria', {
-                      name: session.session.name || session.session.command,
-                    })
-                  "
-                  @click.stop="emit('stopSession', session.session)"
-                >
-                  <Loader2
-                    v-if="props.stoppingSessionId === session.session.id"
-                    class="size-3.5 animate-spin"
-                  />
-                  <CircleStop v-else class="size-3.5" />
-                </button>
-                <button
-                  v-if="['stopped', 'failed'].includes(session.session.lifecycle_state)"
-                  type="button"
-                  :disabled="props.deletingSessionId === session.session.id"
-                  class="workspace-tree-node-action workspace-tree-node-action-danger"
-                  :aria-label="
-                    t('sidebar.deleteSessionAria', {
-                      name: session.session.name || session.session.command,
-                    })
-                  "
-                  :title="
-                    t('sidebar.deleteSessionAria', {
-                      name: session.session.name || session.session.command,
-                    })
-                  "
-                  @click.stop="emit('deleteSession', session.session)"
-                >
-                  <Loader2
-                    v-if="props.deletingSessionId === session.session.id"
-                    class="size-3.5 animate-spin"
-                  />
-                  <Trash2 v-else class="size-3.5" />
-                </button>
-              </div>
+                :session="session.session"
+                :active="isActiveSessionSelection(session.session.id)"
+                :stopping="props.stoppingSessionId === session.session.id"
+                :rerunning="props.rerunningSessionId === session.session.id"
+                :deleting="props.deletingSessionId === session.session.id"
+                @activate="handleSessionClick($event, session.session)"
+                @activate-key="handleSessionKeydown($event, session.session)"
+                @copy="emit('copySession', session.session)"
+                @edit="emit('editSession', session.session)"
+                @stop="emit('stopSession', session.session)"
+                @rerun="emit('rerunSession', session.session)"
+                @delete="emit('deleteSession', session.session)"
+              />
             </VueDraggable>
           </div>
         </VueDraggable>
       </PageStatus>
     </div>
 
-    <footer
-      class="flex h-8 shrink-0 items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-panel-header)] px-2 text-sm text-[var(--color-text-muted)]"
-    >
-      <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-        <DropdownMenuRoot :modal="false">
-          <DropdownMenuTrigger
-            class="flex h-6 items-center gap-1.5 rounded px-1.5 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus:bg-[var(--color-control-hover)] focus:text-[var(--color-text)]"
-            :aria-label="t('common.settings')"
-            :title="t('common.settings')"
-          >
-            <Settings class="size-4" />
-            <span>{{ t('common.settings') }}</span>
-          </DropdownMenuTrigger>
-          <DropdownMenuPortal>
-            <DropdownMenuContent
-              side="top"
-              align="start"
-              :side-offset="8"
-              class="z-50 min-w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
-            >
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger
-                  class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
-                >
-                  <span class="inline-flex items-center gap-2">
-                    <Languages class="size-4 text-[var(--color-text-subtle)]" />
-                    {{ t('common.language') }}
-                  </span>
-                  <ChevronRight class="size-4 text-[var(--color-text-subtle)]" />
-                </DropdownMenuSubTrigger>
-                <DropdownMenuPortal>
-                  <DropdownMenuSubContent
-                    :side-offset="8"
-                    class="z-50 min-w-36 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
-                  >
-                    <DropdownMenuRadioGroup
-                      :model-value="locale"
-                      @update:model-value="changeLocale"
-                    >
-                      <DropdownMenuRadioItem
-                        v-for="item in localeOptions"
-                        :key="item.value"
-                        :value="item.value"
-                        class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
-                      >
-                        <Check
-                          :class="locale === item.value ? 'opacity-100' : 'opacity-0'"
-                          class="size-4 text-blue-500"
-                        />
-                        {{ item.label }}
-                      </DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuSubContent>
-                </DropdownMenuPortal>
-              </DropdownMenuSub>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger
-                  class="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
-                >
-                  <span class="inline-flex items-center gap-2">
-                    <Sun class="size-4 text-[var(--color-text-subtle)]" />
-                    {{ t('common.theme') }}
-                  </span>
-                  <ChevronRight class="size-4 text-[var(--color-text-subtle)]" />
-                </DropdownMenuSubTrigger>
-                <DropdownMenuPortal>
-                  <DropdownMenuSubContent
-                    :side-offset="8"
-                    class="z-50 min-w-36 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
-                  >
-                    <DropdownMenuRadioGroup
-                      :model-value="themeStore.theme"
-                      @update:model-value="changeTheme"
-                    >
-                      <DropdownMenuRadioItem
-                        v-for="item in themeOptions"
-                        :key="item.value"
-                        :value="item.value"
-                        class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
-                      >
-                        <Check
-                          :class="themeStore.theme === item.value ? 'opacity-100' : 'opacity-0'"
-                          class="size-4 text-blue-500"
-                        />
-                        {{ item.label }}
-                      </DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuSubContent>
-                </DropdownMenuPortal>
-              </DropdownMenuSub>
-              <DropdownMenuItem
-                class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)]"
-                @select="emit('logout')"
-              >
-                <LogOut class="size-4 text-[var(--color-text-subtle)]" />
-                {{ t('cloud.logout') }}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenuPortal>
-        </DropdownMenuRoot>
-      </div>
-
-      <button
-        type="button"
-        class="flex size-6 shrink-0 items-center justify-center rounded text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus-visible:bg-[var(--color-control-hover)] focus-visible:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
-        :disabled="!props.activeWorkspace"
-        :aria-label="switchToFilesAria"
-        :title="switchToFilesAria"
-        @click="switchToFiles"
-      >
-        <FileCode2 class="size-4" />
-      </button>
-    </footer>
+    <WorkspaceSidebarFooter
+      :active-workspace="activeWorkspace"
+      :switch-to-files-aria="switchToFilesAria"
+      @switch-to-files="switchToFiles"
+    />
   </aside>
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from 'vue'
+  import { computed, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { RouterLink } from 'vue-router'
-  import {
-    Check,
-    ChevronRight,
-    CircleDot,
-    CircleStop,
-    Copy,
-    FileCode2,
-    Folder,
-    FolderOpen,
-    Languages,
-    Loader2,
-    LogOut,
-    Pencil,
-    Plus,
-    RotateCcw,
-    Search,
-    Settings,
-    Sun,
-    Trash2,
-    X,
-  } from '@lucide/vue'
-  import {
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuPortal,
-    DropdownMenuRadioGroup,
-    DropdownMenuRadioItem,
-    DropdownMenuRoot,
-    DropdownMenuSub,
-    DropdownMenuSubContent,
-    DropdownMenuSubTrigger,
-    DropdownMenuTrigger,
-  } from 'reka-ui'
+  import { FileCode2, Folder, FolderOpen, Loader2, Plus, Trash2 } from '@lucide/vue'
   import { VueDraggable } from 'vue-draggable-plus'
   import type { SortableEvent } from 'sortablejs'
-  import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
-  import { localeLabels, locales, setLocale, type AppLocale } from '../../i18n'
-  import SessionSourceIcon from '../session/SessionSourceIcon.vue'
   import PageStatus from '../layout/PageStatus.vue'
-  import { themes, useThemeStore, type AppTheme } from '../../store/theme'
   import type {
     SessionSummary,
     Workspace as WorkspaceSummary,
     WorkspaceTreeNode as WorkspaceTreeSummary,
   } from '../../gen/proto/termbridge/agent/v1/workspace'
+  import {
+    sidebarStatusCardClass,
+    treeNodeActionClass,
+    treeNodeActionDangerClass,
+    treeNodeActionsClass,
+  } from '../session/sessionUi'
+  import WorkspaceSidebarFooter from './WorkspaceSidebarFooter.vue'
+  import WorkspaceSidebarHeader from './WorkspaceSidebarHeader.vue'
+  import WorkspaceTreeSessionRow from './WorkspaceTreeSessionRow.vue'
 
   type WorkspaceTreeItem = {
     kind: 'workspace'
@@ -574,13 +256,11 @@
     unsupportedDirectoryDelete: [workspace: WorkspaceSummary]
     reorderWorkspaces: [workspaceIds: string[]]
     reorderSessions: [workspaceId: string, sessionIds: string[]]
-    logout: []
   }>()
 
-  const { t, locale } = useI18n()
-  const themeStore = useThemeStore()
+  const { t } = useI18n()
   const searchQuery = ref('')
-  const workspaceExpansionOverrides = ref<Record<string, boolean>>({})
+  const workspaceExpansionState = ref<Record<string, boolean>>({})
   const suppressNextSessionClick = ref(false)
   let sessionClickSuppressionTimer: ReturnType<typeof window.setTimeout> | null = null
 
@@ -590,15 +270,6 @@
   const sessionSortableFilter = interactiveSortableFilter
 
   const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
-  const localeOptions = computed(() =>
-    locales.map((value) => ({ value, label: localeLabels[value] })),
-  )
-  const themeOptions = computed(() =>
-    themes.map((value) => ({
-      value,
-      label: t(`theme.${value}`),
-    })),
-  )
   const switchToFilesAria = computed(() => {
     if (!props.activeWorkspace) return t('sidebar.switchToFilesDisabled')
     return t('sidebar.switchToFilesAria', { name: props.activeWorkspace.name })
@@ -608,17 +279,7 @@
     emit('openFiles', props.activeWorkspace, null)
   }
 
-  function changeLocale(value: unknown) {
-    if (typeof value === 'string' && locales.includes(value as AppLocale)) {
-      setLocale(value as AppLocale)
-    }
-  }
 
-  function changeTheme(value: unknown) {
-    if (typeof value === 'string' && themes.includes(value as AppTheme)) {
-      themeStore.setTheme(value as AppTheme)
-    }
-  }
 
   const treeItems = computed<WorkspaceTreeItem[]>(() => {
     return props.workspaceTree
@@ -728,23 +389,42 @@
     toggleWorkspace(workspaceValue)
   }
 
+  function workspaceKey(workspaceId: string) {
+    return `workspace:${workspaceId}`
+  }
+
+  function hasRunningSession(workspace: WorkspaceTreeSummary) {
+    return workspace.children.some((session) => isActiveSession(session))
+  }
+
+  watch(
+    () => props.workspaceTree,
+    (tree) => {
+      const next = { ...workspaceExpansionState.value }
+      let changed = false
+      for (const workspace of tree) {
+        const key = workspaceKey(workspace.id)
+        if (next[key] === undefined) {
+          next[key] = hasRunningSession(workspace)
+          changed = true
+        }
+      }
+      if (changed) {
+        workspaceExpansionState.value = next
+      }
+    },
+    { immediate: true },
+  )
+
   function toggleWorkspace(workspaceValue: string) {
-    workspaceExpansionOverrides.value = {
-      ...workspaceExpansionOverrides.value,
+    workspaceExpansionState.value = {
+      ...workspaceExpansionState.value,
       [workspaceValue]: !workspaceExpanded(workspaceValue),
     }
   }
 
   function workspaceExpanded(workspaceValue: string) {
-    const override = workspaceExpansionOverrides.value[workspaceValue]
-    if (override !== undefined) {
-      return override
-    }
-    return props.workspaceTree.some(
-      (workspace) =>
-        `workspace:${workspace.id}` === workspaceValue &&
-        workspace.children.some((session) => isActiveSession(session)),
-    )
+    return workspaceExpansionState.value[workspaceValue] ?? false
   }
 
   function handleSessionClick(event: SidebarPointerEvent, session: SessionSummary) {
@@ -788,15 +468,7 @@
     return session.lifecycle_state === 'running'
   }
 
-  function isEditableSession(session: SessionSummary) {
-    return ['stopped', 'failed'].includes(session.lifecycle_state)
-  }
 
-  function sessionSourceLabel(session: SessionSummary) {
-    return session.command_source === 'shortcut'
-      ? t('dialog.shortcut')
-      : t('workbench.launchCommand')
-  }
 
   function canRemoveWorkspace(workspace: WorkspaceTreeItem) {
     return workspace.children.every((child) => !isActiveSession(child.session))

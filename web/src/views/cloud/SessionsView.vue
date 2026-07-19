@@ -5,7 +5,6 @@
     home-route-name="home"
     :login-redirect="loginRedirect"
     :current-device="currentDevice"
-    :logout="authLogout"
   />
 </template>
 
@@ -15,7 +14,6 @@
   import SessionsPageShell from '../../components/session/SessionsPageShell.vue'
   import { useCloudDevicesStore } from '../../store/cloudDevices'
   import {
-    authLogout,
     closeSession,
     createSession,
     createShortcut,

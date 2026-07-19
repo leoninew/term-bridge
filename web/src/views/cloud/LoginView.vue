@@ -1,10 +1,10 @@
 <template>
-  <section
+  <AuthStatusScreen
     v-if="checkingAuth"
-    class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
-  >
-    {{ t('cloud.checkingAuth') }}
-  </section>
+    status="loading"
+    :title="t('cloud.checkingAuth')"
+    :description="t('cloud.externalSigningInHint')"
+  />
 
   <LoginPanel
     v-else
@@ -33,7 +33,8 @@
   import { onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
-  import LoginPanel from '../../components/session/LoginPanel.vue'
+  import AuthStatusScreen from '../../components/cloud/AuthStatusScreen.vue'
+  import LoginPanel from '../../components/cloud/LoginPanel.vue'
   import TurnstileChallenge from '../../components/cloud/TurnstileChallenge.vue'
   import { useAsyncAction } from '../../composable/useAsyncAction'
   import {

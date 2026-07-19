@@ -7,76 +7,31 @@
     <template v-if="isNarrow">
       <div class="sessions-mobile-main relative flex min-h-0 min-w-0 flex-1 flex-col">
         <SessionWorkbench
-          class="session-workbench-stage"
-          :opened-tabs="workbench.openedTabs"
-          :active-session-id="workbench.activeSessionId"
-          :active-tab="workbench.activeTab"
-          :active-session="activeSession"
-          :current-device="workbenchDevice"
-          :terminal-ws-url="activeTerminalWsUrl"
-          :loading="workspaceSessions.loading && workbench.openedTabs.length === 0"
-          :has-terminal-tabs="terminalTabs.length > 0"
-          :has-background-running-sessions="hasRunningSessions"
-          :session-title="sessionTitle"
-          :session-lifecycle-state="sessionLifecycleState"
-          :session-command-source="sessionCommandSource"
-          :session-source-label="sessionSourceLabel"
+          v-bind="workbenchBind"
+          class="session-workbench-stage h-full min-h-0 min-w-0"
           :show-sidebar-toggle="true"
-          :disable-tab-reorder="disableReorder"
-          :show-cloud-connection="isLocalMode"
-          :shortcuts-route="shortcutsRoute"
           @toggle-sidebar="mobileSidebarOpen = true"
-          @activate-tab="activateOpenedTab"
-          @close-tab="closeTab"
-          @close-terminal-tabs="closeTerminalTabs"
-          @open-close-background-sessions-drawer="openCloseBackgroundSessionsDrawer"
-          @reorder-tabs="workbench.openedTabs = $event"
-          @open-create="() => openCreateSessionForm()"
-          @workbench="terminalWorkbench = $event"
-          @terminal-state="handleTerminalState"
-          @terminal-error="handleTerminalError"
+          v-on="workbenchListeners"
         />
       </div>
 
       <div
         v-if="mobileSidebarOpen"
-        class="sessions-mobile-sidebar-backdrop"
+        class="fixed inset-0 z-[35] bg-black/45"
         aria-hidden="true"
         @click="mobileSidebarOpen = false"
       />
       <div
-        class="sessions-mobile-sidebar"
+        class="sessions-mobile-sidebar fixed inset-y-0 left-0 z-40 flex w-[min(320px,88vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-sidebar-bg)] shadow-[12px_0_32px_rgb(0_0_0/0.28)] [&>*]:h-full [&>*]:min-h-0"
         :data-state="mobileSidebarOpen ? 'open' : 'closed'"
         :aria-hidden="mobileSidebarOpen ? 'false' : 'true'"
       >
         <WorkspaceSessionSidebar
-          :workspace-tree="workspaceSessions.workspaceTree"
-          :active-session-id="workbench.activeSessionId"
-          :active-workspace="activeWorkspaceForViewSwitch"
-          :stopping-session-id="stoppingSessionId"
-          :rerunning-session-id="rerunningSessionId"
-          :deleting-session-id="deletingSessionId"
-          :removing-workspace-id="removingWorkspaceId"
-          :loading="workspaceSessions.loading"
-          :load-error="workspaceTreeError"
-          :home-route-name="props.homeRouteName"
-          :disable-reorder="disableReorder"
+          v-bind="sidebarBind"
           :show-close="true"
           @close="mobileSidebarOpen = false"
           @select="selectSessionFromMobileSidebar"
-          @refresh="refresh"
-          @new-session="openCreateSessionForm"
-          @copy-session="openCopiedSessionForm"
-          @edit-session="openEditSessionDialog"
-          @stop-session="stopSessionFromSidebar"
-          @rerun-session="rerunSessionFromSidebar"
-          @delete-session="openDeleteSessionDialog"
-          @remove-workspace="dialogs.openRemoveWorkspaceDialog"
-          @open-files="openWorkspaceFiles"
-          @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
-          @reorder-workspaces="reorderWorkspaces"
-          @reorder-sessions="reorderSessions"
-          @logout="handleLogout"
+          v-on="sidebarListeners"
         />
       </div>
     </template>
@@ -87,36 +42,14 @@
         class="workspace-sidebar-panel"
         collapsible
         :collapsed-size="0"
-        :default-size="20"
+        :default-size="18"
         :min-size="18"
         :max-size="24"
       >
         <WorkspaceSessionSidebar
-          :workspace-tree="workspaceSessions.workspaceTree"
-          :active-session-id="workbench.activeSessionId"
-          :active-workspace="activeWorkspaceForViewSwitch"
-          :stopping-session-id="stoppingSessionId"
-          :rerunning-session-id="rerunningSessionId"
-          :deleting-session-id="deletingSessionId"
-          :removing-workspace-id="removingWorkspaceId"
-          :loading="workspaceSessions.loading"
-          :load-error="workspaceTreeError"
-          :home-route-name="props.homeRouteName"
-          :disable-reorder="disableReorder"
+          v-bind="sidebarBind"
           @select="openSessionTab"
-          @refresh="refresh"
-          @new-session="openCreateSessionForm"
-          @copy-session="openCopiedSessionForm"
-          @edit-session="openEditSessionDialog"
-          @stop-session="stopSessionFromSidebar"
-          @rerun-session="rerunSessionFromSidebar"
-          @delete-session="openDeleteSessionDialog"
-          @remove-workspace="dialogs.openRemoveWorkspaceDialog"
-          @open-files="openWorkspaceFiles"
-          @unsupported-directory-delete="explainUnsupportedDirectoryDelete"
-          @reorder-workspaces="reorderWorkspaces"
-          @reorder-sessions="reorderSessions"
-          @logout="handleLogout"
+          v-on="sidebarListeners"
         />
       </SplitterPanel>
 
@@ -131,32 +64,9 @@
       <SplitterPanel id="terminal-workbench" :min-size="55">
         <div class="relative h-full min-h-0 min-w-0">
           <SessionWorkbench
-            class="session-workbench-stage"
-            :opened-tabs="workbench.openedTabs"
-            :active-session-id="workbench.activeSessionId"
-            :active-tab="workbench.activeTab"
-            :active-session="activeSession"
-            :current-device="workbenchDevice"
-            :terminal-ws-url="activeTerminalWsUrl"
-            :loading="workspaceSessions.loading && workbench.openedTabs.length === 0"
-            :has-terminal-tabs="terminalTabs.length > 0"
-            :has-background-running-sessions="hasRunningSessions"
-            :session-title="sessionTitle"
-            :session-lifecycle-state="sessionLifecycleState"
-            :session-command-source="sessionCommandSource"
-            :session-source-label="sessionSourceLabel"
-            :disable-tab-reorder="disableReorder"
-            :show-cloud-connection="isLocalMode"
-            :shortcuts-route="shortcutsRoute"
-            @activate-tab="activateOpenedTab"
-            @close-tab="closeTab"
-            @close-terminal-tabs="closeTerminalTabs"
-            @open-close-background-sessions-drawer="openCloseBackgroundSessionsDrawer"
-            @reorder-tabs="workbench.openedTabs = $event"
-            @open-create="() => openCreateSessionForm()"
-            @workbench="terminalWorkbench = $event"
-            @terminal-state="handleTerminalState"
-            @terminal-error="handleTerminalError"
+            v-bind="workbenchBind"
+            class="session-workbench-stage h-full min-h-0 min-w-0"
+            v-on="workbenchListeners"
           />
         </div>
       </SplitterPanel>
@@ -270,7 +180,6 @@
     homeRouteName: string
     loginRedirect: string
     currentDevice?: DeviceSummary | CloudSessionSummary | null
-    logout?: () => Promise<void>
   }>()
 
   const { t } = useI18n()
@@ -381,6 +290,7 @@
     ),
   )
 
+
   async function refresh() {
     workspaceTreeError.value = null
     await refreshAction.run(async () => {
@@ -431,32 +341,6 @@
 
   async function refreshShortcuts() {
     shortcuts.value = await props.runtimeApi.listShortcuts()
-  }
-
-  async function handleLogout() {
-    if (props.logout) {
-      try {
-        await props.logout()
-      } catch {
-        // Clear local state even if Cloud logout fails.
-      }
-    }
-    if (isLocalMode.value) {
-      localCloud.clearLocalCloudSession()
-    } else {
-      cloudAuth.clearToken()
-    }
-    workspaceSessions.reset()
-    dialogs.createSessionDialogOpen = false
-    dialogs.editDialogOpen = false
-    dialogs.clearSelectedSession()
-    dialogs.removeWorkspaceDialogOpen = false
-    dialogs.clearSelectedWorkspace()
-    closeBackgroundSessionsDrawerOpen.value = false
-    workbench.resetForSourceChange()
-    await router.replace(
-      isLocalMode.value ? { name: props.homeRouteName } : { name: 'cloud-login' },
-    )
   }
 
   async function startSession() {
@@ -834,16 +718,6 @@
     return workspaceSessions.sessionById(workspaceId, sessionId)?.lifecycle_state ?? ''
   }
 
-  function sessionCommandSource(workspaceId: string, sessionId: string) {
-    return workspaceSessions.sessionById(workspaceId, sessionId)?.command_source ?? ''
-  }
-
-  function sessionSourceLabel(workspaceId: string, sessionId: string) {
-    return sessionCommandSource(workspaceId, sessionId) === 'shortcut'
-      ? t('dialog.shortcut')
-      : t('workbench.launchCommand')
-  }
-
   function isActiveLifecycle(session: SessionSummary) {
     return session.lifecycle_state === 'running'
   }
@@ -908,6 +782,69 @@
       notifications.pushToast('error', t('toast.readHistoryFailed'), message)
     }
   }
+
+  const sidebarBind = computed(() => ({
+    workspaceTree: workspaceSessions.workspaceTree,
+    activeSessionId: workbench.activeSessionId,
+    activeWorkspace: activeWorkspaceForViewSwitch.value,
+    stoppingSessionId: stoppingSessionId.value,
+    rerunningSessionId: rerunningSessionId.value,
+    deletingSessionId: deletingSessionId.value,
+    removingWorkspaceId: removingWorkspaceId.value,
+    loading: workspaceSessions.loading,
+    loadError: workspaceTreeError.value,
+    homeRouteName: props.homeRouteName,
+    disableReorder: disableReorder.value,
+  }))
+
+  const sidebarListeners = {
+    refresh,
+    newSession: openCreateSessionForm,
+    copySession: openCopiedSessionForm,
+    editSession: openEditSessionDialog,
+    stopSession: stopSessionFromSidebar,
+    rerunSession: rerunSessionFromSidebar,
+    deleteSession: openDeleteSessionDialog,
+    removeWorkspace: dialogs.openRemoveWorkspaceDialog,
+    openFiles: openWorkspaceFiles,
+    unsupportedDirectoryDelete: explainUnsupportedDirectoryDelete,
+    reorderWorkspaces,
+    reorderSessions,
+  }
+
+  const workbenchBind = computed(() => ({
+    openedTabs: workbench.openedTabs,
+    activeSessionId: workbench.activeSessionId,
+    activeTab: workbench.activeTab,
+    activeSession: activeSession.value,
+    currentDevice: workbenchDevice.value,
+    terminalWsUrl: activeTerminalWsUrl.value,
+    loading: workspaceSessions.loading && workbench.openedTabs.length === 0,
+    hasTerminalTabs: terminalTabs.value.length > 0,
+    hasBackgroundRunningSessions: hasRunningSessions.value,
+    sessionTitle,
+    sessionLifecycleState,
+    disableTabReorder: disableReorder.value,
+    showCloudConnection: isLocalMode.value,
+    shortcutsRoute: shortcutsRoute.value,
+  }))
+
+  const workbenchListeners = {
+    activateTab: activateOpenedTab,
+    closeTab,
+    closeTerminalTabs,
+    openCloseBackgroundSessionsDrawer,
+    reorderTabs: (tabs: typeof workbench.openedTabs) => {
+      workbench.openedTabs = tabs
+    },
+    openCreate: () => openCreateSessionForm(),
+    workbench: (element: HTMLElement | null) => {
+      terminalWorkbench.value = element
+    },
+    terminalState: handleTerminalState,
+    terminalError: handleTerminalError,
+  }
+
 
   onMounted(async () => {
     try {

@@ -1,15 +1,25 @@
 <template>
-  <section
-    class="flex h-screen min-h-screen items-center justify-center bg-[var(--color-app-bg)] p-6 text-sm text-[var(--color-text-muted)]"
+  <AuthStatusScreen
+    :status="status"
+    :title="title"
+    :description="description"
+    :footer-to="status === 'error' ? { name: 'cloud-login' } : undefined"
+    :footer-label="status === 'error' ? t('cloud.backToLogin') : ''"
   >
-    {{ t('cloud.externalSigningIn') }}
-  </section>
+    <template #icon>
+      <GoogleIcon v-if="provider === 'google'" class="size-10" />
+      <GithubIcon v-else-if="provider === 'github'" class="size-10 text-[var(--color-text)]" />
+    </template>
+  </AuthStatusScreen>
 </template>
 
 <script setup lang="ts">
-  import { onMounted } from 'vue'
+  import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
+  import GithubIcon from '../../components/branding/GithubIcon.vue'
+  import GoogleIcon from '../../components/branding/GoogleIcon.vue'
+  import AuthStatusScreen from '../../components/cloud/AuthStatusScreen.vue'
   import { authExternalCallback } from '../../features/cloud/api'
   import { consumeCloudLoginRedirect } from '../../features/cloud/loginRedirect'
   import { useCloudAuthStore } from '../../store/cloudAuth'
@@ -24,9 +34,28 @@
   const cloudAuth = useCloudAuthStore()
   const notifications = useNotificationsStore()
   const runtimeConfig = useRuntimeConfigStore()
+  const status = ref<'loading' | 'error'>('loading')
+
+  const title = computed(() =>
+    status.value === 'error'
+      ? t('cloud.oauthCallbackFailed')
+      : props.provider === 'google'
+        ? t('cloud.googleSigningIn')
+        : t('cloud.externalSigningIn'),
+  )
+  const description = computed(() =>
+    status.value === 'error'
+      ? t('cloud.oauthCallbackFailedHint')
+      : t('cloud.externalSigningInHint'),
+  )
 
   function redirectAfterLogin() {
     return consumeCloudLoginRedirect() || { name: 'cloud-dashboard' }
+  }
+
+  function failAndStay(err: unknown) {
+    status.value = 'error'
+    notifications.notifyError(t('cloud.externalLoginFailed'), err)
   }
 
   onMounted(async () => {
@@ -38,11 +67,7 @@
       !code ||
       !state
     ) {
-      notifications.notifyError(
-        t('cloud.externalLoginFailed'),
-        new Error('invalid provider callback'),
-      )
-      await router.replace({ name: 'cloud-login' })
+      failAndStay(new Error('invalid provider callback'))
       return
     }
     try {
@@ -51,12 +76,11 @@
       await cloudAuth.initialize()
       if (cloudAuth.authenticated) {
         await router.replace(redirectAfterLogin())
-      } else {
-        await router.replace({ name: 'cloud-login' })
+        return
       }
+      failAndStay(new Error('not authenticated after callback'))
     } catch (err) {
-      notifications.notifyError(t('cloud.externalLoginFailed'), err)
-      await router.replace({ name: 'cloud-login' })
+      failAndStay(err)
     }
   })
 </script>
