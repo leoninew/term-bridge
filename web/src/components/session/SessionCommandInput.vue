@@ -1,11 +1,14 @@
 <template>
   <div class="flex flex-col gap-1.5 text-sm text-[var(--color-text)]">
-    <span>{{ t('dialog.command') }}</span>
+    <span>{{ t('dialog.commandSource') }}</span>
 
-    <div ref="fieldRef" class="session-command-field">
+    <div
+      ref="fieldRef"
+      class="flex h-9 items-stretch overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] focus-within:border-[var(--color-border-strong)]"
+    >
       <ToggleGroupRoot
         type="single"
-        class="session-command-source"
+        class="flex shrink-0 items-stretch divide-x divide-[var(--color-border)] border-r border-[var(--color-border)]"
         :model-value="commandSource"
         :disabled="disabled"
         :aria-label="t('dialog.commandSource')"
@@ -14,41 +17,41 @@
       >
         <ToggleGroupItem
           value="shortcut"
-          class="session-command-source-item"
+          class="inline-flex w-9 min-w-9 items-center justify-center border-0 bg-transparent text-[var(--color-text-muted)] outline-none transition-colors hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus-visible:bg-[var(--color-control-hover)] focus-visible:text-[var(--color-text)] data-[state=on]:bg-[var(--color-control-active)] data-[state=on]:text-[var(--color-text-strong)] disabled:opacity-70"
           :aria-label="t('dialog.shortcut')"
           :title="t('dialog.shortcut')"
         >
-          <Keyboard class="session-command-source-icon" aria-hidden="true" />
+          <LaunchMethodIcon command-source="shortcut" />
         </ToggleGroupItem>
         <ToggleGroupItem
           value="command"
-          class="session-command-source-item"
+          class="inline-flex w-9 min-w-9 items-center justify-center border-0 bg-transparent text-[var(--color-text-muted)] outline-none transition-colors hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus-visible:bg-[var(--color-control-hover)] focus-visible:text-[var(--color-text)] data-[state=on]:bg-[var(--color-control-active)] data-[state=on]:text-[var(--color-text-strong)] disabled:opacity-70"
           :aria-label="t('dialog.directCommand')"
           :title="t('dialog.directCommand')"
         >
-          <Command class="session-command-source-icon" aria-hidden="true" />
+          <LaunchMethodIcon command-source="command" />
         </ToggleGroupItem>
       </ToggleGroupRoot>
 
-      <div class="session-command-body">
+      <div class="flex min-w-0 flex-1 items-stretch">
         <ComboboxRoot
           v-if="commandSource === 'shortcut'"
           v-model:open="shortcutPickerOpen"
-          class="session-command-body-fill"
+          class="flex min-w-0 flex-1 items-stretch"
           :model-value="selectedShortcutId"
           :disabled="disabled || shortcuts.length === 0"
           @update:model-value="emit('update:selectedShortcutId', $event ?? null)"
         >
-          <ComboboxAnchor class="session-command-body-fill relative flex items-center">
+          <ComboboxAnchor class="relative flex min-w-0 flex-1 items-center">
             <ComboboxInput
-              class="session-command-input"
+              class="session-command-input h-full w-full min-w-0 rounded-none !border-0 bg-transparent px-3 pr-9 text-sm leading-none text-[var(--color-text)] !shadow-none outline-none placeholder:text-[var(--color-text-subtle)] disabled:opacity-70"
               :placeholder="
                 shortcuts.length ? t('dialog.searchShortcuts') : t('dialog.noShortcuts')
               "
               :display-value="shortcutDisplayValue"
             />
             <ComboboxTrigger
-              class="session-command-trigger"
+              class="absolute inset-y-0 right-0 inline-flex w-9 items-center justify-center border-0 bg-transparent text-[var(--color-text-subtle)] outline-none hover:text-[var(--color-text)] focus-visible:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-70"
               :aria-label="t('dialog.selectShortcut')"
             >
               <ChevronDown class="size-4" aria-hidden="true" />
@@ -78,7 +81,7 @@
                   >
                     {{ shortcut.name }}
                   </span>
-                  <span v-if="shortcut.tags?.length" class="session-command-item-tags">
+                  <span v-if="shortcut.tags?.length" class="inline-flex max-w-[46%] shrink-0 items-center justify-end gap-1 overflow-hidden">
                     <span
                       v-for="tag in visibleTags(shortcut)"
                       :key="tag"
@@ -107,7 +110,7 @@
         <input
           v-else
           :value="command"
-          class="session-command-input"
+          class="session-command-input h-full w-full min-w-0 rounded-none !border-0 bg-transparent px-3 text-sm leading-none text-[var(--color-text)] !shadow-none outline-none placeholder:text-[var(--color-text-subtle)] disabled:opacity-70"
           :placeholder="t('dialog.commandPlaceholder')"
           :disabled="disabled"
           @input="emit('update:command', ($event.target as HTMLInputElement).value)"
@@ -118,9 +121,10 @@
 </template>
 
 <script setup lang="ts">
-  import { Check, ChevronDown, Command, Keyboard } from '@lucide/vue'
+  import { Check, ChevronDown } from '@lucide/vue'
   import { nextTick, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
+  import LaunchMethodIcon from './LaunchMethodIcon.vue'
   import {
     ComboboxAnchor,
     ComboboxContent,

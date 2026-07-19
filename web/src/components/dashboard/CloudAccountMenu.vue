@@ -12,13 +12,13 @@
 
   <DropdownMenuRoot v-else>
     <DropdownMenuTrigger
-      class="inline-flex h-9 max-w-[9.5rem] items-center gap-1.5 rounded-md px-2 text-sm text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)] sm:max-w-56 sm:px-3"
+      class="inline-flex size-9 items-center justify-center rounded-md text-sm text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus:bg-[var(--color-control-hover)] sm:h-9 sm:w-auto sm:max-w-56 sm:gap-1.5 sm:justify-start sm:px-3"
       :title="userTitle"
       :aria-label="userTitle"
     >
       <User class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
-      <span class="truncate">{{ userDisplayName }}</span>
-      <ChevronDown class="size-4 shrink-0 text-[var(--color-text-subtle)]" />
+      <span class="hidden truncate sm:inline">{{ userDisplayName }}</span>
+      <ChevronDown class="hidden size-4 shrink-0 text-[var(--color-text-subtle)] sm:block" />
     </DropdownMenuTrigger>
     <DropdownMenuPortal>
       <DropdownMenuContent

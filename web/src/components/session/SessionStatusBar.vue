@@ -7,18 +7,33 @@
       <span :class="lifecycleStateClassName(session.lifecycle_state)">
         {{ session.lifecycle_state }}
       </span>
-      <SessionSourceIcon
+
+      <span>{{ t('dialog.cwd') }}</span>
+      <span
+        class="text-[var(--color-text)] max-sm:min-w-0 max-sm:max-w-[12rem] max-sm:truncate"
+        :title="session.cwd"
+      >
+        {{ session.cwd }}
+      </span>
+
+      <span>{{ t('dialog.commandSource') }}</span>
+      <LaunchMethodIcon
         :command-source="session.command_source"
-        size-class="size-3.5"
-        :label="commandSourceLabel"
+        size-class="size-4 text-[var(--color-text)]"
+        :label="launchMethodLabel"
       />
       <span
-        v-if="session.command_source === 'shortcut'"
+        v-if="isShortcutLaunch"
         class="min-w-0 truncate text-[var(--color-text)]"
+        :title="session.shortcut_name_snapshot"
       >
         {{ session.shortcut_name_snapshot }}
       </span>
-      <span v-else class="min-w-0 truncate font-mono text-xs text-[var(--color-text)]">
+      <span
+        v-else
+        class="min-w-0 truncate font-mono text-xs text-[var(--color-text)]"
+        :title="session.command"
+      >
         {{ session.command }}
       </span>
     </template>
@@ -48,7 +63,8 @@
   import { useI18n } from 'vue-i18n'
   import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import { useCloudSessionStore } from '../../store/cloudSession'
-  import SessionSourceIcon from './SessionSourceIcon.vue'
+  import LaunchMethodIcon from './LaunchMethodIcon.vue'
+  import { isShortcutLaunchMethod, launchMethodLabelKey } from './launchMethod'
   import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
@@ -67,11 +83,10 @@
   const { t } = useI18n()
   const cloudSession = useCloudSessionStore()
 
-  const commandSourceLabel = computed(() =>
-    props.session?.command_source === 'shortcut'
-      ? t('dialog.shortcut')
-      : t('workbench.launchCommand'),
+  const launchMethodLabel = computed(() =>
+    props.session ? t(launchMethodLabelKey(props.session.command_source)) : '',
   )
+  const isShortcutLaunch = computed(() => isShortcutLaunchMethod(props.session?.command_source))
   const deviceLabel = computed(() => {
     if (!props.device) {
       return ''
