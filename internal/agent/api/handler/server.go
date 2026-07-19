@@ -17,6 +17,7 @@ import (
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	cloudproto "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/application/quota"
 	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 )
@@ -30,6 +31,8 @@ type Config struct {
 	LocalRuntime        agentapp.RuntimeAccess
 	CORSAllowedOrigins  []string
 	OnLocalCloudSession func(*cloudproto.CloudSessionSummary)
+	AttachQuota         *quota.AttachCounter
+	ConcurrentAttaches  int
 }
 
 type Handler struct {
@@ -42,11 +45,18 @@ type Handler struct {
 	cloudSessionMu     sync.Mutex
 	cloudSession       *cloudproto.CloudSessionSummary
 	localRuntime       runtimeEndpoint
+	attachQuota        *quota.AttachCounter
 }
 
 func New(config Config) *Handler {
 	config = normalizeConfig(config)
-	handler := &Handler{config: config, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}}
+	if config.AttachQuota == nil {
+		config.AttachQuota = quota.NewAttachCounter()
+	}
+	if config.ConcurrentAttaches <= 0 {
+		config.ConcurrentAttaches = quota.DefaultConcurrentAttaches
+	}
+	handler := &Handler{config: config, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}, attachQuota: config.AttachQuota}
 	if config.LocalRuntime != nil {
 		handler.localRuntime = localRuntimeEndpoint{runtime: config.LocalRuntime, handler: handler}
 	}

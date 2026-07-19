@@ -1,11 +1,11 @@
 # 终端与连接资源配额（按用户 / 管理员动态调配）
-最后修改时间: 2026-07-19 15:57:07
+最后修改时间: 2026-07-19 17:25:41
 
-Review status: Draft
+Review status: Accepted
 
 ## Flow mode / Stage
 
-标准模式 / standard；当前阶段：需求 / Requirement
+标准模式 / standard；当前阶段：需求 / Requirement（Accepted）；进入计划 / Plan → 实现
 
 ## Related
 
@@ -264,3 +264,14 @@ keep-alive 需求 **可先上线**；本配额上线后自动成为其上界。
 
 - 2026-07-19：从 keep-alive 讨论中拆出本独立需求。
 - 待用户确认主体、管理面、P0 配额项后进入 Plan。
+
+### 关闭记录（2026-07-19 用户：开始推进实现）
+
+| 项 | 结论 |
+| --- | --- |
+| Q1 主体 | Cloud：user id；本地 Agent：固定主体 local |
+| Q2 管理面 | P0：Cloud Admin API + yaml 默认；本地仅 yaml 默认/覆盖 |
+| Q3 配额项 | P0：	erminal.concurrent_attaches（默认 8）；running sessions 为 P1 |
+| Q4 降配 | 默认不踢现有连接 |
+| Q5 下发摘要 | P0 提供用户只读 GET；前端可选用；管理端 CRUD |
+| 管理员鉴权 | P0：cloud.admin.user_ids / emails 配置白名单（非完整 RBAC） |

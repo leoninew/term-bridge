@@ -35,6 +35,8 @@ terminal:
   keepalive:
     max_hot_terminals: 4
     dispose_delay_ms: 30000
+  quota:
+    concurrent_attaches: 8
 # 工作区文件管理边界。所有操作仅可访问 Agent 已登记工作区的根目录。
 file:
   max_text_bytes: 1048576
@@ -107,6 +109,11 @@ cloud:
   # 是否在 cloud API 错误响应中暴露内部错误细节。
   # 仅建议本地调试打开；生产保持 false。
   expose_errors: false
+
+  # Cloud admin whitelist for quota management APIs.
+  admin:
+    user_ids: []
+    emails: []
 
   # Cloud JWT 认证密钥。Cloud runtime 必须提供 base64 编码的 32 字节随机 key，普通明文 secret 会被拒绝。
   # python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"

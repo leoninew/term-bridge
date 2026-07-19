@@ -20,6 +20,7 @@ import (
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	cloudproto "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	quotapkg "gitee.com/leoninew/TermBridge-go/internal/shared/application/quota"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/prototime"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
@@ -35,11 +36,22 @@ type Config struct {
 	AuthService         AuthService
 	AgentTunnelAudience string
 	DeviceRepository    DeviceRepository
+	QuotaRepository     QuotaRepository
+	AttachQuota         *quotapkg.AttachCounter
+	ConcurrentAttaches  int
+	AdminUserIds        []string
+	AdminEmails         []string
 	CloudPublicURL      string
 	CloudOAuth          CloudOAuthConfig
 	CORSAllowedOrigins  []string
 	Turnstile           TurnstileConfig
 	CSRF                CSRFConfig
+}
+
+type QuotaRepository interface {
+	GetLimit(ctx context.Context, userID, key string) (int, bool, error)
+	UpsertLimit(ctx context.Context, userID, key string, value int, updatedBy string) error
+	DeleteLimit(ctx context.Context, userID, key string) error
 }
 
 type TurnstileConfig struct {
@@ -101,6 +113,7 @@ type Handler struct {
 	historyCache       map[string]map[string]string
 	oauthCodeMu        sync.Mutex
 	oauthCodes         map[string]cloudOAuthCode
+	attachQuota        *quotapkg.AttachCounter
 }
 
 type cloudOAuthCode struct {
@@ -196,7 +209,13 @@ func New(config Config) *Handler {
 
 func newHandler(config Config) *Handler {
 	config = normalizeConfig(config)
-	handler := &Handler{config: config, authService: config.AuthService, registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}, oauthCodes: map[string]cloudOAuthCode{}}
+	if config.AttachQuota == nil {
+		config.AttachQuota = quotapkg.NewAttachCounter()
+	}
+	if config.ConcurrentAttaches <= 0 {
+		config.ConcurrentAttaches = quotapkg.DefaultConcurrentAttaches
+	}
+	handler := &Handler{config: config, authService: config.AuthService, registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}, oauthCodes: map[string]cloudOAuthCode{}, attachQuota: config.AttachQuota}
 	return handler
 }
 
@@ -213,6 +232,8 @@ func (h *Handler) registerCommonRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/health", h.handleHealth)
 	mux.HandleFunc("/api/auth/logout", h.authMiddleware(http.HandlerFunc(h.handleLogout)).ServeHTTP)
 	mux.HandleFunc("/api/auth/me", h.handleAuthMe)
+	mux.HandleFunc("/api/me/quota", h.authMiddleware(http.HandlerFunc(h.handleMyQuota)).ServeHTTP)
+	mux.HandleFunc("/api/admin/users/", h.authMiddleware(http.HandlerFunc(h.handleAdminUserQuota)).ServeHTTP)
 	mux.HandleFunc("/api/auth/turnstile/config", h.handleTurnstileConfig)
 	mux.HandleFunc("/api/auth/login/csrf", h.handleLoginCSRF)
 }
@@ -1030,6 +1051,11 @@ func (s *Handler) handleHistoryRuntime(w http.ResponseWriter, r *http.Request, e
 }
 
 func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route *agentRoute, workspaceId string, sessionId string) {
+	claims, ok := s.claimsFromRequest(r)
+	if !ok {
+		s.writeUnauthorized(w, r)
+		return
+	}
 	writerKey := sessionScopeKey(workspaceId, sessionId)
 	s.writerMu.Lock()
 	if _, exists := s.writers[writerKey]; exists {
@@ -1046,6 +1072,16 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 		s.writerMu.Unlock()
 		route.removeTerminal(streamId)
 	}()
+	limit, err := s.attachLimitForUser(r.Context(), claims.Sub)
+	if err != nil {
+		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+		return
+	}
+	if err := s.attachQuota.TryAcquire(claims.Sub, limit); err != nil {
+		s.writeAPIError(w, r, http.StatusTooManyRequests, quotapkg.CodeAttachExceeded, quotapkg.MessageAttachExceeded, err)
+		return
+	}
+	defer s.attachQuota.Release(claims.Sub)
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{terminalproto.Subprotocol}, OriginPatterns: s.originPatterns(r)})
 	if err != nil {
 		return

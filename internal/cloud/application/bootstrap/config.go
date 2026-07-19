@@ -14,6 +14,15 @@ type Config struct {
 	Gate        GateConfig
 	Database    DatabaseConfig
 	Cloud       CloudConfig
+	Terminal    TerminalConfig
+}
+
+type TerminalConfig struct {
+	Quota TerminalQuotaConfig
+}
+
+type TerminalQuotaConfig struct {
+	ConcurrentAttaches int
 }
 
 type ServerConfig struct {
@@ -70,12 +79,18 @@ type ResendConfig struct {
 type CloudConfig struct {
 	PublicURL  string
 	ApiBaseUrl string
+	Admin      CloudAdminConfig
 	Jwt        JwtConfig
 	Google     GoogleConfig
 	GitHub     GitHubConfig
 	Resend     ResendConfig
 	Turnstile  TurnstileConfig
 	OAuth      CloudOAuthConfig
+}
+
+type CloudAdminConfig struct {
+	UserIds []string
+	Emails  []string
 }
 
 type TurnstileConfig struct {

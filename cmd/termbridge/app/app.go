@@ -280,6 +280,9 @@ func agentConfig(cfg config.Config) agentserver.Config {
 				MaxMessages: cfg.Terminal.Client.Queue.MaxMessages,
 				MaxBytes:    cfg.Terminal.Client.Queue.MaxBytes,
 			}},
+			Quota: agentserver.TerminalQuotaConfig{
+				ConcurrentAttaches: cfg.Terminal.Quota.ConcurrentAttaches,
+			},
 		},
 		File: agentserver.FileConfig{
 			MaxTextBytes:              cfg.File.MaxTextBytes,
@@ -335,9 +338,16 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 			SQLite: cloudserver.SQLiteConfig{Path: cfg.Cloud.Database.SQLite.Path},
 			MySQL:  cloudserver.MySQLConfig{Dsn: cfg.Cloud.Database.MySQL.Dsn},
 		},
+		Terminal: cloudserver.TerminalConfig{
+			Quota: cloudserver.TerminalQuotaConfig{ConcurrentAttaches: cfg.Terminal.Quota.ConcurrentAttaches},
+		},
 		Cloud: cloudserver.CloudConfig{
 			PublicURL:  cfg.Cloud.PublicUrl,
 			ApiBaseUrl: cfg.Cloud.ApiBaseUrl,
+			Admin: cloudserver.CloudAdminConfig{
+				UserIds: append([]string(nil), cfg.Cloud.Admin.UserIds...),
+				Emails:  append([]string(nil), cfg.Cloud.Admin.Emails...),
+			},
 			Jwt: cloudserver.JwtConfig{
 				SecretKey: cfg.Cloud.Jwt.SecretKey,
 				Ttl:       cfg.Cloud.Jwt.Ttl,

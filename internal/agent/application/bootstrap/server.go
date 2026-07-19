@@ -89,7 +89,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		},
 	)
 
-	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, CloudService: cloudService, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, OnLocalCloudSession: func(summary *cloud.CloudSessionSummary) {
+	agentHandler := agentapi.New(agentapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, CloudService: cloudService, LocalDevice: device, LocalDeviceStateDir: cfg.Runtime.StateDir, LocalRuntime: runtimeAccess, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, ConcurrentAttaches: cfg.Terminal.Quota.ConcurrentAttaches, OnLocalCloudSession: func(summary *cloud.CloudSessionSummary) {
 		if summary == nil {
 			cloudConnector.Stop()
 			return

@@ -74,6 +74,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Terminal.KeepAlive.MaxHotTerminals != 4 || cfg.Terminal.KeepAlive.DisposeDelayMs != 30000 {
 		t.Fatalf("Terminal.KeepAlive = %#v", cfg.Terminal.KeepAlive)
 	}
+	if cfg.Terminal.Quota.ConcurrentAttaches != 8 {
+		t.Fatalf("Terminal.Quota.ConcurrentAttaches = %d, want 8", cfg.Terminal.Quota.ConcurrentAttaches)
+	}
 	if cfg.File.MaxTextBytes != 1048576 || cfg.File.MaxDirectoryEntries != 1000 || cfg.File.MaxRecursiveDeleteEntries != 10000 || cfg.File.WatchSubscriberQueueSize != 64 {
 		t.Fatalf("File = %#v", cfg.File)
 	}

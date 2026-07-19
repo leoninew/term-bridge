@@ -27,6 +27,11 @@ type TerminalConfig struct {
 	History history.Config
 	Replay  TerminalReplayConfig
 	Client  TerminalClientConfig
+	Quota   TerminalQuotaConfig
+}
+
+type TerminalQuotaConfig struct {
+	ConcurrentAttaches int
 }
 
 type TerminalReplayConfig struct {

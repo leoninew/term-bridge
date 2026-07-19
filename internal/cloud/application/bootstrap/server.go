@@ -17,6 +17,7 @@ import (
 	cloudemail "gitee.com/leoninew/TermBridge-go/internal/cloud/infrastructure/email"
 	cloudauthrepo "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/auth"
 	clouddevice "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/device"
+	cloudquota "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/quota"
 	httpserver "gitee.com/leoninew/TermBridge-go/internal/shared/api/server"
 	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
 	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
@@ -57,7 +58,8 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger, options Options) 
 		cloudauth.NewOAuthGitHubClient(cloudauth.GitHubConfig{ClientId: cfg.Cloud.GitHub.ClientId, ClientSecret: cfg.Cloud.GitHub.ClientSecret, RedirectUrl: cfg.Cloud.GitHub.RedirectUrl}),
 	)
 	authService := cloudauth.New(repo, tokens, cloudauth.DefaultConfig(), cloudemail.NewResendSender(cloudemail.Config{ApiKey: cfg.Cloud.Resend.ApiKey, FromEmail: cfg.Cloud.Resend.FromEmail}), providers)
-	cloudHandler := cloudapi.New(cloudapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, AgentTunnelAudience: cfg.Cloud.ApiBaseUrl, DeviceRepository: cloudapi.NewDeviceRepository(deviceRepository), CloudPublicURL: cfg.Cloud.PublicURL, CloudOAuth: cloudapi.CloudOAuthConfig{Clients: cloudOAuthClients(cfg.Cloud.OAuth.Clients)}, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, Turnstile: cloudapi.TurnstileConfig{SiteKey: cfg.Cloud.Turnstile.SiteKey, SecretKey: cfg.Cloud.Turnstile.SecretKey, ExpectedHostname: expectedHostname, Verify: cloudapi.NewTurnstileVerifier(cfg.Cloud.Turnstile.SecretKey, expectedHostname, nil)}, CSRF: cloudapi.CSRFConfig{Tokens: cloudapi.NewCSRFTokens(10*time.Minute, 1024)}})
+	quotaRepo := cloudquota.NewRepository(db.DB, db.Driver)
+	cloudHandler := cloudapi.New(cloudapi.Config{DebugErrors: cfg.Gate.API.ExposeErrors, Logger: logger, AuthService: authService, AgentTunnelAudience: cfg.Cloud.ApiBaseUrl, DeviceRepository: cloudapi.NewDeviceRepository(deviceRepository), QuotaRepository: quotaRepo, ConcurrentAttaches: cfg.Terminal.Quota.ConcurrentAttaches, AdminUserIds: append([]string(nil), cfg.Cloud.Admin.UserIds...), AdminEmails: append([]string(nil), cfg.Cloud.Admin.Emails...), CloudPublicURL: cfg.Cloud.PublicURL, CloudOAuth: cloudapi.CloudOAuthConfig{Clients: cloudOAuthClients(cfg.Cloud.OAuth.Clients)}, CORSAllowedOrigins: cfg.Server.CorsAllowedOrigins, Turnstile: cloudapi.TurnstileConfig{SiteKey: cfg.Cloud.Turnstile.SiteKey, SecretKey: cfg.Cloud.Turnstile.SecretKey, ExpectedHostname: expectedHostname, Verify: cloudapi.NewTurnstileVerifier(cfg.Cloud.Turnstile.SecretKey, expectedHostname, nil)}, CSRF: cloudapi.CSRFConfig{Tokens: cloudapi.NewCSRFTokens(10*time.Minute, 1024)}})
 	return serveHTTP(ctx, cfg, logger, options, cloudHandler, stdout)
 }
 

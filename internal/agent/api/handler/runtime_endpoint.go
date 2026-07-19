@@ -14,6 +14,7 @@ import (
 	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/application/quota"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
@@ -242,6 +243,13 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 		delete(s.writers, writerKey)
 		s.writerMu.Unlock()
 	}()
+
+	subject := quota.LocalSubject
+	if err := s.attachQuota.TryAcquire(subject, s.config.ConcurrentAttaches); err != nil {
+		s.writeAPIError(w, r, http.StatusTooManyRequests, quota.CodeAttachExceeded, quota.MessageAttachExceeded, err)
+		return nil
+	}
+	defer s.attachQuota.Release(subject)
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{terminalproto.Subprotocol}, OriginPatterns: s.originPatterns(r)})
 	if err != nil {

@@ -16,7 +16,7 @@ func TestMigrateCreatesCloudIdentitySchemaOnly(t *testing.T) {
 	if err := Migrate(context.Background(), db, "sqlite"); err != nil {
 		t.Fatalf("Migrate() error = %v", err)
 	}
-	for _, table := range []string{"users", "user_identities", "auth_codes", "email_delivery_logs", "oauth_states", "devices", "user_devices", "goose_cloud_db_version"} {
+	for _, table := range []string{"users", "user_identities", "auth_codes", "email_delivery_logs", "oauth_states", "devices", "user_devices", "user_quota_limits", "goose_cloud_db_version"} {
 		if !testTableExists(t, db, table) {
 			t.Fatalf("table %s does not exist", table)
 		}

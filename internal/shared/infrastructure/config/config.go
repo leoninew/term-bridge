@@ -23,13 +23,14 @@ const (
 	EnvPrefix       = "TERMBRIDGE"
 	EnvNameVariable = EnvPrefix + "_ENV"
 
-	DefaultTerminalReplayMaxBytes      int64 = 256 * 1024
-	DefaultTerminalReplayChunkBytes          = 64 * 1024
-	DefaultTerminalClientQueueMessages       = 64
-	DefaultTerminalClientQueueBytes          = 4 * 1024 * 1024
-	DefaultTerminalKeepAliveMaxHot              = 4
-	DefaultTerminalKeepAliveDisposeDelayMs      = 30000
-	MaxGitCommandTimeout                     = 10 * time.Second
+	DefaultTerminalReplayMaxBytes          int64 = 256 * 1024
+	DefaultTerminalReplayChunkBytes              = 64 * 1024
+	DefaultTerminalClientQueueMessages           = 64
+	DefaultTerminalClientQueueBytes              = 4 * 1024 * 1024
+	DefaultTerminalKeepAliveMaxHot               = 4
+	DefaultTerminalKeepAliveDisposeDelayMs       = 30000
+	DefaultTerminalQuotaConcurrentAttaches       = 8
+	MaxGitCommandTimeout                         = 10 * time.Second
 )
 
 type Config struct {
@@ -106,11 +107,16 @@ type TerminalConfig struct {
 	Replay    TerminalReplayConfig
 	Client    TerminalClientConfig
 	KeepAlive TerminalKeepAliveConfig
+	Quota     TerminalQuotaConfig
 }
 
 type TerminalKeepAliveConfig struct {
 	MaxHotTerminals int
 	DisposeDelayMs  int
+}
+
+type TerminalQuotaConfig struct {
+	ConcurrentAttaches int
 }
 
 type TerminalReplayConfig struct {
@@ -172,6 +178,7 @@ type CloudConfig struct {
 	ApiBaseUrl         string
 	CorsAllowedOrigins []string
 	ExposeErrors       bool
+	Admin              CloudAdminConfig
 	Jwt                JwtConfig
 	Google             GoogleConfig
 	GitHub             GitHubConfig
@@ -179,6 +186,11 @@ type CloudConfig struct {
 	Turnstile          TurnstileConfig
 	OAuth              CloudOAuthConfig
 	Database           DatabaseConfig
+}
+
+type CloudAdminConfig struct {
+	UserIds []string
+	Emails  []string
 }
 
 type TurnstileConfig struct {
@@ -314,6 +326,9 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 					return v.GetInt("terminal.keepalive.dispose_delay_ms")
 				}(),
 			},
+			Quota: TerminalQuotaConfig{
+				ConcurrentAttaches: v.GetInt("terminal.quota.concurrent_attaches"),
+			},
 		},
 		File: FileConfig{
 			MaxTextBytes:              v.GetInt64("file.max_text_bytes"),
@@ -352,6 +367,10 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 			ApiBaseUrl:         strings.TrimSpace(v.GetString("cloud.api_base_url")),
 			CorsAllowedOrigins: getStringSlice(v, "cloud.cors_allowed_origins"),
 			ExposeErrors:       v.GetBool("cloud.expose_errors"),
+			Admin: CloudAdminConfig{
+				UserIds: getStringSlice(v, "cloud.admin.user_ids"),
+				Emails:  getStringSlice(v, "cloud.admin.emails"),
+			},
 			Jwt: JwtConfig{
 				SecretKey: v.GetString("cloud.jwt.secret_key"),
 				Ttl:       v.GetDuration("cloud.jwt.ttl"),
@@ -722,6 +741,7 @@ func configKeys() []string {
 		"terminal.client.queue.max_bytes",
 		"terminal.keepalive.max_hot_terminals",
 		"terminal.keepalive.dispose_delay_ms",
+		"terminal.quota.concurrent_attaches",
 		"file.max_text_bytes",
 		"file.max_directory_entries",
 		"file.max_recursive_delete_entries",
@@ -752,6 +772,8 @@ func configKeys() []string {
 		"cloud.api_base_url",
 		"cloud.cors_allowed_origins",
 		"cloud.expose_errors",
+		"cloud.admin.user_ids",
+		"cloud.admin.emails",
 		"cloud.jwt.secret_key",
 		"cloud.jwt.ttl",
 		"cloud.google.client_id",
@@ -882,6 +904,9 @@ func normalizeTerminalConfig(cfg *Config) {
 	if cfg.Terminal.KeepAlive.DisposeDelayMs < 0 {
 		cfg.Terminal.KeepAlive.DisposeDelayMs = DefaultTerminalKeepAliveDisposeDelayMs
 	}
+	if cfg.Terminal.Quota.ConcurrentAttaches <= 0 {
+		cfg.Terminal.Quota.ConcurrentAttaches = DefaultTerminalQuotaConcurrentAttaches
+	}
 }
 
 func validateTerminal(cfg TerminalConfig) error {
@@ -908,6 +933,9 @@ func validateTerminal(cfg TerminalConfig) error {
 	}
 	if cfg.KeepAlive.DisposeDelayMs < 0 || cfg.KeepAlive.DisposeDelayMs > 600000 {
 		return apperrors.Config("invalid terminal.keepalive.dispose_delay_ms", fmt.Errorf("must be between 0 and 600000"))
+	}
+	if cfg.Quota.ConcurrentAttaches < 1 || cfg.Quota.ConcurrentAttaches > 256 {
+		return apperrors.Config("invalid terminal.quota.concurrent_attaches", fmt.Errorf("must be between 1 and 256"))
 	}
 	return nil
 }
