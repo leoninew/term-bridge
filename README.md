@@ -15,6 +15,8 @@
 
 ## 能力概览
 
+![](./assets/screenshot.png)
+
 - **设备与工作区**：按 Device → Workspace → Session 组织任务，状态归属清晰。
 - **浏览器工作台**：在 Web 中管理 session、查看历史、attach 终端。
 - **远程终端**：基于 PTY 的交互体验，支持重连、resize 等常见终端行为。
@@ -58,16 +60,6 @@ task install
 ```bash
 task run
 ```
-
-默认地址：
-
-| 服务 | 地址 |
-| --- | --- |
-| Web | http://localhost:9030 |
-| Agent | http://127.0.0.1:9031 |
-| Cloud | http://127.0.0.1:9032 |
-
-也可分别启动：`task web` / `task agent` / `task cloud`。
 
 ### 常用命令
 

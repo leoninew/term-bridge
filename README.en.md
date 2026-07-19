@@ -14,6 +14,8 @@ It turns the CLI tools, shells, builds, and debugging tasks you run on a device 
 
 ## Capabilities
 
+![](./assets/screenshot.png)
+
 - **Devices and workspaces**: Organize work as Device → Workspace → Session with clear ownership.
 - **Browser workbench**: Manage sessions, browse history, and attach terminals in the web UI.
 - **Remote terminal**: PTY-based interaction with reconnect, resize, and other common terminal behaviors.
@@ -57,16 +59,6 @@ Start the web UI, local Agent, and Cloud together:
 ```bash
 task run
 ```
-
-Default endpoints:
-
-| Service | URL |
-| --- | --- |
-| Web | http://localhost:9030 |
-| Agent | http://127.0.0.1:9031 |
-| Cloud | http://127.0.0.1:9032 |
-
-You can also start them separately: `task web` / `task agent` / `task cloud`.
 
 ### Common commands
 
