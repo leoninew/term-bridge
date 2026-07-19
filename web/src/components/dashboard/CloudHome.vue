@@ -26,7 +26,7 @@
               {{ landingTitle }}
             </h1>
             <p
-              class="mt-3 text-sm leading-6 text-[var(--color-text-muted)] sm:text-[15px] sm:leading-7"
+              class="mt-3 text-sm leading-6 text-[var(--color-text-muted)] sm:text-base sm:leading-7"
             >
               {{ landingCopy }}
             </p>

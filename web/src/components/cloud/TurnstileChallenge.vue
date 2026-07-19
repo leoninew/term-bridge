@@ -1,6 +1,6 @@
 <template>
   <section class="space-y-2">
-    <label class="block text-xs font-semibold text-[var(--color-text)]" for="turnstile-widget">
+    <label class="block text-sm font-medium text-[var(--color-text)]" for="turnstile-widget">
       {{ t('cloud.humanVerification') }}
     </label>
     <div

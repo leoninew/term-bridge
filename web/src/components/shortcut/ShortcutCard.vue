@@ -14,7 +14,7 @@
   >
     <div class="flex min-w-0 items-center justify-between gap-2">
       <h3
-        class="min-w-0 flex-1 truncate text-base leading-tight text-[var(--color-text-strong)]"
+        class="min-w-0 flex-1 truncate text-sm font-semibold leading-5 text-[var(--color-text-strong)]"
         :title="shortcut.name"
       >
         {{ shortcut.name }}
@@ -68,7 +68,7 @@
     <div class="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden">
       <p
         v-if="shortcut.description"
-        class="truncate text-[13px] leading-snug text-[var(--color-text-muted)]"
+        class="truncate text-sm leading-5 text-[var(--color-text-muted)]"
         :title="shortcut.description"
       >
         {{ shortcut.description }}
@@ -106,7 +106,7 @@
 
       <span
         v-if="shortcut.enabled === false"
-        class="inline-flex min-w-0 shrink-0 items-center gap-1 truncate text-xs leading-none text-[var(--color-text-muted)]"
+        class="inline-flex min-w-0 shrink-0 items-center gap-1 truncate text-xs leading-4 text-[var(--color-text-muted)]"
       >
         <CircleOff class="size-3" aria-hidden="true" />
         {{ t('shortcut.disabled') }}
@@ -114,7 +114,7 @@
       <!-- timestamp hidden
       <span
         v-else
-        class="inline-flex min-w-0 shrink-0 items-center gap-1 truncate text-xs leading-none text-[var(--color-text-subtle)]"
+        class="inline-flex min-w-0 shrink-0 items-center gap-1 truncate text-xs leading-4 text-[var(--color-text-subtle)]"
         :title="t('shortcut.updatedAtHint')"
       >
         <Clock3 class="size-3" aria-hidden="true" />

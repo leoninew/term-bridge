@@ -9,7 +9,7 @@ export const authFormCardClass =
   'rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-left shadow-[0_12px_40px_rgb(0_0_0_/_0.18)] sm:p-8'
 
 export const authFormTitleClass =
-  'mb-6 text-center text-2xl font-semibold leading-8 tracking-tight text-[var(--color-text-strong)] sm:text-[1.75rem]'
+  'mb-6 text-center text-xl font-semibold leading-7 tracking-tight text-[var(--color-text-strong)] sm:text-2xl sm:leading-8'
 
 export const authFieldLabelClass = 'text-sm font-medium text-[var(--color-text)]'
 

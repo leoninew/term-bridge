@@ -1,58 +1,73 @@
 <template>
   <footer
-    class="flex h-8 shrink-0 items-center gap-1.5 overflow-hidden border-t border-[var(--color-border)] bg-[var(--color-panel-header)] px-3 text-sm text-[var(--color-text-muted)]"
+    class="flex h-8 shrink-0 items-center gap-2 overflow-hidden border-t border-[var(--color-border)] bg-[var(--color-panel-header)] px-2.5 text-xs leading-4 text-[var(--color-text-muted)]"
   >
     <template v-if="session">
-      <span>{{ t('dialog.cwd') }}</span>
-      <button
-        type="button"
-        class="max-w-full truncate rounded px-0.5 text-left text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus-visible:bg-[var(--color-control-hover)] max-sm:max-w-[12rem]"
-        :title="cwdCopyTitle"
-        :aria-label="cwdCopyTitle"
-        @click="copyCwd"
-      >
-        {{ cwdDisplayName }}
-      </button>
+      <div class="flex min-w-0 items-center gap-1">
+        <span class="shrink-0">{{ t('dialog.cwd') }}</span>
+        <button
+          type="button"
+          class="max-w-full truncate rounded px-0.5 text-left text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus-visible:bg-[var(--color-control-hover)] max-sm:max-w-[12rem]"
+          :title="cwdCopyTitle"
+          :aria-label="cwdCopyTitle"
+          @click="copyCwd"
+        >
+          {{ cwdDisplayName }}
+        </button>
+      </div>
 
-      <span>{{ t('dialog.commandSource') }}</span>
-      <LaunchMethodIcon
-        :command-source="session.command_source"
-        size-class="size-4 text-[var(--color-text)]"
-        :label="launchMethodLabel"
-      />
-      <span
-        v-if="isShortcutLaunch"
-        class="min-w-0 truncate text-[var(--color-text)]"
-        :title="session.shortcut_name_snapshot"
-      >
-        {{ session.shortcut_name_snapshot }}
-      </span>
-      <span
-        v-else
-        class="min-w-0 truncate font-mono text-xs text-[var(--color-text)]"
-        :title="session.command"
-      >
-        {{ session.command }}
-      </span>
+      <span class="shrink-0 text-[var(--color-border-strong)]" aria-hidden="true">|</span>
 
-      <span>{{ t('workbench.status') }}</span>
-      <span :class="lifecycleStateClassName(session.lifecycle_state)">
-        {{ session.lifecycle_state }}
-      </span>
+      <div class="flex min-w-0 items-center gap-1">
+        <span class="shrink-0">{{ t('dialog.commandSource') }}</span>
+        <LaunchMethodIcon
+          :command-source="session.command_source"
+          size-class="size-3.5 text-[var(--color-text)]"
+          :label="launchMethodLabel"
+        />
+        <span
+          v-if="isShortcutLaunch"
+          class="min-w-0 truncate text-[var(--color-text)]"
+          :title="session.shortcut_name_snapshot"
+        >
+          {{ session.shortcut_name_snapshot }}
+        </span>
+        <span
+          v-else
+          class="min-w-0 truncate font-mono text-[var(--color-text)]"
+          :title="session.command"
+        >
+          {{ session.command }}
+        </span>
+      </div>
+
+      <span class="shrink-0 text-[var(--color-border-strong)]" aria-hidden="true">|</span>
+
+      <div class="flex min-w-0 items-center gap-1">
+        <span class="shrink-0">{{ t('workbench.status') }}</span>
+        <span :class="lifecycleStateClassName(session.lifecycle_state)">
+          {{ session.lifecycle_state }}
+        </span>
+      </div>
     </template>
     <span v-else>{{ t('workbench.noActiveSession') }}</span>
 
-    <div class="ml-auto flex min-w-0 shrink-0 items-center gap-3">
+    <div class="ml-auto flex min-w-0 shrink-0 items-center gap-2">
       <span v-if="deviceLabel" class="min-w-0 truncate text-[var(--color-text)]">
         {{ deviceLabel }}
       </span>
       <span
+        v-if="deviceLabel && showCloudConnection"
+        class="shrink-0 text-[var(--color-border-strong)]"
+        aria-hidden="true"
+      >|</span>
+      <span
         v-if="showCloudConnection"
-        class="inline-flex shrink-0 items-center gap-1.5"
+        class="inline-flex shrink-0 items-center gap-1"
         :title="cloudConnectionLabel"
       >
         <span
-          class="size-2 shrink-0 rounded-full"
+          class="size-1.5 shrink-0 rounded-full"
           :class="cloudConnected ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
         />
         <span class="truncate text-[var(--color-text)]">{{ cloudConnectionLabel }}</span>

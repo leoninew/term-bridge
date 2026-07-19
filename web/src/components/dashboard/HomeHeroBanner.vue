@@ -15,7 +15,7 @@
     <div :class="['relative min-h-[240px] p-4 sm:min-h-[280px] sm:p-6 lg:p-8', contentClass]">
       <span
         v-if="version"
-        class="absolute right-4 top-4 inline-flex h-[22px] items-center gap-1 rounded-full border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-control-bg)_88%,transparent)] px-2 text-[11px] font-medium leading-none text-[var(--color-text-muted)] sm:right-6 sm:top-6 lg:right-8 lg:top-8"
+        class="absolute right-4 top-4 inline-flex h-6 items-center gap-1 rounded-full border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-control-bg)_88%,transparent)] px-2 text-xs font-medium leading-4 text-[var(--color-text-muted)] sm:right-6 sm:top-6 lg:right-8 lg:top-8"
         :title="versionTitle"
       >
         <Tag class="size-3 shrink-0" aria-hidden="true" />

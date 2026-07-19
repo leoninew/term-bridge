@@ -11,7 +11,7 @@
         <header class="flex min-h-14 min-w-0 items-center justify-between gap-4">
           <div class="flex min-w-0 flex-1 items-center gap-4">
             <h1
-              class="shrink-0 text-[22px] font-semibold leading-tight text-[var(--color-text-strong)]"
+              class="shrink-0 text-xl font-semibold leading-tight text-[var(--color-text-strong)]"
             >
               {{ t('shortcut.title') }}
             </h1>
@@ -19,7 +19,7 @@
             <div class="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto">
               <input
                 v-model="filterQuery"
-                class="h-9 w-[220px] max-w-full shrink-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 text-sm leading-none text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)] focus:shadow-[0_0_0_3px_var(--color-surface-muted)]"
+                class="h-9 w-[220px] max-w-full shrink-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 text-sm leading-5 text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)] focus:shadow-[0_0_0_3px_var(--color-surface-muted)]"
                 :placeholder="t('shortcut.filterPlaceholder')"
                 type="search"
               />

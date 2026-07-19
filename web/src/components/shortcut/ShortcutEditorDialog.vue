@@ -35,7 +35,7 @@
                 v-for="tag in tags"
                 :key="tag"
                 :value="tag"
-                class="inline-flex max-w-full shrink-0 items-center gap-1 rounded bg-[var(--color-control-hover)] py-0.5 pl-1.5 pr-0.5 text-xs text-[var(--color-text-muted)] data-[state=active]:bg-[var(--color-control-active)]"
+                class="inline-flex max-w-full shrink-0 items-center gap-1 rounded bg-[var(--color-control-hover)] py-0.5 pl-1.5 pr-0.5 text-xs font-medium leading-4 text-[var(--color-text-muted)] data-[state=active]:bg-[var(--color-control-active)]"
               >
                 <TagsInputItemText class="min-w-0 truncate" />
                 <TagsInputItemDelete

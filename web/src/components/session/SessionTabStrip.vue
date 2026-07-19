@@ -35,7 +35,7 @@
         >
           <TabsTrigger
             :value="tab.sessionId"
-            class="tab-drag-handle grid h-full w-full min-w-0 cursor-pointer grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-1 border-0 bg-transparent px-2 pr-6 text-left text-[13px] leading-tight text-inherit outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-primary-border)]"
+            class="tab-drag-handle grid h-full w-full min-w-0 cursor-pointer grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-1 border-0 bg-transparent px-2 pr-6 text-left text-sm leading-tight text-inherit outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-primary-border)]"
           >
             <span
               class="inline-flex size-5 items-center justify-center text-[var(--color-text-subtle)] group-data-[active=true]:text-[var(--color-text-muted)]"

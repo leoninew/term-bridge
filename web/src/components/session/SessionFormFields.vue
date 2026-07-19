@@ -1,19 +1,19 @@
 <template>
-  <label class="flex flex-col gap-1.5 text-sm text-[var(--color-text)]">
+  <label class="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text)]">
     <span>{{ t('dialog.name') }}</span>
     <input
       :value="name"
-      class="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)] disabled:opacity-70"
+      class="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-sm font-normal text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)] disabled:opacity-70"
       :placeholder="t('dialog.sessionNamePlaceholder')"
       :disabled="disabled"
       @input="emit('update:name', ($event.target as HTMLInputElement).value)"
     />
   </label>
-  <label class="flex flex-col gap-1.5 text-sm text-[var(--color-text)]">
+  <label class="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text)]">
     <span>{{ t('dialog.cwd') }}</span>
     <input
       :value="cwd"
-      class="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)] disabled:opacity-70"
+      class="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 text-sm font-normal text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border-strong)] disabled:opacity-70"
       :placeholder="t('dialog.workingDirectoryPlaceholder')"
       :readonly="cwdReadonly"
       :disabled="disabled"

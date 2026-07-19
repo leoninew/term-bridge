@@ -125,9 +125,12 @@ body,
   }
 }
 
+/* Keep form controls on the app font without locking font-size (Tailwind text-* must win). */
 button,
-input {
-  font: inherit;
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 button {
@@ -210,30 +213,11 @@ p {
 }
 
 .button-secondary:hover:not(:disabled) {
-  border-color: var(--color-border-strong);
   background: var(--color-control-active);
 }
 
 .button-secondary:focus-visible {
-  border-color: var(--color-border-strong);
   background: var(--color-control-active);
-  box-shadow: 0 0 0 3px var(--color-surface-muted);
-}
-
-.button-ghost {
-  border-color: transparent;
-  background: transparent;
-  color: var(--color-text);
-}
-
-.button-ghost:hover:not(:disabled) {
-  border-color: transparent;
-  background: var(--color-control-hover);
-}
-
-.button-ghost:focus-visible {
-  border-color: transparent;
-  background: var(--color-control-hover);
   box-shadow: 0 0 0 3px var(--color-surface-muted);
 }
 
@@ -361,8 +345,10 @@ p {
   border-radius: 8px;
   background: var(--color-control-bg);
   color: var(--color-text);
-  font: inherit;
+  font-family: inherit;
+  font-size: inherit;
   font-weight: 400;
+  line-height: inherit;
   outline: none;
   padding: 8px 10px;
 }
@@ -1314,8 +1300,8 @@ p {
   border-radius: 6px;
   color: var(--color-text-muted);
   cursor: pointer;
-  font-size: 13px;
-  line-height: 1;
+  font-size: 14px;
+  line-height: 1.25;
   outline: none;
   padding: 0 12px;
   user-select: none;
@@ -1419,13 +1405,14 @@ p {
 
 .shortcut-type-tag {
   display: inline-flex;
-  height: 18px;
+  height: 20px;
   max-width: 88px;
   align-items: center;
   overflow: hidden;
   border-radius: 999px;
-  font-size: 11px;
-  line-height: 1;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
   padding: 0 7px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1484,7 +1471,7 @@ p {
 
 .shortcut-command-input {
   font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace !important;
-  font-size: 13px !important;
+  font-size: 14px !important;
   line-height: 1.5;
 }
 

@@ -44,7 +44,7 @@
         >
           <ComboboxAnchor class="relative flex min-w-0 flex-1 items-center">
             <ComboboxInput
-              class="session-command-input h-full w-full min-w-0 rounded-none !border-0 bg-transparent px-3 pr-9 text-sm leading-none text-[var(--color-text)] !shadow-none outline-none placeholder:text-[var(--color-text-subtle)] disabled:opacity-70"
+              class="session-command-input h-full w-full min-w-0 rounded-none !border-0 bg-transparent px-3 pr-9 text-sm leading-5 text-[var(--color-text)] !shadow-none outline-none placeholder:text-[var(--color-text-subtle)] disabled:opacity-70"
               :placeholder="
                 shortcuts.length ? t('dialog.searchShortcuts') : t('dialog.noShortcuts')
               "
@@ -113,7 +113,7 @@
         <input
           v-else
           :value="command"
-          class="session-command-input h-full w-full min-w-0 rounded-none !border-0 bg-transparent px-3 text-sm leading-none text-[var(--color-text)] !shadow-none outline-none placeholder:text-[var(--color-text-subtle)] disabled:opacity-70"
+          class="session-command-input h-full w-full min-w-0 rounded-none !border-0 bg-transparent px-3 text-sm leading-5 text-[var(--color-text)] !shadow-none outline-none placeholder:text-[var(--color-text-subtle)] disabled:opacity-70"
           :placeholder="t('dialog.commandPlaceholder')"
           :disabled="disabled"
           @input="emit('update:command', ($event.target as HTMLInputElement).value)"
