@@ -1,12 +1,12 @@
 # Plan / 计划：终端资源配额
 
-最后修改时间: 2026-07-19 17:25:41
+最后修改时间: 2026-07-19 18:20:00
 
 Review status: Accepted
 
 ## Flow mode / Stage
 
-标准模式 / standard；计划 / Plan（Accepted）；进入实现 / Implementation。
+标准模式 / standard；计划 / Plan（Accepted）；**实现 / Implementation 已完成**（commit `05efe92`）。
 
 ## Requirement basis
 
@@ -74,3 +74,23 @@ Frontend:
 ## Rollback
 
 - set concurrent_attaches very high or disable by large default; or revert feature
+
+## Implementation status（2026-07-19 18:20:00）
+
+| Step | 状态 |
+| --- | --- |
+| 1. shared AttachCounter + tests | 完成 |
+| 2. config terminal.quota + cloud.admin | 完成 |
+| 3. Agent wire + 429 | 完成 |
+| 4. Cloud migration + enforce | 完成 |
+| 5. me/admin quota APIs | 完成 |
+| 6. Frontend 429/错误提示 | 完成（轻量） |
+| 7. focused tests | 完成 |
+| Verification 文档 / 浏览器手测 | 未完成 |
+
+### 运行时语义快照
+
+- 无 `user_quota_limits` 行 → default limit **8**
+- 有覆盖行 → 用覆盖 limit；DELETE 回退 default
+- 与 keep-alive：有效 live attach ≈ min(hot 尝试数, 用户 limit)
+- Agent local 主体固定 `local`，limit 来自 yaml/env，无 per-user 表

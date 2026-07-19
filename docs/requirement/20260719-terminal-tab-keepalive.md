@@ -1,17 +1,59 @@
 # 活跃会话终端 Keep-Alive（减少切 Tab 重连）
-最后修改时间: 2026-07-19 16:02:36
+最后修改时间: 2026-07-19 18:20:00
 
 Review status: Accepted
 
 ## Flow mode / Stage
 
-标准模式 / standard；需求 / Requirement（Accepted）；下一阶段：计划 / Plan
+标准模式 / standard；需求 / Requirement（Accepted）→ 计划 / Plan（Accepted）→ **实现 / Implementation 已完成**（commit `1b86761`）。
+验证 / Verification 文档为 Draft：自动化已完成，浏览器手测可能仍不完整。
 
 ## Related
 
 - 资源配额 / 管理员动态调配（防客户端调大保活拖垮服务）：见独立需求 `docs/requirement/20260719-terminal-resource-quota.md`。
 - **本需求继续独立实现**，不等待配额系统完成。
 - 本需求内后端仅保留必要的最小兼容；**按用户配额、管理端调配不在本需求范围**。
+
+## Current understanding（2026-07-19 固化）
+
+### 问题定性
+
+- 日志里 `/ws` 的 `duration_ms` 是 **连接存活时长**，不是握手耗时。
+- 真卡顿主因是 active-only 挂载：切 tab 会 unmount → 关 WS + `xterm.dispose()`，切回再 connect/attach/replay。
+- 频繁切会话会放大短生命周期 WS、closed connection write fail、重连体感；**不是**必须同时开很多 WS 才有问题。
+
+### 保活策略（已实现）
+
+- hot set = 最近 **4** 个激活的 **running** 已打开 tab
+- hot：保留 xterm + live WS + 收输出
+- 离开 hot：立即关 WS；xterm 冻结 **30s** 后 dispose
+- 30s 内再进入：可复用 xterm 并 reconnect/attach/replay
+- 关 tab / 页面卸载：立即 dispose，不走延迟
+- stopped session 走 history 只读，不进 hot set
+
+### 配置
+
+| 层 | 来源 | 默认 |
+| --- | --- | --- |
+| L1 | 前端代码 | hot=4, dispose=30000ms |
+| L2 | yaml/env → `BrowserRuntimeConfig.terminal.keepAlive` | 可覆盖 L1 |
+| clamp | 前端 | hot 1–16；dispose 0–600000 |
+
+- L2/`__CONFIG__` **可被篡改**，只做部署建议；防滥用靠独立需求 `20260719-terminal-resource-quota`（后端默认 attach 硬顶 **8**）。
+- 调试：`localStorage.termbridge.terminalDebug=1` → `keepalive.*` 日志。
+
+### 性能认识
+
+- **本机**：多 hot xterm 增加内存/DOM/渲染；默认 4 是体验与资源折中。
+- **服务器**：每路 live attach 占一条 browser WS + 输出 fan-out 带宽；PTY 本身在 running 时已存在，与是否 attach 部分解耦。
+- 后端配额默认 8 > 前端 hot 4：给 headroom，正常路径仍约 4 路 attach。
+
+### 关键路径快照
+
+- `web/src/features/sessions/terminalKeepAlive.ts`
+- `web/src/features/sessions/terminalKeepAliveConfig.ts`
+- `web/src/components/session/SessionWorkbench.vue`（多 pane 挂载）
+- `TerminalView`：`connectionEnabled` / `active`
 
 ## Background
 
@@ -392,3 +434,13 @@ env 示例：
 - 2026-07-19：用户决定 **按用户资源配额 + 管理员动态调配** 拆到新需求 `20260719-terminal-resource-quota.md`；**本 keep-alive 需求继续实现**，不依赖配额系统。
 - 2026-07-19：用户确认 keep-alive 按推荐，进入 Plan → Accepted。
 - Q6/Q7 按推荐关闭。
+
+### 补充认识（2026-07-19 实现后）
+
+| 项 | 结论 |
+| --- | --- |
+| 实现状态 | 已合入 `1b86761` |
+| 配额关系 | 独立需求 `05efe92`；keep-alive 不依赖配额即可工作 |
+| 默认 hot/dispose | 4 / 30000ms |
+| Verification | Draft：单测 OK；浏览器手测可能未完成 |
+

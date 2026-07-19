@@ -1,6 +1,6 @@
 # 活跃会话终端 Keep-Alive 验证
 
-最后修改时间: 2026-07-19 17:03:40
+最后修改时间: 2026-07-19 18:20:00
 
 Review status: Draft
 
@@ -198,3 +198,9 @@ Review status: Draft
 - 浏览器 smoke **尚未完成**；建议合并前由人工完成 Incomplete 手测清单，或接受“先合代码、后补手测”风险。
 
 Verification 状态：人工 smoke 完成前保持 `Draft`；用户确认手测通过后可将 `Review status` 改为 `Accepted`。
+
+## 关联现状（2026-07-19 18:20:00）
+
+- keep-alive 代码已合入 commit `1b86761`。
+- 资源配额 P0 已合入 `05efe92`（独立 feature）；本 verification 仍只覆盖 keep-alive 体验，不把配额手测并入本文件除非另开 verification。
+- 浏览器手测若仍 Incomplete，需补：多 tab 切回秒开、非 hot 关 WS、30s dispose、关 tab 立即清理、debug 日志。

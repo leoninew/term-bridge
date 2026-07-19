@@ -1,16 +1,56 @@
 # 终端与连接资源配额（按用户 / 管理员动态调配）
-最后修改时间: 2026-07-19 17:25:41
+最后修改时间: 2026-07-19 18:20:00
 
 Review status: Accepted
 
 ## Flow mode / Stage
 
-标准模式 / standard；当前阶段：需求 / Requirement（Accepted）；进入计划 / Plan → 实现
+标准模式 / standard；需求 / Requirement（Accepted）→ 计划 / Plan（Accepted）→ **实现 / Implementation 已完成**（commit `05efe92`）。
+Verification 文档尚未正式起稿；自动化/单测已随实现落地。
 
 ## Related
 
 - 关联体验优化：`docs/requirement/20260719-terminal-tab-keepalive.md`（tab keep-alive，**独立交付**，不依赖本配额系统完成）。
 - 本需求回答：前端策略 vs 后端硬顶、如何按用户配额限制、管理员如何动态调配，避免客户端篡改拖垮服务。
+
+## Current understanding（2026-07-19 固化）
+
+### 与 keep-alive 的默认数字关系
+
+| 层 | 配置 | 默认 | 含义 |
+| --- | --- | --- | --- |
+| L1/L2 前端体验 | `terminal.keepalive.max_hot_terminals` / `maxHotTerminals` | **4** | 最近激活的 running tab 保活 xterm + 收输出 |
+| L1/L2 前端体验 | `dispose_delay_ms` | **30000** | 离开 hot set 后冻结 xterm 再销毁 |
+| L3 后端硬顶 | `terminal.quota.concurrent_attaches` | **8** | 每用户（主体）同时 browser terminal attach 上限 |
+
+**为什么后端默认 8、前端默认 4（不一致是刻意的）**
+
+1. **前端 4**：体验推荐，控制本机 xterm 内存/CPU 与“最近在用”语义，不是安全边界。
+2. **后端 8**：服务器硬顶，给 keep-alive 留 **headroom**（多开 tab、短暂双 attach 竞态、调试、轻微误配），同时仍能挡住把 `maxHotTerminals` 改成 99 的滥用。
+3. **有效并发** ≈ `min(前端实际发起的 attach 数, 后端配额)`。用户没有自定义覆盖时，正常路径大约 4 路 live attach，不是 8 路。
+4. 若管理员把用户配额降到 **小于 4**，前端仍可能按 4 尝试保活，超出部分会 429，keep-alive 自然降级。
+
+### 无 `user_quota_limits` 行时的行为
+
+- **不是无限配额**。
+- 主体（Cloud user / Agent `local`）在表中 **没有覆盖行** 时：使用配置/代码默认 limit（P0 默认 **8**）。
+- API/内部表示：`source: "default"`（有覆盖则为 override/admin 等实现侧来源字段）。
+- `DELETE` 管理端重置 = 删除覆盖行 → 回退 default，而不是“清掉限制”。
+
+### 信任边界（再次强调）
+
+- keep-alive / `BrowserRuntimeConfig` / `__CONFIG__` **可被客户端篡改**，只影响“想怎么做”。
+- 服务器信任边界是 **attach 前 acquire 配额**；超限 HTTP **429** + `terminal_attach_quota_exceeded`。
+- 单 session 仍最多一个 browser writer（409 conflict 语义不变）。
+
+### 已落地交付（实现快照）
+
+- 包：`internal/shared/application/quota/`（`AttachCounter`）
+- Agent：`bridgeTerminalStream` subject=`local`
+- Cloud：`handleTerminalWS` subject=JWT `sub`；`user_quota_limits` migration
+- API：`GET /api/me/quota`；`GET|PUT|DELETE /api/admin/users/{id}/quota`
+- Admin 白名单：`cloud.admin.user_ids` / `emails`
+- 前端：attach 失败/429 更清晰提示，避免重连风暴
 
 ## Background
 
@@ -243,8 +283,12 @@ keep-alive 需求 **可先上线**；本配额上线后自动成为其上界。
 
 1. 前端/RuntimeConfig 只做体验与建议，**不是**防滥用边界。
 2. 防服务器压力靠 **后端按用户配额**（本需求）。
-3. keep-alive 需求继续独立实现，不阻塞本需求。
+3. keep-alive 需求继续独立实现，不阻塞本需求（双方均已实现；keep-alive 先合入 `1b86761`，配额后合入 `05efe92`）。
 4. 管理员动态调配针对配额 limit，不是改全体前端发版。
+5. **默认数字**：前端 keep-alive hot=**4** / dispose=**30s**；后端 attach 配额=**8**。不一致是体验推荐 vs 服务器 headroom，不是文档笔误。
+6. **无覆盖行** = 使用默认 8（`source=default`），**不是**无限。
+7. **降配不踢**已有连接；仅拒绝新 acquire，直到 usage 自然降到 limit 以下。
+8. P0 只做 `terminal.concurrent_attaches`；running sessions 配额为 P1。
 
 ## Risk
 
@@ -275,3 +319,16 @@ keep-alive 需求 **可先上线**；本配额上线后自动成为其上界。
 | Q4 降配 | 默认不踢现有连接 |
 | Q5 下发摘要 | P0 提供用户只读 GET；前端可选用；管理端 CRUD |
 | 管理员鉴权 | P0：cloud.admin.user_ids / emails 配置白名单（非完整 RBAC） |
+
+### 补充认识（2026-07-19 实现后）
+
+| 项 | 结论 |
+| --- | --- |
+| 无 `user_quota_limits` 记录 | 默认 limit=8，source=default；非无限 |
+| 前端 hot 默认 | 4（L1/L2 keep-alive） |
+| 后端 attach 默认 | 8（L3 quota） |
+| 为何 8≠4 | UX 推荐 4；服务器硬顶留 headroom 到 8 |
+| 篡改风险 | 前端可调大 hot，但无法突破 L3 |
+| 实现状态 | P0 已合入主线（`05efe92`） |
+| Verification | 尚未单独起 verification 文档；可后续补浏览器/管理端手测 |
+
