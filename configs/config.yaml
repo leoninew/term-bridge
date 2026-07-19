@@ -32,7 +32,9 @@ terminal:
     queue:
       max_messages: 64
       max_bytes: 4194304
-
+  keepalive:
+    max_hot_terminals: 4
+    dispose_delay_ms: 30000
 # 工作区文件管理边界。所有操作仅可访问 Agent 已登记工作区的根目录。
 file:
   max_text_bytes: 1048576

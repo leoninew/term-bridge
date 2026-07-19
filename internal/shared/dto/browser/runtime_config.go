@@ -1,9 +1,19 @@
 package browser
 
 type RuntimeConfig struct {
-	Version string             `json:"version"`
-	Local   RuntimeLocalConfig `json:"local"`
-	Cloud   RuntimeCloudConfig `json:"cloud"`
+	Version  string                   `json:"version"`
+	Local    RuntimeLocalConfig       `json:"local"`
+	Cloud    RuntimeCloudConfig       `json:"cloud"`
+	Terminal *RuntimeTerminalConfig   `json:"terminal,omitempty"`
+}
+
+type RuntimeTerminalConfig struct {
+	KeepAlive RuntimeTerminalKeepAliveConfig `json:"keepAlive"`
+}
+
+type RuntimeTerminalKeepAliveConfig struct {
+	MaxHotTerminals int `json:"maxHotTerminals"`
+	DisposeDelayMs  int `json:"disposeDelayMs"`
 }
 
 type RuntimeLocalConfig struct {

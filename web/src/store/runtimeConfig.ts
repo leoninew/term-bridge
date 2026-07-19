@@ -1,6 +1,13 @@
 import { reactive } from 'vue'
 import { defineStore } from 'pinia'
-import type { LocalMode, BrowserRuntimeConfig, CloudOAuthConfig, RuntimeConfig } from '../config'
+import type {
+  LocalMode,
+  BrowserRuntimeConfig,
+  CloudOAuthConfig,
+  RuntimeConfig,
+  RuntimeTerminalConfig,
+} from '../config'
+import { clampTerminalKeepAliveConfig } from '../features/sessions/terminalKeepAliveConfig'
 import { readSessionStorageValue, writeSessionStorageValue } from './storage'
 
 declare global {
@@ -98,6 +105,7 @@ function parseRuntimeConfig(source: RuntimeConfigSource): RuntimeConfig {
       apiBaseUrl: requiredApiBaseUrl('cloud.apiBaseUrl', cloud?.apiBaseUrl, errors),
       externalAuthProviderIds: parseExternalAuthProviderIds(cloud?.externalAuthProviderIds),
     },
+    terminal: parseTerminalConfig(source.value.terminal),
   }
 
   if (errors.length > 0) {
@@ -105,6 +113,16 @@ function parseRuntimeConfig(source: RuntimeConfigSource): RuntimeConfig {
   }
 
   return config
+}
+
+function parseTerminalConfig(
+  value: BrowserRuntimeConfig['terminal'] | undefined,
+): RuntimeTerminalConfig {
+  const keepAlive = clampTerminalKeepAliveConfig({
+    maxHotTerminals: value?.keepAlive?.maxHotTerminals,
+    disposeDelayMs: value?.keepAlive?.disposeDelayMs,
+  })
+  return { keepAlive }
 }
 
 function parseLocalMode(value: string | undefined, errors: string[]): LocalMode {

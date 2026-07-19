@@ -27,6 +27,8 @@ const (
 	DefaultTerminalReplayChunkBytes          = 64 * 1024
 	DefaultTerminalClientQueueMessages       = 64
 	DefaultTerminalClientQueueBytes          = 4 * 1024 * 1024
+	DefaultTerminalKeepAliveMaxHot              = 4
+	DefaultTerminalKeepAliveDisposeDelayMs      = 30000
 	MaxGitCommandTimeout                     = 10 * time.Second
 )
 
@@ -100,9 +102,15 @@ type HistoryConfig struct {
 }
 
 type TerminalConfig struct {
-	History HistoryConfig
-	Replay  TerminalReplayConfig
-	Client  TerminalClientConfig
+	History   HistoryConfig
+	Replay    TerminalReplayConfig
+	Client    TerminalClientConfig
+	KeepAlive TerminalKeepAliveConfig
+}
+
+type TerminalKeepAliveConfig struct {
+	MaxHotTerminals int
+	DisposeDelayMs  int
 }
 
 type TerminalReplayConfig struct {
@@ -297,6 +305,15 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 				MaxMessages: v.GetInt("terminal.client.queue.max_messages"),
 				MaxBytes:    v.GetInt("terminal.client.queue.max_bytes"),
 			}},
+			KeepAlive: TerminalKeepAliveConfig{
+				MaxHotTerminals: v.GetInt("terminal.keepalive.max_hot_terminals"),
+				DisposeDelayMs: func() int {
+					if !v.IsSet("terminal.keepalive.dispose_delay_ms") {
+						return DefaultTerminalKeepAliveDisposeDelayMs
+					}
+					return v.GetInt("terminal.keepalive.dispose_delay_ms")
+				}(),
+			},
 		},
 		File: FileConfig{
 			MaxTextBytes:              v.GetInt64("file.max_text_bytes"),
@@ -703,6 +720,8 @@ func configKeys() []string {
 		"terminal.replay.chunk_bytes",
 		"terminal.client.queue.max_messages",
 		"terminal.client.queue.max_bytes",
+		"terminal.keepalive.max_hot_terminals",
+		"terminal.keepalive.dispose_delay_ms",
 		"file.max_text_bytes",
 		"file.max_directory_entries",
 		"file.max_recursive_delete_entries",
@@ -857,6 +876,12 @@ func normalizeTerminalConfig(cfg *Config) {
 	if cfg.Terminal.Client.Queue.MaxBytes <= 0 {
 		cfg.Terminal.Client.Queue.MaxBytes = DefaultTerminalClientQueueBytes
 	}
+	if cfg.Terminal.KeepAlive.MaxHotTerminals <= 0 {
+		cfg.Terminal.KeepAlive.MaxHotTerminals = DefaultTerminalKeepAliveMaxHot
+	}
+	if cfg.Terminal.KeepAlive.DisposeDelayMs < 0 {
+		cfg.Terminal.KeepAlive.DisposeDelayMs = DefaultTerminalKeepAliveDisposeDelayMs
+	}
 }
 
 func validateTerminal(cfg TerminalConfig) error {
@@ -877,6 +902,12 @@ func validateTerminal(cfg TerminalConfig) error {
 	}
 	if cfg.Replay.MaxBytes >= int64(cfg.Client.Queue.MaxBytes) {
 		return apperrors.Config("invalid terminal.replay.max_bytes", fmt.Errorf("must be less than terminal.client.queue.max_bytes"))
+	}
+	if cfg.KeepAlive.MaxHotTerminals < 1 || cfg.KeepAlive.MaxHotTerminals > 16 {
+		return apperrors.Config("invalid terminal.keepalive.max_hot_terminals", fmt.Errorf("must be between 1 and 16"))
+	}
+	if cfg.KeepAlive.DisposeDelayMs < 0 || cfg.KeepAlive.DisposeDelayMs > 600000 {
+		return apperrors.Config("invalid terminal.keepalive.dispose_delay_ms", fmt.Errorf("must be between 0 and 600000"))
 	}
 	return nil
 }

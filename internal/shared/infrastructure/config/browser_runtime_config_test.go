@@ -19,6 +19,12 @@ func TestBuildBrowserRuntimeConfigProjectsPublicConfiguration(t *testing.T) {
 				Scopes:       []string{"openid", "email"},
 			},
 		},
+		Terminal: TerminalConfig{
+			KeepAlive: TerminalKeepAliveConfig{
+				MaxHotTerminals: DefaultTerminalKeepAliveMaxHot,
+				DisposeDelayMs:  DefaultTerminalKeepAliveDisposeDelayMs,
+			},
+		},
 		Cloud: CloudConfig{
 			PublicUrl:  "https://termbridge.preflite.cn",
 			ApiBaseUrl: "https://api.termbridge.preflite.cn",
@@ -56,6 +62,9 @@ func TestBuildBrowserRuntimeConfigProjectsPublicConfiguration(t *testing.T) {
 	}
 	if !reflect.DeepEqual(runtimeConfig.Cloud.ExternalAuthProviderIds, []string{"google", "github"}) {
 		t.Fatalf("ExternalAuthProviderIds = %#v", runtimeConfig.Cloud.ExternalAuthProviderIds)
+	}
+	if runtimeConfig.Terminal == nil || runtimeConfig.Terminal.KeepAlive.MaxHotTerminals != DefaultTerminalKeepAliveMaxHot || runtimeConfig.Terminal.KeepAlive.DisposeDelayMs != DefaultTerminalKeepAliveDisposeDelayMs {
+		t.Fatalf("Terminal.KeepAlive = %#v", runtimeConfig.Terminal)
 	}
 
 	cfg.Local.OAuth.Scopes[0] = "changed"

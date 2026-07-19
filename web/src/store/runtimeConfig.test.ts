@@ -68,6 +68,10 @@ describe('runtime config store', () => {
     expect(store.config.local.apiBasePath).toBe('/local-api')
     expect(store.config.cloud.publicUrl).toBe('http://termbridge.lvh.me')
     expect(store.config.cloud.apiBaseUrl).toBe('http://termbridge.lvh.me/cloud-api')
+    expect(store.config.terminal.keepAlive).toEqual({
+      maxHotTerminals: 4,
+      disposeDelayMs: 30_000,
+    })
     expect(store.view.mode).toBe('cloud')
   })
 
@@ -105,6 +109,12 @@ describe('runtime config store', () => {
         publicUrl: 'https://cloud.example.com',
         apiBaseUrl: 'https://cloud.example.com/cloud-api',
         externalAuthProviderIds: ['google', 'github'],
+      },
+      terminal: {
+        keepAlive: {
+          maxHotTerminals: 4,
+          disposeDelayMs: 30000,
+        },
       },
     })
   })

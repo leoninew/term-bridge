@@ -19,10 +19,20 @@ export interface RuntimeCloudConfig {
   externalAuthProviderIds: string[]
 }
 
+export interface RuntimeTerminalKeepAliveConfig {
+  maxHotTerminals: number
+  disposeDelayMs: number
+}
+
+export interface RuntimeTerminalConfig {
+  keepAlive: RuntimeTerminalKeepAliveConfig
+}
+
 export interface RuntimeConfig {
   version: string
   local: RuntimeLocalConfig
   cloud: RuntimeCloudConfig
+  terminal: RuntimeTerminalConfig
 }
 
 export type BrowserRuntimeLocalConfig = Partial<{
@@ -34,8 +44,13 @@ export type BrowserRuntimeLocalConfig = Partial<{
 
 export type BrowserRuntimeCloudConfig = Partial<RuntimeCloudConfig>
 
+export type BrowserRuntimeTerminalConfig = Partial<{
+  keepAlive: Partial<RuntimeTerminalKeepAliveConfig>
+}>
+
 export type BrowserRuntimeConfig = Partial<{
   version: string
   local: BrowserRuntimeLocalConfig
   cloud: BrowserRuntimeCloudConfig
+  terminal: BrowserRuntimeTerminalConfig
 }>

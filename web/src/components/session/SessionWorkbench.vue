@@ -38,17 +38,50 @@
         </template>
       </PageStatus>
 
-      <TerminalPane
-        v-else-if="activeSession && activeTab"
-        :session="activeSession"
-        :tab="activeTab"
-        :ws-url="terminalWsUrl"
-        @terminal-state="emit('terminalState', $event)"
-        @terminal-error="emit('terminalError', $event)"
-      />
+      <div
+        v-else-if="openedTabs.length > 0"
+        class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+      >
+        <div
+          v-for="pane in livePanes"
+          :key="pane.session.id"
+          class="absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden"
+          :class="
+            pane.active
+              ? 'z-10'
+              : 'pointer-events-none invisible z-0'
+          "
+          :aria-hidden="pane.active ? 'false' : 'true'"
+        >
+          <TerminalPane
+            :session="pane.session"
+            :tab="pane.tab"
+            :ws-url="pane.wsUrl"
+            :connection-enabled="pane.connectionEnabled"
+            :active="pane.active"
+            @terminal-state="emit('terminalState', $event)"
+            @terminal-error="emit('terminalError', $event)"
+          />
+        </div>
+
+        <div
+          v-if="activeStoppedPane"
+          class="absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col overflow-hidden"
+        >
+          <TerminalPane
+            :session="activeStoppedPane.session"
+            :tab="activeStoppedPane.tab"
+            :ws-url="null"
+            :connection-enabled="false"
+            :active="true"
+            @terminal-state="emit('terminalState', $event)"
+            @terminal-error="emit('terminalError', $event)"
+          />
+        </div>
+      </div>
 
       <section
-        v-else-if="openedTabs.length === 0"
+        v-else
         class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-[var(--color-text-muted)]"
       >
         <h3 class="text-lg font-semibold text-[var(--color-text)]">
@@ -77,7 +110,7 @@
 </template>
 
 <script setup lang="ts">
-  import { useTemplateRef, watch } from 'vue'
+  import { computed, onBeforeUnmount, useTemplateRef, watch } from 'vue'
   import { RouterLink } from 'vue-router'
   import { useI18n } from 'vue-i18n'
   import { Keyboard, SquareTerminal } from '@lucide/vue'
@@ -87,20 +120,23 @@
   import SessionTabStrip from './SessionTabStrip.vue'
   import TerminalPane from './TerminalPane.vue'
   import { sessionPanelTextActionClass } from './sessionUi'
+  import { createTerminalKeepAliveController } from '../../features/sessions/terminalKeepAlive'
+  import { useRuntimeConfigStore } from '../../store/runtimeConfig'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
   import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
   import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
   import type { OpenSessionTab } from '../../store/workbench'
 
-  withDefaults(
+  const props = withDefaults(
     defineProps<{
       openedTabs: OpenSessionTab[]
       activeSessionId: string | null
       activeTab: OpenSessionTab | null
       activeSession: SessionSummary | null
       currentDevice: DeviceSummary | CloudSessionSummary | null
-      terminalWsUrl: string | null
+      resolveSession: (workspaceId: string, sessionId: string) => SessionSummary | null
+      resolveWsUrl: (workspaceId: string, sessionId: string) => string | null
       hasTerminalTabs: boolean
       hasBackgroundRunningSessions: boolean
       sessionTitle: (workspaceId: string, sessionId: string) => string
@@ -133,6 +169,86 @@
   }>()
 
   const { t } = useI18n()
+  const runtimeConfig = useRuntimeConfigStore()
+  const keepAlive = createTerminalKeepAliveController({
+    config: runtimeConfig.config.terminal.keepAlive,
+  })
+
   const workbench = useTemplateRef<HTMLElement>('workbench')
   watch(workbench, (element) => emit('workbench', element), { immediate: true })
+
+  const openedRunningSessionIds = computed(() =>
+    props.openedTabs
+      .filter((tab) => props.sessionLifecycleState(tab.workspaceId, tab.sessionId) === 'running')
+      .map((tab) => tab.sessionId),
+  )
+
+  watch(
+    [openedRunningSessionIds, () => props.activeSessionId],
+    ([runningIds, activeId]) => {
+      keepAlive.reconcile(runningIds, activeId)
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => props.openedTabs.map((tab) => tab.sessionId).join(','),
+    () => {
+      const opened = new Set(props.openedTabs.map((tab) => tab.sessionId))
+      for (const sessionId of [...keepAlive.mountedSessionIds.value]) {
+        if (!opened.has(sessionId)) {
+          keepAlive.remove(sessionId)
+        }
+      }
+    },
+  )
+
+  const livePanes = computed(() => {
+    const mountedIds = keepAlive.mountedSessionIds.value
+    const hotIds = new Set(keepAlive.hotSessionIds.value)
+    const panes: Array<{
+      session: SessionSummary
+      tab: OpenSessionTab
+      wsUrl: string | null
+      connectionEnabled: boolean
+      active: boolean
+    }> = []
+
+    for (const sessionId of mountedIds) {
+      const tab = props.openedTabs.find((item) => item.sessionId === sessionId)
+      if (!tab) {
+        continue
+      }
+      const session = props.resolveSession(tab.workspaceId, tab.sessionId)
+      if (!session || session.lifecycle_state !== 'running') {
+        continue
+      }
+      panes.push({
+        session,
+        tab,
+        wsUrl: props.resolveWsUrl(tab.workspaceId, tab.sessionId),
+        connectionEnabled: hotIds.has(sessionId),
+        active: props.activeSessionId === sessionId,
+      })
+    }
+
+    return panes
+  })
+
+  const activeStoppedPane = computed(() => {
+    if (!props.activeSession || !props.activeTab) {
+      return null
+    }
+    if (props.activeSession.lifecycle_state === 'running') {
+      return null
+    }
+    return {
+      session: props.activeSession,
+      tab: props.activeTab,
+    }
+  })
+
+  onBeforeUnmount(() => {
+    keepAlive.disposeAll()
+  })
 </script>

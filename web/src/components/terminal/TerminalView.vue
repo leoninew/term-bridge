@@ -28,10 +28,20 @@
   import { useTerminalSocket } from '../../features/sessions/useTerminalSocket'
   import { useThemeStore } from '../../store/theme'
 
-  const props = defineProps<{
-    wsUrl: string | null
-    sessionId: string | null
-  }>()
+  const props = withDefaults(
+    defineProps<{
+      wsUrl: string | null
+      sessionId: string | null
+      /** When false, close WS but keep xterm (frozen cold pane). */
+      connectionEnabled?: boolean
+      /** Visible/focused live pane. */
+      active?: boolean
+    }>(),
+    {
+      connectionEnabled: true,
+      active: true,
+    },
+  )
 
   const emit = defineEmits<{
     state: [message: ServerControlMessage]
@@ -51,6 +61,9 @@
   let focusTimer: number | null = null
 
   const showBootOverlay = computed(() => {
+    if (!props.active || !props.connectionEnabled) {
+      return false
+    }
     if (socket.error.value) {
       return false
     }
@@ -83,7 +96,9 @@
           terminalRows: xterm?.terminal.rows,
         })
         xterm?.fit('started')
-        scheduleTerminalFocus('started')
+        if (props.active) {
+          scheduleTerminalFocus('started')
+        }
       }
       if (message.type === 'replay_started') {
         replaying.value = true
@@ -133,10 +148,9 @@
   }
 
   function focusTerminal(reason: string) {
-    if (!xterm) {
+    if (!xterm || !props.active) {
       return
     }
-    // TabsTrigger keeps DOM focus after activation; reclaim it once the live terminal is visible.
     terminalDebug('terminal-view.focus', {
       sessionId: props.sessionId,
       reason,
@@ -146,8 +160,10 @@
   }
 
   function scheduleTerminalFocus(reason: string) {
+    if (!props.active) {
+      return
+    }
     clearScheduledTerminalFocus()
-    // Wait past the tab click/focus cycle so TabsTrigger does not keep keyboard ownership.
     focusFrame = window.requestAnimationFrame(() => {
       focusFrame = null
       focusTerminal(`${reason}:raf`)
@@ -158,7 +174,24 @@
     })
   }
 
+  function disconnect(reason: string) {
+    terminalDebug('socket.disconnect', {
+      sessionId: props.sessionId,
+      reason,
+      socketStatus: socket.status.value,
+    })
+    connectAttemptedForUrl = null
+    socket.close()
+  }
+
   function connect(reason = 'manual') {
+    if (!props.connectionEnabled) {
+      terminalDebug('socket.attach.skipped-disabled', {
+        sessionId: props.sessionId,
+        reason,
+      })
+      return
+    }
     if (!props.wsUrl) {
       return
     }
@@ -177,7 +210,6 @@
     url.searchParams.set('rows', String(lastTerminalSize.rows))
     const wsUrl = url.toString()
 
-    // Avoid reconnect churn while already attaching/attached with the same base URL size.
     if (
       connectAttemptedForUrl === wsUrl &&
       (socket.status.value === 'connecting' || socket.status.value === 'connected')
@@ -214,7 +246,13 @@
       cols: lastTerminalSize.cols,
       rows: lastTerminalSize.rows,
       socketStatus: socket.status.value,
+      connectionEnabled: props.connectionEnabled,
+      active: props.active,
     })
+
+    if (!props.connectionEnabled) {
+      return
+    }
 
     if (socket.status.value === 'connected') {
       terminalDebug('socket.control.resize-send', {
@@ -233,7 +271,6 @@
       return
     }
 
-    // Not connected yet (or still connecting with a prior size): attach only with trusted size.
     if (socket.status.value === 'connecting') {
       socket.sendControl({
         type: 'resize',
@@ -268,50 +305,48 @@
     terminalDebug('terminal-view.mount', {
       sessionId: props.sessionId,
       wsUrl: props.wsUrl,
+      connectionEnabled: props.connectionEnabled,
+      active: props.active,
       hasElement: Boolean(el),
       clientWidth: el?.clientWidth,
       clientHeight: el?.clientHeight,
-      parentClientWidth: el?.parentElement?.clientWidth,
-      parentClientHeight: el?.parentElement?.clientHeight,
-      windowInnerWidth: window.innerWidth,
-      windowInnerHeight: window.innerHeight,
-      devicePixelRatio: window.devicePixelRatio,
     })
     xterm = createXterm(
-      (data) => socket.sendInput(data),
-      (data) => socket.sendBinary(data),
+      (data) => {
+        if (props.connectionEnabled) {
+          socket.sendInput(data)
+        }
+      },
+      (data) => {
+        if (props.connectionEnabled) {
+          socket.sendBinary(data)
+        }
+      },
       (cols, rows) => handleTerminalSize(cols, rows, 'xterm-onResize'),
       { source: 'live', sessionId: props.sessionId },
       themeStore.theme,
     )
     if (terminalElement.value) {
       xterm.open(terminalElement.value)
-      scheduleTerminalFocus('open')
+      if (props.active) {
+        scheduleTerminalFocus('open')
+      }
     } else {
       terminalDebug(
         'terminal-view.mount.missing-element',
-        {
-          sessionId: props.sessionId,
-        },
+        { sessionId: props.sessionId },
         { level: 'error' },
       )
     }
-    terminalDebug('terminal-view.mount.after-open', {
-      sessionId: props.sessionId,
-      lastTerminalSize,
-      terminalCols: xterm.terminal.cols,
-      terminalRows: xterm.terminal.rows,
-      clientWidth: terminalElement.value?.clientWidth,
-      clientHeight: terminalElement.value?.clientHeight,
-      waitingForTrustedSize: lastTerminalSize === null,
-    })
-    // Connect only after the first trusted fit populates lastTerminalSize.
     connect('after-open')
   })
 
   watch(
     () => props.wsUrl,
     () => {
+      if (!props.connectionEnabled) {
+        return
+      }
       connectAttemptedForUrl = null
       sessionStarted.value = false
       replaying.value = false
@@ -321,9 +356,47 @@
   )
 
   watch(
+    () => props.connectionEnabled,
+    (enabled, wasEnabled) => {
+      if (enabled === wasEnabled) {
+        return
+      }
+      if (!enabled) {
+        disconnect('connection-disabled')
+        return
+      }
+      connectAttemptedForUrl = null
+      sessionStarted.value = false
+      replaying.value = false
+      connect('connection-enabled')
+      if (props.active) {
+        void nextTick(() => {
+          xterm?.fit('connection-enabled')
+          scheduleTerminalFocus('connection-enabled')
+        })
+      }
+    },
+  )
+
+  watch(
+    () => props.active,
+    (active) => {
+      if (!active) {
+        return
+      }
+      void nextTick(() => {
+        xterm?.fit('activated')
+        scheduleTerminalFocus('session-activated')
+      })
+    },
+  )
+
+  watch(
     () => props.sessionId,
     () => {
-      void nextTick(() => scheduleTerminalFocus('session-activated'))
+      if (props.active) {
+        void nextTick(() => scheduleTerminalFocus('session-id-changed'))
+      }
     },
   )
 

@@ -46,6 +46,12 @@ func BuildBrowserRuntimeConfig(cfg Config, mode string) (browserdto.RuntimeConfi
 			ApiBaseUrl:              cfg.Cloud.ApiBaseUrl,
 			ExternalAuthProviderIds: enabledExternalAuthProviderIds(cfg.Cloud),
 		},
+		Terminal: &browserdto.RuntimeTerminalConfig{
+			KeepAlive: browserdto.RuntimeTerminalKeepAliveConfig{
+				MaxHotTerminals: cfg.Terminal.KeepAlive.MaxHotTerminals,
+				DisposeDelayMs:  cfg.Terminal.KeepAlive.DisposeDelayMs,
+			},
+		},
 	}, nil
 }
 

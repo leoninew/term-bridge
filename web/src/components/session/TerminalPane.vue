@@ -1,9 +1,7 @@
 <template>
-  <!-- Keep this aligned with SessionWorkbench TabsTrigger: sessionId is the globally unique Tab value. -->
-  <TabsContent
+  <!-- Live keep-alive panes are stacked outside TabsContent to avoid unmount on tab switch. -->
+  <section
     v-if="session && tab"
-    :key="session.id"
-    :value="tab.sessionId"
     class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--color-panel-bg)]"
   >
     <TerminalView
@@ -11,6 +9,8 @@
       :key="session.id"
       :ws-url="wsUrl"
       :session-id="session.id"
+      :connection-enabled="connectionEnabled"
+      :active="active"
       @state="emit('terminalState', $event)"
       @terminal-error="emit('terminalError', $event)"
     />
@@ -37,23 +37,30 @@
         {{ t('workbench.noHistory') }}
       </div>
     </section>
-  </TabsContent>
+  </section>
 </template>
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n'
-  import { TabsContent } from 'reka-ui'
   import HistoryTerminalView from '../terminal/HistoryTerminalView.vue'
   import TerminalView from '../terminal/TerminalView.vue'
   import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
   import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
   import type { OpenSessionTab } from '../../store/workbench'
 
-  defineProps<{
-    session: SessionSummary | null
-    tab: OpenSessionTab | null
-    wsUrl: string | null
-  }>()
+  withDefaults(
+    defineProps<{
+      session: SessionSummary | null
+      tab: OpenSessionTab | null
+      wsUrl: string | null
+      connectionEnabled?: boolean
+      active?: boolean
+    }>(),
+    {
+      connectionEnabled: true,
+      active: true,
+    },
+  )
 
   const emit = defineEmits<{
     terminalState: [message: ServerControlMessage]

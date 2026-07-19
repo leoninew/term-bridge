@@ -55,7 +55,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.LogHTTP.Enabled {
 		t.Fatalf("LogHTTP.Enabled = true, want false")
 	}
-	if cfg.LogHTTP.RequestBodyLimit != 0 || cfg.LogHTTP.ResponseBodyLimit != 0 || !cfg.LogHTTP.SkipAssetEnabled {
+	if cfg.LogHTTP.RequestBodyLimit != 4096 || cfg.LogHTTP.ResponseBodyLimit != 4096 || !cfg.LogHTTP.SkipAssetEnabled {
 		t.Fatalf("LogHTTP = %#v", cfg.LogHTTP)
 	}
 	wantStateDir := filepath.Join(cwd, "data")
@@ -70,6 +70,9 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.Terminal.Client.Queue.MaxMessages != 64 || cfg.Terminal.Client.Queue.MaxBytes != 4194304 {
 		t.Fatalf("Terminal.Client.Queue = %#v", cfg.Terminal.Client.Queue)
+	}
+	if cfg.Terminal.KeepAlive.MaxHotTerminals != 4 || cfg.Terminal.KeepAlive.DisposeDelayMs != 30000 {
+		t.Fatalf("Terminal.KeepAlive = %#v", cfg.Terminal.KeepAlive)
 	}
 	if cfg.File.MaxTextBytes != 1048576 || cfg.File.MaxDirectoryEntries != 1000 || cfg.File.MaxRecursiveDeleteEntries != 10000 || cfg.File.WatchSubscriberQueueSize != 64 {
 		t.Fatalf("File = %#v", cfg.File)

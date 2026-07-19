@@ -265,19 +265,6 @@
     return workspaceSessions.workspaceById(tab.workspaceId)
   })
 
-  const activeTerminalWsUrl = computed(() => {
-    const session = activeSession.value
-    if (!session) {
-      return null
-    }
-    return terminalWsUrl(
-      props.runtimeTarget,
-      session.workspace_id,
-      session.id,
-      props.runtimeTarget.mode === 'cloud' ? (cloudAuth.cloudToken ?? undefined) : undefined,
-    )
-  })
-
   const terminalTabs = computed(() =>
     terminalTabTargets(workbench.openedTabs, workspaceSessions.sessionById),
   )
@@ -812,13 +799,27 @@
     reorderSessions,
   }
 
+  function resolveSession(workspaceId: string, sessionId: string) {
+    return workspaceSessions.sessionById(workspaceId, sessionId)
+  }
+
+  function resolveTerminalWsUrl(workspaceId: string, sessionId: string) {
+    return terminalWsUrl(
+      props.runtimeTarget,
+      workspaceId,
+      sessionId,
+      props.runtimeTarget.mode === 'cloud' ? (cloudAuth.cloudToken ?? undefined) : undefined,
+    )
+  }
+
   const workbenchBind = computed(() => ({
     openedTabs: workbench.openedTabs,
     activeSessionId: workbench.activeSessionId,
     activeTab: workbench.activeTab,
     activeSession: activeSession.value,
     currentDevice: workbenchDevice.value,
-    terminalWsUrl: activeTerminalWsUrl.value,
+    resolveSession,
+    resolveWsUrl: resolveTerminalWsUrl,
     loading: workspaceSessions.loading && workbench.openedTabs.length === 0,
     hasTerminalTabs: terminalTabs.value.length > 0,
     hasBackgroundRunningSessions: hasRunningSessions.value,
