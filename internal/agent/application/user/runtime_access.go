@@ -50,6 +50,8 @@ type TerminalStream interface {
 	MarkSent(terminalapp.Outbound)
 	WriteInput(data []byte) error
 	Resize(cols int, rows int) error
+	TakeControl()
+	IsController() bool
 	Detach(reason string)
 }
 

@@ -228,21 +228,7 @@ func localRuntimeRequestFrame(method string, params any, requestId string) (*sha
 }
 
 func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, runtime agentapp.RuntimeAccess, workspaceId string, sessionId string) error {
-	writerKey := sessionScopeKey(workspaceId, sessionId)
-	s.writerMu.Lock()
-	if _, exists := s.writers[writerKey]; exists {
-		s.writerMu.Unlock()
-		s.writeAPIError(w, r, http.StatusConflict, errorCodeConflict, errorMessageConflict, nil)
-		return nil
-	}
 	streamId := "local-term-" + fmt.Sprint(time.Now().UnixNano())
-	s.writers[writerKey] = streamId
-	s.writerMu.Unlock()
-	defer func() {
-		s.writerMu.Lock()
-		delete(s.writers, writerKey)
-		s.writerMu.Unlock()
-	}()
 
 	subject := quota.LocalSubject
 	if err := s.attachQuota.TryAcquire(subject, s.config.ConcurrentAttaches); err != nil {
@@ -269,7 +255,7 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 		return err
 	}
 	defer stream.Detach("agent_detached")
-	if hasAttachSize {
+	if hasAttachSize && stream.IsController() {
 		if err := stream.Resize(cols, rows); err != nil {
 			return err
 		}
@@ -304,6 +290,8 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 					if err := stream.Resize(cols, rows); err != nil {
 						s.config.Logger.Warn("terminal resize failed", "workspace_id", workspaceId, "session_id", sessionId, "cols", cols, "rows", rows, "error", err)
 					}
+				case terminalproto.TypeTakeControl:
+					stream.TakeControl()
 				case terminalproto.TypeDetach:
 					s.config.Logger.Info("terminal browser stream detached", "workspace_id", workspaceId, "session_id", sessionId, "stream_id", streamId, "reason", "browser_detached")
 					stream.Detach("browser_detached")
@@ -313,6 +301,10 @@ func (s *Handler) bridgeTerminalStream(w http.ResponseWriter, r *http.Request, r
 				}
 			case websocket.MessageBinary:
 				if err := stream.WriteInput(data); err != nil {
+					if terminalapp.IsNotController(err) {
+						_ = writeTerminalControl(conn, &agent.ServerControlMessage{Type: terminalproto.TypeError, Code: terminalproto.ErrorCodeNotController, Message: terminalproto.ErrorMessageNotController})
+						continue
+					}
 					s.config.Logger.Warn("terminal input write failed", "workspace_id", workspaceId, "session_id", sessionId, "bytes", len(data), "error", err)
 				}
 			}

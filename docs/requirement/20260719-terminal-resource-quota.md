@@ -1,5 +1,5 @@
 # 终端与连接资源配额（按用户 / 管理员动态调配）
-最后修改时间: 2026-07-19 18:20:00
+最后修改时间: 2026-07-20 13:12:02
 
 Review status: Accepted
 
@@ -11,6 +11,7 @@ Verification 文档尚未正式起稿；自动化/单测已随实现落地。
 ## Related
 
 - 关联体验优化：`docs/requirement/20260719-terminal-tab-keepalive.md`（tab keep-alive，**独立交付**，不依赖本配额系统完成）。
+- 后续修订：`docs/requirement/20260720-multi-device-terminal-control.md`（多 attach 观察 + 单 controller；废止本需求交付时的「每 session 单 live attach / 409」表述）。
 - 本需求回答：前端策略 vs 后端硬顶、如何按用户配额限制、管理员如何动态调配，避免客户端篡改拖垮服务。
 
 ## Current understanding（2026-07-19 固化）
@@ -41,7 +42,8 @@ Verification 文档尚未正式起稿；自动化/单测已随实现落地。
 
 - keep-alive / `BrowserRuntimeConfig` / `__CONFIG__` **可被客户端篡改**，只影响“想怎么做”。
 - 服务器信任边界是 **attach 前 acquire 配额**；超限 HTTP **429** + `terminal_attach_quota_exceeded`。
-- 单 session 仍最多一个 browser writer（409 conflict 语义不变）。
+- **历史（本需求交付时）**：单 session 仍最多一个 browser writer（409 conflict）。
+- **后续修订（见 `20260720-multi-device-terminal-control`）**：废止「每 session 最多一个 live attach / 409」；改为「每 session 最多一个 controller（唯一可写），允许多 attach 观察」。配额仍按每个存活 attach 计数，不因 observer 豁免。
 
 ### 已落地交付（实现快照）
 
@@ -51,6 +53,14 @@ Verification 文档尚未正式起稿；自动化/单测已随实现落地。
 - API：`GET /api/me/quota`；`GET|PUT|DELETE /api/admin/users/{id}/quota`
 - Admin 白名单：`cloud.admin.user_ids` / `emails`
 - 前端：attach 失败/429 更清晰提示，避免重连风暴
+
+
+## Amendment
+
+- **2026-07-20**：`docs/requirement/20260720-multi-device-terminal-control.md` 修订本需求中「单 session 最多一个 browser writer / 409 不变」的产品表述。
+  - **不变**：每用户（主体）`terminal.concurrent_attaches` 硬顶、HTTP 429、`terminal_attach_quota_exceeded`、降配不主动踢已有连接、默认 limit 8。
+  - **变更**：同一 `workspaceId/sessionId` 允许多个 live attach（controller + observers）；双写保护改为 controller 门禁，而不再以第二 attach 的 409 表达。
+  - 在 multi-device 需求落地前，实现仍可能保持 409 单 attach；落地后以 multi-device 验收为准。
 
 ## Background
 
@@ -83,7 +93,7 @@ Verification 文档尚未正式起稿；自动化/单测已随实现落地。
 2. 不做完整通用「多维配额中台」（计费、账单、按 API 的全站 rate limit 平台化）。
 3. 首版不强制做「已连接连接的实时挤下线」高级调度（可列为可选/后续），但要定义默认策略。
 4. 不把配额密钥或管理员接口暴露给浏览器任意调用；管理接口需鉴权与角色。
-5. 不改变 session 单 browser writer 的既有语义（每 session 仍最多一个 browser attach writer，除非另立需求）。
+5. ~~不改变 session 单 browser writer 的既有语义（每 session 仍最多一个 browser attach writer，除非另立需求）。~~ **已由** `docs/requirement/20260720-multi-device-terminal-control.md` **另立并修订**：配额需求本身不实现多 attach；多 attach 观察 + 单 controller 写门禁见该文档。本配额需求仍只约束 concurrent attach 数量与 429 语义。
 6. 不在本需求中重做 OAuth/用户体系；复用现有 Cloud/Agent 身份模型能识别的主体。
 
 ## Control plane（前后端控制策略）

@@ -77,8 +77,7 @@ export function useTerminalSocket(
     }
     next.onerror = () => {
       status.value = 'error'
-      error.value =
-        'Unable to open terminal connection. If you have many live tabs, attach quota may be exceeded.'
+      error.value = 'Unable to open terminal connection.'
       terminalDebug('socket.error', { path: wsUrl }, { level: 'error' })
       onError(error.value)
     }

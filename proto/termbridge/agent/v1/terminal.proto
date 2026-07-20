@@ -25,4 +25,5 @@ message ServerControlMessage {
   string error = 11;
   string nonce = 12;
   optional bool truncated = 13;
+  string control_role = 14;
 }

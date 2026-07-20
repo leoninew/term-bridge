@@ -37,8 +37,6 @@ type Config struct {
 
 type Handler struct {
 	config             Config
-	writers            map[string]string
-	writerMu           sync.Mutex
 	cacheMu            sync.Mutex
 	workspaceTreeCache map[string]json.RawMessage
 	historyCache       map[string]map[string]string
@@ -56,7 +54,7 @@ func New(config Config) *Handler {
 	if config.ConcurrentAttaches <= 0 {
 		config.ConcurrentAttaches = quota.DefaultConcurrentAttaches
 	}
-	handler := &Handler{config: config, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}, attachQuota: config.AttachQuota}
+	handler := &Handler{config: config, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}, attachQuota: config.AttachQuota}
 	if config.LocalRuntime != nil {
 		handler.localRuntime = localRuntimeEndpoint{runtime: config.LocalRuntime, handler: handler}
 	}

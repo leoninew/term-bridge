@@ -10,10 +10,11 @@ import (
 const (
 	Subprotocol = "termbridge.terminal"
 
-	TypeHello  = "hello"
-	TypeResize = "resize"
-	TypeDetach = "detach"
-	TypePing   = "ping"
+	TypeHello       = "hello"
+	TypeResize      = "resize"
+	TypeDetach      = "detach"
+	TypePing        = "ping"
+	TypeTakeControl = "take_control"
 
 	TypeStarted        = "started"
 	TypeReplayStarted  = "replay_started"
@@ -23,8 +24,19 @@ const (
 	TypeError          = "error"
 	TypePong           = "pong"
 
+	ControlRoleController = "controller"
+	ControlRoleObserver   = "observer"
+
+	ReasonControlGranted     = "control_granted"
+	ReasonControlLost        = "control_lost"
+	ReasonControlAutoGranted = "control_auto_granted"
+	ReasonControllerDetached = "controller_detached"
+
 	ErrorCodeBadControl    = "bad_control"
 	ErrorMessageBadControl = "Terminal control message is invalid."
+
+	ErrorCodeNotController    = "not_controller"
+	ErrorMessageNotController = "This terminal connection is read-only."
 
 	// Device disconnect reasons observed by Cloud and mapped to browser-safe terminal errors.
 	DisconnectReasonDeviceDisconnected = "device disconnected"
@@ -64,7 +76,7 @@ func ValidateClient(message *terminal.ClientControlMessage) error {
 		return fmt.Errorf("missing control message")
 	}
 	switch message.Type {
-	case TypeHello, TypeDetach:
+	case TypeHello, TypeDetach, TypeTakeControl:
 		return nil
 	case TypeResize:
 		return ValidateSize(int(message.Cols), int(message.Rows))

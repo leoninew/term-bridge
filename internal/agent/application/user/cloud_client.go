@@ -108,6 +108,11 @@ func (c *Client) Run(ctx context.Context) error {
 }
 
 func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
+	// connCtx is cancelled when this tunnel connection ends so terminal handlers detach promptly,
+	// even if the parent connector context stays alive for reconnect.
+	connCtx, connCancel := context.WithCancel(ctx)
+	defer connCancel()
+
 	var writeMu sync.Mutex
 	var aliveMu sync.Mutex
 	lastAlive := time.Now()
@@ -122,14 +127,15 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 		return time.Since(lastAlive) > tunnel.HeartbeatIdleTimeout
 	}
 	defer c.closeWatches()
+	defer c.closeTerminals()
 
-	hbCtx, hbCancel := context.WithCancel(ctx)
+	hbCtx, hbCancel := context.WithCancel(connCtx)
 	defer hbCancel()
 	hbErr := make(chan error, 1)
 	go c.runHeartbeat(hbCtx, conn, &writeMu, stale, hbErr)
 
 	for {
-		readCtx, cancel := context.WithTimeout(ctx, tunnel.HeartbeatIdleTimeout)
+		readCtx, cancel := context.WithTimeout(connCtx, tunnel.HeartbeatIdleTimeout)
 		_, data, err := conn.Read(readCtx)
 		cancel()
 		if err != nil {
@@ -150,19 +156,19 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 		}
 		switch frame.GetPayload().(type) {
 		case *shared.TunnelFrame_FsWatchSubscribeReq:
-			go c.handleWorkspaceWatch(ctx, conn, &writeMu, frame)
+			go c.handleWorkspaceWatch(connCtx, conn, &writeMu, frame)
 		case *shared.TunnelFrame_Close:
 			c.removeWatch(frame.GetStreamId())
 		case *shared.TunnelFrame_TerminalAttach:
-			go c.handleTerminal(ctx, conn, &writeMu, frame)
+			go c.handleTerminal(connCtx, conn, &writeMu, frame)
 		case *shared.TunnelFrame_Ping:
 			pong := tunnel.PongFrame(frame.GetPing().GetNonce())
-			_ = writeTunnelFrame(ctx, conn, &writeMu, pong)
+			_ = writeTunnelFrame(connCtx, conn, &writeMu, pong)
 		case *shared.TunnelFrame_Pong:
 			continue
 		default:
 			if isRuntimeRequest(frame) {
-				go c.handleRequest(ctx, conn, &writeMu, frame)
+				go c.handleRequest(connCtx, conn, &writeMu, frame)
 			}
 		}
 	}
@@ -630,10 +636,12 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 			_ = writeTerminalError(ctx, conn, writeMu, frame.GetStreamId(), frame.GetRequestId(), err.Error())
 			return
 		}
-		if err := stream.Resize(int(payload.GetCols()), int(payload.GetRows())); err != nil {
-			c.logWarn("agent terminal attach resize failed", append(attrs, "cols", payload.GetCols(), "rows", payload.GetRows(), "error", err)...)
-			_ = writeTerminalError(ctx, conn, writeMu, frame.GetStreamId(), frame.GetRequestId(), err.Error())
-			return
+		if stream.IsController() {
+			if err := stream.Resize(int(payload.GetCols()), int(payload.GetRows())); err != nil {
+				c.logWarn("agent terminal attach resize failed", append(attrs, "cols", payload.GetCols(), "rows", payload.GetRows(), "error", err)...)
+				_ = writeTerminalError(ctx, conn, writeMu, frame.GetStreamId(), frame.GetRequestId(), err.Error())
+				return
+			}
 		}
 	}
 	inbound := make(chan *shared.TunnelFrame, 16)
@@ -643,10 +651,25 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 		select {
 		case <-ctx.Done():
 			return
-		case inboundFrame := <-inbound:
+		case inboundFrame, ok := <-inbound:
+			if !ok {
+				// Tunnel connection closed; Detach runs via defer so controller auto-handoff can proceed.
+				return
+			}
 			switch payload := inboundFrame.GetPayload().(type) {
 			case *shared.TunnelFrame_TerminalInput:
 				if err := stream.WriteInput(payload.TerminalInput.GetData()); err != nil {
+					if terminalapp.IsNotController(err) {
+						_ = writeTunnelFrame(ctx, conn, writeMu, &shared.TunnelFrame{
+							StreamId: frame.GetStreamId(),
+							Payload: &shared.TunnelFrame_TerminalControl{TerminalControl: &agent.ServerControlMessage{
+								Type:    terminalproto.TypeError,
+								Code:    terminalproto.ErrorCodeNotController,
+								Message: terminalproto.ErrorMessageNotController,
+							}},
+						})
+						continue
+					}
 					c.logWarn("agent terminal input write failed", append(attrs, "bytes", len(payload.TerminalInput.GetData()), "error", err)...)
 				}
 			case *shared.TunnelFrame_TerminalResize:
@@ -659,6 +682,8 @@ func (c *Client) handleTerminal(ctx context.Context, conn *websocket.Conn, write
 				if err := stream.Resize(cols, rows); err != nil {
 					c.logWarn("agent terminal resize failed", append(attrs, "cols", cols, "rows", rows, "error", err)...)
 				}
+			case *shared.TunnelFrame_TerminalTakeControl:
+				stream.TakeControl()
 			case *shared.TunnelFrame_Close:
 				return
 			}
@@ -764,6 +789,17 @@ func (c *Client) removeTerminal(streamId string) {
 	c.mu.Lock()
 	delete(c.terms, streamId)
 	c.mu.Unlock()
+}
+
+func (c *Client) closeTerminals() {
+	c.mu.Lock()
+	terms := c.terms
+	c.terms = map[string]chan *shared.TunnelFrame{}
+	c.mu.Unlock()
+	for streamId, ch := range terms {
+		close(ch)
+		c.logInfo("agent terminal stream closed on tunnel end", "stream_id", streamId)
+	}
 }
 
 func writeTerminalError(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, streamId string, requestId string, message string) error {

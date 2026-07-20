@@ -104,6 +104,7 @@ type ServerControlMessage struct {
 	Error           string                 `protobuf:"bytes,11,opt,name=error,proto3" json:"error,omitempty"`
 	Nonce           string                 `protobuf:"bytes,12,opt,name=nonce,proto3" json:"nonce,omitempty"`
 	Truncated       *bool                  `protobuf:"varint,13,opt,name=truncated,proto3,oneof" json:"truncated,omitempty"`
+	ControlRole     string                 `protobuf:"bytes,14,opt,name=control_role,json=controlRole,proto3" json:"control_role,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -229,6 +230,13 @@ func (x *ServerControlMessage) GetTruncated() bool {
 	return false
 }
 
+func (x *ServerControlMessage) GetControlRole() string {
+	if x != nil {
+		return x.ControlRole
+	}
+	return ""
+}
+
 var File_termbridge_agent_v1_terminal_proto protoreflect.FileDescriptor
 
 const file_termbridge_agent_v1_terminal_proto_rawDesc = "" +
@@ -238,7 +246,7 @@ const file_termbridge_agent_v1_terminal_proto_rawDesc = "" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x12\n" +
 	"\x04cols\x18\x02 \x01(\x05R\x04cols\x12\x12\n" +
 	"\x04rows\x18\x03 \x01(\x05R\x04rows\x12\x14\n" +
-	"\x05nonce\x18\x04 \x01(\tR\x05nonce\"\xa9\x03\n" +
+	"\x05nonce\x18\x04 \x01(\tR\x05nonce\"\xcc\x03\n" +
 	"\x14ServerControlMessage\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x1d\n" +
 	"\n" +
@@ -254,7 +262,8 @@ const file_termbridge_agent_v1_terminal_proto_rawDesc = "" +
 	" \x01(\tR\amessage\x12\x14\n" +
 	"\x05error\x18\v \x01(\tR\x05error\x12\x14\n" +
 	"\x05nonce\x18\f \x01(\tR\x05nonce\x12!\n" +
-	"\ttruncated\x18\r \x01(\bH\x01R\ttruncated\x88\x01\x01B\f\n" +
+	"\ttruncated\x18\r \x01(\bH\x01R\ttruncated\x88\x01\x01\x12!\n" +
+	"\fcontrol_role\x18\x0e \x01(\tR\vcontrolRoleB\f\n" +
 	"\n" +
 	"_exit_codeB\f\n" +
 	"\n" +

@@ -151,6 +151,7 @@ export interface TunnelFrame {
   terminal_closed?: TerminalClosed | undefined;
   terminal_control?: ServerControlMessage | undefined;
   fs_change_event?: FsChangeEvent | undefined;
+  terminal_take_control?: TerminalTakeControl | undefined;
   error?: ErrorResp | undefined;
   close?: Close | undefined;
 }
@@ -195,6 +196,11 @@ export interface TerminalResize {
 
 export interface TerminalClosed {
   reason: string;
+}
+
+export interface TerminalTakeControl {
+  workspace_id: string;
+  session_id: string;
 }
 
 export interface Close {

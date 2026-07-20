@@ -13,6 +13,12 @@
     </div>
 
     <p v-if="replaying" class="terminal-message warning">{{ t('workbench.replayingHistory') }}</p>
+    <p v-if="isObserver" class="terminal-message warning">
+      {{ t('workbench.terminalReadOnly') }}
+      <button type="button" class="ml-2 underline" @click="requestTakeover">
+        {{ t('workbench.takeControl') }}
+      </button>
+    </p>
     <p v-if="socket.error.value" class="terminal-message error">{{ socket.error.value }}</p>
   </section>
 </template>
@@ -27,6 +33,7 @@
   import { createXterm } from './useXterm'
   import { useTerminalSocket } from '../../features/sessions/useTerminalSocket'
   import { useThemeStore } from '../../store/theme'
+  import { useNotificationsStore } from '../../store/notifications'
 
   const props = withDefaults(
     defineProps<{
@@ -54,6 +61,9 @@
   const replaying = ref(false)
   const hasTrustedSize = ref(false)
   const sessionStarted = ref(false)
+  const notifications = useNotificationsStore()
+  const controlRole = ref<'controller' | 'observer' | 'unknown'>('unknown')
+  const observerHintShown = ref(false)
   let xterm: ReturnType<typeof createXterm> | null = null
   let lastTerminalSize: { cols: number; rows: number } | null = null
   let connectAttemptedForUrl: string | null = null
@@ -83,12 +93,77 @@
     return t('workbench.attachingTerminal')
   })
 
+  const isObserver = computed(() => controlRole.value === 'observer')
+  const canControl = computed(() => controlRole.value === 'controller')
+
+  function applyControlRole(role: string | undefined, reason?: string) {
+    if (role === 'controller' || role === 'observer') {
+      controlRole.value = role
+    }
+    if (role === 'observer') {
+      maybeToastObserverHint()
+    }
+    if (role === 'controller') {
+      if (lastTerminalSize && props.connectionEnabled) {
+        socket.sendControl({
+          type: 'resize',
+          cols: lastTerminalSize.cols,
+          rows: lastTerminalSize.rows,
+          nonce: '',
+        })
+      }
+    }
+    if (reason === 'control_auto_granted' || reason === 'control_granted') {
+      terminalDebug('socket.control.role', {
+        sessionId: props.sessionId,
+        role,
+        reason,
+      })
+    }
+  }
+
+  function maybeToastObserverHint() {
+    if (observerHintShown.value) {
+      return
+    }
+    observerHintShown.value = true
+    notifications.pushToast(
+      'info',
+      t('workbench.observerControlledToast', {
+        device: t('workbench.observerControlledDevice'),
+      }),
+    )
+  }
+
+  function requestTakeover() {
+    if (!props.connectionEnabled || canControl.value) {
+      return
+    }
+    socket.sendControl({ type: 'take_control', cols: 0, rows: 0, nonce: '' })
+  }
+
+  function handleUserInput(data: string, kind: 'text' | 'binary') {
+    if (!props.connectionEnabled) {
+      return
+    }
+    if (!canControl.value) {
+      // Observer / unknown: discard input; banner + one-time toast explain takeover.
+      return
+    }
+    if (kind === 'binary') {
+      socket.sendBinary(data)
+    } else {
+      socket.sendInput(data)
+    }
+  }
+
   const socket = useTerminalSocket(
     (data) => xterm?.write(data),
     (message) => {
       emit('state', message)
       if (message.type === 'started') {
         sessionStarted.value = true
+        applyControlRole(message.control_role)
         terminalDebug('socket.control.started', {
           sessionId: props.sessionId,
           lastTerminalSize,
@@ -99,6 +174,9 @@
         if (props.active) {
           scheduleTerminalFocus('started')
         }
+      }
+      if (message.type === 'state' && message.control_role) {
+        applyControlRole(message.control_role, message.reason)
       }
       if (message.type === 'replay_started') {
         replaying.value = true
@@ -181,6 +259,8 @@
       socketStatus: socket.status.value,
     })
     connectAttemptedForUrl = null
+    controlRole.value = 'unknown'
+    observerHintShown.value = false
     socket.close()
   }
 
@@ -248,19 +328,25 @@
       socketStatus: socket.status.value,
       connectionEnabled: props.connectionEnabled,
       active: props.active,
+      controlRole: controlRole.value,
     })
 
     if (!props.connectionEnabled) {
       return
     }
 
-    if (socket.status.value === 'connected') {
+    // Only controller may change PTY size. Unknown role still allows connect with attach query size.
+    if (
+      canControl.value &&
+      (socket.status.value === 'connected' || socket.status.value === 'connecting')
+    ) {
       terminalDebug('socket.control.resize-send', {
         sessionId: props.sessionId,
         previous,
         cols: lastTerminalSize.cols,
         rows: lastTerminalSize.rows,
         socketStatus: socket.status.value,
+        controlRole: controlRole.value,
       })
       socket.sendControl({
         type: 'resize',
@@ -268,20 +354,18 @@
         rows: lastTerminalSize.rows,
         nonce: '',
       })
-      return
+      if (socket.status.value === 'connected') {
+        return
+      }
     }
 
-    if (socket.status.value === 'connecting') {
-      socket.sendControl({
-        type: 'resize',
-        cols: lastTerminalSize.cols,
-        rows: lastTerminalSize.rows,
-        nonce: '',
-      })
-      return
+    if (
+      socket.status.value === 'idle' ||
+      socket.status.value === 'closed' ||
+      socket.status.value === 'error'
+    ) {
+      connect(`size-ready:${reason}`)
     }
-
-    connect(`size-ready:${reason}`)
   }
 
   function terminalErrorText(message: ServerControlMessage): string {
@@ -313,14 +397,10 @@
     })
     xterm = createXterm(
       (data) => {
-        if (props.connectionEnabled) {
-          socket.sendInput(data)
-        }
+        handleUserInput(data, 'text')
       },
       (data) => {
-        if (props.connectionEnabled) {
-          socket.sendBinary(data)
-        }
+        handleUserInput(data, 'binary')
       },
       (cols, rows) => handleTerminalSize(cols, rows, 'xterm-onResize'),
       { source: 'live', sessionId: props.sessionId },

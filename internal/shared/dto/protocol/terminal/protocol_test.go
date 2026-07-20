@@ -73,3 +73,13 @@ func TestEncodeServerRejectsUnknownType(t *testing.T) {
 		t.Fatal("EncodeServer() error = nil, want error")
 	}
 }
+
+func TestDecodeClientAcceptsTakeControl(t *testing.T) {
+	message, err := DecodeClient([]byte(`{"type":"take_control"}`))
+	if err != nil {
+		t.Fatalf("DecodeClient() error = %v", err)
+	}
+	if message.Type != TypeTakeControl {
+		t.Fatalf("type = %q, want %q", message.Type, TypeTakeControl)
+	}
+}

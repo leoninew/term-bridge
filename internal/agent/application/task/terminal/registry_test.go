@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1020,13 +1021,16 @@ func (m *fakeManager) Start(ctx context.Context, spec process.ProcessSpec) (term
 }
 
 type fakeSession struct {
-	output      chan []byte
-	done        chan termpty.Result
-	closeSignal chan struct{}
-	written     []byte
-	resizes     []process.TerminalSize
-	resizeErrs  []error
-	closed      bool
+	output       chan []byte
+	done         chan termpty.Result
+	closeSignal  chan struct{}
+	writeMu      sync.Mutex
+	written      []byte
+	writeStarted chan struct{}
+	writeRelease chan struct{}
+	resizes      []process.TerminalSize
+	resizeErrs   []error
+	closed       bool
 }
 
 func newFakeSession() *fakeSession {
@@ -1042,8 +1046,28 @@ func (s *fakeSession) Read(p []byte) (int, error) {
 }
 
 func (s *fakeSession) Write(p []byte) (int, error) {
+	if s.writeStarted != nil {
+		select {
+		case <-s.writeStarted:
+		default:
+			close(s.writeStarted)
+		}
+	}
+	if s.writeRelease != nil {
+		<-s.writeRelease
+	}
+	s.writeMu.Lock()
 	s.written = append(s.written, p...)
+	s.writeMu.Unlock()
 	return len(p), nil
+}
+
+func (s *fakeSession) writtenCopy() []byte {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	out := make([]byte, len(s.written))
+	copy(out, s.written)
+	return out
 }
 
 func (s *fakeSession) Resize(size process.TerminalSize) error {

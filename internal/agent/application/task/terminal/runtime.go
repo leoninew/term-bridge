@@ -18,32 +18,40 @@ import (
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 )
 
+var errNotController = errors.New(terminalproto.ErrorCodeNotController)
+
 type SessionRuntime struct {
 	registry *Registry
 	session  session.Session
 	pty      termpty.Session
 	history  *history.Writer
 
-	mu         sync.Mutex
-	resizeMu   sync.Mutex
-	clients    map[string]*Client
-	attachment AttachmentState
-	closed     bool
-	stopMode   process.StopMode
-	current    process.TerminalSize
-	done       chan struct{}
+	mu sync.Mutex
+	// controlMu serializes controller identity changes with controller-gated PTY ops.
+	// Lock order: controlMu -> resizeMu -> mu. Never hold controlMu across client queue waits.
+	controlMu          sync.Mutex
+	resizeMu           sync.Mutex
+	clients            map[string]*Client
+	clientOrder        []string
+	controllerClientId string
+	attachment         AttachmentState
+	closed             bool
+	stopMode           process.StopMode
+	current            process.TerminalSize
+	done               chan struct{}
 }
 
 func newSessionRuntime(registry *Registry, sess session.Session, ptySession termpty.Session, historyWriter *history.Writer, initialSize process.TerminalSize) *SessionRuntime {
 	return &SessionRuntime{
-		registry:   registry,
-		session:    sess,
-		pty:        ptySession,
-		history:    historyWriter,
-		clients:    map[string]*Client{},
-		attachment: AttachmentUnattached,
-		current:    initialSize.OrDefault(),
-		done:       make(chan struct{}),
+		registry:    registry,
+		session:     sess,
+		pty:         ptySession,
+		history:     historyWriter,
+		clients:     map[string]*Client{},
+		clientOrder: nil,
+		attachment:  AttachmentUnattached,
+		current:     initialSize.OrDefault(),
+		done:        make(chan struct{}),
 	}
 }
 
@@ -53,42 +61,46 @@ func (r *SessionRuntime) start() {
 }
 
 func (r *SessionRuntime) attach() (*Client, error) {
+	r.controlMu.Lock()
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
+		r.controlMu.Unlock()
 		return nil, session.Closed()
 	}
 	id, err := idgen.New()
 	if err != nil {
 		r.mu.Unlock()
+		r.controlMu.Unlock()
 		return nil, err
 	}
 	client := &Client{id: id, runtime: r, queue: make(chan Outbound, r.registry.clientQueueSize)}
 	attachment := AttachmentAttached
-	r.registry.logger.Info("terminal attach start", "session_id", r.session.Id, "client_id", id, "current_cols", r.current.Cols, "current_rows", r.current.Rows)
+	// Reserve membership + controller under lock so concurrent attaches elect exactly one controller.
+	r.clients[id] = client
+	r.clientOrder = append(r.clientOrder, id)
+	controlRole := terminalproto.ControlRoleObserver
+	if r.controllerClientId == "" {
+		r.controllerClientId = id
+		controlRole = terminalproto.ControlRoleController
+	}
+	r.attachment = attachment
+	r.registry.logger.Info("terminal attach start", "session_id", r.session.Id, "client_id", id, "control_role", controlRole, "current_cols", r.current.Cols, "current_rows", r.current.Rows)
 	r.mu.Unlock()
+	r.controlMu.Unlock()
 
-	if err := r.enqueueReplay(client, attachment); err != nil {
-		client.closeQueue()
+	if err := r.enqueueReplay(client, attachment, controlRole); err != nil {
+		r.detachClient(id, "attach_replay_failed")
 		return nil, err
 	}
 
-	r.mu.Lock()
-	if r.closed {
-		r.mu.Unlock()
-		client.closeQueue()
-		return nil, session.Closed()
-	}
-	r.clients[id] = client
-	r.attachment = attachment
-	r.registry.logger.Info("terminal attach live", "session_id", r.session.Id, "client_id", id, "clients", len(r.clients))
-	r.mu.Unlock()
+	r.registry.logger.Info("terminal attach live", "session_id", r.session.Id, "client_id", id, "control_role", controlRole, "clients", len(r.clientsSnapshot()))
 	return client, nil
 }
 
-func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentState) error {
-	r.registry.logger.Debug("terminal replay enqueue start", "session_id", r.session.Id, "client_id", client.Id())
-	if !client.enqueue(Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeStarted, SessionId: r.session.Id, WorkspaceId: r.session.WorkspaceId, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(attachment)}}) {
+func (r *SessionRuntime) enqueueReplay(client *Client, attachment AttachmentState, controlRole string) error {
+	r.registry.logger.Debug("terminal replay enqueue start", "session_id", r.session.Id, "client_id", client.Id(), "control_role", controlRole)
+	if !client.enqueue(Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeStarted, SessionId: r.session.Id, WorkspaceId: r.session.WorkspaceId, State: string(session.StateRunning), LifecycleState: string(session.StateRunning), AttachmentState: string(attachment), ControlRole: controlRole}}) {
 		return fmt.Errorf("client queue full")
 	}
 	if !client.enqueue(Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{Type: terminalproto.TypeReplayStarted}}) {
@@ -212,20 +224,117 @@ func (r *SessionRuntime) resize(cols int, rows int) error {
 }
 
 func (r *SessionRuntime) detachClient(id string, reason string) {
+	r.controlMu.Lock()
 	r.mu.Lock()
 	client := r.clients[id]
+	wasController := r.controllerClientId == id
 	if client != nil {
 		delete(r.clients, id)
 	}
+	r.clientOrder = removeClientOrder(r.clientOrder, id)
+	var promoted *Client
+	if wasController {
+		r.controllerClientId = ""
+		if len(r.clientOrder) > 0 {
+			nextId := r.clientOrder[0]
+			r.controllerClientId = nextId
+			promoted = r.clients[nextId]
+		}
+	}
 	if len(r.clients) == 0 && !r.closed {
 		r.attachment = AttachmentDetached
+		r.controllerClientId = ""
 	}
 	attachment := r.attachment
+	controllerId := r.controllerClientId
 	r.mu.Unlock()
+	r.controlMu.Unlock()
 	if client != nil {
 		client.closeQueue()
 	}
-	r.broadcastText(&agent.ServerControlMessage{Type: terminalproto.TypeState, LifecycleState: string(session.StateRunning), AttachmentState: string(attachment), Reason: reason})
+	if promoted != nil {
+		r.registry.logger.Info("terminal control auto granted", "session_id", r.session.Id, "client_id", promoted.Id(), "reason", reason)
+		r.enqueueControlRole(promoted, attachment, terminalproto.ControlRoleController, terminalproto.ReasonControlAutoGranted)
+		return
+	}
+	if controllerId == "" {
+		r.broadcastText(&agent.ServerControlMessage{Type: terminalproto.TypeState, LifecycleState: string(session.StateRunning), AttachmentState: string(attachment), Reason: reason})
+	}
+}
+
+func removeClientOrder(order []string, id string) []string {
+	if len(order) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(order))
+	for _, item := range order {
+		if item != id {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func (r *SessionRuntime) isControllerLocked(id string) bool {
+	return r.controllerClientId == id
+}
+
+func (r *SessionRuntime) takeControl(id string) {
+	r.controlMu.Lock()
+	r.mu.Lock()
+	client := r.clients[id]
+	if client == nil || r.closed {
+		r.mu.Unlock()
+		r.controlMu.Unlock()
+		return
+	}
+	oldId := r.controllerClientId
+	if oldId == id {
+		attachment := r.attachment
+		r.mu.Unlock()
+		r.controlMu.Unlock()
+		r.enqueueControlRole(client, attachment, terminalproto.ControlRoleController, terminalproto.ReasonControlGranted)
+		return
+	}
+	r.controllerClientId = id
+	var oldClient *Client
+	if oldId != "" {
+		oldClient = r.clients[oldId]
+	}
+	attachment := r.attachment
+	r.mu.Unlock()
+	r.controlMu.Unlock()
+
+	r.registry.logger.Info("terminal control transferred", "session_id", r.session.Id, "from_client_id", oldId, "to_client_id", id)
+	// Role events are best-effort UI sync; queue pressure must not re-elect controllers.
+	r.enqueueControlRole(client, attachment, terminalproto.ControlRoleController, terminalproto.ReasonControlGranted)
+	if oldClient != nil {
+		r.enqueueControlRole(oldClient, attachment, terminalproto.ControlRoleObserver, terminalproto.ReasonControlLost)
+	}
+}
+
+func (r *SessionRuntime) writeInputFrom(id string, data []byte) error {
+	r.controlMu.Lock()
+	defer r.controlMu.Unlock()
+	r.mu.Lock()
+	if !r.isControllerLocked(id) {
+		r.mu.Unlock()
+		return errNotController
+	}
+	r.mu.Unlock()
+	return r.writeInput(data)
+}
+
+func (r *SessionRuntime) resizeFrom(id string, cols int, rows int) error {
+	r.controlMu.Lock()
+	defer r.controlMu.Unlock()
+	r.mu.Lock()
+	if !r.isControllerLocked(id) {
+		r.mu.Unlock()
+		return nil
+	}
+	r.mu.Unlock()
+	return r.resize(cols, rows)
 }
 
 func (r *SessionRuntime) closeSession(reason string) error {
@@ -357,6 +466,34 @@ func (r *SessionRuntime) waitLoop() {
 	close(r.done)
 }
 
+// enqueueControlRole best-effort delivers a control-role state event for browser UI sync.
+// Queue full or closed client: log and drop. Must not detach or re-elect controllers.
+func (r *SessionRuntime) enqueueControlRole(client *Client, attachment AttachmentState, role string, reason string) {
+	if client == nil {
+		return
+	}
+	ok := client.enqueue(Outbound{Kind: OutboundText, Text: &agent.ServerControlMessage{
+		Type:            terminalproto.TypeState,
+		LifecycleState:  string(session.StateRunning),
+		AttachmentState: string(attachment),
+		ControlRole:     role,
+		Reason:          reason,
+	}})
+	if ok {
+		return
+	}
+	r.registry.logger.Warn(
+		"terminal control role notify dropped",
+		"session_id", r.session.Id,
+		"client_id", client.Id(),
+		"control_role", role,
+		"notify_reason", reason,
+		"queued_bytes", client.QueuedBytes(),
+		"queue_bytes", r.registry.clientQueueBytes,
+		"queue_messages", r.registry.clientQueueSize,
+	)
+}
+
 func (r *SessionRuntime) publishBinary(chunk []byte) {
 	clients := r.clientsSnapshot()
 	for _, client := range clients {
@@ -399,4 +536,8 @@ func (r *SessionRuntime) closeClients() {
 	for _, client := range clients {
 		client.once.Do(func() { client.closeQueue() })
 	}
+}
+
+func IsNotController(err error) bool {
+	return err != nil && errors.Is(err, errNotController)
 }

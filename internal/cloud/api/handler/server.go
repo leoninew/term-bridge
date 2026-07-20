@@ -107,8 +107,6 @@ type Handler struct {
 	registry           *DeviceRegistry
 	routes             map[string]*agentRoute
 	routeMu            sync.Mutex
-	writers            map[string]string
-	writerMu           sync.Mutex
 	cacheMu            sync.Mutex
 	workspaceTreeCache map[string]json.RawMessage
 	historyCache       map[string]map[string]string
@@ -216,7 +214,7 @@ func newHandler(config Config) *Handler {
 	if config.ConcurrentAttaches <= 0 {
 		config.ConcurrentAttaches = quotapkg.DefaultConcurrentAttaches
 	}
-	handler := &Handler{config: config, authService: config.AuthService, registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, writers: map[string]string{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}, oauthCodes: map[string]cloudOAuthCode{}, attachQuota: config.AttachQuota}
+	handler := &Handler{config: config, authService: config.AuthService, registry: NewDeviceRegistry(), routes: map[string]*agentRoute{}, workspaceTreeCache: map[string]json.RawMessage{}, historyCache: map[string]map[string]string{}, oauthCodes: map[string]cloudOAuthCode{}, attachQuota: config.AttachQuota}
 	return handler
 }
 
@@ -1067,20 +1065,8 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 		s.writeUnauthorized(w, r)
 		return
 	}
-	writerKey := sessionScopeKey(workspaceId, sessionId)
-	s.writerMu.Lock()
-	if _, exists := s.writers[writerKey]; exists {
-		s.writerMu.Unlock()
-		s.writeAPIError(w, r, http.StatusConflict, errorCodeConflict, errorMessageConflict, nil)
-		return
-	}
 	streamId := "term-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	s.writers[writerKey] = streamId
-	s.writerMu.Unlock()
 	defer func() {
-		s.writerMu.Lock()
-		delete(s.writers, writerKey)
-		s.writerMu.Unlock()
 		route.removeTerminal(streamId)
 	}()
 	limit, err := s.attachLimitForUser(r.Context(), claims.Sub)
@@ -1138,6 +1124,9 @@ func (s *Handler) handleTerminalWS(w http.ResponseWriter, r *http.Request, route
 				case terminalproto.TypeResize:
 					resize := &shared.TunnelFrame{StreamId: streamId, Payload: &shared.TunnelFrame_TerminalResize{TerminalResize: &shared.TerminalResize{Cols: message.Cols, Rows: message.Rows}}}
 					_ = route.writeFrame(r.Context(), resize)
+				case terminalproto.TypeTakeControl:
+					take := &shared.TunnelFrame{StreamId: streamId, Payload: &shared.TunnelFrame_TerminalTakeControl{TerminalTakeControl: &shared.TerminalTakeControl{WorkspaceId: workspaceId, SessionId: sessionId}}}
+					_ = route.writeFrame(r.Context(), take)
 				case terminalproto.TypeDetach:
 					closeFrame := &shared.TunnelFrame{StreamId: streamId, Payload: &shared.TunnelFrame_Close{Close: &shared.Close{Reason: "browser_detached"}}}
 					_ = route.writeFrame(context.Background(), closeFrame)

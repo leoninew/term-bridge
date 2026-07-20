@@ -29,4 +29,5 @@ export interface ServerControlMessage {
   error: string;
   nonce: string;
   truncated?: boolean | undefined;
+  control_role: string;
 }

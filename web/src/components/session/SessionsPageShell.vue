@@ -9,27 +9,26 @@
         <SessionWorkbench
           v-bind="workbenchBind"
           class="session-workbench-stage h-full min-h-0 min-w-0"
-          :show-sidebar-toggle="true"
-          @toggle-sidebar="mobileSidebarOpen = true"
+          :show-sidebar-toggle="sidebarCollapsed"
+          @toggle-sidebar="expandSidebar"
           v-on="workbenchListeners"
         />
       </div>
 
       <div
-        v-if="mobileSidebarOpen"
+        v-if="!sidebarCollapsed"
         class="fixed inset-0 z-[35] bg-black/45"
         aria-hidden="true"
-        @click="mobileSidebarOpen = false"
+        @click="collapseSidebar"
       />
       <div
         class="sessions-mobile-sidebar fixed inset-y-0 left-0 z-40 flex w-[min(320px,88vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-sidebar-bg)] shadow-[12px_0_32px_rgb(0_0_0/0.28)] [&>*]:h-full [&>*]:min-h-0"
-        :data-state="mobileSidebarOpen ? 'open' : 'closed'"
-        :aria-hidden="mobileSidebarOpen ? 'false' : 'true'"
+        :data-state="sidebarCollapsed ? 'closed' : 'open'"
+        :aria-hidden="sidebarCollapsed ? 'true' : 'false'"
       >
         <WorkspaceSessionSidebar
           v-bind="sidebarBind"
-          :show-close="true"
-          @close="mobileSidebarOpen = false"
+          @collapse="collapseSidebar"
           @select="selectSessionFromMobileSidebar"
           v-on="sidebarListeners"
         />
@@ -38,22 +37,23 @@
 
     <SplitterGroup v-else direction="horizontal" class="flex min-h-0 min-w-0 flex-1">
       <SplitterPanel
+        v-if="!sidebarCollapsed"
         id="workspace-sidebar"
         class="workspace-sidebar-panel"
-        collapsible
-        :collapsed-size="0"
         :default-size="18"
         :min-size="18"
         :max-size="24"
       >
         <WorkspaceSessionSidebar
           v-bind="sidebarBind"
+          @collapse="collapseSidebar"
           @select="openSessionTab"
           v-on="sidebarListeners"
         />
       </SplitterPanel>
 
       <SplitterResizeHandle
+        v-if="!sidebarCollapsed"
         class="sessions-resize-handle group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[var(--color-app-bg)] outline-none"
       >
         <span
@@ -61,11 +61,13 @@
         />
       </SplitterResizeHandle>
 
-      <SplitterPanel id="terminal-workbench" :min-size="55">
+      <SplitterPanel id="terminal-workbench" :min-size="sidebarCollapsed ? 100 : 55">
         <div class="relative h-full min-h-0 min-w-0">
           <SessionWorkbench
             v-bind="workbenchBind"
             class="session-workbench-stage h-full min-h-0 min-w-0"
+            :show-sidebar-toggle="sidebarCollapsed"
+            @toggle-sidebar="expandSidebar"
             v-on="workbenchListeners"
           />
         </div>
@@ -197,18 +199,31 @@
   const terminalWorkbench = ref<HTMLElement | null>(null)
   const { measureInitialTerminalSize } = useTerminalSize(terminalWorkbench)
   const { isNarrow, disableReorder } = useSessionsLayoutMode()
-  const mobileSidebarOpen = ref(false)
+  // Narrow starts collapsed (overlay closed); wide starts expanded.
+  const sidebarCollapsed = ref(false)
+
+  function collapseSidebar() {
+    sidebarCollapsed.value = true
+  }
+
+  function expandSidebar() {
+    sidebarCollapsed.value = false
+  }
 
   function selectSessionFromMobileSidebar(session: SessionSummary) {
     void openSessionTab(session)
-    mobileSidebarOpen.value = false
+    collapseSidebar()
   }
 
-  watch(isNarrow, (narrow) => {
-    if (!narrow) {
-      mobileSidebarOpen.value = false
-    }
-  })
+  watch(
+    isNarrow,
+    (narrow, wasNarrow) => {
+      if (narrow === wasNarrow) return
+      // Entering narrow: close overlay. Leaving narrow: restore side panel.
+      sidebarCollapsed.value = narrow
+    },
+    { immediate: true },
+  )
 
   const shortcuts = ref<Shortcut[]>([])
   const enabledShortcuts = computed(() =>
@@ -749,7 +764,16 @@
     }
   }
 
+  const terminalErrorToastAt = new Map<string, number>()
   function handleTerminalError(message: string) {
+    const sessionKey = workbench.activeSessionId ?? ''
+    const key = sessionKey + '|' + message
+    const now = Date.now()
+    const prev = terminalErrorToastAt.get(key) ?? 0
+    if (now - prev < 10000) {
+      return
+    }
+    terminalErrorToastAt.set(key, now)
     notifications.pushToast('error', t('toast.terminalConnectionFailed'), message)
   }
 

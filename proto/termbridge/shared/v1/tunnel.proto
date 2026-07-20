@@ -92,6 +92,7 @@ message TunnelFrame {
     TerminalClosed terminal_closed = 304;
     termbridge.agent.ServerControlMessage terminal_control = 305;
     termbridge.agent.FsChangeEvent fs_change_event = 306;
+    TerminalTakeControl terminal_take_control = 307;
 
     termbridge.shared.ErrorResp error = 900;
     Close close = 901;
@@ -138,6 +139,11 @@ message TerminalResize {
 
 message TerminalClosed {
   string reason = 1;
+}
+
+message TerminalTakeControl {
+  string workspace_id = 1;
+  string session_id = 2;
 }
 
 message Close {

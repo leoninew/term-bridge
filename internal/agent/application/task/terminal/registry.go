@@ -131,6 +131,7 @@ type Client struct {
 	queue            chan Outbound
 	once             sync.Once
 	mu               sync.Mutex
+	queueClosed      bool
 	queuedBytes      int
 	sentBinaryChunks int
 	sentBinaryBytes  int64
@@ -899,11 +900,21 @@ func (c *Client) Outbound() <-chan Outbound {
 }
 
 func (c *Client) WriteInput(data []byte) error {
-	return c.runtime.writeInput(data)
+	return c.runtime.writeInputFrom(c.id, data)
 }
 
 func (c *Client) Resize(cols int, rows int) error {
-	return c.runtime.resize(cols, rows)
+	return c.runtime.resizeFrom(c.id, cols, rows)
+}
+
+func (c *Client) TakeControl() {
+	c.runtime.takeControl(c.id)
+}
+
+func (c *Client) IsController() bool {
+	c.runtime.mu.Lock()
+	defer c.runtime.mu.Unlock()
+	return c.runtime.isControllerLocked(c.id)
 }
 
 func (c *Client) Detach(reason string) {
@@ -921,17 +932,22 @@ func (c *Client) SendControl(message *agent.ServerControlMessage) bool {
 func (c *Client) enqueue(outbound Outbound) bool {
 	size := outboundSize(outbound)
 	c.mu.Lock()
+	if c.queueClosed {
+		c.mu.Unlock()
+		return false
+	}
 	if c.queuedBytes+size > c.runtime.registry.clientQueueBytes {
 		c.mu.Unlock()
 		return false
 	}
-	c.queuedBytes += size
-	c.mu.Unlock()
+	// Hold mu across non-blocking send so closeQueue cannot close under a concurrent send.
 	select {
 	case c.queue <- outbound:
+		c.queuedBytes += size
+		c.mu.Unlock()
 		return true
 	default:
-		c.markSent(outbound)
+		c.mu.Unlock()
 		return false
 	}
 }
@@ -939,6 +955,9 @@ func (c *Client) enqueue(outbound Outbound) bool {
 func (c *Client) canEnqueue(size int) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.queueClosed {
+		return false
+	}
 	return c.queuedBytes+size <= c.runtime.registry.clientQueueBytes && len(c.queue) < cap(c.queue)
 }
 
@@ -986,6 +1005,13 @@ func outboundSize(outbound Outbound) int {
 }
 
 func (c *Client) closeQueue() {
+	c.mu.Lock()
+	if c.queueClosed {
+		c.mu.Unlock()
+		return
+	}
+	c.queueClosed = true
+	c.mu.Unlock()
 	close(c.queue)
 }
 

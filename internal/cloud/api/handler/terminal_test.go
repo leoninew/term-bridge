@@ -17,7 +17,7 @@ import (
 	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
-func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
+func TestTerminalRelayOutputInputAndMultiAttach(t *testing.T) {
 	handler := New(testCloudConfig())
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -52,6 +52,10 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 	if started.GetType() != terminalproto.TypeStarted || started.GetSessionId() != "sess-1" || started.GetWorkspaceId() != "ws-1" || started.GetLifecycleState() != "running" || started.GetAttachmentState() != "attached" {
 		t.Fatalf("started control type=%q session=%q workspace=%q lifecycle=%q attachment=%q", started.GetType(), started.GetSessionId(), started.GetWorkspaceId(), started.GetLifecycleState(), started.GetAttachmentState())
 	}
+	// Fake agent may omit control_role; when present it should be controller for first attach.
+	if role := started.GetControlRole(); role != "" && role != terminalproto.ControlRoleController {
+		t.Fatalf("started control_role = %q, want %q or empty", role, terminalproto.ControlRoleController)
+	}
 	outputType, output, err := browser.Read(ctx)
 	if err != nil {
 		t.Fatalf("browser output Read() error = %v", err)
@@ -63,12 +67,14 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 	if !bytes.Equal(output, wantOutput) {
 		t.Fatalf("terminal output = %q, want %q", output, wantOutput)
 	}
-	_, response, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/0f490dee643b01b06e0ea84c253a9005/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
-	if err == nil {
-		t.Fatal("second writer Dial() error = nil, want conflict")
+	// Second browser may attach the same session (observer). Cloud no longer returns 409.
+	browser2, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/0f490dee643b01b06e0ea84c253a9005/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	if err != nil {
+		t.Fatalf("second attach Dial() error = %v", err)
 	}
-	if response == nil || response.StatusCode != http.StatusConflict {
-		t.Fatalf("second writer status = %#v, want 409", response)
+	defer func() { _ = browser2.Close(websocket.StatusNormalClosure, "") }()
+	if _, _, err := browser2.Read(ctx); err != nil {
+		t.Fatalf("second attach started Read() error = %v", err)
 	}
 	wantInput := []byte{'i', 'n', 'p', 'u', 't', 0xff, 0x00, 0x1b, '[', 'A'}
 	if err := browser.Write(ctx, websocket.MessageBinary, wantInput); err != nil {
@@ -118,7 +124,7 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, input
 			if frame.GetRequestId() == "" || payload.TerminalAttach.GetWorkspaceId() == "" {
 				return
 			}
-			started := &shared.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &shared.TunnelFrame_TerminalControl{TerminalControl: &agent.ServerControlMessage{Type: terminalproto.TypeStarted, SessionId: "sess-1", WorkspaceId: "ws-1", LifecycleState: "running", AttachmentState: "attached"}}}
+			started := &shared.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &shared.TunnelFrame_TerminalControl{TerminalControl: &agent.ServerControlMessage{Type: terminalproto.TypeStarted, SessionId: "sess-1", WorkspaceId: "ws-1", LifecycleState: "running", AttachmentState: "attached", ControlRole: terminalproto.ControlRoleController}}}
 			startedData, _ := tunnel.MarshalFrame(started)
 			_ = conn.Write(ctx, websocket.MessageText, startedData)
 			output := &shared.TunnelFrame{StreamId: frame.GetStreamId(), Payload: &shared.TunnelFrame_TerminalOutput{TerminalOutput: &shared.TerminalOutput{Data: []byte{'h', 'e', 'l', 'l', 'o', 0xff, 0xfe, 0x1b, '[', '2', 'J'}}}}
