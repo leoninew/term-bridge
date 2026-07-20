@@ -233,9 +233,7 @@ export function createXterm(
   const terminal = new Terminal(terminalOptions(theme, diagnostics.source))
   const fitAddon = new FitAddon()
   const webLinksAddon = new WebLinksAddon()
-  const disposables = readOnly
-    ? []
-    : [terminal.onData(onData), terminal.onBinary(onBinary)]
+  const disposables = readOnly ? [] : [terminal.onData(onData), terminal.onBinary(onBinary)]
   let hostElement: HTMLElement | undefined
   let observer: ResizeObserver | undefined
   let lastCols = 0

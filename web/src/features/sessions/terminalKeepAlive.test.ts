@@ -11,9 +11,10 @@ describe('clampTerminalKeepAliveConfig', () => {
   })
 
   it('clamps out-of-range numbers', () => {
-    expect(
-      clampTerminalKeepAliveConfig({ maxHotTerminals: 99, disposeDelayMs: -5 }),
-    ).toEqual({ maxHotTerminals: 16, disposeDelayMs: 0 })
+    expect(clampTerminalKeepAliveConfig({ maxHotTerminals: 99, disposeDelayMs: -5 })).toEqual({
+      maxHotTerminals: 16,
+      disposeDelayMs: 0,
+    })
   })
 
   it('falls back for non-finite values', () => {

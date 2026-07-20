@@ -46,11 +46,7 @@
           v-for="pane in livePanes"
           :key="pane.session.id"
           class="absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden"
-          :class="
-            pane.active
-              ? 'z-10'
-              : 'pointer-events-none invisible z-0'
-          "
+          :class="pane.active ? 'z-10' : 'pointer-events-none invisible z-0'"
           :aria-hidden="pane.active ? 'false' : 'true'"
         >
           <TerminalPane

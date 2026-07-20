@@ -1,10 +1,10 @@
 package browser
 
 type RuntimeConfig struct {
-	Version  string                   `json:"version"`
-	Local    RuntimeLocalConfig       `json:"local"`
-	Cloud    RuntimeCloudConfig       `json:"cloud"`
-	Terminal *RuntimeTerminalConfig   `json:"terminal,omitempty"`
+	Version  string                 `json:"version"`
+	Local    RuntimeLocalConfig     `json:"local"`
+	Cloud    RuntimeCloudConfig     `json:"cloud"`
+	Terminal *RuntimeTerminalConfig `json:"terminal,omitempty"`
 }
 
 type RuntimeTerminalConfig struct {

@@ -60,7 +60,8 @@
         v-if="deviceLabel && showCloudConnection"
         class="shrink-0 text-[var(--color-border-strong)]"
         aria-hidden="true"
-      >|</span>
+        >|</span
+      >
       <span
         v-if="showCloudConnection"
         class="inline-flex shrink-0 items-center gap-1"
