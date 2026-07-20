@@ -541,22 +541,20 @@ func TestMutatePathRejectsUnmergedChangesWithoutTouchingTheWorktree(t *testing.T
 	}
 }
 
-func TestCommitFailureOmitsPreCommitStatus(t *testing.T) {
+func TestCommitFailureOmitsPreCommandStatus(t *testing.T) {
 	repositoryRoot := initializeGitRepository(t)
 	writeTestFile(t, filepath.Join(repositoryRoot, "tracked.txt"), "base\n")
 	runGit(t, repositoryRoot, "add", "tracked.txt")
 	commitTestChanges(t, repositoryRoot, "initial")
 	writeTestFile(t, filepath.Join(repositoryRoot, "tracked.txt"), "staged\n")
 	runGit(t, repositoryRoot, "add", "tracked.txt")
-	writeTestFile(t, filepath.Join(repositoryRoot, ".git", "hooks", "pre-commit"), "#!/bin/sh\nexit 1\n")
-	if err := os.Chmod(filepath.Join(repositoryRoot, ".git", "hooks", "pre-commit"), 0o700); err != nil {
-		t.Fatalf("make pre-commit hook executable: %v", err)
-	}
 
 	repository := newTestRepository(t)
+	repository.config.Executable = testGitCommitFailureExecutable(t, repository.config.Executable)
+	repository.lookPath = func(string) (string, error) { return repository.config.Executable, nil }
 	result, err := repository.Commit(context.Background(), repositoryRoot, gitmodel.CommitRequest{Message: "must fail"})
 	if err != nil {
-		t.Fatalf("commit with failing hook: %v", err)
+		t.Fatalf("commit with failing Git executable: %v", err)
 	}
 	if result.State != gitmodel.OperationStateCommitFailed {
 		t.Fatalf("commit failure state = %q, want %q", result.State, gitmodel.OperationStateCommitFailed)
@@ -719,6 +717,29 @@ func testGitFailureExecutable(t *testing.T) string {
 		t.Fatalf("write Git failure executable: %v", err)
 	}
 	return path
+}
+
+func testGitCommitFailureExecutable(t *testing.T, gitExecutable string) string {
+	t.Helper()
+	directory := t.TempDir()
+	if os.PathSeparator == '\\' {
+		path := filepath.Join(directory, "git-commit-failure.cmd")
+		script := "@echo off\r\nif \"%~1\"==\"commit\" exit /b 17\r\n\"" + gitExecutable + "\" %*\r\n"
+		if err := os.WriteFile(path, []byte(script), 0o600); err != nil {
+			t.Fatalf("write Git commit failure executable: %v", err)
+		}
+		return path
+	}
+	path := filepath.Join(directory, "git-commit-failure")
+	script := "#!/bin/sh\nif [ \"$1\" = \"commit\" ]; then exit 17; fi\nexec " + shellQuote(gitExecutable) + " \"$@\"\n"
+	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
+		t.Fatalf("write Git commit failure executable: %v", err)
+	}
+	return path
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\\\"'\\\"'") + "'"
 }
 
 func writeTestFile(t *testing.T, path string, contents string) {

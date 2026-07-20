@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -840,11 +841,10 @@ func resolveConfigPath(cwd string, path string) (string, error) {
 		return "", nil
 	}
 	if path == "~" || strings.HasPrefix(path, "~/") || strings.HasPrefix(path, `~\`) {
-		home, err := os.UserHomeDir()
+		home, err := resolveConfigHomeDir()
 		if err != nil {
 			return "", fmt.Errorf("resolve user home: %w", err)
 		}
-		home = filepath.Clean(home)
 		if path == "~" {
 			return home, nil
 		}
@@ -854,6 +854,24 @@ func resolveConfigPath(cwd string, path string) (string, error) {
 		return filepath.Clean(path), nil
 	}
 	return filepath.Join(cwd, path), nil
+}
+
+func resolveConfigHomeDir() (string, error) {
+	if runtime.GOOS == "windows" {
+		if home := strings.TrimSpace(os.Getenv("USERPROFILE")); home != "" {
+			return filepath.Clean(home), nil
+		}
+
+		drive := strings.TrimSpace(os.Getenv("HOMEDRIVE"))
+		path := strings.TrimSpace(os.Getenv("HOMEPATH"))
+		if drive != "" && path != "" {
+			return filepath.Clean(filepath.Join(drive, path)), nil
+		}
+	}
+	if home := strings.TrimSpace(os.Getenv("HOME")); home != "" {
+		return filepath.Clean(home), nil
+	}
+	return "", fmt.Errorf("HOME, USERPROFILE, or HOMEDRIVE and HOMEPATH are not defined")
 }
 
 func isConfigAbsPath(path string) bool {

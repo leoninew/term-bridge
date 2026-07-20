@@ -733,9 +733,10 @@ func TestLoadIgnoresUnknownConfigAndEnvironmentKeys(t *testing.T) {
 	}
 }
 
-
 func TestLoadResolvesHomeRelativeRuntimePaths(t *testing.T) {
 	home := isolateHome(t)
+	profile := t.TempDir()
+	t.Setenv("USERPROFILE", profile)
 	cwd := t.TempDir()
 	writeDefaultConfig(t, cwd)
 	writeDotEnv(t, cwd, strings.Join([]string{
@@ -749,15 +750,19 @@ func TestLoadResolvesHomeRelativeRuntimePaths(t *testing.T) {
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	wantStateDir := filepath.Join(home, ".termbridge")
+	wantHome := home
+	if runtime.GOOS == "windows" {
+		wantHome = profile
+	}
+	wantStateDir := filepath.Join(wantHome, ".termbridge")
 	if filepath.Clean(cfg.Runtime.StateDir) != filepath.Clean(wantStateDir) {
 		t.Fatalf("StateDir = %q, want %q", cfg.Runtime.StateDir, wantStateDir)
 	}
-	wantDB := filepath.Join(home, ".termbridge", "agent.db")
+	wantDB := filepath.Join(wantHome, ".termbridge", "agent.db")
 	if filepath.Clean(cfg.Local.Database.SQLite.Path) != filepath.Clean(wantDB) {
 		t.Fatalf("Local.Database.SQLite.Path = %q, want %q", cfg.Local.Database.SQLite.Path, wantDB)
 	}
-	wantLogDir := filepath.Join(home, ".termbridge", "logs")
+	wantLogDir := filepath.Join(wantHome, ".termbridge", "logs")
 	if filepath.Clean(cfg.LogDir) != filepath.Clean(wantLogDir) {
 		t.Fatalf("LogDir = %q, want %q", cfg.LogDir, wantLogDir)
 	}
@@ -792,6 +797,81 @@ func TestResolveConfigPath(t *testing.T) {
 		t.Fatalf("resolveConfigPath(abs) = %q", got)
 	}
 }
+
+func TestResolveConfigHomeDirUsesPlatformHomePrecedence(t *testing.T) {
+	isolateHome(t)
+	home := t.TempDir()
+	profile := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", profile)
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+
+	got, err := resolveConfigHomeDir()
+	if err != nil {
+		t.Fatalf("resolveConfigHomeDir() error = %v", err)
+	}
+	want := home
+	if runtime.GOOS == "windows" {
+		want = profile
+	}
+	if filepath.Clean(got) != filepath.Clean(want) {
+		t.Fatalf("resolveConfigHomeDir() = %q, want %q", got, want)
+	}
+}
+
+func TestResolveConfigHomeDirFallsBackToUserProfile(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("USERPROFILE is a Windows fallback")
+	}
+	isolateHome(t)
+	profile := t.TempDir()
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", profile)
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+
+	got, err := resolveConfigHomeDir()
+	if err != nil {
+		t.Fatalf("resolveConfigHomeDir() error = %v", err)
+	}
+	if filepath.Clean(got) != filepath.Clean(profile) {
+		t.Fatalf("resolveConfigHomeDir() = %q, want %q", got, profile)
+	}
+}
+
+func TestResolveConfigHomeDirFallsBackToHomeDriveAndPath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("HOMEDRIVE and HOMEPATH are Windows fallbacks")
+	}
+	isolateHome(t)
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
+	t.Setenv("HOMEDRIVE", t.TempDir())
+	t.Setenv("HOMEPATH", "profile")
+
+	got, err := resolveConfigHomeDir()
+	if err != nil {
+		t.Fatalf("resolveConfigHomeDir() error = %v", err)
+	}
+	want := filepath.Join(os.Getenv("HOMEDRIVE"), os.Getenv("HOMEPATH"))
+	if filepath.Clean(got) != filepath.Clean(want) {
+		t.Fatalf("resolveConfigHomeDir() = %q, want %q", got, want)
+	}
+}
+
+func TestResolveConfigHomeDirRequiresEnvironmentHome(t *testing.T) {
+	isolateHome(t)
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+
+	if _, err := resolveConfigHomeDir(); err == nil {
+		t.Fatal("resolveConfigHomeDir() error = nil, want missing home error")
+	}
+}
+
 func TestDefaultConfigFileExists(t *testing.T) {
 	if _, err := os.ReadFile(repoDefaultConfigPath(t)); err != nil {
 		t.Fatalf("ReadFile(default config) error = %v", err)
