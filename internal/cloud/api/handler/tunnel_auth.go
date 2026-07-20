@@ -8,15 +8,16 @@ import (
 	"strings"
 	"time"
 
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/security"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
 
 func verifyRepositorySignedTunnelRequest(ctx context.Context, r *http.Request, repo DeviceRepository, audience string) (string, bool) {
-	deviceID := strings.TrimSpace(r.Header.Get(tunnel.HeaderDeviceId))
-	if deviceID == "" {
+	deviceId := strings.TrimSpace(r.Header.Get(tunnel.HeaderDeviceId))
+	if deviceId == "" {
 		return "", false
 	}
-	publicKeyText, err := repo.PublicKey(ctx, deviceID)
+	publicKeyText, err := repo.PublicKey(ctx, deviceId)
 	if err != nil {
 		return "", false
 	}
@@ -24,6 +25,10 @@ func verifyRepositorySignedTunnelRequest(ctx context.Context, r *http.Request, r
 	if err != nil || len(publicKey) != ed25519.PublicKeySize {
 		return "", false
 	}
-	verifiedDeviceID, err := tunnel.VerifySignedRequest(r, audience, ed25519.PublicKey(publicKey), time.Now())
-	return verifiedDeviceID, err == nil
+	derivedDeviceId, err := security.DeviceIdForEd25519PublicKey(ed25519.PublicKey(publicKey))
+	if err != nil || derivedDeviceId != deviceId {
+		return "", false
+	}
+	verifiedDeviceId, err := tunnel.VerifySignedRequest(r, audience, ed25519.PublicKey(publicKey), time.Now())
+	return verifiedDeviceId, err == nil
 }

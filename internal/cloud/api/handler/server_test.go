@@ -62,9 +62,11 @@ func (testDeviceRepository) UpsertUserDevice(context.Context, string, Device) er
 func (testDeviceRepository) UserOwnsDevice(context.Context, string, string) (bool, error) {
 	return true, nil
 }
-func (testDeviceRepository) DeleteUserDevice(context.Context, string, string) error { return nil }
+func (testDeviceRepository) DeleteUserDevice(context.Context, string, string) (bool, error) {
+	return true, nil
+}
 func (testDeviceRepository) PublicKey(_ context.Context, deviceId string) (string, error) {
-	if deviceId != "dev-1" {
+	if deviceId != "0f490dee643b01b06e0ea84c253a9005" {
 		return "", nil
 	}
 	return base64.StdEncoding.EncodeToString(testTunnelPrivateKey.Public().(ed25519.PublicKey)), nil
@@ -75,7 +77,7 @@ func (testDeviceRepository) ListDevicesForUser(context.Context, string) ([]Devic
 
 func signedTestTunnelHeader(t *testing.T) http.Header {
 	t.Helper()
-	header, err := tunnel.SignedTunnelHeader(http.MethodGet, "/api/agent/tunnel", "termbridge-cloud", "dev-1", testTunnelPrivateKey, time.Now(), "test-nonce")
+	header, err := tunnel.SignedTunnelHeader(http.MethodGet, "/api/agent/tunnel", "termbridge-cloud", "0f490dee643b01b06e0ea84c253a9005", testTunnelPrivateKey, time.Now(), "test-nonce")
 	if err != nil {
 		t.Fatalf("SignedTunnelHeader() error = %v", err)
 	}

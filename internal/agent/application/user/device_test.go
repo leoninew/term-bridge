@@ -1,11 +1,14 @@
 package application
 
 import (
+	"crypto/ed25519"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/security"
 )
 
 func TestDeviceIdentityDoesNotPersistCloudBinding(t *testing.T) {
@@ -30,6 +33,41 @@ func TestDeviceIdentityDoesNotPersistCloudBinding(t *testing.T) {
 	}
 	if strings.Contains(string(data), "cloud_binding") {
 		t.Fatalf("device identity persisted cloud binding: %s", string(data))
+	}
+}
+
+func TestDeviceIdentityMustMatchPrivateKey(t *testing.T) {
+	stateDir := t.TempDir()
+	privateKey := ed25519.NewKeyFromSeed([]byte("12345678901234567890123456789012"))
+	if err := writePEMFile(filepath.Join(stateDir, PrivateKeyFileName), "ED25519 PRIVATE KEY", privateKey, 0o600); err != nil {
+		t.Fatalf("write private key: %v", err)
+	}
+	if err := writeDeviceIdentity(filepath.Join(stateDir, DeviceIdentityFileName), deviceIdentity{SchemaVersion: DeviceSchemaVersion, Id: "00000000000000000000000000000000", Name: "local", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("write device identity: %v", err)
+	}
+
+	if _, err := LoadOrCreateDevice(DeviceOptions{StateDir: stateDir}); err == nil {
+		t.Fatal("LoadOrCreateDevice() error = nil, want identity/key mismatch")
+	}
+}
+
+func TestDeviceIdentityUsesPublicKeyFingerprint(t *testing.T) {
+	stateDir := t.TempDir()
+	privateKey := ed25519.NewKeyFromSeed([]byte("12345678901234567890123456789012"))
+	if err := writePEMFile(filepath.Join(stateDir, PrivateKeyFileName), "ED25519 PRIVATE KEY", privateKey, 0o600); err != nil {
+		t.Fatalf("write private key: %v", err)
+	}
+
+	device, err := LoadOrCreateDevice(DeviceOptions{StateDir: stateDir})
+	if err != nil {
+		t.Fatalf("LoadOrCreateDevice() error = %v", err)
+	}
+	wantID, err := security.DeviceIdForEd25519PublicKey(privateKey.Public().(ed25519.PublicKey))
+	if err != nil {
+		t.Fatalf("DeviceIdForEd25519PublicKey() error = %v", err)
+	}
+	if device.Id != wantID {
+		t.Fatalf("device id = %q, want %q", device.Id, wantID)
 	}
 }
 

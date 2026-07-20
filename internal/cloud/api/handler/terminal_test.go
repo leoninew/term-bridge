@@ -29,11 +29,11 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 		defer close(agentDone)
 		runTerminalAgent(t, ctx, server.URL, inputCh)
 	}()
-	waitForRoute(t, handler, "dev-1")
+	waitForRoute(t, handler, "0f490dee643b01b06e0ea84c253a9005")
 	token := loginToken(t, handler)
 	header := http.Header{}
 	header.Set("Authorization", "Bearer "+token)
-	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/0f490dee643b01b06e0ea84c253a9005/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		t.Fatalf("browser Dial() error = %v", err)
 	}
@@ -63,7 +63,7 @@ func TestTerminalRelayOutputInputAndSingleWriter(t *testing.T) {
 	if !bytes.Equal(output, wantOutput) {
 		t.Fatalf("terminal output = %q, want %q", output, wantOutput)
 	}
-	_, response, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	_, response, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/0f490dee643b01b06e0ea84c253a9005/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err == nil {
 		t.Fatal("second writer Dial() error = nil, want conflict")
 	}
@@ -94,7 +94,7 @@ func runTerminalAgent(t *testing.T, ctx context.Context, serverUrl string, input
 		return
 	}
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
-	hello := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Hello{Hello: &shared.Hello{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
+	hello := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Hello{Hello: &shared.Hello{DeviceId: "0f490dee643b01b06e0ea84c253a9005", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
 	helloData, _ := tunnel.MarshalFrame(hello)
 	if err := conn.Write(ctx, websocket.MessageText, helloData); err != nil {
 		t.Errorf("hello Write() error = %v", err)
@@ -144,11 +144,11 @@ func TestAgentDisconnectSendsStructuredTerminalError(t *testing.T) {
 		defer close(agentDone)
 		runTerminalAgent(t, ctx, server.URL, inputCh)
 	}()
-	waitForRoute(t, handler, "dev-1")
+	waitForRoute(t, handler, "0f490dee643b01b06e0ea84c253a9005")
 	token := loginToken(t, handler)
 	header := http.Header{}
 	header.Set("Authorization", "Bearer "+token)
-	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
+	browser, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/devices/0f490dee643b01b06e0ea84c253a9005/workspaces/ws-1/sessions/sess-1/ws", &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		t.Fatalf("browser Dial() error = %v", err)
 	}

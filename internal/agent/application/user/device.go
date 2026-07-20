@@ -4,7 +4,6 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -12,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/security"
 )
 
 const (
@@ -50,28 +51,31 @@ func LoadOrCreateDevice(options DeviceOptions) (Device, error) {
 	if options.Now == nil {
 		options.Now = time.Now
 	}
-	identity, err := loadOrCreateDeviceIdentity(options.StateDir, options.Now().UTC())
+	keys, err := loadOrCreateDeviceKeys(options.StateDir)
 	if err != nil {
 		return Device{}, err
 	}
-	keys, err := loadOrCreateDeviceKeys(options.StateDir)
+	id, err := security.DeviceIdForEd25519PublicKey(keys.PublicKey)
+	if err != nil {
+		return Device{}, fmt.Errorf("derive device id: %w", err)
+	}
+	identity, err := loadOrCreateDeviceIdentity(options.StateDir, id, options.Now().UTC())
 	if err != nil {
 		return Device{}, err
 	}
 	return Device{SchemaVersion: DeviceSchemaVersion, Id: identity.Id, Name: identity.Name, PublicKey: keys.PublicKeyBase64, CreatedAt: identity.CreatedAt, UpdatedAt: identity.UpdatedAt}, nil
 }
 
-func loadOrCreateDeviceIdentity(stateDir string, now time.Time) (deviceIdentity, error) {
+func loadOrCreateDeviceIdentity(stateDir string, id string, now time.Time) (deviceIdentity, error) {
 	path := filepath.Join(stateDir, DeviceIdentityFileName)
 	identity, err := readDeviceIdentity(path)
 	if err == nil {
+		if identity.Id != id {
+			return deviceIdentity{}, fmt.Errorf("read device identity: id does not match device key")
+		}
 		return identity, nil
 	}
 	if !os.IsNotExist(err) {
-		return deviceIdentity{}, err
-	}
-	id, err := randomDeviceId()
-	if err != nil {
 		return deviceIdentity{}, err
 	}
 	identity = deviceIdentity{SchemaVersion: DeviceSchemaVersion, Id: id, Name: defaultDeviceName(), CreatedAt: now, UpdatedAt: now}
@@ -208,14 +212,6 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 		return err
 	}
 	return nil
-}
-
-func randomDeviceId() (string, error) {
-	data := make([]byte, 16)
-	if _, err := rand.Read(data); err != nil {
-		return "", fmt.Errorf("generate device id: %w", err)
-	}
-	return hex.EncodeToString(data), nil
 }
 
 func defaultDeviceName() string {

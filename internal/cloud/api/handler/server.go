@@ -17,6 +17,7 @@ import (
 	"time"
 
 	authmodel "gitee.com/leoninew/TermBridge-go/internal/cloud/model/user/auth"
+	clouddevice "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/device"
 	agent "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/agent/v1"
 	cloudproto "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
@@ -719,7 +720,14 @@ func (s *Handler) handleCurrentDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	device := Device{Id: req.GetId(), Name: req.GetName(), PublicKey: req.GetPublicKey()}
 	if err := s.config.DeviceRepository.UpsertUserDevice(r.Context(), claims.Sub, device); err != nil {
-		s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Device report is invalid.", err)
+		switch {
+		case errors.Is(err, clouddevice.ErrInvalidDeviceIdentity):
+			s.writeAPIError(w, r, http.StatusBadRequest, errorCodeBadRequest, "Device report is invalid.", err)
+		case errors.Is(err, clouddevice.ErrDevicePublicKeyConflict):
+			s.writeAPIError(w, r, http.StatusConflict, errorCodeConflict, "Device identity is already bound to a different public key.", err)
+		default:
+			s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, &cloudproto.CurrentDeviceResp{Accepted: true, Device: s.deviceSummary(device)})
@@ -972,11 +980,14 @@ func (s *Handler) handleDeleteDevice(w http.ResponseWriter, r *http.Request, dev
 		s.writeNotFound(w, r)
 		return
 	}
-	if err := s.config.DeviceRepository.DeleteUserDevice(r.Context(), claims.Sub, deviceId); err != nil {
+	deleteDevice, err := s.config.DeviceRepository.DeleteUserDevice(r.Context(), claims.Sub, deviceId)
+	if err != nil {
 		s.writeAPIError(w, r, http.StatusInternalServerError, errorCodeInternal, errorMessageInternal, err)
 		return
 	}
-	s.disconnectDevice(deviceId, "device deleted")
+	if deleteDevice {
+		s.disconnectDevice(deviceId, "device deleted")
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

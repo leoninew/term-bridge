@@ -17,6 +17,7 @@ import (
 	clouddevice "gitee.com/leoninew/TermBridge-go/internal/cloud/repository/user/device"
 	cloud "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
 	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/security"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/tunnel"
 )
@@ -28,7 +29,7 @@ func TestCurrentDeviceReportBindsDeviceToCloudUserAndTunnelUsesPublicKey(t *test
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
-	localDevice := Device{Id: "dev-1", Name: "local-device", PublicKey: base64.StdEncoding.EncodeToString(publicKey)}
+	localDevice := testDeviceForPublicKey(t, publicKey, "local-device")
 
 	reportRequest := httptest.NewRequest(http.MethodPost, "/api/devices/current", strings.NewReader(`{"id":"`+localDevice.Id+`","name":"`+localDevice.Name+`","public_key":"`+localDevice.PublicKey+`"}`))
 	reportRequest.Header.Set("Authorization", "Bearer "+token)
@@ -72,6 +73,55 @@ func TestCurrentDeviceReportBindsDeviceToCloudUserAndTunnelUsesPublicKey(t *test
 	}
 }
 
+func testDeviceForPublicKey(t *testing.T, publicKey ed25519.PublicKey, name string) Device {
+	t.Helper()
+	id, err := security.DeviceIdForEd25519PublicKey(publicKey)
+	if err != nil {
+		t.Fatalf("DeviceIdForEd25519PublicKey() error = %v", err)
+	}
+	return Device{Id: id, Name: name, PublicKey: base64.StdEncoding.EncodeToString(publicKey)}
+}
+
+func TestCurrentDeviceReportAllowsSharedBindingAndRejectsPublicKeyConflict(t *testing.T) {
+	handler := newCloudHandlerForTest(t)
+	publicKey, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+	device := testDeviceForPublicKey(t, publicKey, "shared-device")
+	requestBody := `{"id":"` + device.Id + `","name":"` + device.Name + `","public_key":"` + device.PublicKey + `"}`
+	for _, userId := range []string{"user-1", "user-2"} {
+		request := httptest.NewRequest(http.MethodPost, "/api/devices/current", strings.NewReader(requestBody))
+		request.Header.Set("Authorization", "Bearer "+cloudUserToken(t, handler.authService, userId, userId+"@example.test"))
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("report for %s status = %d; body=%s", userId, response.Code, response.Body.String())
+		}
+	}
+	for _, userId := range []string{"user-1", "user-2"} {
+		owns, err := handler.config.DeviceRepository.UserOwnsDevice(context.Background(), userId, device.Id)
+		if err != nil || !owns {
+			t.Fatalf("UserOwnsDevice(%s) = %v, %v", userId, owns, err)
+		}
+	}
+
+	otherPublicKey, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("GenerateKey(other) error = %v", err)
+	}
+	conflictBody := `{"id":"` + device.Id + `","name":"changed","public_key":"` + base64.StdEncoding.EncodeToString(otherPublicKey) + `"}`
+	conflictRequest := httptest.NewRequest(http.MethodPost, "/api/devices/current", strings.NewReader(conflictBody))
+	conflictRequest.Header.Set("Authorization", "Bearer "+cloudUserToken(t, handler.authService, "user-1", "user-1@example.test"))
+	conflictResponse := httptest.NewRecorder()
+	handler.ServeHTTP(conflictResponse, conflictRequest)
+	assertAPIError(t, conflictResponse, http.StatusConflict, errorCodeConflict)
+	storedPublicKey, err := handler.config.DeviceRepository.PublicKey(context.Background(), device.Id)
+	if err != nil || storedPublicKey != device.PublicKey {
+		t.Fatalf("stored public key = %q, %v", storedPublicKey, err)
+	}
+}
+
 func TestCurrentDeviceReportRejectsUnauthenticatedRequest(t *testing.T) {
 	handler := newCloudHandlerForTest(t)
 	request := httptest.NewRequest(http.MethodPost, "/api/devices/current", strings.NewReader(`{"id":"dev-1","name":"local-device","public_key":"public-key"}`))
@@ -80,18 +130,51 @@ func TestCurrentDeviceReportRejectsUnauthenticatedRequest(t *testing.T) {
 	assertAPIError(t, response, http.StatusUnauthorized, errorCodeUnauthorized)
 }
 
+func TestDeleteSharedDeviceKeepsRouteUntilLastBinding(t *testing.T) {
+	handler := newCloudHandlerForTest(t)
+	privateKey := ed25519.NewKeyFromSeed([]byte("12345678901234567890123456789012"))
+	device := testDeviceForPublicKey(t, privateKey.Public().(ed25519.PublicKey), "shared-device")
+	for _, userId := range []string{"user-1", "user-2"} {
+		if err := handler.config.DeviceRepository.UpsertDeviceBinding(context.Background(), userId, device); err != nil {
+			t.Fatalf("UpsertDeviceBinding(%s) error = %v", userId, err)
+		}
+	}
+	handler.registry.Register(device.Id, device.Name, time.Now().UTC())
+	handler.setRoute(device.Id, newAgentRoute(device.Id, nil))
+
+	for index, userId := range []string{"user-1", "user-2"} {
+		request := httptest.NewRequest(http.MethodDelete, "/api/devices/"+device.Id, nil)
+		request.Header.Set("Authorization", "Bearer "+cloudUserToken(t, handler.authService, userId, userId+"@example.test"))
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusNoContent {
+			t.Fatalf("delete for %s status = %d; body=%s", userId, response.Code, response.Body.String())
+		}
+		if index == 0 && handler.routeFor(device.Id) == nil {
+			t.Fatal("route removed while another user binding remains")
+		}
+	}
+	if handler.routeFor(device.Id) != nil {
+		t.Fatal("route remains after the last binding is deleted")
+	}
+}
+
 func TestDevicesFiltersByCloudUserAndDeleteDisconnectsRoute(t *testing.T) {
 	handler := newCloudHandlerForTest(t)
 	repo := handler.config.DeviceRepository
 	ctx := context.Background()
-	if err := repo.UpsertDeviceBinding(ctx, "user-1", Device{Id: "dev-1", Name: "owned", PublicKey: base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))}); err != nil {
+	privateKey := ed25519.NewKeyFromSeed([]byte("12345678901234567890123456789012"))
+	owned := testDeviceForPublicKey(t, privateKey.Public().(ed25519.PublicKey), "owned")
+	otherPrivateKey := ed25519.NewKeyFromSeed([]byte("abcdefghijklmnopqrstuvwxyz123456"))
+	other := testDeviceForPublicKey(t, otherPrivateKey.Public().(ed25519.PublicKey), "other")
+	if err := repo.UpsertDeviceBinding(ctx, "user-1", owned); err != nil {
 		t.Fatalf("UpsertDeviceBinding(user-1) error = %v", err)
 	}
-	if err := repo.UpsertDeviceBinding(ctx, "user-2", Device{Id: "dev-2", Name: "other", PublicKey: base64.StdEncoding.EncodeToString([]byte("abcdefghijklmnopqrstuvwxyz123456"))}); err != nil {
+	if err := repo.UpsertDeviceBinding(ctx, "user-2", other); err != nil {
 		t.Fatalf("UpsertDeviceBinding(user-2) error = %v", err)
 	}
-	handler.registry.Register("dev-1", "owned", time.Now().UTC())
-	handler.setRoute("dev-1", newAgentRoute("dev-1", nil))
+	handler.registry.Register(owned.Id, "owned", time.Now().UTC())
+	handler.setRoute(owned.Id, newAgentRoute(owned.Id, nil))
 	token := cloudUserToken(t, handler.authService, "user-1", "user-1@example.test")
 
 	devicesRequest := httptest.NewRequest(http.MethodGet, "/api/devices", nil)
@@ -105,26 +188,26 @@ func TestDevicesFiltersByCloudUserAndDeleteDisconnectsRoute(t *testing.T) {
 	if err := codec.UnmarshalProtoJSON(devicesResponse.Body.Bytes(), &devices); err != nil {
 		t.Fatalf("decode devices: %v", err)
 	}
-	if len(devices.GetItems()) != 1 || devices.GetItems()[0].GetId() != "dev-1" || !devices.GetItems()[0].GetOnline() {
+	if len(devices.GetItems()) != 1 || devices.GetItems()[0].GetId() != owned.Id || !devices.GetItems()[0].GetOnline() {
 		t.Fatalf("devices count=%d first_id=%q first_online=%v", len(devices.GetItems()), devices.GetItems()[0].GetId(), devices.GetItems()[0].GetOnline())
 	}
 
-	deleteRequest := httptest.NewRequest(http.MethodDelete, "/api/devices/dev-1", nil)
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/api/devices/"+owned.Id, nil)
 	deleteRequest.Header.Set("Authorization", "Bearer "+token)
 	deleteResponse := httptest.NewRecorder()
 	handler.ServeHTTP(deleteResponse, deleteRequest)
 	if deleteResponse.Code != http.StatusNoContent {
 		t.Fatalf("delete status = %d; body=%s", deleteResponse.Code, deleteResponse.Body.String())
 	}
-	if route := handler.routeFor("dev-1"); route != nil {
+	if route := handler.routeFor(owned.Id); route != nil {
 		t.Fatalf("route after delete = %#v, want nil", route)
 	}
-	owns, err := repo.UserOwnsDevice(ctx, "user-1", "dev-1")
+	owns, err := repo.UserOwnsDevice(ctx, "user-1", owned.Id)
 	if err != nil {
 		t.Fatalf("UserOwnsDevice(after delete) error = %v", err)
 	}
 	if owns {
-		t.Fatal("user-1 still owns dev-1 after delete")
+		t.Fatalf("user-1 still owns %s after delete", owned.Id)
 	}
 }
 

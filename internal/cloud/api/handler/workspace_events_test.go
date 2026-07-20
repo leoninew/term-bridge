@@ -31,13 +31,13 @@ func TestCloudWorkspaceWatchRelaysSubscribedAndChanges(t *testing.T) {
 		defer close(agentDone)
 		runWorkspaceWatchAgent(t, ctx, server.URL, subscribe, closed)
 	}()
-	waitForRoute(t, handler, "dev-1")
+	waitForRoute(t, handler, "0f490dee643b01b06e0ea84c253a9005")
 
 	browserCtx, browserCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer browserCancel()
 	browser, _, err := websocket.Dial(
 		browserCtx,
-		"ws"+server.URL[len("http"):]+"/api/devices/dev-1/workspaces/ws-1/fs/events",
+		"ws"+server.URL[len("http"):]+"/api/devices/0f490dee643b01b06e0ea84c253a9005/workspaces/ws-1/fs/events",
 		&websocket.DialOptions{
 			HTTPHeader:   http.Header{"Authorization": []string{"Bearer " + loginToken(t, handler)}},
 			Subprotocols: []string{workspacefs.Subprotocol},
@@ -101,7 +101,7 @@ func runWorkspaceWatchAgent(t *testing.T, ctx context.Context, serverUrl string,
 	hello := &shared.TunnelFrame{
 		StreamId: tunnel.ControlStreamID,
 		Payload: &shared.TunnelFrame_Hello{Hello: &shared.Hello{
-			DeviceId:        "dev-1",
+			DeviceId:        "0f490dee643b01b06e0ea84c253a9005",
 			DeviceName:      "local",
 			ProtocolVersion: tunnel.ProtocolVersion,
 		}},

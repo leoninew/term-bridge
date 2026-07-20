@@ -7,6 +7,13 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/security"
+)
+
+var (
+	ErrInvalidDeviceIdentity   = errors.New("invalid device identity")
+	ErrDevicePublicKeyConflict = errors.New("device public key conflict")
 )
 
 type Repository struct {
@@ -26,18 +33,38 @@ func NewRepository(db *sql.DB, driver string) *Repository {
 	return &Repository{db: db, driver: strings.ToLower(strings.TrimSpace(driver))}
 }
 
-func (r *Repository) UpsertDeviceBinding(ctx context.Context, userID string, device Device) error {
-	return r.UpsertUserDevice(ctx, userID, device)
+func (r *Repository) UpsertDeviceBinding(ctx context.Context, userId string, device Device) error {
+	return r.UpsertUserDevice(ctx, userId, device)
 }
 
-func (r *Repository) UpsertUserDevice(ctx context.Context, userID string, device Device) error {
-	userID = strings.TrimSpace(userID)
+func (r *Repository) UpsertUserDevice(ctx context.Context, userId string, device Device) error {
+	userId = strings.TrimSpace(userId)
 	device.Id = strings.TrimSpace(device.Id)
 	device.Name = strings.TrimSpace(device.Name)
-	device.PublicKey = strings.TrimSpace(device.PublicKey)
-	if userID == "" || device.Id == "" || device.Name == "" || device.PublicKey == "" {
-		return errors.New("user id, device id, device name and public key are required")
+	if userId == "" || device.Name == "" || !security.IsCanonicalDeviceId(device.Id) {
+		return ErrInvalidDeviceIdentity
 	}
+	publicKey, canonicalPublicKey, err := security.ParseCanonicalEd25519PublicKey(device.PublicKey)
+	if err != nil {
+		return ErrInvalidDeviceIdentity
+	}
+	expectedId, err := security.DeviceIdForEd25519PublicKey(publicKey)
+	if err != nil {
+		return ErrInvalidDeviceIdentity
+	}
+	if device.Id != expectedId {
+		var storedPublicKey string
+		err := r.db.QueryRowContext(ctx, `SELECT public_key FROM devices WHERE id=?`, device.Id).Scan(&storedPublicKey)
+		switch {
+		case err == nil:
+			return ErrDevicePublicKeyConflict
+		case !errors.Is(err, sql.ErrNoRows):
+			return err
+		default:
+			return ErrInvalidDeviceIdentity
+		}
+	}
+	device.PublicKey = canonicalPublicKey
 	now := time.Now().UTC()
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -47,14 +74,14 @@ func (r *Repository) UpsertUserDevice(ctx context.Context, userID string, device
 	if err := r.upsertDevice(ctx, tx, device, now); err != nil {
 		return err
 	}
-	if err := r.upsertUserDevice(ctx, tx, userID, device.Id, now); err != nil {
+	if err := r.upsertUserDevice(ctx, tx, userId, device.Id, now); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-func (r *Repository) ListDevicesForUser(ctx context.Context, userID string) ([]Device, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT d.id,d.name,COALESCE(d.public_key,''),d.created_at,d.updated_at FROM devices d JOIN user_devices ud ON ud.device_id=d.id WHERE ud.user_id=? ORDER BY d.updated_at DESC`, strings.TrimSpace(userID))
+func (r *Repository) ListDevicesForUser(ctx context.Context, userId string) ([]Device, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT d.id,d.name,COALESCE(d.public_key,''),d.created_at,d.updated_at FROM devices d JOIN user_devices ud ON ud.device_id=d.id WHERE ud.user_id=? ORDER BY d.updated_at DESC`, strings.TrimSpace(userId))
 	if err != nil {
 		return nil, err
 	}
@@ -80,8 +107,8 @@ func (r *Repository) ListDevicesForUser(ctx context.Context, userID string) ([]D
 	return devices, rows.Err()
 }
 
-func (r *Repository) UserOwnsDevice(ctx context.Context, userID string, deviceID string) (bool, error) {
-	row := r.db.QueryRowContext(ctx, `SELECT 1 FROM user_devices WHERE user_id=? AND device_id=?`, strings.TrimSpace(userID), strings.TrimSpace(deviceID))
+func (r *Repository) UserOwnsDevice(ctx context.Context, userId string, deviceId string) (bool, error) {
+	row := r.db.QueryRowContext(ctx, `SELECT 1 FROM user_devices WHERE user_id=? AND device_id=?`, strings.TrimSpace(userId), strings.TrimSpace(deviceId))
 	var value int
 	if err := row.Scan(&value); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -92,34 +119,38 @@ func (r *Repository) UserOwnsDevice(ctx context.Context, userID string, deviceID
 	return true, nil
 }
 
-func (r *Repository) DeleteUserDevice(ctx context.Context, userID string, deviceID string) error {
-	userID = strings.TrimSpace(userID)
-	deviceID = strings.TrimSpace(deviceID)
-	if userID == "" || deviceID == "" {
-		return errors.New("user id and device id are required")
+func (r *Repository) DeleteUserDevice(ctx context.Context, userId string, deviceId string) (bool, error) {
+	userId = strings.TrimSpace(userId)
+	deviceId = strings.TrimSpace(deviceId)
+	if userId == "" || deviceId == "" {
+		return false, errors.New("user id and device id are required")
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM user_devices WHERE user_id=? AND device_id=?`, userID, deviceID); err != nil {
-		return err
+	if _, err := tx.ExecContext(ctx, `DELETE FROM user_devices WHERE user_id=? AND device_id=?`, userId, deviceId); err != nil {
+		return false, err
 	}
 	var count int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM user_devices WHERE device_id=?`, deviceID).Scan(&count); err != nil {
-		return err
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM user_devices WHERE device_id=?`, deviceId).Scan(&count); err != nil {
+		return false, err
 	}
-	if count == 0 {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM devices WHERE id=?`, deviceID); err != nil {
-			return err
+	deleteDevice := count == 0
+	if deleteDevice {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM devices WHERE id=?`, deviceId); err != nil {
+			return false, err
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return deleteDevice, nil
 }
 
-func (r *Repository) PublicKey(ctx context.Context, deviceID string) (string, error) {
-	row := r.db.QueryRowContext(ctx, `SELECT public_key FROM devices WHERE id=?`, strings.TrimSpace(deviceID))
+func (r *Repository) PublicKey(ctx context.Context, deviceId string) (string, error) {
+	row := r.db.QueryRowContext(ctx, `SELECT public_key FROM devices WHERE id=?`, strings.TrimSpace(deviceId))
 	var publicKey string
 	if err := row.Scan(&publicKey); err != nil {
 		return "", err
@@ -128,30 +159,38 @@ func (r *Repository) PublicKey(ctx context.Context, deviceID string) (string, er
 }
 
 func (r *Repository) upsertDevice(ctx context.Context, tx *sql.Tx, device Device, now time.Time) error {
-	var existing string
-	err := tx.QueryRowContext(ctx, `SELECT id FROM devices WHERE id=?`, device.Id).Scan(&existing)
-	if err == nil {
-		_, err = tx.ExecContext(ctx, `UPDATE devices SET name=?, public_key=CASE WHEN ?='' THEN public_key ELSE ? END, updated_at=? WHERE id=?`, device.Name, device.PublicKey, device.PublicKey, r.storeTime(now), device.Id)
+	if _, err := tx.ExecContext(ctx, r.insertDeviceIfAbsentSQL(), device.Id, device.Name, device.PublicKey, r.storeTime(now), r.storeTime(now)); err != nil {
 		return err
 	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	var storedPublicKey string
+	if err := tx.QueryRowContext(ctx, `SELECT public_key FROM devices WHERE id=?`, device.Id).Scan(&storedPublicKey); err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO devices (id,name,public_key,created_at,updated_at) VALUES (?,?,?,?,?)`, device.Id, device.Name, device.PublicKey, r.storeTime(now), r.storeTime(now))
+	if storedPublicKey != device.PublicKey {
+		return ErrDevicePublicKeyConflict
+	}
+	_, err := tx.ExecContext(ctx, `UPDATE devices SET name=?, updated_at=? WHERE id=?`, device.Name, r.storeTime(now), device.Id)
 	return err
 }
 
-func (r *Repository) upsertUserDevice(ctx context.Context, tx *sql.Tx, userID string, deviceID string, now time.Time) error {
+func (r *Repository) insertDeviceIfAbsentSQL() string {
+	if r.driver == "mysql" {
+		return `INSERT INTO devices (id,name,public_key,created_at,updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE id=id`
+	}
+	return `INSERT INTO devices (id,name,public_key,created_at,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(id) DO NOTHING`
+}
+
+func (r *Repository) upsertUserDevice(ctx context.Context, tx *sql.Tx, userId string, deviceId string, now time.Time) error {
 	var existing string
-	err := tx.QueryRowContext(ctx, `SELECT device_id FROM user_devices WHERE user_id=? AND device_id=?`, userID, deviceID).Scan(&existing)
+	err := tx.QueryRowContext(ctx, `SELECT device_id FROM user_devices WHERE user_id=? AND device_id=?`, userId, deviceId).Scan(&existing)
 	if err == nil {
-		_, err = tx.ExecContext(ctx, `UPDATE user_devices SET role=?, updated_at=? WHERE user_id=? AND device_id=?`, "owner", r.storeTime(now), userID, deviceID)
+		_, err = tx.ExecContext(ctx, `UPDATE user_devices SET role=?, updated_at=? WHERE user_id=? AND device_id=?`, "owner", r.storeTime(now), userId, deviceId)
 		return err
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO user_devices (user_id,device_id,role,created_at,updated_at) VALUES (?,?,?,?,?)`, userID, deviceID, "owner", r.storeTime(now), r.storeTime(now))
+	_, err = tx.ExecContext(ctx, `INSERT INTO user_devices (user_id,device_id,role,created_at,updated_at) VALUES (?,?,?,?,?)`, userId, deviceId, "owner", r.storeTime(now), r.storeTime(now))
 	return err
 }
 

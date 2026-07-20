@@ -12,7 +12,7 @@ type DeviceRepository interface {
 	UpsertDeviceBinding(ctx context.Context, userId string, device Device) error
 	UpsertUserDevice(ctx context.Context, userId string, device Device) error
 	UserOwnsDevice(ctx context.Context, userId string, deviceId string) (bool, error)
-	DeleteUserDevice(ctx context.Context, userId string, deviceId string) error
+	DeleteUserDevice(ctx context.Context, userId string, deviceId string) (deleteDevice bool, err error)
 	PublicKey(ctx context.Context, deviceId string) (string, error)
 	ListDevicesForUser(ctx context.Context, userId string) ([]Device, error)
 }

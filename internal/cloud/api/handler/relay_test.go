@@ -58,16 +58,16 @@ func TestBrowserAPIRelay(t *testing.T) {
 			}
 		})
 	}()
-	waitForRoute(t, handler, "dev-1")
+	waitForRoute(t, handler, "0f490dee643b01b06e0ea84c253a9005")
 	token := loginToken(t, handler)
 	for _, tc := range []struct {
 		path string
 		want string
 	}{
-		{"/api/devices/dev-1/workspaces/tree", "Workspace"},
-		{"/api/devices/dev-1/workspaces/ws-1/sessions", "sess-1"},
-		{"/api/devices/dev-1/workspaces/ws-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
-		{"/api/devices/dev-1/shortcuts", "shortcut-1"},
+		{"/api/devices/0f490dee643b01b06e0ea84c253a9005/workspaces/tree", "Workspace"},
+		{"/api/devices/0f490dee643b01b06e0ea84c253a9005/workspaces/ws-1/sessions", "sess-1"},
+		{"/api/devices/0f490dee643b01b06e0ea84c253a9005/workspaces/ws-1/sessions/sess-1/history", strings.Repeat("h", 64*1024)},
+		{"/api/devices/0f490dee643b01b06e0ea84c253a9005/shortcuts", "shortcut-1"},
 	} {
 		request := httptest.NewRequest(http.MethodGet, tc.path, nil)
 		request.Header.Set(requestIdHeader, "req_test_relay")
@@ -88,11 +88,11 @@ func TestBrowserAPIRelay(t *testing.T) {
 		status int
 		want   string
 	}{
-		{http.MethodGet, "/api/devices/dev-1/shortcuts", "", http.StatusOK, "2026-07-14T12:30:00Z"},
-		{http.MethodPost, "/api/devices/dev-1/shortcuts", `{"name":"Created shell","command":"cmd /c \"echo created\""}`, http.StatusCreated, "Created shell"},
-		{http.MethodPatch, "/api/devices/dev-1/shortcuts/shortcut-1", `{"name":"Updated shell"}`, http.StatusOK, "Updated shell"},
-		{http.MethodPatch, "/api/devices/dev-1/shortcuts/order", `{"shortcut_ids":["shortcut-2","shortcut-1"]}`, http.StatusOK, "shortcut-2"},
-		{http.MethodDelete, "/api/devices/dev-1/shortcuts/shortcut-1", "", http.StatusNoContent, ""},
+		{http.MethodGet, "/api/devices/0f490dee643b01b06e0ea84c253a9005/shortcuts", "", http.StatusOK, "2026-07-14T12:30:00Z"},
+		{http.MethodPost, "/api/devices/0f490dee643b01b06e0ea84c253a9005/shortcuts", `{"name":"Created shell","command":"cmd /c \"echo created\""}`, http.StatusCreated, "Created shell"},
+		{http.MethodPatch, "/api/devices/0f490dee643b01b06e0ea84c253a9005/shortcuts/shortcut-1", `{"name":"Updated shell"}`, http.StatusOK, "Updated shell"},
+		{http.MethodPatch, "/api/devices/0f490dee643b01b06e0ea84c253a9005/shortcuts/order", `{"shortcut_ids":["shortcut-2","shortcut-1"]}`, http.StatusOK, "shortcut-2"},
+		{http.MethodDelete, "/api/devices/0f490dee643b01b06e0ea84c253a9005/shortcuts/shortcut-1", "", http.StatusNoContent, ""},
 	} {
 		request := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 		request.Header.Set(requestIdHeader, "req_test_relay")
@@ -146,7 +146,7 @@ func runFakeAgent(t *testing.T, ctx context.Context, serverUrl string, respond f
 		return
 	}
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
-	hello := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Hello{Hello: &shared.Hello{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
+	hello := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Hello{Hello: &shared.Hello{DeviceId: "0f490dee643b01b06e0ea84c253a9005", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
 	helloData, _ := tunnel.MarshalFrame(hello)
 	if err := conn.Write(ctx, websocket.MessageText, helloData); err != nil {
 		t.Errorf("hello Write() error = %v", err)

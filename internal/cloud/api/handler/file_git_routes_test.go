@@ -27,7 +27,9 @@ func (r *fileGitDeviceRepository) UserOwnsDevice(context.Context, string, string
 	r.lookups++
 	return r.owns, nil
 }
-func (r *fileGitDeviceRepository) DeleteUserDevice(context.Context, string, string) error { return nil }
+func (r *fileGitDeviceRepository) DeleteUserDevice(context.Context, string, string) (bool, error) {
+	return true, nil
+}
 func (r *fileGitDeviceRepository) PublicKey(context.Context, string) (string, error) {
 	return "", nil
 }

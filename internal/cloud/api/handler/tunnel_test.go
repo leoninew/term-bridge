@@ -24,7 +24,7 @@ func TestAgentTunnelRegistersDevice(t *testing.T) {
 		t.Fatalf("Dial() error = %v", err)
 	}
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
-	hello := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Hello{Hello: &shared.Hello{DeviceId: "dev-1", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
+	hello := &shared.TunnelFrame{StreamId: tunnel.ControlStreamID, Payload: &shared.TunnelFrame_Hello{Hello: &shared.Hello{DeviceId: "0f490dee643b01b06e0ea84c253a9005", DeviceName: "local", ProtocolVersion: tunnel.ProtocolVersion}}}
 	helloData, err := tunnel.MarshalFrame(hello)
 	if err != nil {
 		t.Fatalf("MarshalFrame() error = %v", err)
@@ -45,7 +45,7 @@ func TestAgentTunnelRegistersDevice(t *testing.T) {
 	}
 
 	devices := handler.registry.List()
-	if len(devices) != 1 || devices[0].Id != "dev-1" || devices[0].Name != "local" || !devices[0].Online {
+	if len(devices) != 1 || devices[0].Id != "0f490dee643b01b06e0ea84c253a9005" || devices[0].Name != "local" || !devices[0].Online {
 		t.Fatalf("devices = %#v", devices)
 	}
 }
@@ -60,7 +60,7 @@ func TestAgentTunnelReconnectKeepsDeviceOnline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first Dial() error = %v", err)
 	}
-	writeHello(t, ctx, first, "dev-1", "local")
+	writeHello(t, ctx, first, "0f490dee643b01b06e0ea84c253a9005", "local")
 	readHelloAck(t, ctx, first)
 
 	second, _, err := websocket.Dial(ctx, "ws"+server.URL[len("http"):]+"/api/agent/tunnel", &websocket.DialOptions{HTTPHeader: signedTestTunnelHeader(t)})
@@ -68,7 +68,7 @@ func TestAgentTunnelReconnectKeepsDeviceOnline(t *testing.T) {
 		t.Fatalf("second Dial() error = %v", err)
 	}
 	defer func() { _ = second.Close(websocket.StatusNormalClosure, "") }()
-	writeHello(t, ctx, second, "dev-1", "local")
+	writeHello(t, ctx, second, "0f490dee643b01b06e0ea84c253a9005", "local")
 	readHelloAck(t, ctx, second)
 
 	// Closing the replaced tunnel must not leave the device offline while the
@@ -76,13 +76,13 @@ func TestAgentTunnelReconnectKeepsDeviceOnline(t *testing.T) {
 	_ = first.Close(websocket.StatusNormalClosure, "replaced")
 	deadline := time.Now().Add(2 * time.Second)
 	for {
-		device, ok := handler.registry.Get("dev-1")
+		device, ok := handler.registry.Get("0f490dee643b01b06e0ea84c253a9005")
 		if !ok {
 			t.Fatal("device missing from registry after reconnect")
 		}
 		online := device.GetOnline()
-		route := handler.routeFor("dev-1")
-		summary := handler.deviceSummary(Device{Id: "dev-1", Name: "local"})
+		route := handler.routeFor("0f490dee643b01b06e0ea84c253a9005")
+		summary := handler.deviceSummary(Device{Id: "0f490dee643b01b06e0ea84c253a9005", Name: "local"})
 		if online && route != nil && summary.GetOnline() {
 			return
 		}
@@ -95,22 +95,22 @@ func TestAgentTunnelReconnectKeepsDeviceOnline(t *testing.T) {
 
 func TestClearRouteOnlyMarksCurrentOwner(t *testing.T) {
 	handler := New(testCloudConfig())
-	first := newAgentRoute("dev-1", nil)
-	second := newAgentRoute("dev-1", nil)
-	handler.registry.Register("dev-1", "local", time.Now().UTC())
-	handler.setRoute("dev-1", first)
-	handler.setRoute("dev-1", second)
+	first := newAgentRoute("0f490dee643b01b06e0ea84c253a9005", nil)
+	second := newAgentRoute("0f490dee643b01b06e0ea84c253a9005", nil)
+	handler.registry.Register("0f490dee643b01b06e0ea84c253a9005", "local", time.Now().UTC())
+	handler.setRoute("0f490dee643b01b06e0ea84c253a9005", first)
+	handler.setRoute("0f490dee643b01b06e0ea84c253a9005", second)
 
-	if cleared := handler.clearRoute("dev-1", first); cleared {
+	if cleared := handler.clearRoute("0f490dee643b01b06e0ea84c253a9005", first); cleared {
 		t.Fatal("clearRoute(old) cleared current route")
 	}
-	if handler.routeFor("dev-1") != second {
+	if handler.routeFor("0f490dee643b01b06e0ea84c253a9005") != second {
 		t.Fatal("current route replaced unexpectedly")
 	}
-	if cleared := handler.clearRoute("dev-1", second); !cleared {
+	if cleared := handler.clearRoute("0f490dee643b01b06e0ea84c253a9005", second); !cleared {
 		t.Fatal("clearRoute(current) did not clear")
 	}
-	if handler.routeFor("dev-1") != nil {
+	if handler.routeFor("0f490dee643b01b06e0ea84c253a9005") != nil {
 		t.Fatal("route still present after clear")
 	}
 }
@@ -135,14 +135,14 @@ func TestAgentTunnelIdleTimeoutMarksOffline(t *testing.T) {
 		t.Fatalf("Dial() error = %v", err)
 	}
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
-	writeHello(t, ctx, conn, "dev-1", "local")
+	writeHello(t, ctx, conn, "0f490dee643b01b06e0ea84c253a9005", "local")
 	readHelloAck(t, ctx, conn)
 
 	// Stay silent so the cloud-side idle read timeout closes the tunnel.
 	deadline := time.Now().Add(2 * time.Second)
 	for {
-		device, ok := handler.registry.Get("dev-1")
-		if ok && !device.GetOnline() && handler.routeFor("dev-1") == nil {
+		device, ok := handler.registry.Get("0f490dee643b01b06e0ea84c253a9005")
+		if ok && !device.GetOnline() && handler.routeFor("0f490dee643b01b06e0ea84c253a9005") == nil {
 			return
 		}
 		if time.Now().After(deadline) {
@@ -150,7 +150,7 @@ func TestAgentTunnelIdleTimeoutMarksOffline(t *testing.T) {
 			if ok {
 				online = device.GetOnline()
 			}
-			t.Fatalf("device still online after idle timeout: registry_ok=%v online=%v route=%v", ok, online, handler.routeFor("dev-1") != nil)
+			t.Fatalf("device still online after idle timeout: registry_ok=%v online=%v route=%v", ok, online, handler.routeFor("0f490dee643b01b06e0ea84c253a9005") != nil)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -176,7 +176,7 @@ func TestAgentTunnelPingKeepsDeviceOnline(t *testing.T) {
 		t.Fatalf("Dial() error = %v", err)
 	}
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
-	writeHello(t, ctx, conn, "dev-1", "local")
+	writeHello(t, ctx, conn, "0f490dee643b01b06e0ea84c253a9005", "local")
 	readHelloAck(t, ctx, conn)
 
 	// Act as agent: send pings longer than one idle window.
@@ -204,9 +204,9 @@ func TestAgentTunnelPingKeepsDeviceOnline(t *testing.T) {
 		time.Sleep(40 * time.Millisecond)
 	}
 
-	device, ok := handler.registry.Get("dev-1")
-	if !ok || !device.GetOnline() || handler.routeFor("dev-1") == nil {
-		t.Fatalf("device offline while pinging: ok=%v online=%v route=%v", ok, device.GetOnline(), handler.routeFor("dev-1") != nil)
+	device, ok := handler.registry.Get("0f490dee643b01b06e0ea84c253a9005")
+	if !ok || !device.GetOnline() || handler.routeFor("0f490dee643b01b06e0ea84c253a9005") == nil {
+		t.Fatalf("device offline while pinging: ok=%v online=%v route=%v", ok, device.GetOnline(), handler.routeFor("0f490dee643b01b06e0ea84c253a9005") != nil)
 	}
 }
 
