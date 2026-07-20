@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="isLocalMode || cloudAuth.authenticated"
-    class="sessions-shell flex h-screen min-h-screen overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
+    class="sessions-shell flex h-full overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
     :class="{ 'sessions-shell-narrow': isNarrow }"
   >
     <template v-if="isNarrow">
@@ -22,7 +22,7 @@
         @click="collapseSidebar"
       />
       <div
-        class="sessions-mobile-sidebar fixed inset-y-0 left-0 z-40 flex w-[min(320px,88vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-sidebar-bg)] shadow-[12px_0_32px_rgb(0_0_0/0.28)] [&>*]:h-full [&>*]:min-h-0"
+        class="sessions-mobile-sidebar fixed inset-x-auto top-[env(safe-area-inset-top,0px)] bottom-[env(safe-area-inset-bottom,0px)] left-0 z-40 flex w-[min(320px,88vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-sidebar-bg)] shadow-[12px_0_32px_rgb(0_0_0/0.28)] [&>*]:h-full [&>*]:min-h-0"
         :data-state="sidebarCollapsed ? 'closed' : 'open'"
         :aria-hidden="sidebarCollapsed ? 'true' : 'false'"
       >

@@ -107,8 +107,8 @@ body,
 #app {
   margin: 0;
   min-width: var(--app-layout-min-width);
-  min-height: 100vh;
-  height: 100%;
+  min-height: 100dvh;
+  height: 100dvh;
   overflow: hidden;
   background: var(--color-app-bg);
 }
@@ -122,6 +122,10 @@ body,
   body,
   #app {
     min-width: 0;
+    /* svh keeps chrome visible while the mobile URL bar is expanded */
+    min-height: 100svh;
+    height: 100svh;
+    overscroll-behavior: none;
   }
 }
 

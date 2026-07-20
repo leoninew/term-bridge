@@ -1,16 +1,17 @@
 <template>
   <div
-    class="flex h-11 shrink-0 items-stretch gap-1 border-b border-[var(--color-border)] bg-[var(--color-panel-header)] pr-1 pl-2"
+    class="flex h-11 shrink-0 items-stretch gap-1 border-b border-[var(--color-border)] bg-[var(--color-panel-header)] pr-1"
+    :class="showSidebarToggle ? 'pl-2' : 'pl-0'"
   >
     <button
       v-if="showSidebarToggle"
       type="button"
-      class="button button-secondary button-icon shrink-0 self-center"
-      :aria-label="t('workbench.openSidebarAria')"
-      :title="t('workbench.openSidebarAria')"
+      :class="[sidebarHeaderIconButtonClass, 'self-center']"
+      :aria-label="t('workbench.expandSidebarAria')"
+      :title="t('workbench.expandSidebarAria')"
       @click="emit('toggleSidebar')"
     >
-      <PanelLeft class="size-4" />
+      <UnfoldHorizontal class="size-3.5" />
     </button>
 
     <TabsList as-child>
@@ -149,7 +150,7 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n'
-  import { CircleStop, MoreHorizontal, PanelLeft, SquareTerminal, X } from '@lucide/vue'
+  import { CircleStop, MoreHorizontal, SquareTerminal, UnfoldHorizontal, X } from '@lucide/vue'
   import {
     DropdownMenuContent,
     DropdownMenuItem,
@@ -162,7 +163,11 @@
   import { VueDraggable } from 'vue-draggable-plus'
   import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import type { OpenSessionTab } from '../../store/workbench'
-  import { sessionIconButtonClass, sessionMenuItemInteractiveClass } from './sessionUi'
+  import {
+    sessionIconButtonClass,
+    sessionMenuItemInteractiveClass,
+    sidebarHeaderIconButtonClass,
+  } from './sessionUi'
 
   withDefaults(
     defineProps<{

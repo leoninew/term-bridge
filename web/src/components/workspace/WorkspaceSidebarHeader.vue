@@ -34,14 +34,13 @@
         <Plus class="size-3.5" />
       </button>
       <button
-        v-if="showClose"
         type="button"
         :class="sidebarHeaderIconButtonClass"
-        :aria-label="t('common.close')"
-        :title="t('common.close')"
-        @click="emit('close')"
+        :aria-label="t('workbench.collapseSidebarAria')"
+        :title="t('workbench.collapseSidebarAria')"
+        @click="emit('collapse')"
       >
-        <X class="size-3.5" />
+        <FoldHorizontal class="size-3.5" />
       </button>
     </div>
   </header>
@@ -49,23 +48,19 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n'
-  import { Plus, Search, X } from '@lucide/vue'
+  import { FoldHorizontal, Plus, Search } from '@lucide/vue'
   import { RouterLink } from 'vue-router'
   import { sidebarHeaderIconButtonClass } from '../session/sessionUi'
 
-  withDefaults(
-    defineProps<{
-      homeRouteName: string
-      searchQuery: string
-      showClose?: boolean
-    }>(),
-    { showClose: false },
-  )
+  defineProps<{
+    homeRouteName: string
+    searchQuery: string
+  }>()
 
   const emit = defineEmits<{
     'update:searchQuery': [value: string]
     newSession: []
-    close: []
+    collapse: []
   }>()
 
   const { t } = useI18n()

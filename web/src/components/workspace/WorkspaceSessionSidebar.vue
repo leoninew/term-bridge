@@ -5,9 +5,8 @@
     <WorkspaceSidebarHeader
       v-model:search-query="searchQuery"
       :home-route-name="homeRouteName"
-      :show-close="showClose"
       @new-session="emit('newSession')"
-      @close="emit('close')"
+      @collapse="emit('collapse')"
     />
 
     <div class="min-h-0 flex-1 overflow-y-auto p-1.5">
@@ -236,11 +235,10 @@
     loadError?: string | null
     homeRouteName: string
     disableReorder?: boolean
-    showClose?: boolean
   }>()
 
   const emit = defineEmits<{
-    close: []
+    collapse: []
     select: [session: SessionSummary]
     refresh: []
     newSession: [workspace?: WorkspaceSummary]
