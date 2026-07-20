@@ -3,16 +3,6 @@ set -eu
 cd "$(dirname "$0")"
 : "${TERMBRIDGE_ENV:=preflite}"
 export TERMBRIDGE_ENV
-profile=.env.preflite
-
-if [ ! -f "$profile" ]; then
-  printf '%s\n' "$profile is missing" >&2
-  exit 1
-fi
-
-set -a
-. "./$profile"
-set +a
 
 : "${TERMBRIDGE_LOCAL__PUBLIC_URL:=http://localhost:9030}"
 export TERMBRIDGE_LOCAL__PUBLIC_URL

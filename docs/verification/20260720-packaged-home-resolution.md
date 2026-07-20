@@ -1,6 +1,6 @@
 # 打包运行时用户目录解析 — 验证
 
-最后修改时间: 2026-07-20 08:49:35
+最后修改时间: 2026-07-20 09:47:58
 
 Review status: Accepted
 
@@ -11,6 +11,8 @@ Review status: Accepted
 | 需求点 | 结果 |
 | --- | --- |
 | `~` 不再直接调用 `os.UserHomeDir()` | 已实现：`resolveConfigPath` 改用 `resolveConfigHomeDir` |
+| package launcher 不解释 `.env.preflite` | 已实现：`termbridge.cmd` / `termbridge.sh` 仅设置 `TERMBRIDGE_ENV=preflite`，由 `config.Load` 读取 profile |
+| Cygwin `source` 不得提前展开 `~` | 已实现：移除 shell profile sourcing；新增 launcher environment regression test |
 | Windows 原生 home 优先 | 已实现：`USERPROFILE` → `HOMEDRIVE` + `HOMEPATH` → `HOME` |
 | 非 Windows 使用 `HOME` | 已实现：Windows 分支外使用 `HOME` |
 | 以标准路径拼接 `.termbridge` | 已保持：`filepath.Join(home, path[2:])` |
@@ -39,7 +41,13 @@ Review status: Accepted
    - 记录 Cygwin 与 PowerShell `HOME` 格式差异和最终优先级。
 4. `internal/agent/infrastructure/gitexec/repository_test.go`
    - 将 Windows 不可靠的 Unix `pre-commit` hook fixture 改为跨平台的 Git commit failure wrapper。
-5. 本文档。
+5. `scripts/package/termbridge.cmd` / `scripts/package/termbridge.sh`
+   - 删除重复 profile parser；launcher 仅选择 `preflite` environment。
+6. `scripts/package/termbridge_test.sh`
+   - 用 Cygwin-style `HOME=/c/Users/...` fixture 确认 shell launcher 不会导出 profile 值。
+7. `cmd/termbridge/app/app_test.go`
+   - 更新陈旧的 prod/test package assertions 为当前 preflite profile 合约。
+8. 本文档。
 
 ## Expected vs actual changed files
 
@@ -50,16 +58,22 @@ Review status: Accepted
 - `internal/shared/infrastructure/config/config.go`
 - `internal/shared/infrastructure/config/config_test.go`
 - `internal/agent/infrastructure/gitexec/repository_test.go`
+- `scripts/package/termbridge.cmd`
+- `scripts/package/termbridge.sh`
+- `scripts/package/termbridge_test.sh`
+- `cmd/termbridge/app/app_test.go`
 
 ### 实际观察
 
-配置 home 解析及 Requirement 已位于当前 `HEAD`（`84bea1c fix(config): resolve packaged home paths from environment`）。本次暂存区仅包含：修正后的 gitexec 测试和本文档；`git diff --cached --check` 通过。
+配置 home resolver、Requirement 和 gitexec fixture 已位于当前 `HEAD`。本次实际变更移除两个 launcher 的重复 `.env.preflite` 解析，增加 shell launcher regression test，并将旧 prod/test package assertions 改为当前 preflite profile 合约。
 
-执行 `task check` 的自动修复命令后，工作区仍有 29 个与本需求无关的前端文件和 browser runtime config 文件改动。它们不属于本需求实现，未将其纳入暂存区，也未对其执行还原操作。
+当前 `git diff --check` 通过；本轮 focused tests 未产生范围外格式化改动。
 
 ## Acceptance criteria checklist
 
 - [x] `resolveConfigPath` 不直接用 `os.UserHomeDir()` 展开 `~`
+- [x] launcher 不解析 `.env.preflite`，应用是唯一 dotenv parser
+- [x] Cygwin-style `HOME=/c/Users/...` 下 launcher 不会导出已展开的 profile 值
 - [x] Windows `HOME=/c/Users/...` 与 `USERPROFILE=C:\\Users\\...` 冲突时选择 `USERPROFILE`
 - [x] state、SQLite、日志解析到同一 native home 下的 `.termbridge`
 - [x] `USERPROFILE` 回退有测试覆盖
@@ -83,14 +97,17 @@ task check
 # ./bin/golangci-lint run ./cmd/... ./internal/...  0 issues
 ```
 
-### 相关配置测试（通过）
+### Launcher 与相关配置测试（通过）
 
 ```text
-go test -run 'TestLoadResolvesHomeRelativeRuntimePaths|TestResolveConfigHomeDir' -v ./internal/shared/infrastructure/config
+sh scripts/package/termbridge_test.sh
+# PASS
+
+go test ./cmd/termbridge/app ./internal/shared/infrastructure/config
 # PASS
 ```
 
-覆盖通过：运行时三类路径、平台优先级、Windows `USERPROFILE`、Windows `HOMEDRIVE` + `HOMEPATH`、缺失变量报错。
+shell fixture 在 `HOME=/c/Users/cygwin-user`、`USERPROFILE=C:\\Users\\native-user` 下执行 `termbridge.sh`；伪 `termbridge` 仅收到 `TERMBRIDGE_ENV=preflite`，没有收到 runtime state、SQLite、log 的 profile environment variables。由此证明 launcher 不会把 `~/.termbridge` 提前展开为 `/c/...`。Go 覆盖继续验证运行时三类路径、平台优先级、Windows `USERPROFILE`、Windows `HOMEDRIVE` + `HOMEPATH`、缺失变量报错。
 
 ### 本机环境核对（通过）
 
@@ -118,23 +135,21 @@ go test -count=1 ./internal/agent/infrastructure/gitexec
 
 ## Missed or expanded scope
 
-- 未修改 `scripts/package/.env.preflite` 或 package 启动脚本，符合 Non-goal。
+- 未修改 `scripts/package/.env.preflite`；profile 继续以 literal `~/.termbridge` 声明持久化位置。
+- 修改 package 启动脚本的范围仅限删除重复 dotenv 解析，符合新增 Requirement 边界。
 - 未修改终端会话 CWD 的独立 `~` 展开，符合 Non-goal。
-- `task check` 产生的无关格式化改动不属于本需求，未处理。
 
 ## Risks
 
 1. `HOMEDRIVE` 与 `HOMEPATH` 仅在均非空时组合；不完整环境会继续回退到 `HOME` 或返回错误。
-2. 没有在真实 Windows 打包 ZIP 中手工启动 Agent；本机已核对 Cygwin 与 Windows 环境变量值，并通过 Windows 目标单元测试逻辑覆盖。
-3. 当前工作区包含 `task check` 自动修改的无关文件；提交前需由用户决定是否保留、单独提交或还原。
+2. 没有在真实 Windows 打包 ZIP 中手工启动 Agent；shell fixture 证明了 pre-Go 边界，但仍需在 D: 盘 Cygwin 中确认真实 binary 写入位置。
 
 ## Incomplete items
 
-1. 可选的端到端手工验收：从 Windows ZIP 的 `termbridge.cmd` 启动，在 Cygwin 注入 `/c/...` 的 `HOME` 后确认实际生成目录为 `%USERPROFILE%\\.termbridge`。
-2. 需处理 `task check` 造成的无关工作区改动，避免与本需求混合提交。
+1. 端到端手工验收：从 D: 盘 Windows ZIP 以 Cygwin `bash termbridge.sh` 启动，确认 state、SQLite、logs 位于 `%USERPROFILE%\\.termbridge`，且不存在 `D:\\c\\Users\\wangm25`。
 
 ## Conclusion
 
 **本需求范围内验证通过。**
 
-`task check` 与 `go test ./internal/...` 已通过；相关配置测试及本机 Cygwin/PowerShell 环境核对均确认 Windows 会使用原生 `USERPROFILE`，从而将 `~/.termbridge` 解析为 `C:\\Users\\wangm25\\.termbridge`。gitexec 的 Windows 兼容测试夹具已修正。工作区仍有 `task check` 自动产生的无关格式化改动，已明确隔离并记录。
+launcher 已停止重复 dotenv 加载；相关 shell fixture 和 `cmd/termbridge/app` / config Go tests 均通过。Cygwin-style `HOME` 不再能在应用启动前将 profile 的 literal `~/.termbridge` 变为 `/c/...`，随后 Windows config resolver 会使用原生 `USERPROFILE` 并生成 `C:\\Users\\wangm25\\.termbridge`。仍需执行真实 D: 盘 Windows ZIP + Cygwin 启动验收。

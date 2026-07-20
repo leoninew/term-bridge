@@ -123,34 +123,30 @@ func TestRunMigrateRunsAgentDatabaseMigrations(t *testing.T) {
 	}
 }
 
-func TestPortableAgentProfilesStartWithoutCloudJWT(t *testing.T) {
-	for _, profile := range []string{"prod", "test"} {
-		t.Run(profile, func(t *testing.T) {
-			restoreTermBridgeEnvironment(t)
-			home := t.TempDir()
-			t.Setenv("HOME", home)
-			t.Setenv("USERPROFILE", home)
-			cwd := t.TempDir()
-			writeDefaultConfig(t, cwd)
-			if err := os.Mkdir(filepath.Join(cwd, "web"), 0o755); err != nil {
-				t.Fatalf("Mkdir(web) error = %v", err)
-			}
-			profileContent := readRepoFile(t, "scripts", "package", ".env."+profile)
-			restorePackageProfileEnvironment(t, profileContent)
-			if err := os.WriteFile(filepath.Join(cwd, ".env."+profile), []byte(profileContent), 0o644); err != nil {
-				t.Fatalf("WriteFile(profile) error = %v", err)
-			}
-			t.Setenv("TERMBRIDGE_ENV", profile)
-			t.Setenv("TERMBRIDGE_CLOUD__JWT__SECRET_KEY", "")
+func TestPortableAgentProfileLoadsWithoutCloudJWT(t *testing.T) {
+	restoreTermBridgeEnvironment(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	cwd := t.TempDir()
+	writeDefaultConfig(t, cwd)
+	if err := os.Mkdir(filepath.Join(cwd, "web"), 0o755); err != nil {
+		t.Fatalf("Mkdir(web) error = %v", err)
+	}
+	profileContent := readRepoFile(t, "scripts", "package", ".env.preflite")
+	restorePackageProfileEnvironment(t, profileContent)
+	if err := os.WriteFile(filepath.Join(cwd, ".env.preflite"), []byte(profileContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(profile) error = %v", err)
+	}
+	t.Setenv("TERMBRIDGE_ENV", "preflite")
+	t.Setenv("TERMBRIDGE_CLOUD__JWT__SECRET_KEY", "")
 
-			cfg, err := config.Load(config.Options{Cwd: cwd, ValidationScope: config.ValidationScopeAgent})
-			if err != nil {
-				t.Fatalf("Load(agent profile) error = %v", err)
-			}
-			if cfg.Cloud.Jwt.SecretKey != "" {
-				t.Fatalf("agent profile JWT secret = %q", cfg.Cloud.Jwt.SecretKey)
-			}
-		})
+	cfg, err := config.Load(config.Options{Cwd: cwd, ValidationScope: config.ValidationScopeAgent})
+	if err != nil {
+		t.Fatalf("Load(agent profile) error = %v", err)
+	}
+	if cfg.Cloud.Jwt.SecretKey != "" {
+		t.Fatalf("agent profile JWT secret = %q", cfg.Cloud.Jwt.SecretKey)
 	}
 }
 
@@ -414,14 +410,13 @@ func TestDeploymentBuildsAreConfigurationNeutral(t *testing.T) {
 	}
 }
 
-func TestPortablePackageShipsSelectableRuntimeProfiles(t *testing.T) {
+func TestPortablePackageShipsPrefliteRuntimeProfile(t *testing.T) {
 	taskfile := readRepoFile(t, "Taskfile.yml")
 	envExample := readRepoFile(t, ".env.example")
 	config := readRepoFile(t, "configs", "config.yaml")
 	startCmd := readRepoFile(t, "scripts", "package", "termbridge.cmd")
 	startSh := readRepoFile(t, "scripts", "package", "termbridge.sh")
-	prodEnv := readRepoFile(t, "scripts", "package", ".env.prod")
-	testEnv := readRepoFile(t, "scripts", "package", ".env.test")
+	prefliteEnv := readRepoFile(t, "scripts", "package", ".env.preflite")
 
 	assertContains(t, taskfile, "sh ./scripts/build-version.sh", "Taskfile must derive build version through the shared Git helper")
 	assertContains(t, taskfile, "git rev-parse --short=12 HEAD", "Taskfile must derive the short build commit from Git HEAD")
@@ -435,36 +430,25 @@ func TestPortablePackageShipsSelectableRuntimeProfiles(t *testing.T) {
 	assertContains(t, taskfile, "cd web && yarn build", "portable package must use the neutral bundle build")
 	assertNotContains(t, taskfile, "yarn build:", "portable package must not use a product-line build alias")
 	for _, packageRoot := range []string{"{{.WINDOWS_ROOT}}", "{{.LINUX_ROOT}}", "{{.MACOS_ROOT}}"} {
-		assertContains(t, taskfile, "cp scripts/package/.env.prod scripts/package/.env.test "+packageRoot+"/", "portable package must include both selectable runtime profiles")
+		assertContains(t, taskfile, "cp scripts/package/.env.preflite "+packageRoot+"/", "portable package must include the preflite runtime profile")
 	}
-	assertNotContains(t, taskfile, "scripts/package/.env.local", "portable package must not include the obsolete local runtime profile")
 
 	for scriptName, script := range map[string]string{"termbridge.cmd": startCmd, "termbridge.sh": startSh} {
-		assertContains(t, script, "TERMBRIDGE_ENV", scriptName+" must inspect the caller-selected environment")
-		assertContains(t, script, ".env.prod", scriptName+" must default to the production runtime profile")
-		assertContains(t, script, ".env.test", scriptName+" must select the test runtime profile")
+		assertContains(t, script, "TERMBRIDGE_ENV", scriptName+" must select the application environment")
+		assertContains(t, script, "preflite", scriptName+" must default to the preflite environment")
 		assertContains(t, script, "TERMBRIDGE_LOCAL__PUBLIC_URL", scriptName+" must open the configured local public URL")
-		assertNotContains(t, script, ".env.local", scriptName+" must not load the obsolete local runtime profile")
+		assertNotContains(t, script, ".env.preflite", scriptName+" must leave profile loading to the application")
 	}
 
-	for profileName, profile := range map[string]struct {
-		content         string
-		cloudURL        string
-		cloudApiBaseURL string
-	}{
-		"prod": {content: prodEnv, cloudURL: "TERMBRIDGE_CLOUD__PUBLIC_URL=https://termbridge.preflite.cn", cloudApiBaseURL: "TERMBRIDGE_CLOUD__API_BASE_URL=https://termbridge.preflite.cn/api"},
-		"test": {content: testEnv, cloudURL: "TERMBRIDGE_CLOUD__PUBLIC_URL=http://termbridge.lvh.me", cloudApiBaseURL: "TERMBRIDGE_CLOUD__API_BASE_URL=http://termbridge.lvh.me/api"},
+	for _, want := range []string{
+		"TERMBRIDGE_LOCAL__STATIC_DIR=web",
+		"TERMBRIDGE_RUNTIME__STATE_DIR=~/.termbridge",
+		"TERMBRIDGE_LOCAL__DATABASE__SQLITE__PATH=~/.termbridge/agent.db",
+		"TERMBRIDGE_LOG__DIR=~/.termbridge/logs",
+		"TERMBRIDGE_CLOUD__PUBLIC_URL=https://termbridge.preflite.cn",
+		"TERMBRIDGE_CLOUD__API_BASE_URL=https://termbridge.preflite.cn/api",
 	} {
-		for _, want := range []string{
-			"TERMBRIDGE_LOCAL__STATIC_DIR=web",
-			"TERMBRIDGE_LOCAL__PUBLIC_URL=http://localhost:9030",
-			profile.cloudURL,
-			profile.cloudApiBaseURL,
-			"TERMBRIDGE_LOCAL__OAUTH__CLIENT_SECRET=agent-secret",
-			"TERMBRIDGE_LOCAL__OAUTH__REDIRECT_URL=http://localhost:9030/oauth/callback",
-		} {
-			assertContains(t, profile.content, want, profileName+" runtime profile must carry local and OAuth configuration")
-		}
+		assertContains(t, prefliteEnv, want, "preflite runtime profile must carry persistent local runtime configuration")
 	}
 }
 
