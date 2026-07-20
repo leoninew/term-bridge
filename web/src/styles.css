@@ -1249,6 +1249,64 @@ p {
   height: 100%;
 }
 
+/* Keep xterm scrollback usable on touch: pan vertically inside the viewport. */
+.terminal-container .xterm,
+.terminal-container .xterm .xterm-viewport {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.terminal-scroll-fab {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  color: var(--color-text-muted);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 16%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  outline: none;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.terminal-scroll-fab:hover,
+.terminal-scroll-fab:focus-visible {
+  border-color: var(--color-border-strong);
+  background: var(--color-control-hover);
+  color: var(--color-text);
+}
+
+.terminal-scroll-fab:active {
+  transform: scale(0.96);
+}
+
+.terminal-scroll-fab:focus-visible {
+  outline: 2px solid var(--color-primary-border);
+  outline-offset: 2px;
+}
+
+@media (min-width: 769px) and (hover: hover) {
+  /* Desktop with fine pointer: keep FABs available but slightly quieter. */
+  .terminal-scroll-fab {
+    width: 2rem;
+    height: 2rem;
+    opacity: 0.85;
+  }
+
+  .terminal-shell:hover .terminal-scroll-fab,
+  .terminal-scroll-fab:focus-visible {
+    opacity: 1;
+  }
+}
+
 .terminal-message {
   border-top: 1px solid var(--color-border);
   font-size: 14px;

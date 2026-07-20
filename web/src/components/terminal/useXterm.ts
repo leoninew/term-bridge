@@ -19,11 +19,20 @@ type FitReason =
   | 'started'
   | string
 
+export type TerminalScrollEdges = {
+  atTop: boolean
+  atBottom: boolean
+}
+
 type XtermController = {
   terminal: Terminal
   open: (element: HTMLElement) => void
   fit: (reason?: FitReason) => void
   focus: () => void
+  scrollToTop: () => void
+  scrollToBottom: () => void
+  getScrollEdges: () => TerminalScrollEdges
+  setScrollEdgesListener: (listener: ((edges: TerminalScrollEdges) => void) | null) => void
   write: (data: Uint8Array) => void
   pendingBytes: () => number
   setTheme: (theme: AppTheme) => void
@@ -243,6 +252,24 @@ export function createXterm(
   let invalidRetryTimer: number | undefined
   let invalidRetryCount = 0
   let disposed = false
+  let scrollEdgesListener: ((edges: TerminalScrollEdges) => void) | null = null
+  const scrollDisposables: Array<{ dispose: () => void }> = []
+
+  function getScrollEdges(): TerminalScrollEdges {
+    const buffer = terminal.buffer.active
+    return {
+      atTop: buffer.viewportY <= 0,
+      atBottom: buffer.viewportY >= buffer.baseY,
+    }
+  }
+
+  function emitScrollEdges() {
+    if (disposed || !scrollEdgesListener) {
+      return
+    }
+    scrollEdgesListener(getScrollEdges())
+  }
+
   const settleTimers: number[] = []
   const writeQueue: Uint8Array[] = []
   let writing = false
@@ -404,6 +431,7 @@ export function createXterm(
       lastCols = size.cols
       lastRows = size.rows
       onResize(size.cols, size.rows)
+      emitScrollEdges()
       return
     }
 
@@ -422,6 +450,7 @@ export function createXterm(
         geometryAfter,
       }),
     )
+    emitScrollEdges()
   }
 
   function scheduleResize(reason: FitReason = 'resize-observer') {
@@ -573,6 +602,18 @@ export function createXterm(
         scheduleResize('resize-observer')
       })
       observer.observe(element)
+      scrollDisposables.push(
+        terminal.onScroll(() => {
+          emitScrollEdges()
+        }),
+      )
+      // line feed / buffer growth can change baseY without a user scroll
+      scrollDisposables.push(
+        terminal.onWriteParsed(() => {
+          emitScrollEdges()
+        }),
+      )
+      emitScrollEdges()
       if (readOnly) {
         terminal.write(hideCursorSequence)
       } else {
@@ -587,6 +628,29 @@ export function createXterm(
         return
       }
       terminal.focus()
+    },
+    scrollToTop() {
+      if (disposed) {
+        return
+      }
+      terminal.scrollToTop()
+      emitScrollEdges()
+    },
+    scrollToBottom() {
+      if (disposed) {
+        return
+      }
+      terminal.scrollToBottom()
+      emitScrollEdges()
+    },
+    getScrollEdges() {
+      return getScrollEdges()
+    },
+    setScrollEdgesListener(listener: ((edges: TerminalScrollEdges) => void) | null) {
+      scrollEdgesListener = listener
+      if (!disposed && listener) {
+        listener(getScrollEdges())
+      }
     },
     write(data: Uint8Array) {
       writeCount += 1
@@ -642,6 +706,11 @@ export function createXterm(
       clearInvalidRetryTimer()
       clearSettleTimers()
       observer?.disconnect()
+      for (const disposable of scrollDisposables) {
+        disposable.dispose()
+      }
+      scrollDisposables.length = 0
+      scrollEdgesListener = null
       for (const disposable of disposables) {
         disposable.dispose()
       }

@@ -2,6 +2,14 @@
   <section class="terminal-shell relative">
     <div ref="terminalElement" class="terminal-container" />
 
+    <TerminalScrollFabs
+      :dimmed="showBootOverlay"
+      :show-top="scrollEdges.showTop"
+      :show-bottom="scrollEdges.showBottom"
+      @scroll-to-top="scrollToTop"
+      @scroll-to-bottom="scrollToBottom"
+    />
+
     <div
       v-if="showBootOverlay"
       class="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[color-mix(in_srgb,var(--color-terminal-bg)_88%,transparent)] text-sm text-[var(--color-text-muted)] backdrop-blur-[1px] transition-opacity duration-200"
@@ -28,9 +36,10 @@
   import { useI18n } from 'vue-i18n'
   import { Loader2 } from '@lucide/vue'
   import { clampTerminalSize } from '../../protocol/terminal'
+  import TerminalScrollFabs from './TerminalScrollFabs.vue'
   import type { ServerControlMessage } from '../../gen/proto/termbridge/agent/v1/terminal'
   import { terminalDebug } from './diagnostics'
-  import { createXterm } from './useXterm'
+  import { createXterm, type TerminalScrollEdges } from './useXterm'
   import { useTerminalSocket } from '../../features/sessions/useTerminalSocket'
   import { useThemeStore } from '../../store/theme'
   import { useNotificationsStore } from '../../store/notifications'
@@ -60,6 +69,7 @@
   const themeStore = useThemeStore()
   const replaying = ref(false)
   const hasTrustedSize = ref(false)
+  const scrollEdges = ref({ showTop: false, showBottom: false })
   const sessionStarted = ref(false)
   const notifications = useNotificationsStore()
   const controlRole = ref<'controller' | 'observer' | 'unknown'>('unknown')
@@ -252,6 +262,24 @@
     })
   }
 
+  function applyScrollEdges(edges: TerminalScrollEdges) {
+    // At top: only show bottom; at bottom: only show top; middle: both.
+    // When content fits (both top and bottom), hide both.
+    const fits = edges.atTop && edges.atBottom
+    scrollEdges.value = {
+      showTop: !fits && !edges.atTop,
+      showBottom: !fits && !edges.atBottom,
+    }
+  }
+
+  function scrollToTop() {
+    xterm?.scrollToTop()
+  }
+
+  function scrollToBottom() {
+    xterm?.scrollToBottom()
+  }
+
   function disconnect(reason: string) {
     terminalDebug('socket.disconnect', {
       sessionId: props.sessionId,
@@ -408,6 +436,7 @@
     )
     if (terminalElement.value) {
       xterm.open(terminalElement.value)
+      xterm.setScrollEdgesListener(applyScrollEdges)
       if (props.active) {
         scheduleTerminalFocus('open')
       }

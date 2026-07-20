@@ -1,12 +1,19 @@
 <template>
-  <section class="terminal-shell">
+  <section class="terminal-shell relative">
     <div ref="terminalElement" class="terminal-container" />
+    <TerminalScrollFabs
+      :show-top="scrollEdges.showTop"
+      :show-bottom="scrollEdges.showBottom"
+      @scroll-to-top="scrollToTop"
+      @scroll-to-bottom="scrollToBottom"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
   import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-  import { createXterm } from './useXterm'
+  import TerminalScrollFabs from './TerminalScrollFabs.vue'
+  import { createXterm, type TerminalScrollEdges } from './useXterm'
   import { useThemeStore } from '../../store/theme'
 
   const props = defineProps<{
@@ -14,8 +21,17 @@
   }>()
 
   const terminalElement = ref<HTMLElement | null>(null)
+  const scrollEdges = ref({ showTop: false, showBottom: false })
   const themeStore = useThemeStore()
   let xterm: ReturnType<typeof createXterm> | null = null
+
+  function applyScrollEdges(edges: TerminalScrollEdges) {
+    const fits = edges.atTop && edges.atBottom
+    scrollEdges.value = {
+      showTop: !fits && !edges.atTop,
+      showBottom: !fits && !edges.atBottom,
+    }
+  }
 
   function replay() {
     xterm?.terminal.clear()
@@ -24,6 +40,14 @@
     }
     // History may contain CSI ? 25 h; always re-hide after replay.
     xterm?.write(new TextEncoder().encode('\u001b[?25l'))
+  }
+
+  function scrollToTop() {
+    xterm?.scrollToTop()
+  }
+
+  function scrollToBottom() {
+    xterm?.scrollToBottom()
   }
 
   onMounted(() => {
@@ -36,6 +60,7 @@
     )
     if (terminalElement.value) {
       xterm.open(terminalElement.value)
+      xterm.setScrollEdgesListener(applyScrollEdges)
     }
     replay()
   })

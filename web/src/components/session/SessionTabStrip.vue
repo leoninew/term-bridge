@@ -18,12 +18,14 @@
       <VueDraggable
         :model-value="openedTabs"
         tag="div"
-        class="flex h-full min-w-0 flex-1 overflow-x-auto"
-        ghost-class="opacity-70 bg-[var(--color-surface-muted)]"
-        chosen-class="bg-[var(--color-control-hover)]"
-        drag-class="bg-[var(--color-control-active)] opacity-95 shadow-lg"
+        class="tab-strip flex h-full min-w-0 flex-1 overflow-x-auto"
+        ghost-class="tab-sortable-ghost"
+        chosen-class="tab-sortable-chosen"
+        drag-class="tab-sortable-dragging"
         :animation="150"
         handle=".tab-drag-handle"
+        filter="button:not(.tab-drag-handle)"
+        :prevent-on-filter="false"
         item-key="sessionId"
         :disabled="disableTabReorder"
         @update:model-value="emit('reorderTabs', $event)"
@@ -197,3 +199,26 @@
 
   const { t } = useI18n()
 </script>
+
+<style scoped>
+  .tab-sortable-ghost {
+    border-color: var(--color-border-strong) !important;
+    border-style: dashed;
+    background: var(--color-surface-muted) !important;
+    color: var(--color-text-subtle) !important;
+    opacity: 0.72;
+  }
+
+  .tab-sortable-chosen {
+    border-color: var(--color-border-strong) !important;
+    background: var(--color-control-hover) !important;
+    box-shadow: 0 0 0 1px var(--color-border-strong);
+  }
+
+  .tab-sortable-dragging {
+    border-color: var(--color-border-strong) !important;
+    background: var(--color-control-active) !important;
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 20%, transparent);
+    opacity: 0.96;
+  }
+</style>
