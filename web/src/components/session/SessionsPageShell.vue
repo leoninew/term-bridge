@@ -4,17 +4,51 @@
     class="sessions-shell flex h-full overflow-hidden bg-[var(--color-app-bg)] text-sm text-[var(--color-text)]"
     :class="{ 'sessions-shell-narrow': isNarrow }"
   >
-    <template v-if="isNarrow">
-      <div class="sessions-mobile-main relative flex min-h-0 min-w-0 flex-1 flex-col">
-        <SessionWorkbench
-          v-bind="workbenchBind"
-          class="session-workbench-stage h-full min-h-0 min-w-0"
-          :show-sidebar-toggle="sidebarCollapsed"
-          @toggle-sidebar="expandSidebar"
-          v-on="workbenchListeners"
+    <!--
+      Single SessionWorkbench host: isNarrow only changes sidebar chrome.
+      Avoid v-if/v-else remount of workbench on orientation/breakpoint flips
+      (that closed the terminal WS and dropped multi-attach control).
+    -->
+    <SplitterGroup direction="horizontal" class="flex min-h-0 min-w-0 flex-1">
+      <SplitterPanel
+        v-if="!isNarrow && !sidebarCollapsed"
+        id="workspace-sidebar"
+        class="workspace-sidebar-panel"
+        :default-size="18"
+        :min-size="12"
+        :max-size="24"
+      >
+        <WorkspaceSessionSidebar
+          v-bind="sidebarBind"
+          @collapse="collapseSidebar"
+          @select="openSessionTab"
+          v-on="sidebarListeners"
         />
-      </div>
+      </SplitterPanel>
 
+      <SplitterResizeHandle
+        v-if="!isNarrow && !sidebarCollapsed"
+        class="sessions-resize-handle group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[var(--color-app-bg)] outline-none"
+      >
+        <span
+          class="w-px bg-[var(--color-border)] transition group-hover:bg-[var(--color-border-strong)]"
+        />
+      </SplitterResizeHandle>
+
+      <SplitterPanel id="terminal-workbench" :min-size="isNarrow || sidebarCollapsed ? 100 : 55">
+        <div class="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
+          <SessionWorkbench
+            v-bind="workbenchBind"
+            class="session-workbench-stage h-full min-h-0 min-w-0"
+            :show-sidebar-toggle="sidebarCollapsed"
+            @toggle-sidebar="expandSidebar"
+            v-on="workbenchListeners"
+          />
+        </div>
+      </SplitterPanel>
+    </SplitterGroup>
+
+    <template v-if="isNarrow">
       <div
         v-if="!sidebarCollapsed"
         class="fixed inset-0 z-[35] bg-black/45"
@@ -34,45 +68,6 @@
         />
       </div>
     </template>
-
-    <SplitterGroup v-else direction="horizontal" class="flex min-h-0 min-w-0 flex-1">
-      <SplitterPanel
-        v-if="!sidebarCollapsed"
-        id="workspace-sidebar"
-        class="workspace-sidebar-panel"
-        :default-size="18"
-        :min-size="12"
-        :max-size="24"
-      >
-        <WorkspaceSessionSidebar
-          v-bind="sidebarBind"
-          @collapse="collapseSidebar"
-          @select="openSessionTab"
-          v-on="sidebarListeners"
-        />
-      </SplitterPanel>
-
-      <SplitterResizeHandle
-        v-if="!sidebarCollapsed"
-        class="sessions-resize-handle group flex w-1 shrink-0 cursor-col-resize items-stretch justify-center bg-[var(--color-app-bg)] outline-none"
-      >
-        <span
-          class="w-px bg-[var(--color-border)] transition group-hover:bg-[var(--color-border-strong)]"
-        />
-      </SplitterResizeHandle>
-
-      <SplitterPanel id="terminal-workbench" :min-size="sidebarCollapsed ? 100 : 55">
-        <div class="relative h-full min-h-0 min-w-0">
-          <SessionWorkbench
-            v-bind="workbenchBind"
-            class="session-workbench-stage h-full min-h-0 min-w-0"
-            :show-sidebar-toggle="sidebarCollapsed"
-            @toggle-sidebar="expandSidebar"
-            v-on="workbenchListeners"
-          />
-        </div>
-      </SplitterPanel>
-    </SplitterGroup>
   </div>
 
   <CreateSessionDialog
