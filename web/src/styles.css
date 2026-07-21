@@ -1267,6 +1267,7 @@ p {
 /*
   Terminal control rail (page up / fit / page down).
   Offset left of xterm's vertical scrollbar (~14px) + safe-area.
+  Default anchors right/bottom; .is-custom uses left/top from drag position.
 */
 .terminal-scroll-fabs {
   right: max(1.25rem, calc(env(safe-area-inset-right, 0px) + 1.25rem));
@@ -1274,12 +1275,21 @@ p {
 }
 
 /* When a scrollbar is present, park the rail just left of the thumb track. */
-.terminal-shell:has(.xterm-viewport) .terminal-scroll-fabs {
+.terminal-shell:has(.xterm-viewport) .terminal-scroll-fabs:not(.is-custom) {
   right: max(1.5rem, calc(env(safe-area-inset-right, 0px) + 1rem + 14px));
+}
+
+.terminal-scroll-fabs.is-custom {
+  right: auto;
+  bottom: auto;
 }
 
 .terminal-scroll-fabs.is-dimmed {
   opacity: 0.4;
+}
+
+.terminal-scroll-fabs.is-dragging {
+  opacity: 1;
 }
 
 .terminal-scroll-fab-rail {
@@ -1296,6 +1306,17 @@ p {
     inset 0 0 0 1px color-mix(in srgb, var(--color-surface) 40%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.terminal-scroll-fab-rail.is-dragging {
+  cursor: grabbing;
+  box-shadow:
+    0 10px 28px color-mix(in srgb, var(--color-text) 18%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-surface) 40%, transparent);
 }
 
 .terminal-scroll-fab {
@@ -1309,10 +1330,15 @@ p {
   background: transparent;
   color: var(--color-text-muted);
   outline: none;
+  cursor: pointer;
   transition:
     background 140ms ease,
     color 140ms ease,
     transform 120ms ease;
+}
+
+.terminal-scroll-fab-rail.is-dragging .terminal-scroll-fab {
+  cursor: grabbing;
 }
 
 .terminal-scroll-fab-fit {
@@ -1327,6 +1353,10 @@ p {
 
 .terminal-scroll-fab:active {
   transform: scale(0.94);
+}
+
+.terminal-scroll-fab-rail.is-dragging .terminal-scroll-fab:active {
+  transform: none;
 }
 
 .terminal-scroll-fab:focus-visible {
