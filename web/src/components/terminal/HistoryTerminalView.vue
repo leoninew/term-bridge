@@ -6,6 +6,7 @@
       :show-bottom="scrollEdges.showBottom"
       @scroll-page-up="scrollPageUp"
       @scroll-page-down="scrollPageDown"
+      @fit="fitTerminal"
     />
   </section>
 </template>
@@ -48,6 +49,10 @@
 
   function scrollPageDown() {
     xterm?.scrollPageDown()
+  }
+
+  function fitTerminal() {
+    xterm?.fit('manual')
   }
 
   onMounted(() => {

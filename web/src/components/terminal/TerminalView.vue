@@ -8,6 +8,7 @@
       :show-bottom="scrollEdges.showBottom"
       @scroll-page-up="scrollPageUp"
       @scroll-page-down="scrollPageDown"
+      @fit="fitTerminal"
     />
 
     <div
@@ -278,6 +279,10 @@
 
   function scrollPageDown() {
     xterm?.scrollPageDown()
+  }
+
+  function fitTerminal() {
+    xterm?.fit('manual')
   }
 
   function disconnect(reason: string) {

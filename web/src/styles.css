@@ -1264,54 +1264,94 @@ p {
   touch-action: none;
 }
 
+/*
+  Terminal control rail (page up / fit / page down).
+  Offset left of xterm's vertical scrollbar (~14px) + safe-area.
+*/
+.terminal-scroll-fabs {
+  right: max(1.25rem, calc(env(safe-area-inset-right, 0px) + 1.25rem));
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+/* When a scrollbar is present, park the rail just left of the thumb track. */
+.terminal-shell:has(.xterm-viewport) .terminal-scroll-fabs {
+  right: max(1.5rem, calc(env(safe-area-inset-right, 0px) + 1rem + 14px));
+}
+
+.terminal-scroll-fabs.is-dimmed {
+  opacity: 0.4;
+}
+
+.terminal-scroll-fab-rail {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 90%, transparent);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+  box-shadow:
+    0 6px 18px color-mix(in srgb, var(--color-text) 12%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-surface) 40%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 .terminal-scroll-fab {
   display: inline-flex;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2rem;
+  height: 2rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--color-border);
+  border: 0;
   border-radius: 9999px;
-  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  background: transparent;
   color: var(--color-text-muted);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 16%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   outline: none;
   transition:
-    background 150ms ease,
-    color 150ms ease,
-    border-color 150ms ease,
-    transform 150ms ease;
+    background 140ms ease,
+    color 140ms ease,
+    transform 120ms ease;
+}
+
+.terminal-scroll-fab-fit {
+  color: var(--color-text);
 }
 
 .terminal-scroll-fab:hover,
 .terminal-scroll-fab:focus-visible {
-  border-color: var(--color-border-strong);
   background: var(--color-control-hover);
   color: var(--color-text);
 }
 
 .terminal-scroll-fab:active {
-  transform: scale(0.96);
+  transform: scale(0.94);
 }
 
 .terminal-scroll-fab:focus-visible {
   outline: 2px solid var(--color-primary-border);
-  outline-offset: 2px;
+  outline-offset: 1px;
 }
 
 @media (min-width: 769px) and (hover: hover) {
-  /* Desktop with fine pointer: keep FABs available but slightly quieter. */
-  .terminal-scroll-fab {
-    width: 2rem;
-    height: 2rem;
-    opacity: 0.85;
+  /* Desktop: quieter until the terminal shell is hovered / focused. */
+  .terminal-scroll-fab-rail {
+    opacity: 0.72;
+    transition: opacity 150ms ease;
   }
 
-  .terminal-shell:hover .terminal-scroll-fab,
-  .terminal-scroll-fab:focus-visible {
+  .terminal-shell:hover .terminal-scroll-fab-rail,
+  .terminal-scroll-fab-rail:focus-within {
     opacity: 1;
+  }
+}
+
+/* Touch / narrow: slightly larger hit targets, always full opacity. */
+@media (max-width: 768px), (hover: none) {
+  .terminal-scroll-fab {
+    width: 2.25rem;
+    height: 2.25rem;
   }
 }
 

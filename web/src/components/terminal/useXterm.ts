@@ -558,6 +558,84 @@ export function createXterm(
     })
   }
 
+  /** Wait one paint frame so a PTY resize can be observed as a distinct change. */
+  function nextFrame(): Promise<void> {
+    return new Promise((resolve) => {
+      window.requestAnimationFrame(() => resolve())
+    })
+  }
+
+  /**
+   * Escape hatch for layout drift (common with full-screen TUI apps).
+   * When already at the target size, briefly nudge then restore so the PTY gets a real
+   * size change (SIGWINCH). Same-size resize is often a no-op for remote apps.
+   * async/await only structures the flow — a real frame gap is still required; a bare
+   * await Promise.resolve() would coalesce both resizes and look like "no effect".
+   */
+  async function runManualFit() {
+    if (disposed) {
+      return
+    }
+    fitSeq += 1
+    const seq = fitSeq
+    const geometryBefore = captureElementGeometry(hostElement)
+    const dimensions = fitAddon.proposeDimensions()
+    terminalDebug(
+      'xterm.fit.manual',
+      diagnosticDetails({
+        seq,
+        proposed: dimensions ? { cols: dimensions.cols, rows: dimensions.rows } : null,
+        lastCols,
+        lastRows,
+        terminalCols: terminal.cols,
+        terminalRows: terminal.rows,
+        geometry: geometryBefore,
+      }),
+    )
+    if (!dimensions || dimensions.cols < 1 || dimensions.rows < 1) {
+      terminal.refresh(0, Math.max(terminal.rows - 1, 0))
+      emitScrollEdges()
+      return
+    }
+
+    const target = clampTerminalSize({ cols: dimensions.cols, rows: dimensions.rows })
+    const sameAsNow = terminal.cols === target.cols && terminal.rows === target.rows
+
+    const applySize = (cols: number, rows: number, note: string) => {
+      if (disposed) {
+        return
+      }
+      terminal.resize(cols, rows)
+      lastCols = cols
+      lastRows = rows
+      onResize(cols, rows)
+      terminalDebug('xterm.fit.manual.apply', diagnosticDetails({ seq, note, cols, rows }))
+    }
+
+    if (sameAsNow) {
+      // Prefer a one-column nudge so row layout stays stable during the pulse.
+      const nudge =
+        target.cols > 1
+          ? clampTerminalSize({ cols: target.cols - 1, rows: target.rows })
+          : clampTerminalSize({ cols: target.cols, rows: Math.max(target.rows - 1, 1) })
+      applySize(nudge.cols, nudge.rows, 'nudge')
+      // Two frames: first schedules layout, second runs after paint — enough for WS+PTY.
+      await nextFrame()
+      await nextFrame()
+      if (disposed) {
+        return
+      }
+      applySize(target.cols, target.rows, 'restore')
+      terminal.refresh(0, Math.max(terminal.rows - 1, 0))
+      emitScrollEdges()
+      return
+    }
+
+    applySize(target.cols, target.rows, 'direct')
+    terminal.refresh(0, Math.max(terminal.rows - 1, 0))
+    emitScrollEdges()
+  }
+
   return {
     terminal,
     open(element: HTMLElement) {
@@ -632,6 +710,13 @@ export function createXterm(
       }
     },
     fit(reason: FitReason = 'explicit') {
+      if (disposed) {
+        return
+      }
+      if (reason === 'manual') {
+        void runManualFit()
+        return
+      }
       emitResize(reason)
     },
     focus() {
