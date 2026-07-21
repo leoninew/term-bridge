@@ -1249,11 +1249,19 @@ p {
   height: 100%;
 }
 
-/* Keep xterm scrollback usable on touch: pan vertically inside the viewport. */
+/* Fallback: allow vertical pan when custom touch-scroll is not attached. */
 .terminal-container .xterm,
 .terminal-container .xterm .xterm-viewport {
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Custom touch scroll owns the gesture via non-passive listeners + scrollLines. */
+.terminal-container.xterm-touch-scroll,
+.terminal-container.xterm-touch-scroll .xterm,
+.terminal-container.xterm-touch-scroll .xterm-viewport,
+.terminal-container.xterm-touch-scroll .xterm-screen {
+  touch-action: none;
 }
 
 .terminal-scroll-fab {

@@ -3,6 +3,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { terminalDebug } from './diagnostics'
+import { attachTouchScroll } from './touchScroll'
 import { clampTerminalSize } from '../../protocol/terminal'
 import type { AppTheme } from '../../store/theme'
 
@@ -254,6 +255,7 @@ export function createXterm(
   let disposed = false
   let scrollEdgesListener: ((edges: TerminalScrollEdges) => void) | null = null
   const scrollDisposables: Array<{ dispose: () => void }> = []
+  let detachTouchScroll: (() => void) | undefined
 
   function getScrollEdges(): TerminalScrollEdges {
     const buffer = terminal.buffer.active
@@ -613,6 +615,13 @@ export function createXterm(
           emitScrollEdges()
         }),
       )
+      // Custom touch → scrollLines path for mobile/coarse devices (CSS pan-y alone is unreliable).
+      detachTouchScroll?.()
+      detachTouchScroll = attachTouchScroll(element, terminal, () => {
+        if (!disposed) {
+          emitScrollEdges()
+        }
+      })
       emitScrollEdges()
       if (readOnly) {
         terminal.write(hideCursorSequence)
@@ -706,6 +715,8 @@ export function createXterm(
       clearInvalidRetryTimer()
       clearSettleTimers()
       observer?.disconnect()
+      detachTouchScroll?.()
+      detachTouchScroll = undefined
       for (const disposable of scrollDisposables) {
         disposable.dispose()
       }
