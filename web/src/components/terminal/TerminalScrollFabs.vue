@@ -4,13 +4,14 @@
       Sit left of xterm's vertical scrollbar (~14px) so the rail never covers the thumb.
       Order: page up → fit → page down (browse, then adapt, then continue).
       Whole rail is draggable; click actions still work under a small move threshold.
+      Custom placement is edge-anchored (px from nearest sides), not left/top or % of width.
     -->
     <div
       ref="rootEl"
       class="terminal-scroll-fabs pointer-events-none absolute z-20"
       :class="{
         'is-dimmed': dimmed,
-        'is-custom': customPos !== null,
+        'is-custom': customAnchor !== null || dragAbs !== null,
         'is-dragging': dragging,
       }"
       :style="rootStyle"
@@ -106,11 +107,15 @@
     TooltipTrigger,
   } from 'reka-ui'
   import {
-    clampFabPosition,
+    absoluteToAnchor,
+    absoluteToStyle,
+    anchorToStyle,
+    clampAbsolutePosition,
     isDragPastThreshold,
-    loadFabPosition,
-    saveFabPosition,
-    type TerminalScrollFabPosition,
+    loadFabAnchor,
+    saveFabAnchor,
+    type TerminalScrollFabAbsolute,
+    type TerminalScrollFabAnchor,
   } from './terminalScrollFabPosition'
 
   const props = withDefaults(
@@ -135,8 +140,14 @@
   const { t } = useI18n()
 
   const rootEl = ref<HTMLElement | null>(null)
-  const customPos = ref<TerminalScrollFabPosition | null>(loadFabPosition())
+  /** Persisted edge-anchored placement (px from nearest sides). */
+  const customAnchor = ref<TerminalScrollFabAnchor | null>(loadFabAnchor())
+  /** Absolute left/top only while actively dragging (smooth pointer tracking). */
+  const dragAbs = ref<TerminalScrollFabAbsolute | null>(null)
   const dragging = ref(false)
+  /** Cached shell size for style resolution when ResizeObserver has measured. */
+  const shellSize = ref<{ width: number; height: number } | null>(null)
+  const railSize = ref<{ width: number; height: number } | null>(null)
 
   type DragState = {
     pointerId: number
@@ -155,57 +166,54 @@
   let windowListenersBound = false
 
   const rootStyle = computed(() => {
-    if (!customPos.value) {
-      return undefined
+    if (dragAbs.value) {
+      return absoluteToStyle(dragAbs.value)
     }
-    return {
-      left: `${customPos.value.left}px`,
-      top: `${customPos.value.top}px`,
+    if (!customAnchor.value || !shellSize.value || !railSize.value) {
+      // Default CSS right/bottom; or wait until measurable to apply anchor.
+      if (customAnchor.value && !shellSize.value) {
+        // Avoid flashing default corner before measure: hide nothing, keep CSS default.
+        return undefined
+      }
+      if (!customAnchor.value) {
+        return undefined
+      }
     }
+    if (customAnchor.value && shellSize.value && railSize.value) {
+      return anchorToStyle(customAnchor.value, shellSize.value, railSize.value)
+    }
+    return undefined
   })
 
   function shellElement(): HTMLElement | null {
     return (rootEl.value?.closest('.terminal-shell') as HTMLElement | null) ?? null
   }
 
-  function hasMeasurableLayout(): boolean {
+  function refreshMetrics(): boolean {
     const shell = shellElement()
     const root = rootEl.value
-    return Boolean(
-      shell &&
-        root &&
-        shell.clientWidth > 0 &&
-        shell.clientHeight > 0 &&
-        root.offsetWidth > 0 &&
-        root.offsetHeight > 0,
-    )
+    if (!shell || !root || shell.clientWidth <= 0 || shell.clientHeight <= 0) {
+      return false
+    }
+    // Prefer rail box for size; root is the absolute wrapper (same as rail when custom).
+    const rail = root.querySelector('.terminal-scroll-fab-rail') as HTMLElement | null
+    const sizeEl = rail ?? root
+    if (sizeEl.offsetWidth <= 0 || sizeEl.offsetHeight <= 0) {
+      return false
+    }
+    shellSize.value = { width: shell.clientWidth, height: shell.clientHeight }
+    railSize.value = { width: sizeEl.offsetWidth, height: sizeEl.offsetHeight }
+    return true
   }
 
-  function measureAndClamp(position: TerminalScrollFabPosition): TerminalScrollFabPosition {
-    const shell = shellElement()
-    const root = rootEl.value
-    if (!shell || !root || !hasMeasurableLayout()) {
+  function measureAndClampAbs(position: TerminalScrollFabAbsolute): TerminalScrollFabAbsolute {
+    if (!refreshMetrics() || !shellSize.value || !railSize.value) {
       return position
     }
-    return clampFabPosition(
-      position,
-      { width: shell.clientWidth, height: shell.clientHeight },
-      { width: root.offsetWidth, height: root.offsetHeight },
-    )
+    return clampAbsolutePosition(position, shellSize.value, railSize.value)
   }
 
-  function reclampStoredPosition() {
-    if (!customPos.value || !hasMeasurableLayout()) {
-      return
-    }
-    const next = measureAndClamp(customPos.value)
-    if (next.left !== customPos.value.left || next.top !== customPos.value.top) {
-      customPos.value = next
-      saveFabPosition(next)
-    }
-  }
-
-  function captureCurrentOffset(): TerminalScrollFabPosition | null {
+  function captureCurrentOffset(): TerminalScrollFabAbsolute | null {
     const shell = shellElement()
     const root = rootEl.value
     if (!shell || !root) {
@@ -273,10 +281,10 @@
       dragState.moved = true
       dragging.value = true
       suppressClick = true
-      // Switch from CSS right/bottom default to explicit left/top at current visual spot.
-      customPos.value = { left: dragState.originLeft, top: dragState.originTop }
+      // Track with absolute left/top for the duration of the drag.
+      dragAbs.value = { left: dragState.originLeft, top: dragState.originTop }
     }
-    customPos.value = measureAndClamp({
+    dragAbs.value = measureAndClampAbs({
       left: dragState.originLeft + dx,
       top: dragState.originTop + dy,
     })
@@ -291,11 +299,14 @@
     dragState = null
     dragging.value = false
     unbindWindowListeners()
-    if (moved && customPos.value && hasMeasurableLayout()) {
-      const clamped = measureAndClamp(customPos.value)
-      customPos.value = clamped
-      saveFabPosition(clamped)
+    if (moved && dragAbs.value && refreshMetrics() && shellSize.value && railSize.value) {
+      const clamped = clampAbsolutePosition(dragAbs.value, shellSize.value, railSize.value)
+      // Pin to nearest edges (px offsets) — resize keeps the rail by that corner.
+      const anchor = absoluteToAnchor(clamped, shellSize.value, railSize.value)
+      customAnchor.value = anchor
+      saveFabAnchor(anchor)
     }
+    dragAbs.value = null
   }
 
   function onAction(action: () => void) {
@@ -310,6 +321,11 @@
     action()
   }
 
+  function onShellResized() {
+    // Refresh metrics so edge anchors re-resolve via rootStyle; do not rewrite storage.
+    refreshMetrics()
+  }
+
   function bindShellObserver() {
     const shell = shellElement()
     if (shell === observedShell) {
@@ -321,7 +337,7 @@
       return
     }
     shellObserver = new ResizeObserver(() => {
-      reclampStoredPosition()
+      onShellResized()
     })
     shellObserver.observe(shell)
   }
@@ -329,7 +345,7 @@
   onMounted(() => {
     void nextTick(() => {
       bindShellObserver()
-      reclampStoredPosition()
+      onShellResized()
     })
   })
 
@@ -338,7 +354,7 @@
     () => {
       void nextTick(() => {
         bindShellObserver()
-        reclampStoredPosition()
+        onShellResized()
       })
     },
   )
@@ -350,5 +366,6 @@
     observedShell = null
     dragState = null
     dragging.value = false
+    dragAbs.value = null
   })
 </script>

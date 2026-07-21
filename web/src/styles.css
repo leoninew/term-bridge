@@ -1267,7 +1267,8 @@ p {
 /*
   Terminal control rail (page up / fit / page down).
   Offset left of xterm's vertical scrollbar (~14px) + safe-area.
-  Default anchors right/bottom; .is-custom uses left/top from drag position.
+  Default anchors right/bottom.
+  .is-custom uses inline edge offsets (right/bottom or left/top px) — not width %.
 */
 .terminal-scroll-fabs {
   right: max(1.25rem, calc(env(safe-area-inset-right, 0px) + 1.25rem));
@@ -1279,8 +1280,11 @@ p {
   right: max(1.5rem, calc(env(safe-area-inset-right, 0px) + 1rem + 14px));
 }
 
+/* Reset defaults so inline left/right/top/bottom fully control placement. */
 .terminal-scroll-fabs.is-custom {
+  left: auto;
   right: auto;
+  top: auto;
   bottom: auto;
 }
 
