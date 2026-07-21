@@ -41,7 +41,7 @@
         id="workspace-sidebar"
         class="workspace-sidebar-panel"
         :default-size="18"
-        :min-size="18"
+        :min-size="12"
         :max-size="24"
       >
         <WorkspaceSessionSidebar

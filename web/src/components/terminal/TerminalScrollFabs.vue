@@ -13,11 +13,11 @@
           <button
             type="button"
             class="terminal-scroll-fab pointer-events-auto"
-            :aria-label="t('workbench.scrollToTopAria')"
-            :title="t('workbench.scrollToTopAria')"
-            @click.stop="emit('scrollToTop')"
+            :aria-label="t('workbench.scrollPageUpAria')"
+            :title="t('workbench.scrollPageUpAria')"
+            @click.stop="emit('scrollPageUp')"
           >
-            <ChevronsUp class="size-4" aria-hidden="true" />
+            <ChevronUp class="size-4" aria-hidden="true" />
           </button>
         </TooltipTrigger>
         <TooltipPortal>
@@ -26,7 +26,7 @@
             :side-offset="8"
             class="z-50 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text)] shadow-lg"
           >
-            {{ t('workbench.scrollToTopAria') }}
+            {{ t('workbench.scrollPageUpAria') }}
           </TooltipContent>
         </TooltipPortal>
       </TooltipRoot>
@@ -35,11 +35,11 @@
           <button
             type="button"
             class="terminal-scroll-fab pointer-events-auto"
-            :aria-label="t('workbench.scrollToBottomAria')"
-            :title="t('workbench.scrollToBottomAria')"
-            @click.stop="emit('scrollToBottom')"
+            :aria-label="t('workbench.scrollPageDownAria')"
+            :title="t('workbench.scrollPageDownAria')"
+            @click.stop="emit('scrollPageDown')"
           >
-            <ChevronsDown class="size-4" aria-hidden="true" />
+            <ChevronDown class="size-4" aria-hidden="true" />
           </button>
         </TooltipTrigger>
         <TooltipPortal>
@@ -48,7 +48,7 @@
             :side-offset="8"
             class="z-50 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text)] shadow-lg"
           >
-            {{ t('workbench.scrollToBottomAria') }}
+            {{ t('workbench.scrollPageDownAria') }}
           </TooltipContent>
         </TooltipPortal>
       </TooltipRoot>
@@ -58,7 +58,7 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n'
-  import { ChevronsDown, ChevronsUp } from '@lucide/vue'
+  import { ChevronDown, ChevronUp } from '@lucide/vue'
   import {
     TooltipContent,
     TooltipPortal,
@@ -81,8 +81,8 @@
   )
 
   const emit = defineEmits<{
-    scrollToTop: []
-    scrollToBottom: []
+    scrollPageUp: []
+    scrollPageDown: []
   }>()
 
   const { t } = useI18n()

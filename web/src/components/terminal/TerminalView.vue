@@ -6,8 +6,8 @@
       :dimmed="showBootOverlay"
       :show-top="scrollEdges.showTop"
       :show-bottom="scrollEdges.showBottom"
-      @scroll-to-top="scrollToTop"
-      @scroll-to-bottom="scrollToBottom"
+      @scroll-page-up="scrollPageUp"
+      @scroll-page-down="scrollPageDown"
     />
 
     <div
@@ -272,12 +272,12 @@
     }
   }
 
-  function scrollToTop() {
-    xterm?.scrollToTop()
+  function scrollPageUp() {
+    xterm?.scrollPageUp()
   }
 
-  function scrollToBottom() {
-    xterm?.scrollToBottom()
+  function scrollPageDown() {
+    xterm?.scrollPageDown()
   }
 
   function disconnect(reason: string) {

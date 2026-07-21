@@ -1,7 +1,7 @@
 <template>
   <!--
     Three tiers (Tailwind):
-    - Phone  < sm:  launch icon + truncated command/name · status · cloud dot
+    - Phone  < sm:  launch icon + truncated command/name · status · device · cloud dot
     - Pad    sm–md: basename cwd · launch · status · device · cloud dot
     - PC     md+:   full labels + longer fields + cloud text (current desktop density)
   -->
@@ -61,14 +61,14 @@
     <div class="ml-auto flex min-w-0 shrink-0 items-center gap-1.5 md:gap-2">
       <span
         v-if="deviceLabel"
-        class="hidden min-w-0 max-w-[8rem] truncate text-[var(--color-text)] sm:inline md:max-w-[12rem]"
+        class="min-w-0 max-w-[6.5rem] truncate text-[var(--color-text)] sm:max-w-[8rem] md:max-w-[12rem]"
         :title="deviceLabel"
       >
         {{ deviceLabel }}
       </span>
       <span
         v-if="deviceLabel && showCloudConnection"
-        class="hidden shrink-0 text-[var(--color-border-strong)] sm:inline"
+        class="shrink-0 text-[var(--color-border-strong)]"
         aria-hidden="true"
         >|</span
       >

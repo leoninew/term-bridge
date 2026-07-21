@@ -30,8 +30,10 @@ type XtermController = {
   open: (element: HTMLElement) => void
   fit: (reason?: FitReason) => void
   focus: () => void
-  scrollToTop: () => void
-  scrollToBottom: () => void
+  /** Scroll toward earlier history by one viewport (terminal.rows). */
+  scrollPageUp: () => void
+  /** Scroll toward newer output by one viewport (terminal.rows). */
+  scrollPageDown: () => void
   getScrollEdges: () => TerminalScrollEdges
   setScrollEdgesListener: (listener: ((edges: TerminalScrollEdges) => void) | null) => void
   write: (data: Uint8Array) => void
@@ -638,18 +640,22 @@ export function createXterm(
       }
       terminal.focus()
     },
-    scrollToTop() {
+    scrollPageUp() {
       if (disposed) {
         return
       }
-      terminal.scrollToTop()
+      // Negative scrollLines moves toward earlier history (toward top).
+      const lines = Math.max(terminal.rows, 1)
+      terminal.scrollLines(-lines)
       emitScrollEdges()
     },
-    scrollToBottom() {
+    scrollPageDown() {
       if (disposed) {
         return
       }
-      terminal.scrollToBottom()
+      // Positive scrollLines moves toward newer output (toward bottom).
+      const lines = Math.max(terminal.rows, 1)
+      terminal.scrollLines(lines)
       emitScrollEdges()
     },
     getScrollEdges() {

@@ -4,8 +4,8 @@
     <TerminalScrollFabs
       :show-top="scrollEdges.showTop"
       :show-bottom="scrollEdges.showBottom"
-      @scroll-to-top="scrollToTop"
-      @scroll-to-bottom="scrollToBottom"
+      @scroll-page-up="scrollPageUp"
+      @scroll-page-down="scrollPageDown"
     />
   </section>
 </template>
@@ -42,12 +42,12 @@
     xterm?.write(new TextEncoder().encode('\u001b[?25l'))
   }
 
-  function scrollToTop() {
-    xterm?.scrollToTop()
+  function scrollPageUp() {
+    xterm?.scrollPageUp()
   }
 
-  function scrollToBottom() {
-    xterm?.scrollToBottom()
+  function scrollPageDown() {
+    xterm?.scrollPageDown()
   }
 
   onMounted(() => {
