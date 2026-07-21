@@ -1,5 +1,9 @@
 <template>
-  <TooltipProvider v-if="showTop || showBottom" :delay-duration="400" :disable-hoverable-content="true">
+  <TooltipProvider
+    v-if="showTop || showBottom"
+    :delay-duration="400"
+    :disable-hoverable-content="true"
+  >
     <div
       class="terminal-scroll-fabs pointer-events-none absolute right-2 bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] z-20 flex flex-col gap-2"
       :class="dimmed ? 'opacity-40' : ''"

@@ -9,7 +9,10 @@
       @input="emit('update:name', ($event.target as HTMLInputElement).value)"
     />
   </label>
-  <label class="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text)]">
+  <label
+    v-if="!cwdHidden"
+    class="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text)]"
+  >
     <span>{{ t('dialog.cwd') }}</span>
     <input
       :value="cwd"
@@ -26,7 +29,7 @@
     :selected-shortcut-id="selectedShortcutId"
     :selected-shortcut-name="selectedShortcutName"
     :shortcuts="shortcuts"
-    :disabled="disabled"
+    :disabled="disabled || commandDisabled"
     @update:command="emit('update:command', $event)"
     @update:command-source="emit('update:commandSource', $event)"
     @update:selected-shortcut-id="emit('update:selectedShortcutId', $event)"
@@ -41,7 +44,12 @@
 
   defineProps<{
     cwd: string
+    /** Hide the directory field; cwd still submits from the draft. */
+    cwdHidden?: boolean
+    /** Show directory as non-editable text (edit session). */
     cwdReadonly?: boolean
+    /** Disable launch method controls while leaving the name editable. */
+    commandDisabled?: boolean
     name: string
     command: string
     commandSource: CommandSource

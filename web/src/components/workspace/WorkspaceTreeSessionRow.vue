@@ -13,10 +13,24 @@
     @keydown.enter="emit('activateKey', $event)"
     @keydown.space="emit('activateKey', $event)"
   >
-    <SquareTerminal class="size-4 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
+    <SquareTerminal
+      class="size-4 shrink-0"
+      :class="isRunning ? lifecycleStateClassName('running') : 'text-[var(--color-text-subtle)]'"
+      aria-hidden="true"
+    />
     <span class="min-w-0 flex-1 truncate text-sm">{{ session.name || session.command }}</span>
 
-    <span v-if="session.lifecycle_state === 'running'" :class="treeNodeActionsClass">
+    <!-- Running: edit + copy on hover; stop always visible. -->
+    <span v-if="isRunning" :class="treeNodeActionsClass">
+      <button
+        type="button"
+        :class="treeNodeActionClass"
+        :aria-label="t('sidebar.editSessionAria')"
+        :title="t('sidebar.editSessionAria')"
+        @click.stop="emit('edit')"
+      >
+        <Pencil class="size-3.5" />
+      </button>
       <button
         type="button"
         :class="treeNodeActionClass"
@@ -27,45 +41,8 @@
         <Copy class="size-3.5" />
       </button>
     </span>
-
-    <span
-      v-if="session.lifecycle_state === 'running'"
-      class="flex size-5 shrink-0 items-center justify-center"
-    >
-      <CircleDot
-        class="size-3.5"
-        :class="lifecycleStateClassName(session.lifecycle_state)"
-        aria-hidden="true"
-      />
-    </span>
-
-    <span v-if="isEditable" :class="treeNodeActionsClass">
-      <button
-        type="button"
-        :class="treeNodeActionClass"
-        :aria-label="t('sidebar.editSessionAria')"
-        :title="t('sidebar.editSessionAria')"
-        @click.stop="emit('edit')"
-      >
-        <Pencil class="size-3.5" />
-      </button>
-    </span>
-
     <button
-      v-if="isEditable"
-      type="button"
-      :disabled="rerunning"
-      :class="treeNodeActionClass"
-      :aria-label="t('sidebar.rerunSessionAria')"
-      :title="t('sidebar.rerunSessionAria')"
-      @click.stop="emit('rerun')"
-    >
-      <Loader2 v-if="rerunning" class="size-3.5 animate-spin" />
-      <RotateCcw v-else class="size-3.5" />
-    </button>
-
-    <button
-      v-if="session.lifecycle_state === 'running'"
+      v-if="isRunning"
       type="button"
       :disabled="stopping"
       :class="treeNodeActionClass"
@@ -77,8 +54,31 @@
       <CircleStop v-else class="size-3.5" />
     </button>
 
+    <!-- Stopped/failed: edit + rerun on hover; delete always visible. -->
+    <span v-if="isTerminal" :class="treeNodeActionsClass">
+      <button
+        type="button"
+        :class="treeNodeActionClass"
+        :aria-label="t('sidebar.editSessionAria')"
+        :title="t('sidebar.editSessionAria')"
+        @click.stop="emit('edit')"
+      >
+        <Pencil class="size-3.5" />
+      </button>
+      <button
+        type="button"
+        :disabled="rerunning"
+        :class="treeNodeActionClass"
+        :aria-label="t('sidebar.rerunSessionAria')"
+        :title="t('sidebar.rerunSessionAria')"
+        @click.stop="emit('rerun')"
+      >
+        <Loader2 v-if="rerunning" class="size-3.5 animate-spin" />
+        <RotateCcw v-else class="size-3.5" />
+      </button>
+    </span>
     <button
-      v-if="isEditable"
+      v-if="isTerminal"
       type="button"
       :disabled="deleting"
       :class="treeNodeActionClass"
@@ -95,16 +95,7 @@
 <script setup lang="ts">
   import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import {
-    CircleDot,
-    CircleStop,
-    Copy,
-    Loader2,
-    Pencil,
-    RotateCcw,
-    SquareTerminal,
-    Trash2,
-  } from '@lucide/vue'
+  import { CircleStop, Copy, Loader2, Pencil, RotateCcw, SquareTerminal, Trash2 } from '@lucide/vue'
   import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
   import { treeNodeActionClass, treeNodeActionsClass } from '../session/sessionUi'
@@ -129,5 +120,6 @@
 
   const { t } = useI18n()
 
-  const isEditable = computed(() => ['stopped', 'failed'].includes(props.session.lifecycle_state))
+  const isRunning = computed(() => props.session.lifecycle_state === 'running')
+  const isTerminal = computed(() => ['stopped', 'failed'].includes(props.session.lifecycle_state))
 </script>

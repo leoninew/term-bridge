@@ -1,12 +1,14 @@
 <template>
-  <DialogRoot :open="open" @update:open="emit('update:open', $event)"
-    ><DialogPortal
-      ><DialogOverlay class="dialog-overlay" /><DialogContent class="dialog-content"
-        ><DialogTitle class="dialog-title">{{ t('dialog.editSessionTitle') }}</DialogTitle>
+  <DialogRoot :open="open" @update:open="emit('update:open', $event)">
+    <DialogPortal>
+      <DialogOverlay class="dialog-overlay" />
+      <DialogContent class="dialog-content">
+        <DialogTitle class="dialog-title">{{ t('dialog.editSessionTitle') }}</DialogTitle>
         <form class="dialog-form" @submit.prevent="submit">
           <SessionFormFields
             :cwd="cwd"
-            cwd-readonly
+            cwd-hidden
+            :command-disabled="launchMethodReadonly"
             :name="name"
             :command="command"
             :command-source="commandSource"
@@ -21,21 +23,22 @@
             @update:selected-shortcut-id="selectShortcut"
           />
           <div class="dialog-actions">
-            <DialogClose as-child
-              ><button type="button" class="button button-secondary">
+            <DialogClose as-child>
+              <button type="button" class="button button-secondary">
                 {{ t('common.cancel') }}
-              </button></DialogClose
-            ><button type="submit" class="button button-primary" :disabled="editing">
+              </button>
+            </DialogClose>
+            <button type="submit" class="button button-primary" :disabled="editing">
               {{ t('common.confirm') }}
             </button>
           </div>
-        </form></DialogContent
-      ></DialogPortal
-    ></DialogRoot
-  >
+        </form>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 </template>
 <script setup lang="ts">
-  import { ref, watch } from 'vue'
+  import { computed, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import {
     DialogClose,
@@ -60,7 +63,7 @@
     submit: [
       payload: {
         name: string
-        command: string
+        command?: string
         command_source?: CommandSource
         shortcut_id_snapshot?: string
         shortcut_name_snapshot?: string
@@ -75,6 +78,7 @@
   const selectedShortcutId = ref<string | null>(null)
   const selectedShortcutName = ref<string | null>(null)
   const commandChanged = ref(false)
+  const launchMethodReadonly = computed(() => props.session?.lifecycle_state === 'running')
   watch(
     () => props.open,
     (open) => {
@@ -89,6 +93,7 @@
     },
   )
   function selectCommandSource(source: CommandSource) {
+    if (launchMethodReadonly.value) return
     commandSource.value = source
     commandChanged.value = true
     if (source === 'command') return
@@ -101,6 +106,7 @@
   }
 
   function selectShortcut(id: string | null) {
+    if (launchMethodReadonly.value) return
     const shortcut = props.shortcuts.find((value) => value.id === id)
     if (!shortcut) return
     selectedShortcutId.value = shortcut.id
@@ -110,13 +116,19 @@
   }
 
   function updateCommand(value: string) {
+    if (launchMethodReadonly.value) return
     command.value = value
     commandChanged.value = true
   }
 
   function submit() {
+    const nextName = name.value.trim()
+    if (launchMethodReadonly.value) {
+      emit('submit', { name: nextName })
+      return
+    }
     emit('submit', {
-      name: name.value.trim(),
+      name: nextName,
       command: command.value,
       ...(commandChanged.value
         ? {

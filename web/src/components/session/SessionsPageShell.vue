@@ -78,6 +78,7 @@
   <CreateSessionDialog
     :open="dialogs.createSessionDialogOpen"
     :cwd="createDraft.cwd"
+    :cwd-hidden="!!createDraft.workspace"
     :name="createDraft.sessionName"
     :command="createDraft.commandText"
     :command-source="createDraft.commandSource"
@@ -396,7 +397,13 @@
     })
   }
 
-  async function editSelectedSession(payload: { name: string; command: string }) {
+  async function editSelectedSession(payload: {
+    name: string
+    command?: string
+    command_source?: string
+    shortcut_id_snapshot?: string
+    shortcut_name_snapshot?: string
+  }) {
     const session = dialogs.selectedSession
     if (!session || !isEditableLifecycle(session) || editAction.running) {
       return
@@ -405,15 +412,29 @@
       notifications.pushToast('error', t('toast.editSessionFailed'), t('message.nameRequired'))
       return
     }
-    if (!payload.command.trim()) {
+    const nameOnly = isActiveLifecycle(session)
+    if (!nameOnly && !payload.command?.trim()) {
       notifications.pushToast('error', t('toast.editSessionFailed'), t('message.commandRequired'))
       return
     }
     await editAction.run(async () => {
+      const request = nameOnly
+        ? { name: payload.name }
+        : {
+            name: payload.name,
+            command: payload.command,
+            ...(payload.command_source !== undefined
+              ? {
+                  command_source: payload.command_source,
+                  shortcut_id_snapshot: payload.shortcut_id_snapshot,
+                  shortcut_name_snapshot: payload.shortcut_name_snapshot,
+                }
+              : {}),
+          }
       const updated = await props.runtimeApi.updateSession(
         session.workspace_id,
         session.id,
-        payload,
+        request,
       )
       workspaceSessions.updateSession(updated)
       dialogs.selectedSession = updated
@@ -566,6 +587,8 @@
             props.runtimeApi.closeSession,
             workspaceSessions.updateSession,
           )
+          // Keep terminal strip in sync: closed running sessions drop their open tabs.
+          await closeTabs(sessions.map((session) => session.id))
           completed = true
         },
         { rethrow: true },
@@ -627,9 +650,8 @@
         async () => {
           const updated = await props.runtimeApi.closeSession(session.workspace_id, session.id)
           workspaceSessions.updateSession(updated)
-          await notifyHistoryError(
-            await workbench.ensureHistoryLoaded(props.runtimeTarget, props.runtimeApi, updated),
-          )
+          // Closing a running session from the sidebar should drop its terminal tab.
+          await closeTabs([session.id])
         },
         { rethrow: true },
       )
@@ -733,7 +755,7 @@
   }
 
   function isEditableLifecycle(session: SessionSummary) {
-    return ['stopped', 'failed'].includes(session.lifecycle_state)
+    return ['running', 'stopped', 'failed'].includes(session.lifecycle_state)
   }
 
   function handleTerminalState(message: ServerControlMessage) {

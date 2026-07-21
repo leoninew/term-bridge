@@ -30,7 +30,7 @@ const (
 	messageWorkspaceNotFound         = "Workspace was not found."
 	messageMissingName               = "Session name is required."
 	messageMissingCommand            = "Session command is required."
-	messageNotEditable               = "Only stopped or failed sessions can be edited."
+	messageNotEditable               = "Only stopped or failed sessions can change the launch command."
 	messageAlreadyRunning            = "Session is already running."
 	messageCannotRerunRunning        = "A running session cannot be rerun."
 	messageCannotDeleteRunning       = "A running session cannot be deleted."

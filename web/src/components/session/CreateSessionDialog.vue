@@ -7,6 +7,7 @@
         <form class="dialog-form" @submit.prevent="emit('submit')">
           <SessionFormFields
             :cwd="cwd"
+            :cwd-hidden="cwdHidden"
             :name="name"
             :command="command"
             :command-source="commandSource"
@@ -53,6 +54,8 @@
   defineProps<{
     open: boolean
     cwd: string
+    /** When true, directory field is omitted; cwd still submitted from draft. */
+    cwdHidden?: boolean
     name: string
     command: string
     commandSource: CommandSource

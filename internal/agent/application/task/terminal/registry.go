@@ -612,7 +612,13 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 	if err != nil {
 		return nil, err
 	}
-	if !session.Terminal(view.State.State) {
+	// Name-only renames are allowed while running; launch method changes require a terminal session.
+	commandUpdate := request.Command != nil
+	if commandUpdate {
+		if !session.Terminal(view.State.State) {
+			return nil, session.NotEditable()
+		}
+	} else if !view.State.State.Valid() {
 		return nil, session.NotEditable()
 	}
 	if request.Command != nil && commandSourceProvided {
@@ -623,7 +629,7 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 			return nil, err
 		}
 	}
-	updated, err := r.store.UpdateTerminalSession(workspaceId, sessionId, func(value *session.Session) error {
+	applyUpdate := func(value *session.Session) error {
 		if request.Name != nil {
 			value.Name = name
 		}
@@ -640,7 +646,13 @@ func (r *Registry) UpdateSession(workspaceId string, sessionId string, request *
 		}
 		value.UpdatedAt = time.Now().UTC()
 		return nil
-	})
+	}
+	var updated session.Session
+	if commandUpdate {
+		updated, err = r.store.UpdateTerminalSession(workspaceId, sessionId, applyUpdate)
+	} else {
+		updated, err = r.store.UpdateSession(workspaceId, sessionId, applyUpdate)
+	}
 	if err != nil {
 		if strings.Contains(err.Error(), "no longer terminal") {
 			return nil, session.NotEditable()

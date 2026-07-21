@@ -532,15 +532,21 @@ func TestUpdateTerminalSessionChangesNameAndPreservesRawCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
-	if _, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{Name: stringPointer("New name")}); err == nil {
-		t.Fatal("UpdateSession() error = nil, want running session rejection")
+	runningName := "Running name"
+	if summary, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{Name: &runningName}); err != nil {
+		t.Fatalf("UpdateSession(name while running) error = %v", err)
+	} else if summary.Name != runningName {
+		t.Fatalf("UpdateSession(name while running) name = %q, want %q", summary.Name, runningName)
+	}
+	commandText := `ccs run c1 --prompt "review changes"`
+	if _, err := registry.UpdateSession(response.WorkspaceId, response.SessionId, &agent.UpdateSessionReq{Command: &commandText}); err == nil {
+		t.Fatal("UpdateSession(command while running) error = nil, want rejection")
 	}
 	fake.finish(termpty.Result{ExitCode: 0})
 	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 	waitRuntimeRemoved(t, registry, response.SessionId)
 
 	newName := "New name"
-	commandText := `ccs run c1 --prompt "review changes"`
 	commandSource := string(session.CommandSourceShortcut)
 	shortcutIdSnapshot := "shortcut-1"
 	shortcutNameSnapshot := "Review shortcut"
@@ -627,10 +633,6 @@ type fakeShortcutStore struct {
 
 func (s fakeShortcutStore) ListShortcuts() ([]shortcutmodel.Shortcut, error) {
 	return s.values, s.err
-}
-
-func stringPointer(value string) *string {
-	return &value
 }
 
 func TestDeleteSessionRejectsRunningAndAllowsStopped(t *testing.T) {

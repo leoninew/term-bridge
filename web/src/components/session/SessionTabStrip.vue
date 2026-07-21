@@ -40,18 +40,17 @@
             :value="tab.sessionId"
             class="tab-drag-handle grid h-full w-full min-w-0 cursor-pointer grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-1 border-0 bg-transparent px-2 pr-6 text-left text-sm leading-tight text-inherit outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-primary-border)]"
           >
-            <span
-              class="inline-flex size-5 items-center justify-center text-[var(--color-text-subtle)] group-data-[active=true]:text-[var(--color-text-muted)]"
-              aria-hidden="true"
-            >
-              <SquareTerminal class="size-3.5" />
+            <span class="inline-flex size-5 items-center justify-center" aria-hidden="true">
+              <SquareTerminal
+                class="size-3.5"
+                :class="
+                  sessionLifecycleState(tab.workspaceId, tab.sessionId) === 'running'
+                    ? lifecycleStateClassName('running')
+                    : 'text-[var(--color-text-subtle)] group-data-[active=true]:text-[var(--color-text-muted)]'
+                "
+              />
             </span>
-            <span
-              class="min-w-0 truncate"
-              :class="
-                lifecycleStateClassName(sessionLifecycleState(tab.workspaceId, tab.sessionId))
-              "
-            >
+            <span class="min-w-0 truncate">
               {{ sessionTitle(tab.workspaceId, tab.sessionId) }}
             </span>
           </TabsTrigger>
@@ -126,15 +125,15 @@
             @select="emit('activateTab', tab.sessionId)"
           >
             <SquareTerminal
-              class="size-4 shrink-0 text-[var(--color-text-subtle)]"
+              class="size-4 shrink-0"
+              :class="
+                sessionLifecycleState(tab.workspaceId, tab.sessionId) === 'running'
+                  ? lifecycleStateClassName('running')
+                  : 'text-[var(--color-text-subtle)]'
+              "
               aria-hidden="true"
             />
-            <span
-              class="min-w-0 flex-1 truncate"
-              :class="
-                lifecycleStateClassName(sessionLifecycleState(tab.workspaceId, tab.sessionId))
-              "
-            >
+            <span class="min-w-0 flex-1 truncate">
               {{ sessionTitle(tab.workspaceId, tab.sessionId) }}
             </span>
             <span
