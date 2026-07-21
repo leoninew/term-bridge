@@ -378,7 +378,6 @@ async function initializeWorkbench(container: HTMLElement): Promise<void> {
       nameLong: 'TermBridge Code',
       applicationName: 'termbridge',
       dataFolderName: '.termbridge-code',
-      version: '0.84.7',
     },
   }
 
