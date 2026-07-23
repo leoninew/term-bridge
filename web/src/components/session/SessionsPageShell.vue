@@ -629,7 +629,9 @@
     createDraft.populateFromSession(
       session,
       workspace,
-      workspaceSessions.sessions.map((existingSession) => existingSession.name),
+      workspaceSessions.sessions
+        .filter((existingSession) => existingSession.workspace_id === session.workspace_id)
+        .map((existingSession) => existingSession.name),
       enabledShortcuts.value,
     )
     dialogs.openCreateSessionDialog()

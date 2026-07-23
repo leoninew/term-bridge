@@ -185,6 +185,15 @@ describe('useCreateSessionDraft', () => {
     expect(draft.sessionName).toBe('Build_2')
   })
 
+  it('starts at suffix 1 when only the source name exists in the provided name set', () => {
+    const draft = useCreateSessionDraft()
+
+    // Callers should pass same-workspace names only; cross-workspace names must not consume suffixes.
+    draft.populateFromSession(session({ name: '开发' }), workspace, ['开发'], [])
+
+    expect(draft.sessionName).toBe('开发_1')
+  })
+
   it('prefills a copied shortcut session from its current shortcut', () => {
     const draft = useCreateSessionDraft()
     const copiedShortcut = shortcut('shortcut-1', 'Review', 'codex review')
