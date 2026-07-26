@@ -157,12 +157,12 @@ describe('useCreateSessionDraft', () => {
     draft.populateFromSession(
       session(),
       workspace,
-      ['Build', 'Build_2', 'Build_3'],
+      ['Build', 'Build-2', 'Build-3'],
       [shortcut('shortcut-1', 'Review', 'codex review')],
     )
 
     expect(draft.workspace?.id).toBe(workspace.id)
-    expect(draft.sessionName).toBe('Build_1')
+    expect(draft.sessionName).toBe('Build-1')
     expect(draft.cwd).toBe(workspace.path)
     expect(draft.commandSource).toBe('command')
     expect(draft.commandText).toBe('npm run build')
@@ -172,17 +172,17 @@ describe('useCreateSessionDraft', () => {
   it('increments a trailing numeric suffix when copying a numbered session name', () => {
     const draft = useCreateSessionDraft()
 
-    draft.populateFromSession(session({ name: 'Build_1' }), workspace, ['Build_1'], [])
+    draft.populateFromSession(session({ name: 'Build-1' }), workspace, ['Build-1'], [])
 
-    expect(draft.sessionName).toBe('Build_2')
+    expect(draft.sessionName).toBe('Build-2')
   })
 
   it('fills the first free suffix after stripping a trailing numeric suffix', () => {
     const draft = useCreateSessionDraft()
 
-    draft.populateFromSession(session({ name: 'Build_3' }), workspace, ['Build_1', 'Build_3'], [])
+    draft.populateFromSession(session({ name: 'Build-3' }), workspace, ['Build-1', 'Build-3'], [])
 
-    expect(draft.sessionName).toBe('Build_2')
+    expect(draft.sessionName).toBe('Build-2')
   })
 
   it('starts at suffix 1 when only the source name exists in the provided name set', () => {
@@ -191,7 +191,7 @@ describe('useCreateSessionDraft', () => {
     // Callers should pass same-workspace names only; cross-workspace names must not consume suffixes.
     draft.populateFromSession(session({ name: '开发' }), workspace, ['开发'], [])
 
-    expect(draft.sessionName).toBe('开发_1')
+    expect(draft.sessionName).toBe('开发-1')
   })
 
   it('prefills a copied shortcut session from its current shortcut', () => {
@@ -207,11 +207,11 @@ describe('useCreateSessionDraft', () => {
         shortcut_name_snapshot: copiedShortcut.name,
       }),
       workspace,
-      ['Review', 'Review_1'],
+      ['Review', 'Review-1'],
       [copiedShortcut],
     )
 
-    expect(draft.sessionName).toBe('Review_2')
+    expect(draft.sessionName).toBe('Review-2')
     expect(draft.commandSource).toBe('shortcut')
     expect(draft.commandText).toBe('codex review --saved')
     expect(draft.selectedShortcutId).toBe(copiedShortcut.id)

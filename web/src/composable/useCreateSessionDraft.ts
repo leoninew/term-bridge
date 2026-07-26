@@ -146,13 +146,13 @@ function nextCopiedSessionName(name: string, existingSessionNames: Iterable<stri
   const existingNames = new Set(existingSessionNames)
   const baseName = baseCopiedSessionName(name)
   let sequence = 1
-  while (existingNames.has(`${baseName}_${sequence}`)) {
+  while (existingNames.has(`${baseName}-${sequence}`)) {
     sequence += 1
   }
-  return `${baseName}_${sequence}`
+  return `${baseName}-${sequence}`
 }
 
 function baseCopiedSessionName(name: string) {
-  const match = /^(.*)_(\d+)$/.exec(name)
+  const match = /^(.*)-(\d+)$/.exec(name)
   return match?.[1] ?? name
 }
