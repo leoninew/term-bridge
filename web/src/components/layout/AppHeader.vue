@@ -10,6 +10,13 @@
     </RouterLink>
 
     <div class="flex shrink-0 items-center gap-1.5 sm:gap-3">
+      <RouterLink
+        :to="{ name: 'docs' }"
+        :aria-label="t('common.help')"
+        class="inline-flex size-9 items-center justify-center rounded-md text-[var(--color-text-subtle)] outline-none hover:bg-[var(--color-control-hover)] hover:text-[var(--color-text)] focus:bg-[var(--color-control-hover)] focus:text-[var(--color-text)]"
+      >
+        <BookOpen class="size-4" aria-hidden="true" />
+      </RouterLink>
       <a
         href="https://github.com/leoninew/TermBridge-go"
         target="_blank"
@@ -27,6 +34,7 @@
 </template>
 
 <script setup lang="ts">
+  import { BookOpen } from '@lucide/vue'
   import { useI18n } from 'vue-i18n'
   import { RouterLink } from 'vue-router'
   import BrandMark from '../branding/BrandMark.vue'

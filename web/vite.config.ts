@@ -52,6 +52,9 @@ export default defineConfig({
   server: {
     host: 'localhost',
     port: 9030,
+    fs: {
+      allow: ['..'],
+    },
     proxy: {
       '/local-api': {
         target: 'http://127.0.0.1:9031',

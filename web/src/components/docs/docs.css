@@ -1,0 +1,129 @@
+.doc-markdown {
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.doc-markdown > * + * {
+  margin-top: 1.25rem;
+}
+
+.doc-markdown h1,
+.doc-markdown h2,
+.doc-markdown h3 {
+  scroll-margin-top: 5.5rem;
+  color: var(--color-text-strong);
+  font-weight: 650;
+  letter-spacing: -0.018em;
+}
+
+.doc-markdown h2 {
+  margin-top: 3rem;
+  font-size: 1.5rem;
+  line-height: 1.35;
+}
+
+.doc-markdown h3 {
+  margin-top: 2rem;
+  font-size: 1.125rem;
+  line-height: 1.45;
+}
+
+.doc-markdown a {
+  color: var(--color-primary-text);
+  text-decoration: underline;
+  text-decoration-color: var(--color-primary-border);
+  text-underline-offset: 3px;
+}
+
+.doc-markdown a:hover {
+  color: var(--color-text-strong);
+}
+
+.doc-markdown ul,
+.doc-markdown ol {
+  padding-left: 1.35rem;
+}
+
+.doc-markdown ul {
+  list-style: disc;
+}
+
+.doc-markdown ol {
+  list-style: decimal;
+}
+
+.doc-markdown ul ul {
+  list-style: circle;
+}
+
+.doc-markdown ol ol {
+  list-style: lower-alpha;
+}
+
+.doc-markdown li + li {
+  margin-top: 0.4rem;
+}
+
+.doc-markdown blockquote {
+  border-left: 3px solid var(--color-primary-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  padding: 0.9rem 1rem;
+}
+
+.doc-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 0.625rem;
+  background: var(--color-terminal-bg);
+  color: var(--color-terminal-fg);
+  padding: 1rem;
+}
+
+.doc-markdown code {
+  border-radius: 0.25rem;
+  background: var(--color-control-hover);
+  color: var(--color-text-strong);
+  padding: 0.1rem 0.3rem;
+  font-size: 0.875em;
+}
+
+.doc-markdown pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.doc-markdown table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.doc-markdown th,
+.doc-markdown td {
+  border: 1px solid var(--color-border);
+  padding: 0.65rem 0.8rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.doc-markdown th {
+  background: var(--color-surface-muted);
+  color: var(--color-text-strong);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .doc-markdown {
+    font-size: 0.9375rem;
+  }
+
+  .doc-markdown h2 {
+    font-size: 1.3rem;
+  }
+}

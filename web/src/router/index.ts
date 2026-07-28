@@ -28,6 +28,12 @@ export const router = createRouter({
       meta: { mode: 'hybrid' },
     },
     {
+      path: '/doc',
+      name: 'docs',
+      component: () => import('../views/DocView.vue'),
+      meta: { mode: 'hybrid' },
+    },
+    {
       path: '/login',
       name: 'cloud-login',
       component: () => import('../views/cloud/LoginView.vue'),
