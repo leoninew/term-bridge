@@ -227,6 +227,7 @@
     shortcuts.value.filter((shortcut) => shortcut.enabled !== false),
   )
   const stoppingSessionId = ref<string | null>(null)
+  const stoppingWorkspaceId = ref<string | null>(null)
   const rerunningSessionId = ref<string | null>(null)
   const deletingSessionId = ref<string | null>(null)
   const removingWorkspaceId = ref<string | null>(null)
@@ -554,6 +555,10 @@
     await closeTabs([sessionId])
   }
 
+  async function closeAllTabs() {
+    await closeTabs(workbench.openedTabs.map((tab) => tab.sessionId))
+  }
+
   async function closeTerminalTabs() {
     await closeTabs(terminalTabs.value.map((tab) => tab.sessionId))
   }
@@ -674,6 +679,40 @@
       // notify handled by stopAction.onError
     } finally {
       stoppingSessionId.value = null
+    }
+  }
+
+  async function stopWorkspaceSessionsFromSidebar(workspace: WorkspaceSummary) {
+    if (stoppingWorkspaceId.value || stopAction.running) {
+      return
+    }
+    const runningSessions =
+      sessionWorkspaceTree.value
+        .find((workspaceTreeNode) => workspaceTreeNode.id === workspace.id)
+        ?.children.filter(isStoppableLifecycle) ?? []
+    if (runningSessions.length === 0) {
+      return
+    }
+
+    stoppingWorkspaceId.value = workspace.id
+    try {
+      await stopAction.run(
+        async () => {
+          for (const session of runningSessions) {
+            stoppingSessionId.value = session.id
+            const updated = await props.runtimeApi.closeSession(session.workspace_id, session.id)
+            workspaceSessions.updateSession(updated)
+            await closeTabs([session.id])
+          }
+        },
+        { rethrow: true },
+      )
+    } catch {
+      // notify handled by stopAction.onError
+    } finally {
+      stoppingSessionId.value = null
+      stoppingWorkspaceId.value = null
+      await refresh()
     }
   }
 
@@ -836,6 +875,7 @@
     activeSessionId: workbench.activeSessionId,
     activeWorkspace: activeWorkspaceForViewSwitch.value,
     stoppingSessionId: stoppingSessionId.value,
+    stoppingWorkspaceId: stoppingWorkspaceId.value,
     rerunningSessionId: rerunningSessionId.value,
     deletingSessionId: deletingSessionId.value,
     removingWorkspaceId: removingWorkspaceId.value,
@@ -851,6 +891,7 @@
     copySession: openCopiedSessionForm,
     editSession: openEditSessionDialog,
     stopSession: stopSessionFromSidebar,
+    stopWorkspaceSessions: stopWorkspaceSessionsFromSidebar,
     rerunSession: rerunSessionFromSidebar,
     deleteSession: openDeleteSessionDialog,
     removeWorkspace: dialogs.openRemoveWorkspaceDialog,
@@ -895,6 +936,7 @@
   const workbenchListeners = {
     activateTab: activateOpenedTab,
     closeTab,
+    closeAllTabs,
     closeTerminalTabs,
     openAllRunningTabs,
     openCloseBackgroundSessionsDrawer,

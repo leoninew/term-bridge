@@ -103,6 +103,15 @@
             {{ t('workbench.openAllRunningTabs') }}
           </DropdownMenuItem>
           <DropdownMenuItem
+            :disabled="openedTabs.length === 0"
+            :title="t('workbench.closeAllTabsDescription')"
+            :class="sessionMenuItemInteractiveClass"
+            @select="emit('closeAllTabs')"
+          >
+            <X class="size-4 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
+            {{ t('workbench.closeAllTabs') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem
             :disabled="!hasTerminalTabs"
             :title="t('workbench.closeTerminalTabsDescription')"
             :class="sessionMenuItemInteractiveClass"
@@ -114,6 +123,7 @@
             />
             {{ t('workbench.closeTerminalTabs') }}
           </DropdownMenuItem>
+          <div class="my-1 border-t border-[var(--color-border)]" role="separator" />
           <DropdownMenuItem
             :disabled="!hasBackgroundRunningSessions"
             :title="t('workbench.closeBackgroundSessionsDescription')"
@@ -210,6 +220,7 @@
   const emit = defineEmits<{
     activateTab: [sessionId: string]
     closeTab: [workspaceId: string, sessionId: string]
+    closeAllTabs: []
     closeTerminalTabs: []
     openAllRunningTabs: []
     openCloseBackgroundSessionsDrawer: []

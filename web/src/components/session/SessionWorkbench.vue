@@ -20,6 +20,7 @@
         :disable-tab-reorder="disableTabReorder"
         @activate-tab="emit('activateTab', $event)"
         @close-tab="(workspaceId, sessionId) => emit('closeTab', workspaceId, sessionId)"
+        @close-all-tabs="emit('closeAllTabs')"
         @close-terminal-tabs="emit('closeTerminalTabs')"
         @open-all-running-tabs="emit('openAllRunningTabs')"
         @open-close-background-sessions-drawer="emit('openCloseBackgroundSessionsDrawer')"
@@ -157,6 +158,7 @@
   const emit = defineEmits<{
     activateTab: [sessionId: string]
     closeTab: [workspaceId: string, sessionId: string]
+    closeAllTabs: []
     closeTerminalTabs: []
     openAllRunningTabs: []
     openCloseBackgroundSessionsDrawer: []

@@ -108,14 +108,27 @@
                   <Plus class="size-3.5" />
                 </button>
                 <button
+                  v-if="workspaceHasRunningSessions(workspace.workspace)"
                   type="button"
-                  :disabled="
-                    !canRemoveWorkspace(workspace) ||
-                    props.removingWorkspaceId === workspace.workspace.id
-                  "
+                  :disabled="props.stoppingWorkspaceId === workspace.workspace.id"
                   :class="treeNodeActionClass"
-                  :aria-label="removeWorkspaceLabel(workspace)"
-                  :title="removeWorkspaceLabel(workspace)"
+                  :aria-label="t('sidebar.stopWorkspaceSessionsAria')"
+                  :title="t('sidebar.stopWorkspaceSessionsAria')"
+                  @click.stop="emit('stopWorkspaceSessions', workspace.workspace)"
+                >
+                  <Loader2
+                    v-if="props.stoppingWorkspaceId === workspace.workspace.id"
+                    class="size-3.5 animate-spin"
+                  />
+                  <CircleStop v-else class="size-3.5" />
+                </button>
+                <button
+                  v-else
+                  type="button"
+                  :disabled="props.removingWorkspaceId === workspace.workspace.id"
+                  :class="treeNodeActionClass"
+                  :aria-label="t('sidebar.removeWorkspaceAria')"
+                  :title="t('sidebar.removeWorkspaceAria')"
                   @click.stop="emit('removeWorkspace', workspace.workspace)"
                 >
                   <Loader2
@@ -179,7 +192,7 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { Folder, FolderOpen, Loader2, Plus, Trash2 } from '@lucide/vue'
+  import { CircleStop, Folder, FolderOpen, Loader2, Plus, Trash2 } from '@lucide/vue'
   import VscodeCodicon from '../branding/VscodeCodicon.vue'
   import { VueDraggable } from 'vue-draggable-plus'
   import type { SortableEvent } from 'sortablejs'
@@ -230,6 +243,7 @@
     stoppingSessionId: string | null
     rerunningSessionId: string | null
     deletingSessionId: string | null
+    stoppingWorkspaceId: string | null
     removingWorkspaceId: string | null
     loading?: boolean
     loadError?: string | null
@@ -245,6 +259,7 @@
     copySession: [session: SessionSummary]
     editSession: [session: SessionSummary]
     stopSession: [session: SessionSummary]
+    stopWorkspaceSessions: [workspace: WorkspaceSummary]
     rerunSession: [session: SessionSummary]
     deleteSession: [session: SessionSummary]
     removeWorkspace: [workspace: WorkspaceSummary]
@@ -391,6 +406,11 @@
     return workspace.children.some((session) => isActiveSession(session))
   }
 
+  function workspaceHasRunningSessions(workspace: WorkspaceSummary) {
+    const workspaceTreeNode = props.workspaceTree.find((item) => item.id === workspace.id)
+    return workspaceTreeNode ? hasRunningSession(workspaceTreeNode) : false
+  }
+
   watch(
     () => props.workspaceTree,
     (tree) => {
@@ -460,17 +480,6 @@
 
   function isActiveSession(session: SessionSummary) {
     return session.lifecycle_state === 'running'
-  }
-
-  function canRemoveWorkspace(workspace: WorkspaceTreeItem) {
-    return workspace.children.every((child) => !isActiveSession(child.session))
-  }
-
-  function removeWorkspaceLabel(workspace: WorkspaceTreeItem) {
-    if (canRemoveWorkspace(workspace)) {
-      return t('sidebar.removeWorkspaceAria')
-    }
-    return t('sidebar.removeWorkspaceDisabledAria')
   }
 
   function sessionsFor(workspace: WorkspaceTreeSummary): SessionSummary[] {

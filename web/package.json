@@ -1,7 +1,7 @@
 {
   "name": "termbridge-web",
   "description": "Web terminal prototype for TermBridge Gate precursor.",
-  "version": "0.106.2",
+  "version": "0.109.0",
   "private": true,
   "license": "MIT",
   "type": "module",
