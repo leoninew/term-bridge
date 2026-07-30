@@ -1,12 +1,12 @@
 <template>
-  <section class="space-y-2">
+  <section class="w-full min-w-0 space-y-2">
     <label class="block text-sm font-medium text-[var(--color-text)]" for="turnstile-widget">
       {{ t('cloud.humanVerification') }}
     </label>
     <div
       id="turnstile-widget"
       ref="widget"
-      class="flex min-h-[65px] w-full justify-center overflow-hidden"
+      class="turnstile-widget flex min-h-[65px] w-full min-w-0 justify-center"
     />
     <p v-if="error" class="text-xs text-[var(--color-danger-text)]" role="alert">
       {{ error }}
@@ -131,3 +131,11 @@
 
   defineExpose({ reset })
 </script>
+
+<style scoped>
+  .turnstile-widget :deep(> div),
+  .turnstile-widget :deep(iframe) {
+    width: 100% !important;
+    max-width: 100%;
+  }
+</style>
