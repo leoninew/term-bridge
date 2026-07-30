@@ -150,6 +150,7 @@
   import {
     closeSessionsSerially,
     normalizedSessionWorkspaceTree,
+    runningSessionWorkspaceTreeTargets,
     selectedSessionWorkspaceTreeTargets,
     terminalTabTargets,
     type SessionIdentity,
@@ -282,11 +283,15 @@
   const sessionWorkspaceTree = computed(() =>
     normalizedSessionWorkspaceTree(workspaceSessions.workspaceTree),
   )
-  const hasRunningSessions = computed(() =>
-    sessionWorkspaceTree.value.some((workspace) =>
-      workspace.children.some((session) => session.lifecycle_state === 'running'),
-    ),
+  const hasRunningSessions = computed(
+    () => runningSessionWorkspaceTreeTargets(sessionWorkspaceTree.value).length > 0,
   )
+  const hasUnopenedRunningSessions = computed(() => {
+    const openedSessionIds = new Set(workbench.openedTabs.map((tab) => tab.sessionId))
+    return runningSessionWorkspaceTreeTargets(sessionWorkspaceTree.value).some(
+      (session) => !openedSessionIds.has(session.id),
+    )
+  })
 
   async function refresh() {
     workspaceTreeError.value = null
@@ -551,6 +556,19 @@
 
   async function closeTerminalTabs() {
     await closeTabs(terminalTabs.value.map((tab) => tab.sessionId))
+  }
+
+  function openAllRunningTabs() {
+    const runningSessions = runningSessionWorkspaceTreeTargets(sessionWorkspaceTree.value)
+    if (runningSessions.length === 0) {
+      return
+    }
+    for (const session of runningSessions) {
+      workbench.ensureTab(session)
+    }
+    if (!workbench.activeSessionId) {
+      workbench.setActiveSession(runningSessions[0].id)
+    }
   }
 
   function openCloseBackgroundSessionsDrawer() {
@@ -866,6 +884,7 @@
     loading: workspaceSessions.loading && workbench.openedTabs.length === 0,
     hasTerminalTabs: terminalTabs.value.length > 0,
     hasBackgroundRunningSessions: hasRunningSessions.value,
+    hasUnopenedRunningSessions: hasUnopenedRunningSessions.value,
     sessionTitle,
     sessionLifecycleState,
     disableTabReorder: disableReorder.value,
@@ -877,6 +896,7 @@
     activateTab: activateOpenedTab,
     closeTab,
     closeTerminalTabs,
+    openAllRunningTabs,
     openCloseBackgroundSessionsDrawer,
     reorderTabs: (tabs: typeof workbench.openedTabs) => {
       workbench.openedTabs = tabs

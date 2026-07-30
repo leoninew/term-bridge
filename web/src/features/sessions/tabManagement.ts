@@ -28,6 +28,14 @@ export function normalizedSessionWorkspaceTree(
   }))
 }
 
+export function runningSessionWorkspaceTreeTargets(
+  workspaceTree: WorkspaceTreeNode[],
+): SessionSummary[] {
+  return workspaceTree.flatMap((workspace) =>
+    workspace.children.filter((session) => session.lifecycle_state === 'running'),
+  )
+}
+
 export function defaultBackgroundSessionSelectionKeys(
   workspaceTree: WorkspaceTreeNode[],
   openedTabs: OpenSessionTab[],

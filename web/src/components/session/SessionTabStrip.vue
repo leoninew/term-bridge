@@ -91,6 +91,18 @@
           class="z-50 max-h-80 w-72 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm text-[var(--color-text)] shadow-xl"
         >
           <DropdownMenuItem
+            :disabled="!hasUnopenedRunningSessions"
+            :title="t('workbench.openAllRunningTabsDescription')"
+            :class="sessionMenuItemInteractiveClass"
+            @select="emit('openAllRunningTabs')"
+          >
+            <PanelsTopLeft
+              class="size-4 shrink-0 text-[var(--color-text-subtle)]"
+              aria-hidden="true"
+            />
+            {{ t('workbench.openAllRunningTabs') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem
             :disabled="!hasTerminalTabs"
             :title="t('workbench.closeTerminalTabsDescription')"
             :class="sessionMenuItemInteractiveClass"
@@ -151,7 +163,14 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n'
-  import { CircleStop, MoreHorizontal, SquareTerminal, UnfoldHorizontal, X } from '@lucide/vue'
+  import {
+    CircleStop,
+    MoreHorizontal,
+    PanelsTopLeft,
+    SquareTerminal,
+    UnfoldHorizontal,
+    X,
+  } from '@lucide/vue'
   import {
     DropdownMenuContent,
     DropdownMenuItem,
@@ -176,6 +195,7 @@
       activeSessionId: string | null
       hasTerminalTabs: boolean
       hasBackgroundRunningSessions: boolean
+      hasUnopenedRunningSessions: boolean
       sessionTitle: (workspaceId: string, sessionId: string) => string
       sessionLifecycleState: (workspaceId: string, sessionId: string) => string
       showSidebarToggle?: boolean
@@ -191,6 +211,7 @@
     activateTab: [sessionId: string]
     closeTab: [workspaceId: string, sessionId: string]
     closeTerminalTabs: []
+    openAllRunningTabs: []
     openCloseBackgroundSessionsDrawer: []
     reorderTabs: [tabs: OpenSessionTab[]]
     toggleSidebar: []

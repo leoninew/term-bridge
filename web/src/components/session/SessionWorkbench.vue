@@ -13,6 +13,7 @@
         :active-session-id="activeSessionId"
         :has-terminal-tabs="hasTerminalTabs"
         :has-background-running-sessions="hasBackgroundRunningSessions"
+        :has-unopened-running-sessions="hasUnopenedRunningSessions"
         :session-title="sessionTitle"
         :session-lifecycle-state="sessionLifecycleState"
         :show-sidebar-toggle="showSidebarToggle"
@@ -20,6 +21,7 @@
         @activate-tab="emit('activateTab', $event)"
         @close-tab="(workspaceId, sessionId) => emit('closeTab', workspaceId, sessionId)"
         @close-terminal-tabs="emit('closeTerminalTabs')"
+        @open-all-running-tabs="emit('openAllRunningTabs')"
         @open-close-background-sessions-drawer="emit('openCloseBackgroundSessionsDrawer')"
         @reorder-tabs="emit('reorderTabs', $event)"
         @toggle-sidebar="emit('toggleSidebar')"
@@ -135,6 +137,7 @@
       resolveWsUrl: (workspaceId: string, sessionId: string) => string | null
       hasTerminalTabs: boolean
       hasBackgroundRunningSessions: boolean
+      hasUnopenedRunningSessions: boolean
       sessionTitle: (workspaceId: string, sessionId: string) => string
       sessionLifecycleState: (workspaceId: string, sessionId: string) => string
       loading?: boolean
@@ -155,6 +158,7 @@
     activateTab: [sessionId: string]
     closeTab: [workspaceId: string, sessionId: string]
     closeTerminalTabs: []
+    openAllRunningTabs: []
     openCloseBackgroundSessionsDrawer: []
     reorderTabs: [tabs: OpenSessionTab[]]
     openCreate: []

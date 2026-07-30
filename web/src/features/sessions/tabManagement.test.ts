@@ -8,6 +8,7 @@ import {
   closeSessionsSerially,
   defaultBackgroundSessionSelectionKeys,
   normalizedSessionWorkspaceTree,
+  runningSessionWorkspaceTreeTargets,
   selectedSessionWorkspaceTreeTargets,
   sessionIdentityKey,
   terminalTabTargets,
@@ -102,6 +103,22 @@ describe('tab management', () => {
       treeNode('workspace-3', []),
     ])
     expect(input[0]?.children[2]?.workspace_id).toBe('')
+  })
+
+  it('returns every running session in workspace order', () => {
+    const first = session({ id: 'first', workspace_id: 'workspace-1' })
+    const stopped = session({
+      id: 'stopped',
+      workspace_id: 'workspace-1',
+      lifecycle_state: 'stopped',
+    })
+    const second = session({ id: 'second', workspace_id: 'workspace-2' })
+    const tree = normalizedSessionWorkspaceTree([
+      treeNode('workspace-1', [first, stopped]),
+      treeNode('workspace-2', [second]),
+    ])
+
+    expect(runningSessionWorkspaceTreeTargets(tree)).toEqual([first, second])
   })
 
   it('defaults only unopened running sessions to selected with workspace-scoped tab identities', () => {
