@@ -19,6 +19,11 @@
       aria-hidden="true"
     />
     <span class="min-w-0 flex-1 truncate text-sm">{{ session.name || session.command }}</span>
+    <span
+      class="hidden min-w-0 max-w-32 shrink truncate text-xs text-[var(--color-text-subtle)] group-hover:block group-focus-within:block"
+    >
+      {{ launchDescription }}
+    </span>
 
     <!-- Running: edit + copy on hover; stop always visible. -->
     <span v-if="isRunning" :class="treeNodeActionsClass">
@@ -99,6 +104,7 @@
   import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
   import { treeNodeActionClass, treeNodeActionsClass } from '../session/sessionUi'
+  import { isShortcutLaunchMethod } from '../session/launchMethod'
 
   const props = defineProps<{
     session: SessionSummary
@@ -122,4 +128,10 @@
 
   const isRunning = computed(() => props.session.lifecycle_state === 'running')
   const isTerminal = computed(() => ['stopped', 'failed'].includes(props.session.lifecycle_state))
+  const launchDescription = computed(() => {
+    const shortcutName = props.session.shortcut_name_snapshot.trim()
+    const launchedFromShortcut =
+      isShortcutLaunchMethod(props.session.command_source) && shortcutName
+    return launchedFromShortcut ? shortcutName : props.session.command.trim()
+  })
 </script>
