@@ -135,6 +135,31 @@ describe('useWorkbenchStore', () => {
     expect(store.activeSessionId).toBeNull()
   })
 
+  it('selects the next tab from the visible workspace when closing a filtered tab', async () => {
+    const store = useWorkbenchStore()
+    const first = session({ id: 'session-1', workspace_id: 'workspace-1' })
+    const hidden = session({ id: 'session-2', workspace_id: 'workspace-2' })
+    const active = session({ id: 'session-3', workspace_id: 'workspace-1' })
+    const sessions = [first, hidden, active]
+    const resolver = (workspaceId: string, sessionId: string) =>
+      sessions.find((item) => item.workspace_id === workspaceId && item.id === sessionId) ?? null
+
+    for (const item of sessions) {
+      await store.openSession(null, runtimeApi, item)
+    }
+    store.setActiveSession(active.id)
+
+    expect(
+      store.closeTabs(
+        [active.id],
+        resolver,
+        store.openedTabs.filter((tab) => tab.workspaceId === first.workspace_id),
+      ),
+    ).toEqual(first)
+    expect(store.activeSessionId).toBe(first.id)
+    expect(store.openedTabs.map((tab) => tab.sessionId)).toEqual([first.id, hidden.id])
+  })
+
   it('leaves tab state unchanged when bulk targets are not open', async () => {
     const store = useWorkbenchStore()
     const first = session()

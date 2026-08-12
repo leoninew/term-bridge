@@ -73,11 +73,7 @@ export const useWorkspaceSessionsStore = defineStore('workspaceSessions', () => 
   }
 
   function sessionTitle(session: SessionSummary | null): string {
-    if (!session) {
-      return ''
-    }
-    const workspace = workspaceById(session.workspace_id)
-    return workspace ? `${session.name} · ${workspace.name}` : session.name
+    return session?.name ?? ''
   }
 
   function upsertSession(updated: SessionSummary): boolean {

@@ -117,7 +117,7 @@
 
   <CloseBackgroundSessionsDrawer
     :open="closeBackgroundSessionsDrawerOpen"
-    :workspace-tree="sessionWorkspaceTree"
+    :workspace-tree="scopedSessionWorkspaceTree"
     :opened-tabs="workbench.openedTabs"
     :closing="closingBackgroundSessions"
     @update:open="closeBackgroundSessionsDrawerOpen = $event"
@@ -278,19 +278,32 @@
     return workspaceSessions.workspaceById(tab.workspaceId)
   })
 
+  const selectedWorkspaceId = ref<string | null>(null)
+  const visibleOpenedTabs = computed(() =>
+    selectedWorkspaceId.value
+      ? workbench.openedTabs.filter((tab) => tab.workspaceId === selectedWorkspaceId.value)
+      : workbench.openedTabs,
+  )
   const terminalTabs = computed(() =>
-    terminalTabTargets(workbench.openedTabs, workspaceSessions.sessionById),
+    terminalTabTargets(visibleOpenedTabs.value, workspaceSessions.sessionById),
   )
   const sessionWorkspaceTree = computed(() =>
     normalizedSessionWorkspaceTree(workspaceSessions.workspaceTree),
   )
+  const scopedSessionWorkspaceTree = computed(() =>
+    selectedWorkspaceId.value
+      ? sessionWorkspaceTree.value.filter((workspace) => workspace.id === selectedWorkspaceId.value)
+      : sessionWorkspaceTree.value,
+  )
   const hasRunningSessions = computed(
-    () => runningSessionWorkspaceTreeTargets(sessionWorkspaceTree.value).length > 0,
+    () => runningSessionWorkspaceTreeTargets(scopedSessionWorkspaceTree.value).length > 0,
   )
   const hasUnopenedRunningSessions = computed(() => {
     const openedSessionIds = new Set(workbench.openedTabs.map((tab) => tab.sessionId))
     return runningSessionWorkspaceTreeTargets(sessionWorkspaceTree.value).some(
-      (session) => !openedSessionIds.has(session.id),
+      (session) =>
+        (!selectedWorkspaceId.value || session.workspace_id === selectedWorkspaceId.value) &&
+        !openedSessionIds.has(session.id),
     )
   })
 
@@ -494,6 +507,9 @@
           await props.runtimeApi.deleteWorkspace(workspace.id)
           const removedSessions = workspaceSessions.removeWorkspace(workspace.id)
           workbench.closeRemovedSessions(removedSessions)
+          if (selectedWorkspaceId.value === workspace.id) {
+            selectedWorkspaceId.value = null
+          }
           dialogs.clearSelectedWorkspace()
           dialogs.removeWorkspaceDialogOpen = false
           notifications.pushToast(
@@ -535,6 +551,7 @@
   }
 
   async function openSessionTab(session: SessionSummary) {
+    selectedWorkspaceId.value = session.workspace_id
     await notifyHistoryError(
       await workbench.openSession(props.runtimeTarget, props.runtimeApi, session),
     )
@@ -556,7 +573,7 @@
   }
 
   async function closeAllTabs() {
-    await closeTabs(workbench.openedTabs.map((tab) => tab.sessionId))
+    await closeTabs(visibleOpenedTabs.value.map((tab) => tab.sessionId))
   }
 
   async function closeTerminalTabs() {
@@ -564,7 +581,9 @@
   }
 
   function openAllRunningTabs() {
-    const runningSessions = runningSessionWorkspaceTreeTargets(sessionWorkspaceTree.value)
+    const runningSessions = runningSessionWorkspaceTreeTargets(sessionWorkspaceTree.value).filter(
+      (session) => !selectedWorkspaceId.value || session.workspace_id === selectedWorkspaceId.value,
+    )
     if (runningSessions.length === 0) {
       return
     }
@@ -589,7 +608,7 @@
     }
 
     const sessions = selectedSessionWorkspaceTreeTargets(
-      sessionWorkspaceTree.value,
+      scopedSessionWorkspaceTree.value,
       selectedSessions,
     )
     if (sessions.length === 0) {
@@ -622,7 +641,11 @@
   }
 
   async function closeTabs(sessionIds: string[]) {
-    const nextSession = workbench.closeTabs(sessionIds, workspaceSessions.sessionById)
+    const nextSession = workbench.closeTabs(
+      sessionIds,
+      workspaceSessions.sessionById,
+      visibleOpenedTabs.value,
+    )
     if (nextSession) {
       await notifyHistoryError(
         await workbench.ensureHistoryLoaded(props.runtimeTarget, props.runtimeApi, nextSession),
@@ -915,7 +938,8 @@
   }
 
   const workbenchBind = computed(() => ({
-    openedTabs: workbench.openedTabs,
+    openedTabs: visibleOpenedTabs.value,
+    allOpenedTabs: workbench.openedTabs,
     activeSessionId: workbench.activeSessionId,
     activeTab: workbench.activeTab,
     activeSession: activeSession.value,
@@ -941,7 +965,16 @@
     openAllRunningTabs,
     openCloseBackgroundSessionsDrawer,
     reorderTabs: (tabs: typeof workbench.openedTabs) => {
-      workbench.openedTabs = tabs
+      if (!selectedWorkspaceId.value) {
+        workbench.openedTabs = tabs
+        return
+      }
+      let nextIndex = 0
+      workbench.openedTabs = workbench.openedTabs.map((tab) =>
+        selectedWorkspaceId.value && tab.workspaceId === selectedWorkspaceId.value
+          ? tabs[nextIndex++]!
+          : tab,
+      )
     },
     openCreate: () => openCreateSessionForm(),
     workbench: (element: HTMLElement | null) => {

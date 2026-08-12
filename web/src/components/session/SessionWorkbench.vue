@@ -29,7 +29,7 @@
       />
 
       <PageStatus
-        v-if="loading && openedTabs.length === 0"
+        v-if="loading && allOpenedTabs.length === 0"
         class="flex min-h-0 flex-1 items-center justify-center p-6"
         :loading="true"
         :loading-text="t('workbench.loadingContent')"
@@ -41,10 +41,7 @@
         </template>
       </PageStatus>
 
-      <div
-        v-else-if="openedTabs.length > 0"
-        class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-      >
+      <div v-else class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div
           v-for="pane in livePanes"
           :key="pane.session.id"
@@ -77,27 +74,27 @@
             @terminal-error="emit('terminalError', $event)"
           />
         </div>
-      </div>
 
-      <section
-        v-else
-        class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-[var(--color-text-muted)]"
-      >
-        <h3 class="text-lg font-semibold text-[var(--color-text)]">
-          {{ t('workbench.noTabTitle') }}
-        </h3>
-        <p>{{ t('workbench.noTabDescription') }}</p>
-        <div class="flex flex-wrap items-center justify-center gap-3">
-          <button type="button" :class="sessionPanelTextActionClass" @click="emit('openCreate')">
-            <SquareTerminal class="size-3.5" />
-            {{ t('workbench.newSession') }}
-          </button>
-          <RouterLink :to="shortcutsRoute" :class="sessionPanelTextActionClass">
-            <Keyboard class="size-3.5" />
-            {{ t('workbench.manageShortcuts') }}
-          </RouterLink>
-        </div>
-      </section>
+        <section
+          v-if="openedTabs.length === 0"
+          class="absolute inset-0 z-20 flex min-h-0 min-w-0 flex-col items-center justify-center gap-3 bg-[var(--color-panel-bg)] p-6 text-center text-[var(--color-text-muted)]"
+        >
+          <h3 class="text-lg font-semibold text-[var(--color-text)]">
+            {{ t('workbench.noTabTitle') }}
+          </h3>
+          <p>{{ t('workbench.noTabDescription') }}</p>
+          <div class="flex flex-wrap items-center justify-center gap-3">
+            <button type="button" :class="sessionPanelTextActionClass" @click="emit('openCreate')">
+              <SquareTerminal class="size-3.5" />
+              {{ t('workbench.newSession') }}
+            </button>
+            <RouterLink :to="shortcutsRoute" :class="sessionPanelTextActionClass">
+              <Keyboard class="size-3.5" />
+              {{ t('workbench.manageShortcuts') }}
+            </RouterLink>
+          </div>
+        </section>
+      </div>
     </TabsRoot>
 
     <SessionStatusBar
@@ -130,6 +127,7 @@
   const props = withDefaults(
     defineProps<{
       openedTabs: OpenSessionTab[]
+      allOpenedTabs: OpenSessionTab[]
       activeSessionId: string | null
       activeTab: OpenSessionTab | null
       activeSession: SessionSummary | null
@@ -179,8 +177,10 @@
   const workbench = useTemplateRef<HTMLElement>('workbench')
   watch(workbench, (element) => emit('workbench', element), { immediate: true })
 
+  const terminalTabs = computed(() => props.allOpenedTabs)
+
   const openedRunningSessionIds = computed(() =>
-    props.openedTabs
+    terminalTabs.value
       .filter((tab) => props.sessionLifecycleState(tab.workspaceId, tab.sessionId) === 'running')
       .map((tab) => tab.sessionId),
   )
@@ -194,9 +194,9 @@
   )
 
   watch(
-    () => props.openedTabs.map((tab) => tab.sessionId).join(','),
+    () => terminalTabs.value.map((tab) => tab.sessionId).join(','),
     () => {
-      const opened = new Set(props.openedTabs.map((tab) => tab.sessionId))
+      const opened = new Set(terminalTabs.value.map((tab) => tab.sessionId))
       for (const sessionId of [...keepAlive.mountedSessionIds.value]) {
         if (!opened.has(sessionId)) {
           keepAlive.remove(sessionId)
@@ -217,7 +217,7 @@
     }> = []
 
     for (const sessionId of mountedIds) {
-      const tab = props.openedTabs.find((item) => item.sessionId === sessionId)
+      const tab = terminalTabs.value.find((item) => item.sessionId === sessionId)
       if (!tab) {
         continue
       }

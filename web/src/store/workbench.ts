@@ -81,16 +81,15 @@ export const useWorkbenchStore = defineStore('workbench', () => {
   function closeTabs(
     sessionIds: string[],
     sessionResolver: (workspaceId: string, sessionId: string) => SessionSummary | null,
+    focusTabs: OpenSessionTab[] = openedTabs.value,
   ) {
     const closingSessionIds = new Set(sessionIds)
-    const activeIndex = openedTabs.value.findIndex((tab) => tab.sessionId === activeSessionId.value)
+    const activeIndex = focusTabs.findIndex((tab) => tab.sessionId === activeSessionId.value)
     const activeTabIsClosing =
-      activeIndex !== -1 && closingSessionIds.has(openedTabs.value[activeIndex].sessionId)
+      activeIndex !== -1 && closingSessionIds.has(focusTabs[activeIndex].sessionId)
     const nextTab = activeTabIsClosing
-      ? (openedTabs.value
-          .slice(activeIndex + 1)
-          .find((tab) => !closingSessionIds.has(tab.sessionId)) ??
-        openedTabs.value
+      ? (focusTabs.slice(activeIndex + 1).find((tab) => !closingSessionIds.has(tab.sessionId)) ??
+        focusTabs
           .slice(0, activeIndex)
           .reverse()
           .find((tab) => !closingSessionIds.has(tab.sessionId)) ??
