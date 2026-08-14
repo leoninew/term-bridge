@@ -94,6 +94,7 @@ type CloudAdminConfig struct {
 }
 
 type TurnstileConfig struct {
+	Enabled   bool
 	SiteKey   string
 	SecretKey string
 }

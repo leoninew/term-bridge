@@ -367,6 +367,7 @@ func cloudConfig(cfg config.Config) cloudserver.Config {
 				FromEmail: cfg.Cloud.Resend.FromEmail,
 			},
 			Turnstile: cloudserver.TurnstileConfig{
+				Enabled:   cfg.Cloud.Turnstile.Enabled,
 				SiteKey:   cfg.Cloud.Turnstile.SiteKey,
 				SecretKey: cfg.Cloud.Turnstile.SecretKey,
 			},

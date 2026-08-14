@@ -195,6 +195,7 @@ type CloudAdminConfig struct {
 }
 
 type TurnstileConfig struct {
+	Enabled   bool
 	SiteKey   string
 	SecretKey string
 }
@@ -397,6 +398,7 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 				FromEmail: strings.TrimSpace(v.GetString("cloud.resend.from_email")),
 			},
 			Turnstile: TurnstileConfig{
+				Enabled:   turnstileEnabled(v),
 				SiteKey:   strings.TrimSpace(v.GetString("cloud.turnstile.site_key")),
 				SecretKey: strings.TrimSpace(v.GetString("cloud.turnstile.secret_key")),
 			},
@@ -429,6 +431,10 @@ func buildConfig(cwd string, options Options, environment string, defaultConfigF
 	}
 
 	return cfg, nil
+}
+
+func turnstileEnabled(v *viper.Viper) bool {
+	return !v.IsSet("cloud.turnstile.enabled") || v.GetBool("cloud.turnstile.enabled")
 }
 
 func validValidationScope(scope ValidationScope) bool {
@@ -791,6 +797,7 @@ func configKeys() []string {
 		"cloud.github.redirect_url",
 		"cloud.resend.api_key",
 		"cloud.resend.from_email",
+		"cloud.turnstile.enabled",
 		"cloud.turnstile.site_key",
 		"cloud.turnstile.secret_key",
 		"cloud.database.driver",
@@ -1142,30 +1149,10 @@ func validateCloud(cfg Config) error {
 	if err := validateHTTPURL("cloud.api_base_url", cfg.Cloud.ApiBaseUrl); err != nil {
 		return err
 	}
-	if err := validateTurnstile(cfg.Environment, cfg.Cloud); err != nil {
-		return err
-	}
 	for index, client := range cfg.Cloud.OAuth.Clients {
 		if err := validateCloudOAuthClient(index, client); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func validateTurnstile(environment string, cloud CloudConfig) error {
-	if environment != "production" {
-		return nil
-	}
-	if cloud.Turnstile.SiteKey == "" {
-		return apperrors.Config("invalid cloud.turnstile.site_key", fmt.Errorf("required in production"))
-	}
-	if cloud.Turnstile.SecretKey == "" {
-		return apperrors.Config("invalid cloud.turnstile.secret_key", fmt.Errorf("required in production"))
-	}
-	parsed, err := url.Parse(cloud.PublicUrl)
-	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" {
-		return apperrors.Config("invalid cloud.public_url", fmt.Errorf("must be an absolute HTTPS URL for Turnstile hostname validation in production"))
 	}
 	return nil
 }

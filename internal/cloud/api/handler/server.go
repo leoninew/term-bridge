@@ -56,6 +56,7 @@ type QuotaRepository interface {
 }
 
 type TurnstileConfig struct {
+	Enabled          bool
 	SiteKey          string
 	SecretKey        string
 	ExpectedHostname string
@@ -297,6 +298,9 @@ func (s *Handler) consumeCSRFToken(token string) bool {
 }
 
 func (s *Handler) verifyTurnstile(ctx context.Context, token string) bool {
+	if !s.config.Turnstile.Enabled {
+		return true
+	}
 	return s.config.Turnstile.Verify != nil && s.config.Turnstile.Verify.Verify(ctx, token, "") == nil
 }
 

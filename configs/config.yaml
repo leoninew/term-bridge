@@ -137,8 +137,9 @@ cloud:
     from_email: ""
 
   # Cloudflare Turnstile protects public email/password login and registration.
-  # Production must supply non-empty credentials and a public HTTPS hostname via environment-specific configuration.
+  # Set enabled to false to bypass the challenge.
   turnstile:
+    enabled: true
     site_key: ""
     secret_key: ""
 

@@ -36,7 +36,7 @@ func (acceptingTurnstileVerifier) Verify(context.Context, string, string) error 
 }
 
 func testAuthSecurityConfig() (TurnstileConfig, CSRFConfig) {
-	return TurnstileConfig{Verify: acceptingTurnstileVerifier{}}, CSRFConfig{Tokens: NewCSRFTokens(0, 0)}
+	return TurnstileConfig{Enabled: true, Verify: acceptingTurnstileVerifier{}}, CSRFConfig{Tokens: NewCSRFTokens(0, 0)}
 }
 
 func testLoginRequestBody(t *testing.T, handler *Handler, username string, password string) string {

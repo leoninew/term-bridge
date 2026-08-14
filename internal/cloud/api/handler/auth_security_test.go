@@ -81,7 +81,7 @@ func TestLoginSecurityRejectsInvalidCSRFBeforeCredentialAuthentication(t *testin
 func TestLoginSecurityConsumesCSRFTokenAndRequiresTurnstile(t *testing.T) {
 	service := &countingAuthService{}
 	_, csrf := testAuthSecurityConfig()
-	handler := New(Config{Logger: testLogger(), AuthService: service, Turnstile: TurnstileConfig{Verify: rejectingTurnstileVerifier{}}, CSRF: csrf})
+	handler := New(Config{Logger: testLogger(), AuthService: service, Turnstile: TurnstileConfig{Enabled: true, Verify: rejectingTurnstileVerifier{}}, CSRF: csrf})
 	csrfToken, err := handler.config.CSRF.Tokens.Issue()
 	if err != nil {
 		t.Fatalf("issue csrf token: %v", err)
@@ -102,7 +102,7 @@ func TestLoginSecurityConsumesCSRFTokenAndRequiresTurnstile(t *testing.T) {
 func TestRegistrationSecurityRejectsChallengeBeforeAccountCreation(t *testing.T) {
 	service := &countingAuthService{}
 	_, csrf := testAuthSecurityConfig()
-	handler := New(Config{Logger: testLogger(), AuthService: service, Turnstile: TurnstileConfig{Verify: rejectingTurnstileVerifier{}}, CSRF: csrf})
+	handler := New(Config{Logger: testLogger(), AuthService: service, Turnstile: TurnstileConfig{Enabled: true, Verify: rejectingTurnstileVerifier{}}, CSRF: csrf})
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"user@example.test","password":"password","turnstile_token":"challenge"}`)))
@@ -124,10 +124,40 @@ func TestAuthSecurityEndpointsExposeOnlyPublicValues(t *testing.T) {
 	if configResponse.Code != http.StatusOK || !bytes.Contains(configResponse.Body.Bytes(), []byte("public-site-key")) || bytes.Contains(configResponse.Body.Bytes(), []byte("private-secret")) {
 		t.Fatalf("Turnstile config response = %d %s", configResponse.Code, configResponse.Body.String())
 	}
-
 	csrfResponse := httptest.NewRecorder()
 	handler.ServeHTTP(csrfResponse, httptest.NewRequest(http.MethodGet, "/api/auth/login/csrf", nil))
 	if csrfResponse.Code != http.StatusOK || csrfResponse.Header().Get("Cache-Control") != "no-store" || !bytes.Contains(csrfResponse.Body.Bytes(), []byte(`"token"`)) {
 		t.Fatalf("CSRF response = %d headers=%v body=%s", csrfResponse.Code, csrfResponse.Header(), csrfResponse.Body.String())
 	}
+}
+
+func TestDisabledTurnstileSkipsChallengeVerificationButRequiresCSRF(t *testing.T) {
+	service := &countingAuthService{}
+	_, csrf := testAuthSecurityConfig()
+	handler := New(Config{Logger: testLogger(), AuthService: service, Turnstile: TurnstileConfig{Verify: rejectingTurnstileVerifier{}}, CSRF: csrf})
+
+	missingCSRFResponse := httptest.NewRecorder()
+	handler.ServeHTTP(missingCSRFResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"email":"user@example.test","password":"password"}`)))
+	assertAPIError(t, missingCSRFResponse, http.StatusBadRequest, errorCodeBadRequest)
+	if service.loginCalls.Load() != 0 {
+		t.Fatalf("credential authentication ran %d times without a CSRF token", service.loginCalls.Load())
+	}
+
+	csrfToken, err := handler.config.CSRF.Tokens.Issue()
+	if err != nil {
+		t.Fatalf("issue csrf token: %v", err)
+	}
+
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"email":"user@example.test","password":"password","csrf_token":"`+csrfToken+`"}`)))
+	if loginResponse.Code != http.StatusOK || service.loginCalls.Load() != 1 {
+		t.Fatalf("login response = %d, calls = %d", loginResponse.Code, service.loginCalls.Load())
+	}
+
+	registerResponse := httptest.NewRecorder()
+	handler.ServeHTTP(registerResponse, httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"email":"user@example.test","password":"password"}`)))
+	if registerResponse.Code != http.StatusNoContent || service.registerCalls.Load() != 1 {
+		t.Fatalf("register response = %d, calls = %d", registerResponse.Code, service.registerCalls.Load())
+	}
+
 }
