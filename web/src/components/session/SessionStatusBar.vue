@@ -63,13 +63,24 @@
         <DropdownMenuTrigger as-child>
           <button
             type="button"
-            class="inline-flex min-w-0 max-w-[6.5rem] items-center gap-1 rounded px-0.5 text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus-visible:bg-[var(--color-control-hover)] sm:max-w-[8rem] md:max-w-[12rem]"
+            class="inline-flex min-w-0 max-w-[6.5rem] items-center gap-1 rounded px-0.5 text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus-visible:bg-[var(--color-control-hover)] disabled:cursor-wait disabled:opacity-70 sm:max-w-[8rem] md:max-w-[12rem]"
             :title="t('workbench.switchDevice')"
             :aria-label="t('workbench.switchDeviceAria', { name: deviceLabel })"
+            :aria-busy="deviceSwitching"
+            :disabled="deviceSwitching"
           >
             <Monitor class="size-3.5 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
             <span class="min-w-0 truncate">{{ deviceLabel }}</span>
-            <ChevronUp class="size-3 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
+            <LoaderCircle
+              v-if="deviceSwitching"
+              class="size-3 shrink-0 animate-spin text-[var(--color-text-subtle)]"
+              aria-hidden="true"
+            />
+            <ChevronUp
+              v-else
+              class="size-3 shrink-0 text-[var(--color-text-subtle)]"
+              aria-hidden="true"
+            />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuPortal>
@@ -95,6 +106,12 @@
                 aria-hidden="true"
               />
               <span class="min-w-0 flex-1 truncate">{{ candidate.name }}</span>
+              <span
+                v-if="candidate.id === localDeviceId"
+                class="shrink-0 text-[var(--color-text-subtle)]"
+              >
+                {{ t('workbench.localDevice') }}
+              </span>
               <Check
                 v-if="candidate.id === currentDeviceId"
                 class="size-3.5 shrink-0 text-[var(--color-text-subtle)]"
@@ -140,7 +157,7 @@
 <script setup lang="ts">
   import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { Check, ChevronUp, Monitor } from '@lucide/vue'
+  import { Check, ChevronUp, LoaderCircle, Monitor } from '@lucide/vue'
   import {
     DropdownMenuContent,
     DropdownMenuItem,
@@ -163,13 +180,17 @@
       session: SessionSummary | null
       device: DeviceSummary | CloudSessionSummary | null
       showCloudConnection?: boolean
+      localDeviceId?: string
       devices?: DeviceSummary[]
       devicesLoading?: boolean
+      deviceSwitching?: boolean
     }>(),
     {
       showCloudConnection: false,
+      localDeviceId: '',
       devices: () => [],
       devicesLoading: false,
+      deviceSwitching: false,
     },
   )
 

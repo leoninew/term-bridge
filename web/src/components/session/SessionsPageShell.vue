@@ -126,9 +126,9 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref, watch } from 'vue'
+  import { computed, nextTick, onMounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import { useRouter } from 'vue-router'
+  import { useRoute, useRouter } from 'vue-router'
   import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
   import CloseBackgroundSessionsDrawer from './CloseBackgroundSessionsDrawer.vue'
   import CreateSessionDialog from './CreateSessionDialog.vue'
@@ -147,7 +147,13 @@
   import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useCloudDevicesStore } from '../../store/cloudDevices'
   import { useCloudSessionStore } from '../../store/cloudSession'
+  import { useRuntimeConfigStore } from '../../store/runtimeConfig'
   import { listCloudDevicesViaLocalApi } from '../../features/local/api'
+  import {
+    cloudSessionsQuery,
+    localDeviceIdFromQuery,
+    sessionsPageUrl,
+  } from '../../features/sessions/deviceNavigation'
   import {
     closeSessionsSerially,
     normalizedSessionWorkspaceTree,
@@ -183,7 +189,9 @@
   }>()
 
   const { t } = useI18n()
+  const route = useRoute()
   const router = useRouter()
+  const runtimeConfig = useRuntimeConfigStore()
   const cloudAuth = useCloudAuthStore()
   const cloudDevices = useCloudDevicesStore()
   const cloudSession = useCloudSessionStore()
@@ -272,8 +280,16 @@
   )
   const localCloudDevices = ref<DeviceSummary[]>([])
   const deviceOptionsLoading = ref(false)
+  const deviceSwitching = ref(false)
+  const runtimeTargetLoading = ref(false)
+  let runtimeTargetReload = Promise.resolve()
   const deviceOptions = computed(() =>
     isLocalMode.value ? localCloudDevices.value : cloudDevices.devices,
+  )
+  const localDeviceId = computed(() =>
+    isLocalMode.value
+      ? deviceIdFor(localDevice.value ?? cloudSession.cloudSession)
+      : localDeviceIdFromQuery(route.query.local_device_id),
   )
 
   const activeSession = computed(() => {
@@ -367,6 +383,21 @@
 
   async function refreshShortcuts() {
     shortcuts.value = await props.runtimeApi.listShortcuts()
+  }
+
+  async function refreshForRuntimeTarget() {
+    runtimeTargetLoading.value = true
+    workbench.resetForSourceChange()
+    workspaceSessions.reset()
+    selectedWorkspaceId.value = null
+    try {
+      await refresh()
+      await refreshShortcuts()
+    } catch (err) {
+      notifications.notifyError(t('toast.refreshFailed'), err)
+    } finally {
+      runtimeTargetLoading.value = false
+    }
   }
 
   async function startSession() {
@@ -970,32 +1001,53 @@
   }
 
   async function switchDevice(deviceId: string) {
+    if (deviceSwitching.value) {
+      return
+    }
     const device = deviceOptions.value.find((candidate) => candidate.id === deviceId)
     if (!device?.online || deviceId === deviceIdFor(workbenchDevice.value)) {
       return
     }
-    if (isLocalMode.value) {
-      let cloudPublicUrl = cloudSession.cloudSession?.public_url
-      if (!cloudPublicUrl) {
-        const result = await localCloud.connectDevice({
-          onError: (err) => notifications.notifyError(t('dashboard.cloudConnectionFailed'), err),
-        })
-        if (!result.ok || result.kind !== 'connected') {
+    deviceSwitching.value = true
+    try {
+      if (isLocalMode.value) {
+        let cloudPublicUrl = cloudSession.cloudSession?.public_url
+        if (!cloudPublicUrl) {
+          const result = await localCloud.connectDevice({
+            onError: (err) => notifications.notifyError(t('dashboard.cloudConnectionFailed'), err),
+          })
+          if (!result.ok || result.kind !== 'connected') {
+            return
+          }
+          cloudPublicUrl = cloudSession.cloudSession?.public_url
+        }
+        if (!cloudPublicUrl) {
           return
         }
-        cloudPublicUrl = cloudSession.cloudSession?.public_url
-      }
-      if (!cloudPublicUrl) {
+        const url = sessionsPageUrl(cloudPublicUrl, deviceId)
+        if (localDeviceId.value) {
+          url.searchParams.set('local_device_id', localDeviceId.value)
+        }
+        window.location.assign(url.toString())
         return
       }
-      const url = new URL(`/devices/${encodeURIComponent(deviceId)}/sessions`, cloudPublicUrl)
-      window.location.assign(url)
-      return
+      if (deviceId === localDeviceId.value) {
+        window.location.assign(sessionsPageUrl(runtimeConfig.config.local.publicUrl).toString())
+        return
+      }
+      if (!cloudDevices.selectDeviceId(deviceId)) {
+        return
+      }
+      await router.push({
+        name: 'cloud-sessions',
+        params: { deviceId },
+        query: cloudSessionsQuery(localDeviceId.value),
+      })
+      await nextTick()
+      await runtimeTargetReload
+    } finally {
+      deviceSwitching.value = false
     }
-    if (!cloudDevices.selectDeviceId(deviceId)) {
-      return
-    }
-    await router.push({ name: 'cloud-sessions', params: { deviceId } })
   }
 
   function deviceIdFor(device: DeviceSummary | CloudSessionSummary | null): string {
@@ -1014,7 +1066,9 @@
     currentDevice: workbenchDevice.value,
     resolveSession,
     resolveWsUrl: resolveTerminalWsUrl,
-    loading: workspaceSessions.loading && workbench.openedTabs.length === 0,
+    loading:
+      (runtimeTargetLoading.value || workspaceSessions.loading) &&
+      workbench.openedTabs.length === 0,
     hasTerminalTabs: terminalTabs.value.length > 0,
     hasBackgroundRunningSessions: hasRunningSessions.value,
     hasUnopenedRunningSessions: hasUnopenedRunningSessions.value,
@@ -1022,8 +1076,10 @@
     sessionLifecycleState,
     disableTabReorder: disableReorder.value,
     showCloudConnection: isLocalMode.value,
+    localDeviceId: localDeviceId.value,
     deviceOptions: deviceOptions.value,
     deviceOptionsLoading: deviceOptionsLoading.value,
+    deviceSwitching: deviceSwitching.value,
     shortcutsRoute: shortcutsRoute.value,
   }))
 
@@ -1056,6 +1112,16 @@
     switchDevice,
   }
 
+  watch(
+    () =>
+      `${props.runtimeTarget.mode}:${props.runtimeTarget.mode === 'cloud' ? props.runtimeTarget.deviceId : ''}`,
+    (nextTarget, previousTarget) => {
+      if (nextTarget !== previousTarget) {
+        runtimeTargetReload = refreshForRuntimeTarget()
+      }
+    },
+  )
+
   onMounted(async () => {
     try {
       if (isLocalMode.value) {
@@ -1068,7 +1134,7 @@
       } else {
         await cloudDevices.loadDevices()
       }
-      await Promise.all([refresh(), refreshShortcuts()])
+      await refreshForRuntimeTarget()
     } catch (err) {
       notifications.notifyError(t('toast.refreshFailed'), err)
     }

@@ -1,5 +1,5 @@
 # 会话页设备切换验证
-最后修改时间: 2026-08-17 12:41:48
+最后修改时间: 2026-08-17 13:16:07
 
 Review status: Draft
 
@@ -12,6 +12,9 @@ Review status: Draft
 - 本机切换到其他在线设备使用 Cloud 工作台整页导航；Cloud 工作台内继续使用现有同源设备列表和路由切换。
 - `ListDevicesResp` 保持为 Agent 的 Cloud client、service 和 handler 的响应类型；`DeviceSummary` 只作为列表项。
 - 本机 session 缺失时，选择设备会先调用本地 Agent 恢复 Cloud session，恢复失败时显示连接错误。
+- Cloud 菜单保留发起本机设备 ID：该项显示“本地”，并跳转 `local.publicUrl` 的 `/sessions`。
+- Cloud device ID 改变时清空旧终端标签和工作区状态，并重新加载目标设备的工作区、会话和快捷方式。
+- 目标设备刷新顺序为工作区/会话后快捷方式；刷新期间工作台保持 loading，状态栏设备按钮禁用并显示 spinner。
 
 ## Spec Alignment / 规格对齐
 
@@ -33,6 +36,9 @@ Review status: Draft
 - 状态栏设备名始终作为菜单触发器；菜单直接渲染后端/Cloud 提供的设备列表，离线和当前设备保持不可选。
 - Cloud 工作台继续支持从已进入的设备切换至其他在线设备。
 - 本机未建立 Cloud session 时，切换目标设备前会先恢复 session，避免静默无操作。
+- 增加设备导航 helper，保留配置 URL 的路径前缀并传递本机设备 ID；新增单测覆盖本地返回与 Cloud URL。
+- Cloud 工作台设备切换时重置旧运行时数据，避免显示上一台设备的工作区或会话。
+- 设备切换刷新不再使用 `Promise.all`，按既定顺序请求数据并防止并发切换。
 - 补充中英文文案，并修复一条与现有会话编辑行为不一致的断言。
 
 ## Expected And Actual Files / 预期与实际文件
@@ -57,6 +63,9 @@ Review status: Draft
 - [x] Cloud 上游失败时 Agent 返回 `502`。
 - [x] `ListDevicesResp` 在 Agent 边界保持为响应类型，`DeviceSummary` 只作为列表项。
 - [x] 本机缺少 Cloud session 时，切换前先恢复 session。
+- [x] 本机设备在菜单中显示“本地”，且 Cloud 选择它时进入本地 `/sessions` 地址。
+- [x] Cloud device ID 变更时重新加载目标设备的工作区、会话和快捷方式。
+- [x] 目标设备数据顺序请求，切换期间显示 loading 并禁止重复操作。
 - [x] 当前设备和离线设备不可切换，其他在线设备可切换。
 - [x] Cloud 工作台保留连续设备切换路径。
 - [x] 后端测试、前端类型检查、lint、格式检查和单测通过。
@@ -70,7 +79,7 @@ Review status: Draft
 | `yarn --cwd web typecheck` | 通过 |
 | `yarn --cwd web lint` | 通过 |
 | `yarn --cwd web format` | 通过 |
-| `yarn --cwd web test` | 通过，29 个文件、163 项测试 |
+| `yarn --cwd web test` | 通过，30 个文件、165 项测试 |
 | `git -c core.whitespace=cr-at-eol diff --check HEAD` | 通过 |
 
 ## Scope / 范围

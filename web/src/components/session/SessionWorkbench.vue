@@ -101,8 +101,10 @@
       :session="activeSession"
       :device="currentDevice"
       :show-cloud-connection="showCloudConnection"
+      :local-device-id="localDeviceId"
       :devices="deviceOptions"
       :devices-loading="deviceOptionsLoading"
+      :device-switching="deviceSwitching"
       @load-device-options="emit('loadDeviceOptions')"
       @switch-device="emit('switchDevice', $event)"
     />
@@ -147,8 +149,10 @@
       showSidebarToggle?: boolean
       disableTabReorder?: boolean
       showCloudConnection?: boolean
+      localDeviceId?: string
       deviceOptions?: DeviceSummary[]
       deviceOptionsLoading?: boolean
+      deviceSwitching?: boolean
       shortcutsRoute: { name: string; params?: Record<string, string> }
     }>(),
     {
@@ -156,8 +160,10 @@
       showSidebarToggle: false,
       disableTabReorder: false,
       showCloudConnection: false,
+      localDeviceId: '',
       deviceOptions: () => [],
       deviceOptionsLoading: false,
+      deviceSwitching: false,
     },
   )
 
