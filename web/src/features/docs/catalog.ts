@@ -37,9 +37,9 @@ export const DOC_PAGES: readonly DocPageDefinition[] = [
 export const DOC_RELEASE_URL = 'https://github.com/leoninew/TermBridge-go/releases/latest'
 
 export const DOC_RELEASE_ASSETS = [
-  'TermBridge-windows-x64.zip',
-  'TermBridge-linux-x64.zip',
-  'TermBridge-macos-x64.zip',
+  'termbridge-v<version>-windows-x64.zip',
+  'termbridge-v<version>-linux-x64.zip',
+  'termbridge-v<version>-macos-x64.zip',
 ] as const
 
 export const DOC_SCREENSHOT_IDS = [

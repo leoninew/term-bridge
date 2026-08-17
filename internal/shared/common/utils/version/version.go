@@ -3,15 +3,11 @@ package version
 import "runtime"
 
 var (
-	Version   = "0.114.0"
-	Commit    = "unknown"
-	BuildTime = "unknown"
+	Version = "0.114.1"
 )
 
 type Info struct {
 	Version   string
-	Commit    string
-	BuildTime string
 	GoVersion string
 	Runtime   string
 }
@@ -19,8 +15,6 @@ type Info struct {
 func Get() Info {
 	return Info{
 		Version:   Version,
-		Commit:    Commit,
-		BuildTime: BuildTime,
 		GoVersion: runtime.Version(),
 		Runtime:   Runtime(),
 	}
@@ -32,5 +26,5 @@ func Runtime() string {
 
 func String() string {
 	info := Get()
-	return "termbridge " + info.Version + " " + info.Runtime + " go=" + info.GoVersion + " commit=" + info.Commit + " built=" + info.BuildTime
+	return "termbridge " + info.Version + " " + info.Runtime + " go=" + info.GoVersion
 }

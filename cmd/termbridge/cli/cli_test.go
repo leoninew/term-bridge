@@ -259,12 +259,10 @@ func TestRunHelpWritesStdoutOnly(t *testing.T) {
 }
 
 func TestRunVersionWritesStdoutOnly(t *testing.T) {
-	originalVersion, originalCommit, originalBuildTime := version.Version, version.Commit, version.BuildTime
-	version.Version = "v1.2.3"
-	version.Commit = "0123456789ab"
-	version.BuildTime = "2026-07-14T12:34:56Z"
+	originalVersion := version.Version
+	version.Version = "0.114.1"
 	t.Cleanup(func() {
-		version.Version, version.Commit, version.BuildTime = originalVersion, originalCommit, originalBuildTime
+		version.Version = originalVersion
 	})
 
 	var stdout bytes.Buffer
@@ -275,10 +273,13 @@ func TestRunVersionWritesStdoutOnly(t *testing.T) {
 	if code != apperrors.ExitSuccess {
 		t.Fatalf("Run() code = %d, want %d", code, apperrors.ExitSuccess)
 	}
-	for _, want := range []string{"termbridge v1.2.3", "commit=0123456789ab", "built=2026-07-14T12:34:56Z"} {
+	for _, want := range []string{"termbridge 0.114.1"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("stdout missing %q: %s", want, stdout.String())
 		}
+	}
+	if strings.Contains(stdout.String(), "commit=") || strings.Contains(stdout.String(), "built=") {
+		t.Fatalf("stdout exposes removed build metadata: %s", stdout.String())
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())

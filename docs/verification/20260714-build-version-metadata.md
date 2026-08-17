@@ -1,5 +1,5 @@
 # 构建版本元数据验证
-最后修改时间: 2026-07-14 10:51:40
+最后修改时间: 2026-08-17
 
 ## Review status
 
@@ -7,14 +7,14 @@ Accepted
 
 ## Flow mode / Stage
 
-轻量模式 / light；验证 / Verification。本次为已完成版本相关工作的补充记录。
+轻量模式 / light；验证 / Verification。本次记录当前版本模型及已执行的验证。
 
 ## Requirement alignment
 
 - Requirement 文档：`docs/requirement/20260714-build-version-metadata.md`
 - Requirement status：`Accepted`
 
-对齐结论：构建元数据已统一由 Git 派生并注入 Go 二进制；CLI、浏览器 runtime config 与 local 首页均使用 Go Version。构建 metadata 与运行时配置严格分离。
+对齐结论：发布版本由根目录 `VERSION` 记录，并通过 `task version:apply` 同步到 Go 与前端元数据。CLI、浏览器 runtime config 与 local 首页均使用 Go Version；版本不属于运行时配置。
 
 ## Spec alignment
 
@@ -26,80 +26,64 @@ Accepted
 
 ## Actual diff summary
 
-- `internal/shared/common/utils/version/version.go`：复用 Version、Commit、BuildTime 变量作为 linker 注入目标。
-- `Taskfile.yml`：为 build、package、docker 增加统一 `GO_LDFLAGS`；Commit 固定读取当前 Git HEAD 12 位短 hash，BuildTime 默认 UTC；所有 build 入口使用 Git 派生 Version。
-- `scripts/build-version.sh`：新增 Git 版本解析器，支持 release tag、tag 后提交、无 tag 开发版本、dirty 标识和受控版本覆盖。
-- `scripts/build-version_test.sh`：验证无 tag、精确 tag、tag 后提交、dirty 工作区与显式版本覆盖。
-- `Dockerfile`、`Dockerfile.cn`：Go build stage 使用 Version、Commit、BuildTime build args 编译二进制。
-- `cmd/termbridge/cli/cli.go`、`cmd/termbridge/cli/cli_test.go`：将版本查询改为 `termbridge version` 子命令，并验证 Version/Commit/BuildTime 输出。
-- `internal/shared/dto/browser/runtime_config.go`、`internal/shared/infrastructure/config/browser_runtime_config.go`、`web/src/config.ts`、`web/src/store/runtimeConfig.ts`：服务端将 Go Version 注入浏览器 runtime config；开发环境可使用 Vite version 值，缺失时页面版本内容为空。
-- `web/src/components/dashboard/LocalHome.vue`：项目版本卡显示 runtime config Version。
-- `.env.example`、`configs/config.yaml`、`README.md`：记录构建元数据来源、Git tag/dirty 语义，以及其非运行时配置边界。
+- `VERSION`：新增作为 portable package 命名和包内记录的 SemVer 版本文件。
+- `internal/shared/common/utils/version/version.go`：只保留编译进二进制的 `Version` 与运行时信息。
+- `Taskfile.yml`：新增 `version`、`version:apply` 任务；build、package、docker 直接编译已同步的源码，portable package 使用版本化目录和 ZIP 名称。
+- `scripts/version-calc.py`：`--apply` 同步更新 `VERSION`、Go `Version` 和 `web/package.json`。
+- `scripts/build-version.sh`、`scripts/build-version_test.sh`：删除旧的 Git tag、commit 距离、dirty 和环境变量覆盖构建模型。
+- `Dockerfile`、`Dockerfile.cn`：移除 build args 和 linker flags。
+- `cmd/termbridge/cli/cli_test.go`：验证 `termbridge version` 不再输出 commit 或构建时间。
+- `.env.example`、`configs/config.yaml`：移除已经不存在的 build metadata 配置说明。
+- 用户指南与前端帮助目录：改为展示带版本号的 portable package 文件名。
 
 ## Expected vs actual changed files
 
-预期涉及构建脚本、Dockerfile、Go version/CLI、browser runtime config、local 首页和相关文档/测试。实际改动覆盖上述范围；未引入后端业务 API 或运行时 YAML 配置键。
+预期涉及版本文件、构建脚本、Dockerfile、Go version/CLI、发布命名和相关文档/测试。实际改动覆盖上述范围；未引入后端业务 API 或运行时 YAML 配置键。
 
 ## Acceptance criteria checklist
 
-- [x] build、package、docker 复用同一 linker metadata 结构。
-- [x] Commit 固定来自 `git rev-parse --short=12 HEAD`。
-- [x] BuildTime 使用 UTC `YYYYMMDD-HHMMSS` 默认格式。
-- [x] Version 可根据 Git tag / commit 距离 / 无 tag / dirty 状态区分构建。
-- [x] `termbridge version` 输出 Version、Commit 与 BuildTime，且不启动服务。
+- [x] `VERSION` 保存 SemVer package 版本，并用于 portable package 命名和包内记录。
+- [x] `task version:apply` 同步 `VERSION`、Go `Version` 和 `web/package.json`。
+- [x] build、package、docker 不再传递 linker metadata 或构建环境变量。
+- [x] `termbridge version` 输出 Version 与运行时信息，且不启动服务。
 - [x] local dashboard 通过服务端 runtime config 显示 Go Version。
-- [x] build metadata 未被加入 YAML/Viper/portable runtime profile。
-- [x] helper 测试覆盖 Git 版本派生的主要场景。
+- [x] 版本未被加入 YAML/Viper/portable runtime profile。
+- [x] portable package 文件名为 `termbridge-v<version>-<platform>.zip`，并在包内携带 `VERSION`。
 
 ## Command results
 
 通过：
 
 ```text
-sh scripts/build-version_test.sh
-  → passed（无 tag、精确 tag、tag 后提交、dirty、显式覆盖）
+python scripts/version-calc.py --quiet
+  -> version: 0.114.1
 
-go test ./cmd/termbridge/cli/...
-  → passed
+task --dry package
+  -> 展开 termbridge-v0.114.1-<platform> 的目录和 ZIP 路径
 
-go test ./cmd/termbridge/app/...
-  → passed
-
-go test ./internal/shared/infrastructure/config/... ./internal/shared/api/...
-  → passed
-
-yarn --cwd web test --run src/store/runtimeConfig.test.ts
-  → 1 test file / 8 tests passed
-
-yarn --cwd web typecheck
-  → passed
-
-task --dry --verbose build/package/docker
-  → 统一展开 Git-derived Version、12 位 Commit、UTC BuildTime
-
-go run -ldflags "…" ./cmd/termbridge version
-  → 输出指定 Version、Commit、BuildTime；未启动服务
+go test ./cmd/... ./internal/...
+  -> passed
 ```
 
-`git diff --check`：版本相关 Go、Taskfile、script 改动通过；全工作区仍报告 `web/.env.development` 的既有尾随空白，未由本任务修改。
+`git diff --check` 当前报告 `VERSION:1` 的 CRLF 尾随空白；在提交前需要改为 LF。
 
 ## Missed or expanded scope
 
-范围扩展：增加了 browser runtime config 和 local 首页实际显示路径，确保构建版本对用户可见；未改变任何业务 API。
+范围扩展：新增 `VERSION` 作为 portable package 元数据，并把 package 命名改为带版本号的文件名；未改变任何业务 API。
 
 ## Risks
 
-1. 本机 Docker daemon 不可用，未执行真实 Docker image build/run；Docker build-arg 与 linker 命令仅通过静态审查和 Task dry-run 确认。
-2. 当前 Git 历史没有 release tag，当前自动版本为开发形式；发布流程仍需采用不可变 `vX.Y.Z` tag。
-3. `TERMBRIDGE_BUILD_VERSION` 允许 CI/源码归档覆盖，因此发布 CI 需将该变量限制在受控发布环境，不能用于掩盖脏工作区产物。
+1. 本机 Docker daemon 不可用，未执行真实 Docker image build/run；两个 Dockerfile 已移除 build args，但仍需验证镜像 `termbridge version` 与仓库版本一致。
+2. GitHub Release 名称来自 tag，资产名称来自 `VERSION`，工作流尚未验证两者相等；发布时必须确认 tag 为 `v$(cat VERSION)`。
+3. `VERSION`、Go `Version` 和 `web/package.json` 的同步依赖 `task version:apply`；应在 CI 中加入一致性检查，防止手工编辑造成漂移。
 
 ## Incomplete items
 
-- Docker daemon 可用后，需分别构建 `Dockerfile` 与 `Dockerfile.cn`，执行容器 `termbridge version`，确认 metadata 与 Taskfile 一致。
-- 建立实际 release CI 后，应在 tag 触发器中验证 SemVer tag、全量 fetch tags、portable package checksum 与镜像发布策略。
+- Docker daemon 可用后，需分别构建 `Dockerfile` 与 `Dockerfile.cn`，执行容器 `termbridge version`，确认其与 `VERSION` 一致。
+- 在 release CI 中验证 SemVer tag 等于 `v$(cat VERSION)`，并验证 `VERSION`、Go `Version`、`web/package.json` 一致后再上传资产。
 
 ## Conclusion
 
-结论：**已满足本次构建版本元数据的代码与脚本目标；Docker 运行态验证待本机 Docker daemon 可用后补充。**
+结论：**版本模型已改为 `VERSION` 加受控同步；Docker 运行态验证和 release tag 一致性校验仍待补充。**
 
-Git 派生的 Version、固定 Git HEAD Commit、UTC BuildTime 已在编译期统一注入。`termbridge version`、服务端 browser runtime config 和 local 首页使用同一 Go Version；运行时配置文件不能覆盖已编译二进制身份。
+`termbridge version`、服务端 browser runtime config 和 local 首页使用同一 Go Version；运行时配置文件不能覆盖已编译二进制身份。portable package 命名和包内记录使用 `VERSION`，发布流程必须保持它与 Git tag 一致。

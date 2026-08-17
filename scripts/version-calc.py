@@ -9,6 +9,7 @@ Rules (x is fixed at 0):
         <commit-date>  <sha8>  <subject-first-50-chars>  <x>.<y>.<z>
 
 After calculation, optionally apply the final version to:
+  * VERSION                                           (package version source)
   * internal/shared/common/utils/version/version.go  (Version var)
   * web/package.json                                 ("version" field)
 
@@ -29,6 +30,7 @@ from pathlib import Path
 from typing import Iterator, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+VERSION_FILE = REPO_ROOT / "VERSION"
 VERSION_GO = REPO_ROOT / "internal" / "shared" / "common" / "utils" / "version" / "version.go"
 PACKAGE_JSON = REPO_ROOT / "web" / "package.json"
 
@@ -100,9 +102,12 @@ def calculate_version(*, print_history: bool = True) -> str:
 
 
 def apply_version(version: str) -> None:
-    """Write version into version.go and web/package.json."""
-    update_version_go(version)
-    update_package_json(version)
+    """Write the release version to every tracked consumer."""
+    previous = VERSION_FILE.read_text(encoding="utf-8").strip() if VERSION_FILE.exists() else ""
+    VERSION_FILE.write_text(version + "\n", encoding="utf-8")
+    print(f"updated {VERSION_FILE.relative_to(REPO_ROOT)}: {previous} -> {version}")
+    _replace_version_bytes(VERSION_GO, VERSION_GO_RE, version, "Version")
+    _replace_version_bytes(PACKAGE_JSON, PACKAGE_JSON_VERSION_RE, version, "version")
 
 
 def _replace_version_bytes(
@@ -131,20 +136,12 @@ def _replace_version_bytes(
     return previous
 
 
-def update_version_go(version: str) -> None:
-    _replace_version_bytes(VERSION_GO, VERSION_GO_RE, version, "Version")
-
-
-def update_package_json(version: str) -> None:
-    _replace_version_bytes(PACKAGE_JSON, PACKAGE_JSON_VERSION_RE, version, "version")
-
-
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Derive x.y.z from git history")
     parser.add_argument(
         "--apply",
         action="store_true",
-        help="write final version to version.go and web/package.json",
+        help="write final version to VERSION, version.go, and web/package.json",
     )
     parser.add_argument(
         "--quiet",

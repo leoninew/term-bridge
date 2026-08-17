@@ -27,9 +27,9 @@ next: understand-termbridge
 
 | 系统 | 制品 |
 | --- | --- |
-| Windows x64 | `TermBridge-windows-x64.zip` |
-| Linux x64 | `TermBridge-linux-x64.zip` |
-| macOS Intel x64 | `TermBridge-macos-x64.zip` |
+| Windows x64 | `termbridge-v<version>-windows-x64.zip` |
+| Linux x64 | `termbridge-v<version>-linux-x64.zip` |
+| macOS Intel x64 | `termbridge-v<version>-macos-x64.zip` |
 
 当前 Release 不提供 ARM64 安装包。下载后解压到方便长期保留的位置。
 

@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -412,25 +413,25 @@ func TestDeploymentBuildsAreConfigurationNeutral(t *testing.T) {
 
 func TestPortablePackageShipsPrefliteRuntimeProfile(t *testing.T) {
 	taskfile := readRepoFile(t, "Taskfile.yml")
-	envExample := readRepoFile(t, ".env.example")
-	config := readRepoFile(t, "configs", "config.yaml")
+	versionFile := readRepoFile(t, "VERSION")
+	versionScript := readRepoFile(t, "scripts", "version-calc.py")
 	startCmd := readRepoFile(t, "scripts", "package", "termbridge.cmd")
 	startSh := readRepoFile(t, "scripts", "package", "termbridge.sh")
 	prefliteEnv := readRepoFile(t, "scripts", "package", ".env.preflite")
 
-	assertContains(t, taskfile, "sh ./scripts/build-version.sh", "Taskfile must derive build version through the shared Git helper")
-	assertContains(t, taskfile, "git rev-parse --short=12 HEAD", "Taskfile must derive the short build commit from Git HEAD")
-	assertNotContains(t, taskfile, "TERMBRIDGE_BUILD_COMMIT", "Taskfile must not allow the build commit to diverge from Git HEAD")
-	assertContains(t, taskfile, "date -u +%Y%m%d-%H%M%S", "Taskfile must derive the UTC build time")
-	assertContains(t, envExample, "TERMBRIDGE_BUILD_VERSION=v1.2.3", ".env.example must document the build version override")
-	assertContains(t, envExample, "-dirty", ".env.example must document dirty build versions")
-	assertNotContains(t, envExample, "TERMBRIDGE_BUILD_COMMIT=", ".env.example must not imply that the build commit is configurable")
-	assertContains(t, config, "TERMBRIDGE_BUILD_VERSION 是 Taskfile/CI 编译元数据", "runtime config must document the build metadata boundary")
-	assertNotContains(t, config, "build_version:", "runtime config must not advertise build version as a YAML key")
+	assertContains(t, taskfile, "sh: cat VERSION", "Taskfile must read the tracked release version")
+	assertNotContains(t, taskfile, "build-version.sh", "Taskfile must not derive versions while packaging")
+	assertNotContains(t, taskfile, "GO_LDFLAGS", "Taskfile must not inject build metadata")
+	if !regexp.MustCompile(`^\d+\.\d+\.\d+\s*$`).MatchString(versionFile) {
+		t.Fatalf("VERSION must hold a semantic package version, got %q", versionFile)
+	}
+	assertContains(t, versionScript, "VERSION_FILE", "version script must update the tracked package version")
+	assertContains(t, taskfile, "dist/package/termbridge-v{{.VERSION}}-windows-x64", "portable packages must use versioned dist directories")
 	assertContains(t, taskfile, "cd web && yarn build", "portable package must use the neutral bundle build")
 	assertNotContains(t, taskfile, "yarn build:", "portable package must not use a product-line build alias")
 	for _, packageRoot := range []string{"{{.WINDOWS_ROOT}}", "{{.LINUX_ROOT}}", "{{.MACOS_ROOT}}"} {
 		assertContains(t, taskfile, "cp scripts/package/.env.preflite "+packageRoot+"/", "portable package must include the preflite runtime profile")
+		assertContains(t, taskfile, "cp VERSION "+packageRoot+"/", "portable package must include its release version")
 	}
 
 	for scriptName, script := range map[string]string{"termbridge.cmd": startCmd, "termbridge.sh": startSh} {

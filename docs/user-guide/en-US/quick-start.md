@@ -27,9 +27,9 @@ Open [TermBridge Releases](https://github.com/leoninew/TermBridge-go/releases/la
 
 | System | Package |
 | --- | --- |
-| Windows x64 | `TermBridge-windows-x64.zip` |
-| Linux x64 | `TermBridge-linux-x64.zip` |
-| macOS Intel x64 | `TermBridge-macos-x64.zip` |
+| Windows x64 | `termbridge-v<version>-windows-x64.zip` |
+| Linux x64 | `termbridge-v<version>-linux-x64.zip` |
+| macOS Intel x64 | `termbridge-v<version>-macos-x64.zip` |
 
 The current release does not provide ARM64 packages. Extract the ZIP somewhere you can keep it.
 

@@ -1,24 +1,24 @@
 version: '3'
 
-silent: false
-
 vars:
-  BUILD_VERSION:
-    sh: sh ./scripts/build-version.sh
-  BUILD_COMMIT:
-    sh: 'git rev-parse --short=12 HEAD'
-  BUILD_TIME:
-    sh: 'if [ -n "$TERMBRIDGE_BUILD_TIME" ]; then printf "%s" "$TERMBRIDGE_BUILD_TIME"; else date -u +%Y%m%d-%H%M%S; fi'
-  GO_LDFLAGS: >-
-    -X gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version.Version={{.BUILD_VERSION}}
-    -X gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version.Commit={{.BUILD_COMMIT}}
-    -X gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/version.BuildTime={{.BUILD_TIME}}
+  VERSION:
+    sh: cat VERSION
 
 tasks:
   default:
     desc: Show available tasks
     cmds:
       - task --list
+
+  version:
+    desc: Calculate the release version from Git history
+    cmds:
+      - python scripts/version-calc.py
+
+  version:apply:
+    desc: Calculate and apply the release version to tracked metadata
+    cmds:
+      - python scripts/version-calc.py --quiet --apply
 
   install:
     desc: Install web and Go dependencies, plus proto tooling into ./bin
@@ -53,7 +53,6 @@ tasks:
   test:
     desc: Run frontend and backend unit tests
     cmds:
-      - sh scripts/build-version_test.sh
       - cd web && yarn test
       - go test ./cmd/... ./internal/...
 
@@ -95,26 +94,35 @@ tasks:
     desc: Build web frontend and termbridge image
     cmds:
       - mkdir -p bin
-      - go build -trimpath -ldflags "{{.GO_LDFLAGS}}" -o bin/termbridge ./cmd/termbridge
-
+      - CGO_ENABLED=0 go build -trimpath -o bin/termbridge ./cmd/termbridge
   docker:
     desc: Build web frontend and termbridge image
     cmds:
-      - docker build -f Dockerfile.cn -t termbridge --build-arg VERSION={{.BUILD_VERSION}} --build-arg COMMIT={{.BUILD_COMMIT}} --build-arg BUILD_TIME={{.BUILD_TIME}} .
-
+      - docker build -f Dockerfile.cn -t termbridge .
   package:
     desc: Build Windows, Linux, and macOS x64 portable zip packages
+    env:
+      CGO_ENABLED: '0'
     vars:
-      WINDOWS_ROOT: bin/package/windows
-      LINUX_ROOT: bin/package/linux
-      MACOS_ROOT: bin/package/macos
+      WINDOWS_ROOT: 'dist/package/termbridge-v{{.VERSION}}-windows-x64'
+      LINUX_ROOT: 'dist/package/termbridge-v{{.VERSION}}-linux-x64'
+      MACOS_ROOT: 'dist/package/termbridge-v{{.VERSION}}-macos-x64'
     cmds:
-      - rm -rf bin/package bin/TermBridge-windows-x64.zip bin/TermBridge-linux-x64.zip bin/TermBridge-macos-x64.zip
+      - rm -rf {{.WINDOWS_ROOT}} {{.LINUX_ROOT}} {{.MACOS_ROOT}} "dist/termbridge-v{{.VERSION}}-windows-x64.zip" "dist/termbridge-v{{.VERSION}}-linux-x64.zip" "dist/termbridge-v{{.VERSION}}-macos-x64.zip"
       - mkdir -p {{.WINDOWS_ROOT}}/web {{.WINDOWS_ROOT}}/configs {{.LINUX_ROOT}}/web {{.LINUX_ROOT}}/configs {{.MACOS_ROOT}}/web {{.MACOS_ROOT}}/configs
       - cd web && yarn build
-      - env GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "{{.GO_LDFLAGS}}" -o {{.WINDOWS_ROOT}}/termbridge.exe ./cmd/termbridge
-      - env GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "{{.GO_LDFLAGS}}" -o {{.LINUX_ROOT}}/termbridge ./cmd/termbridge
-      - env GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "{{.GO_LDFLAGS}}" -o {{.MACOS_ROOT}}/termbridge ./cmd/termbridge
+      - cmd: go build -trimpath -o {{.WINDOWS_ROOT}}/termbridge.exe ./cmd/termbridge
+        env:
+          GOOS: windows
+          GOARCH: amd64
+      - cmd: go build -trimpath -o {{.LINUX_ROOT}}/termbridge ./cmd/termbridge
+        env:
+          GOOS: linux
+          GOARCH: amd64
+      - cmd: go build -trimpath -o {{.MACOS_ROOT}}/termbridge ./cmd/termbridge
+        env:
+          GOOS: darwin
+          GOARCH: amd64
       - cp -R web/dist/. {{.WINDOWS_ROOT}}/web/
       - cp -R web/dist/. {{.LINUX_ROOT}}/web/
       - cp -R web/dist/. {{.MACOS_ROOT}}/web/
@@ -124,19 +132,22 @@ tasks:
       - cp scripts/package/.env.preflite {{.WINDOWS_ROOT}}/
       - cp scripts/package/.env.preflite {{.LINUX_ROOT}}/
       - cp scripts/package/.env.preflite {{.MACOS_ROOT}}/
+      - cp VERSION {{.WINDOWS_ROOT}}/
+      - cp VERSION {{.LINUX_ROOT}}/
+      - cp VERSION {{.MACOS_ROOT}}/
       - cp scripts/package/termbridge.cmd {{.WINDOWS_ROOT}}/termbridge.cmd
       - cp scripts/package/termbridge.sh {{.WINDOWS_ROOT}}/termbridge.sh
       - cp scripts/package/termbridge.sh {{.LINUX_ROOT}}/termbridge.sh
       - cp scripts/package/termbridge.sh {{.MACOS_ROOT}}/termbridge.sh
       - chmod +x {{.LINUX_ROOT}}/termbridge {{.LINUX_ROOT}}/termbridge.sh {{.MACOS_ROOT}}/termbridge {{.MACOS_ROOT}}/termbridge.sh
-      - cd {{.WINDOWS_ROOT}} && zip -r ../../TermBridge-windows-x64.zip .
-      - cd {{.LINUX_ROOT}} && zip -r ../../TermBridge-linux-x64.zip .
-      - cd {{.MACOS_ROOT}} && zip -r ../../TermBridge-macos-x64.zip .
+      - cd dist/package && zip -r ../termbridge-v{{.VERSION}}-windows-x64.zip termbridge-v{{.VERSION}}-windows-x64
+      - cd dist/package && zip -r ../termbridge-v{{.VERSION}}-linux-x64.zip termbridge-v{{.VERSION}}-linux-x64
+      - cd dist/package && zip -r ../termbridge-v{{.VERSION}}-macos-x64.zip termbridge-v{{.VERSION}}-macos-x64
 
   clean:
     desc: Remove build outputs
     cmds:
-      - rm -rf web/dist bin
+      - rm -rf web/dist bin dist
       - rm -rf data/agent.db*
       - rm -rf data/cloud.db*
       - rm -rf data/history
