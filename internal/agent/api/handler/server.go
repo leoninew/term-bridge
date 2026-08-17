@@ -79,6 +79,7 @@ func (h *Handler) registerAgentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/cloud/connect", h.handleCloudConnect)
 	mux.HandleFunc("/api/cloud/disconnect", h.handleCloudDisconnect)
 	mux.HandleFunc("/api/cloud/auth/me", h.handleCloudAuthMe)
+	mux.HandleFunc("/api/cloud/devices", h.handleCloudDevices)
 	mux.HandleFunc("/api/cloud/oauth/exchange", h.handleExchangeOAuthCode)
 	mux.HandleFunc("/api/workspaces", h.handleLocalWorkspaces)
 	mux.HandleFunc("/api/workspaces/", h.handleLocalWorkspaces)
@@ -178,6 +179,28 @@ func (s *Handler) handleCloudAuthMe(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: false})
 		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Handler) handleCloudDevices(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	cloudToken := cloudTokenFromRequest(r)
+	if cloudToken == "" {
+		s.writeAPIError(w, r, http.StatusUnauthorized, errorCodeUnauthorized, errorMessageUnauthorized, nil)
+		return
+	}
+	result, err := s.config.CloudService.ListDevices(r.Context(), cloudToken)
+	if err != nil {
+		s.config.Logger.Warn("cloud device list failed", "error", err)
+		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		return
+	}
+	if result == nil {
+		result = &cloudproto.ListDevicesResp{}
 	}
 	writeJSON(w, http.StatusOK, result)
 }

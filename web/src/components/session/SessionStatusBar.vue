@@ -59,13 +59,60 @@
     <span v-else class="min-w-0 truncate">{{ t('workbench.noActiveSession') }}</span>
 
     <div class="ml-auto flex min-w-0 shrink-0 items-center gap-1.5 md:gap-2">
-      <span
-        v-if="deviceLabel"
-        class="min-w-0 max-w-[6.5rem] truncate text-[var(--color-text)] sm:max-w-[8rem] md:max-w-[12rem]"
-        :title="deviceLabel"
-      >
-        {{ deviceLabel }}
-      </span>
+      <DropdownMenuRoot v-if="deviceLabel" @update:open="loadDeviceOptionsIfOpened">
+        <DropdownMenuTrigger as-child>
+          <button
+            type="button"
+            class="inline-flex min-w-0 max-w-[6.5rem] items-center gap-1 rounded px-0.5 text-[var(--color-text)] outline-none hover:bg-[var(--color-control-hover)] focus-visible:bg-[var(--color-control-hover)] sm:max-w-[8rem] md:max-w-[12rem]"
+            :title="t('workbench.switchDevice')"
+            :aria-label="t('workbench.switchDeviceAria', { name: deviceLabel })"
+          >
+            <Monitor class="size-3.5 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
+            <span class="min-w-0 truncate">{{ deviceLabel }}</span>
+            <ChevronUp class="size-3 shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuPortal>
+          <DropdownMenuContent
+            side="top"
+            align="end"
+            :side-offset="8"
+            :class="sessionDropdownContentClass"
+          >
+            <p class="px-2 py-1 text-xs text-[var(--color-text-subtle)]">
+              {{ t('cloud.devices') }}
+            </p>
+            <DropdownMenuItem
+              v-for="candidate in devices"
+              :key="candidate.id"
+              :disabled="!candidate.online || candidate.id === currentDeviceId"
+              :class="sessionMenuItemInteractiveClass"
+              @select="emit('switchDevice', candidate.id)"
+            >
+              <span
+                class="size-2 shrink-0 rounded-full"
+                :class="candidate.online ? 'bg-green-500' : 'bg-[var(--color-text-subtle)]'"
+                aria-hidden="true"
+              />
+              <span class="min-w-0 flex-1 truncate">{{ candidate.name }}</span>
+              <Check
+                v-if="candidate.id === currentDeviceId"
+                class="size-3.5 shrink-0 text-[var(--color-text-subtle)]"
+                aria-hidden="true"
+              />
+            </DropdownMenuItem>
+            <p
+              v-if="!devicesLoading && devices.length === 0"
+              class="px-2 py-1.5 text-xs text-[var(--color-text-subtle)]"
+            >
+              {{ t('cloud.noDevices') }}
+            </p>
+            <p v-if="devicesLoading" class="px-2 py-1.5 text-xs text-[var(--color-text-subtle)]">
+              {{ t('dashboard.loadingDevices') }}
+            </p>
+          </DropdownMenuContent>
+        </DropdownMenuPortal>
+      </DropdownMenuRoot>
       <span
         v-if="deviceLabel && showCloudConnection"
         class="shrink-0 text-[var(--color-border-strong)]"
@@ -93,11 +140,20 @@
 <script setup lang="ts">
   import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
+  import { Check, ChevronUp, Monitor } from '@lucide/vue'
+  import {
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuPortal,
+    DropdownMenuRoot,
+    DropdownMenuTrigger,
+  } from 'reka-ui'
   import { lifecycleStateClassName } from '../../features/sessions/lifecycleState'
   import { useCloudSessionStore } from '../../store/cloudSession'
   import { useNotificationsStore } from '../../store/notifications'
   import LaunchMethodIcon from './LaunchMethodIcon.vue'
   import { isShortcutLaunchMethod, launchMethodLabelKey } from './launchMethod'
+  import { sessionDropdownContentClass, sessionMenuItemInteractiveClass } from './sessionUi'
   import type { SessionSummary } from '../../gen/proto/termbridge/agent/v1/workspace'
   import type { CloudSessionSummary } from '../../gen/proto/termbridge/cloud/v1/session'
   import type { DeviceSummary } from '../../gen/proto/termbridge/cloud/v1/device'
@@ -107,11 +163,20 @@
       session: SessionSummary | null
       device: DeviceSummary | CloudSessionSummary | null
       showCloudConnection?: boolean
+      devices?: DeviceSummary[]
+      devicesLoading?: boolean
     }>(),
     {
       showCloudConnection: false,
+      devices: () => [],
+      devicesLoading: false,
     },
   )
+
+  const emit = defineEmits<{
+    loadDeviceOptions: []
+    switchDevice: [deviceId: string]
+  }>()
 
   const { t } = useI18n()
   const cloudSession = useCloudSessionStore()
@@ -151,6 +216,12 @@ ${t('workbench.copyCwd')}`
     }
     return 'name' in props.device ? props.device.name : props.device.device_name
   })
+  const currentDeviceId = computed(() => {
+    if (!props.device) {
+      return cloudSession.cloudSession?.device_id ?? ''
+    }
+    return 'device_id' in props.device ? props.device.device_id : props.device.id
+  })
   const cloudConnected = computed(() => !!cloudSession.cloudSession)
   const cloudConnectionLabel = computed(() =>
     cloudConnected.value
@@ -168,6 +239,12 @@ ${t('workbench.copyCwd')}`
       notifications.pushToast('success', t('toast.cwdCopied'), path)
     } catch (err) {
       notifications.notifyError(t('toast.copyCwdFailed'), err)
+    }
+  }
+
+  function loadDeviceOptionsIfOpened(open: boolean) {
+    if (open) {
+      emit('loadDeviceOptions')
     }
   }
 

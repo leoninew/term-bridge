@@ -101,6 +101,10 @@
       :session="activeSession"
       :device="currentDevice"
       :show-cloud-connection="showCloudConnection"
+      :devices="deviceOptions"
+      :devices-loading="deviceOptionsLoading"
+      @load-device-options="emit('loadDeviceOptions')"
+      @switch-device="emit('switchDevice', $event)"
     />
   </section>
 </template>
@@ -143,6 +147,8 @@
       showSidebarToggle?: boolean
       disableTabReorder?: boolean
       showCloudConnection?: boolean
+      deviceOptions?: DeviceSummary[]
+      deviceOptionsLoading?: boolean
       shortcutsRoute: { name: string; params?: Record<string, string> }
     }>(),
     {
@@ -150,6 +156,8 @@
       showSidebarToggle: false,
       disableTabReorder: false,
       showCloudConnection: false,
+      deviceOptions: () => [],
+      deviceOptionsLoading: false,
     },
   )
 
@@ -166,6 +174,8 @@
     workbench: [element: HTMLElement | null]
     terminalState: [message: ServerControlMessage]
     terminalError: [message: string]
+    loadDeviceOptions: []
+    switchDevice: [deviceId: string]
   }>()
 
   const { t } = useI18n()

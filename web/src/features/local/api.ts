@@ -28,6 +28,7 @@ import type {
   CloudOAuthExchangeReq,
   CloudOAuthExchangeResp,
 } from '../../gen/proto/termbridge/cloud/v1/auth'
+import type { DeviceSummary, ListDevicesResp } from '../../gen/proto/termbridge/cloud/v1/device'
 import type { CloudConnectResp } from '../../gen/proto/termbridge/cloud/v1/session'
 import { localApiClient } from '../api/client'
 import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
@@ -46,6 +47,13 @@ export async function fetchCloudIdentityViaLocalApi(cloudToken: string): Promise
     headers: cloudAuthorizationHeaders(cloudToken),
   })
   return response.data
+}
+
+export async function listCloudDevicesViaLocalApi(cloudToken: string): Promise<DeviceSummary[]> {
+  const response = await localApiClient.get<ListDevicesResp>('/cloud/devices', {
+    headers: cloudAuthorizationHeaders(cloudToken),
+  })
+  return response.data.items
 }
 
 export async function connectCloudWithToken(cloudToken: string): Promise<CloudConnectResp> {

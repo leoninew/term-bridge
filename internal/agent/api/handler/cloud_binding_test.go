@@ -138,6 +138,68 @@ func TestCloudAuthMeSoftFailsWhenCloudIsUnavailable(t *testing.T) {
 	}
 }
 
+func TestCloudDevicesForwardsCloudTokenFromAuthorizationHeader(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/devices" {
+			t.Fatalf("cloud request method=%s path=%s", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer cloud-token" {
+			t.Fatalf("cloud authorization = %q", got)
+		}
+		body, err := codec.MarshalProtoJSON(&cloudv1.ListDevicesResp{Items: []*cloudv1.DeviceSummary{{Id: "device-2", Name: "other-device", Online: true}}})
+		if err != nil {
+			t.Fatalf("encode cloud devices: %v", err)
+		}
+		_, _ = w.Write(body)
+	}))
+	defer cloud.Close()
+
+	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, requestWithCloudToken(http.MethodGet, "/api/cloud/devices", "cloud-token"))
+	if response.Code != http.StatusOK {
+		t.Fatalf("cloud devices status = %d; body=%s", response.Code, response.Body.String())
+	}
+	var body cloudv1.ListDevicesResp
+	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode cloud devices: %v", err)
+	}
+	if len(body.GetItems()) != 1 || body.GetItems()[0].GetId() != "device-2" {
+		t.Fatalf("cloud devices = %#v", body.GetItems())
+	}
+}
+
+func TestCloudDevicesRequireCloudToken(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("cloud endpoint should not be called without Cloud token")
+	}))
+	defer cloud.Close()
+
+	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/cloud/devices", nil))
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("cloud devices status = %d, want 401; body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCloudDevicesReportsCloudFailure(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/devices" {
+			t.Fatalf("cloud request path = %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer cloud.Close()
+
+	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, requestWithCloudToken(http.MethodGet, "/api/cloud/devices", "cloud-token"))
+	if response.Code != http.StatusBadGateway {
+		t.Fatalf("cloud devices status = %d, want 502; body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 	stateDir := t.TempDir()
 	device, err := agentapp.LoadOrCreateDevice(agentapp.DeviceOptions{StateDir: stateDir})

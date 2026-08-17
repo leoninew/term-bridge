@@ -147,6 +147,7 @@
   import { useCloudAuthStore } from '../../store/cloudAuth'
   import { useCloudDevicesStore } from '../../store/cloudDevices'
   import { useCloudSessionStore } from '../../store/cloudSession'
+  import { listCloudDevicesViaLocalApi } from '../../features/local/api'
   import {
     closeSessionsSerially,
     normalizedSessionWorkspaceTree,
@@ -265,7 +266,15 @@
   })
   const closingBackgroundSessions = computed(() => closeBackgroundAction.running)
   const isLocalMode = computed(() => props.runtimeTarget.mode === 'local')
-  const workbenchDevice = computed(() => props.currentDevice ?? cloudSession.cloudSession)
+  const localDevice = ref<DeviceSummary | null>(null)
+  const workbenchDevice = computed(
+    () => props.currentDevice ?? localDevice.value ?? cloudSession.cloudSession,
+  )
+  const localCloudDevices = ref<DeviceSummary[]>([])
+  const deviceOptionsLoading = ref(false)
+  const deviceOptions = computed(() =>
+    isLocalMode.value ? localCloudDevices.value : cloudDevices.devices,
+  )
 
   const activeSession = computed(() => {
     const tab = workbench.activeTab
@@ -937,6 +946,65 @@
     )
   }
 
+  async function loadDeviceOptions() {
+    if (deviceOptionsLoading.value) {
+      return
+    }
+    deviceOptionsLoading.value = true
+    try {
+      if (isLocalMode.value) {
+        const cloudToken = cloudAuth.cloudToken
+        if (!cloudToken) {
+          localCloudDevices.value = []
+          return
+        }
+        localCloudDevices.value = await listCloudDevicesViaLocalApi(cloudToken)
+        return
+      }
+      await cloudDevices.loadDevices()
+    } catch (err) {
+      notifications.notifyError(t('dashboard.loadDevicesFailed'), err)
+    } finally {
+      deviceOptionsLoading.value = false
+    }
+  }
+
+  async function switchDevice(deviceId: string) {
+    const device = deviceOptions.value.find((candidate) => candidate.id === deviceId)
+    if (!device?.online || deviceId === deviceIdFor(workbenchDevice.value)) {
+      return
+    }
+    if (isLocalMode.value) {
+      let cloudPublicUrl = cloudSession.cloudSession?.public_url
+      if (!cloudPublicUrl) {
+        const result = await localCloud.connectDevice({
+          onError: (err) => notifications.notifyError(t('dashboard.cloudConnectionFailed'), err),
+        })
+        if (!result.ok || result.kind !== 'connected') {
+          return
+        }
+        cloudPublicUrl = cloudSession.cloudSession?.public_url
+      }
+      if (!cloudPublicUrl) {
+        return
+      }
+      const url = new URL(`/devices/${encodeURIComponent(deviceId)}/sessions`, cloudPublicUrl)
+      window.location.assign(url)
+      return
+    }
+    if (!cloudDevices.selectDeviceId(deviceId)) {
+      return
+    }
+    await router.push({ name: 'cloud-sessions', params: { deviceId } })
+  }
+
+  function deviceIdFor(device: DeviceSummary | CloudSessionSummary | null): string {
+    if (!device) {
+      return ''
+    }
+    return 'device_id' in device ? device.device_id : device.id
+  }
+
   const workbenchBind = computed(() => ({
     openedTabs: visibleOpenedTabs.value,
     allOpenedTabs: workbench.openedTabs,
@@ -954,6 +1022,8 @@
     sessionLifecycleState,
     disableTabReorder: disableReorder.value,
     showCloudConnection: isLocalMode.value,
+    deviceOptions: deviceOptions.value,
+    deviceOptionsLoading: deviceOptionsLoading.value,
     shortcutsRoute: shortcutsRoute.value,
   }))
 
@@ -982,13 +1052,16 @@
     },
     terminalState: handleTerminalState,
     terminalError: handleTerminalError,
+    loadDeviceOptions,
+    switchDevice,
   }
 
   onMounted(async () => {
     try {
       if (isLocalMode.value) {
         try {
-          await localCloud.hydrateFromAgent()
+          const { device } = await localCloud.hydrateFromAgent()
+          localDevice.value = device
         } catch (err) {
           notifications.notifyError(t('dashboard.cloudConnectionFailed'), err)
         }

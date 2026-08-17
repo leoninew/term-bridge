@@ -81,6 +81,31 @@ func (c *Client) AuthMe(ctx context.Context, cloudToken string) (*cloudproto.Aut
 	return &result, nil
 }
 
+func (c *Client) ListDevices(ctx context.Context, cloudToken string) (*cloudproto.ListDevicesResp, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiBaseUrl+"/devices", nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Authorization", "Bearer "+cloudToken)
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("cloud list devices status %d", response.StatusCode)
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	var result cloudproto.ListDevicesResp
+	if err := codec.UnmarshalProtoJSON(body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *Client) ExchangeOAuthCode(ctx context.Context, client agentapp.OAuthClientConfig, code string) (string, error) {
 	cfg := oauth2.Config{
 		ClientID:     client.ClientId,

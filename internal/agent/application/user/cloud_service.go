@@ -13,6 +13,7 @@ import (
 type CloudApi interface {
 	RegisterCurrentDevice(ctx context.Context, cloudToken string, device Device) error
 	AuthMe(ctx context.Context, cloudToken string) (*cloudproto.AuthMeResp, error)
+	ListDevices(ctx context.Context, cloudToken string) (*cloudproto.ListDevicesResp, error)
 	ExchangeOAuthCode(ctx context.Context, client OAuthClientConfig, code string) (string, error)
 }
 
@@ -61,6 +62,10 @@ func (s *CloudService) Connect(ctx context.Context, cloudToken string, device De
 
 func (s *CloudService) AuthMe(ctx context.Context, cloudToken string) (*cloudproto.AuthMeResp, error) {
 	return s.cloudApi.AuthMe(ctx, cloudToken)
+}
+
+func (s *CloudService) ListDevices(ctx context.Context, cloudToken string) (*cloudproto.ListDevicesResp, error) {
+	return s.cloudApi.ListDevices(ctx, cloudToken)
 }
 
 func (s *CloudService) ExchangeOAuthCode(ctx context.Context, code string) (string, error) {

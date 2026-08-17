@@ -91,7 +91,7 @@ func TestRuntimeErrorResponsePreservesSessionP1Catalog(t *testing.T) {
 		{name: "missing command", err: sessionmodel.MissingCommand(), status: http.StatusBadRequest, code: sessionmodel.CodeMissingCommand, message: "Session command is required."},
 		{name: "not found", err: sessionmodel.NotFound(), status: http.StatusNotFound, code: sessionmodel.CodeNotFound, message: "Session was not found."},
 		{name: "workspace not found", err: sessionmodel.WorkspaceNotFound(), status: http.StatusNotFound, code: sessionmodel.CodeWorkspaceNotFound, message: "Workspace was not found."},
-		{name: "not editable", err: sessionmodel.NotEditable(), status: http.StatusConflict, code: sessionmodel.CodeNotEditable, message: "Only stopped or failed sessions can be edited."},
+		{name: "not editable", err: sessionmodel.NotEditable(), status: http.StatusConflict, code: sessionmodel.CodeNotEditable, message: "Only stopped or failed sessions can change the launch command."},
 		{name: "already running", err: sessionmodel.AlreadyRunning(), status: http.StatusConflict, code: sessionmodel.CodeAlreadyRunning, message: "Session is already running."},
 		{name: "cannot rerun", err: sessionmodel.CannotRerunRunning(), status: http.StatusConflict, code: sessionmodel.CodeCannotRerunRunning, message: "A running session cannot be rerun."},
 		{name: "cannot delete", err: sessionmodel.CannotDeleteRunning(), status: http.StatusConflict, code: sessionmodel.CodeCannotDeleteRunning, message: "A running session cannot be deleted."},

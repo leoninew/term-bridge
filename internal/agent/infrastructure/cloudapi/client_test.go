@@ -66,6 +66,33 @@ func TestAuthMeRejectsInvalidCloudResponse(t *testing.T) {
 	}
 }
 
+func TestListDevicesUsesConfiguredApiBaseUrlAndCloudBearer(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/devices" {
+			t.Fatalf("request method=%s path=%s", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer cloud-token" {
+			t.Fatalf("authorization = %q", got)
+		}
+		body, err := codec.MarshalProtoJSON(&cloudproto.ListDevicesResp{Items: []*cloudproto.DeviceSummary{{Id: "device-1", Name: "developer-machine", Online: true}}})
+		if err != nil {
+			t.Fatalf("encode device list response: %v", err)
+		}
+		_, _ = w.Write(body)
+	}))
+	defer cloud.Close()
+
+	client := New(Config{ApiBaseUrl: cloud.URL + "/api", HttpClient: http.DefaultClient})
+	result, err := client.ListDevices(context.Background(), "cloud-token")
+	if err != nil {
+		t.Fatalf("ListDevices() error = %v", err)
+	}
+	devices := result.GetItems()
+	if len(devices) != 1 || devices[0].GetId() != "device-1" || devices[0].GetName() != "developer-machine" {
+		t.Fatalf("devices = %#v", devices)
+	}
+}
+
 func TestRegisterCurrentDeviceUsesConfiguredApiBaseUrl(t *testing.T) {
 	var deviceReport cloudproto.CurrentDeviceReq
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
