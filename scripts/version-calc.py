@@ -13,6 +13,10 @@ After calculation, optionally apply the final version to:
   * internal/shared/common/utils/version/version.go  (Version var)
   * web/package.json                                 ("version" field)
 
+When applying from a clean worktree, create the matching lightweight Git tag
+on HEAD. A dirty worktree still receives the version-file updates, but skips
+tag creation with a warning.
+
 Run from any directory inside the target git repository:
 
     python scripts/version-calc.py
@@ -110,6 +114,18 @@ def apply_version(version: str) -> None:
     _replace_version_bytes(PACKAGE_JSON, PACKAGE_JSON_VERSION_RE, version, "version")
 
 
+def is_worktree_clean() -> bool:
+    """Return whether the index and worktree, including untracked files, are clean."""
+    return not run_git("status", "--porcelain=v1", "--untracked-files=all").strip()
+
+
+def create_version_tag(version: str) -> None:
+    """Create the lightweight release tag for the current HEAD."""
+    tag = f"v{version}"
+    run_git("tag", tag)
+    print(f"created tag: {tag}")
+
+
 def _replace_version_bytes(
     path: Path,
     pattern: re.Pattern[bytes],
@@ -141,7 +157,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--apply",
         action="store_true",
-        help="write final version to VERSION, version.go, and web/package.json",
+        help="write final version and tag HEAD when the worktree is clean",
     )
     parser.add_argument(
         "--quiet",
@@ -158,7 +174,16 @@ def main(argv: list[str] | None = None) -> int:
         print()
     print(f"version: {version}")
     if args.apply:
+        worktree_was_clean = is_worktree_clean()
         apply_version(version)
+        if worktree_was_clean:
+            create_version_tag(version)
+        else:
+            print(
+                "warning: worktree was not clean before --apply; "
+                f"skipped tag v{version}",
+                file=sys.stderr,
+            )
     return 0
 
 

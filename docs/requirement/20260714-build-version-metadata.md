@@ -1,5 +1,5 @@
 # 构建版本元数据需求
-最后修改时间: 2026-08-17
+最后修改时间: 2026-08-19
 
 ## Review status
 
@@ -15,7 +15,7 @@ Accepted
 
 ## Goal
 
-1. 使用根目录 `VERSION` 记录 SemVer package 版本；`task version:apply` 从 Git 历史计算版本并同步更新 `VERSION`、Go `Version` 变量和 `web/package.json`。
+1. 使用根目录 `VERSION` 记录 SemVer package 版本；`task version:apply` 从 Git 历史计算版本并同步更新 `VERSION`、Go `Version` 变量和 `web/package.json`；运行前工作目录干净时，为当前 `HEAD` 创建对应的轻量 Git tag。
 2. 使 `task build`、`task package`、`task docker` 直接编译已同步的源码元数据，不再通过 linker flags 或环境变量注入版本、commit 或构建时间。
 3. 提供 `termbridge version` 子命令，仅输出版本和运行时信息，不启动 Agent 或 Cloud 服务。
 4. 为三个 portable package 使用带版本号的目录和 ZIP 名称，并在包内携带 `VERSION`。
@@ -26,11 +26,11 @@ Accepted
 1. 不将版本作为 Viper/YAML/运行时 `.env` 配置项。
 2. 不再向二进制暴露 commit 或构建时间，也不保留 Git tag、commit 距离或 dirty 标识作为构建版本格式。
 3. 不修改后端业务 API 或认证逻辑。
-4. 不创建或移动 Git tag，不执行 Git 提交、推送或发布。
+4. 不执行 Git 提交、推送或发布；已有未提交或未跟踪文件时，`task version:apply` 只同步版本文件并警告，不创建 Git tag。
 
 ## User scenarios
 
-1. 开发者执行 `task version` 查看根据 Git 历史计算出的版本，并执行 `task version:apply` 将该版本同步到全部跟踪的消费者。
+1. 开发者执行 `task version` 查看根据 Git 历史计算出的版本，并在干净工作目录执行 `task version:apply`，将该版本同步到全部跟踪的消费者并创建 `v<version>` tag。
 2. 开发者执行 `task build`、`task package` 或 `task docker` 时，产物使用已提交的 Go `Version`；portable package 名称为 `termbridge-v<version>-<platform>.zip`。
 3. 用户运行 `termbridge version` 时，获得版本和运行时信息；local dashboard 显示服务端二进制 Version。
 
@@ -38,6 +38,7 @@ Accepted
 
 - [x] 根目录 `VERSION` 仅保存 SemVer package 版本，并作为 portable package 命名来源。
 - [x] `task version:apply` 同步更新 `VERSION`、Go `Version` 变量和 `web/package.json`。
+- [x] `task version:apply` 在运行前工作目录干净时为当前 `HEAD` 创建 `v<version>` 轻量 tag；工作目录不干净时警告并跳过 tag。
 - [x] build、package、docker 不再接收 linker metadata 或构建环境变量。
 - [x] `termbridge version` 是正式版本查询子命令，且不接受无关参数。
 - [x] Dockerfile 与 Dockerfile.cn 编译仓库中已同步的 Go 版本变量。
@@ -54,10 +55,11 @@ Accepted
 2. `VERSION` 是 package 命名和包内版本记录；`version:apply` 将其与 Go `Version` 变量、`web/package.json` 保持一致。
 3. 版本信息的唯一运行时来源是 Go 二进制 `internal/shared/common/utils/version`；服务端将 Version 注入 `window.__CONFIG__`。
 4. `termbridge version` 不再输出 commit 或构建时间。
+5. `version:apply` 在修改版本文件前检查工作目录；当时干净则为当前 `HEAD` 创建轻量 `v<version>` tag，不干净则保留版本同步并输出 warning。
 
 ## Risk
 
-1. 发布 CI 使用 `VERSION` 生成制品文件名、使用 Git tag 命名 GitHub Release；当前尚未自动校验两者相等。发布前必须确认 tag 为 `v$(cat VERSION)`，否则可能生成 tag 与制品版本不一致的 Release。
+1. 发布 CI 使用 `VERSION` 生成制品文件名、使用 Git tag 命名 GitHub Release；只有从干净工作目录执行 `task version:apply` 才会自动创建 tag。若版本同步发生在不干净的工作目录，发布前仍必须确认 tag 为 `v$(cat VERSION)`。
 2. `VERSION`、Go `Version` 与 `web/package.json` 均为跟踪文件；跳过 `task version:apply` 的手工修改可能使它们漂移。
 3. Docker daemon 不可用时，仍需在可用环境中构建两个 Dockerfile 并执行 `termbridge version`，验证镜像包含已同步版本。
 
@@ -66,3 +68,4 @@ Accepted
 - 2026-07-14：用户要求首页项目版本优先使用 Go 后端运行时版本，而不是独立前端版本。
 - 2026-07-14：用户要求版本查询使用 `version` 子命令，不使用 `--version`，并要求验证使用 `go run`，避免误启动服务或调用无扩展名 Windows 文件。
 - 2026-08-17：版本模型改为由 `VERSION` 及受控的 `version:apply` 同步管理，不再将 Git commit、构建时间或 dirty 状态注入二进制。
+- 2026-08-19：`version:apply` 在运行前工作目录干净时自动创建对应轻量 tag；不干净时保留同步并提示未创建 tag。

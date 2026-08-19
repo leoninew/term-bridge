@@ -1,5 +1,5 @@
 # 构建版本元数据验证
-最后修改时间: 2026-08-17
+最后修改时间: 2026-08-19
 
 ## Review status
 
@@ -29,7 +29,7 @@ Accepted
 - `VERSION`：新增作为 portable package 命名和包内记录的 SemVer 版本文件。
 - `internal/shared/common/utils/version/version.go`：只保留编译进二进制的 `Version` 与运行时信息。
 - `Taskfile.yml`：新增 `version`、`version:apply` 任务；build、package、docker 直接编译已同步的源码，portable package 使用版本化目录和 ZIP 名称。
-- `scripts/version-calc.py`：`--apply` 同步更新 `VERSION`、Go `Version` 和 `web/package.json`。
+- `scripts/version-calc.py`：`--apply` 同步更新 `VERSION`、Go `Version` 和 `web/package.json`；运行前工作目录干净时创建对应轻量 tag，不干净时警告并跳过 tag。
 - `scripts/build-version.sh`、`scripts/build-version_test.sh`：删除旧的 Git tag、commit 距离、dirty 和环境变量覆盖构建模型。
 - `Dockerfile`、`Dockerfile.cn`：移除 build args 和 linker flags。
 - `cmd/termbridge/cli/cli_test.go`：验证 `termbridge version` 不再输出 commit 或构建时间。
@@ -44,6 +44,7 @@ Accepted
 
 - [x] `VERSION` 保存 SemVer package 版本，并用于 portable package 命名和包内记录。
 - [x] `task version:apply` 同步 `VERSION`、Go `Version` 和 `web/package.json`。
+- [x] `task version:apply` 仅在运行前工作目录干净时创建 `v<version>` 轻量 tag；不干净时输出 warning 并跳过 tag。
 - [x] build、package、docker 不再传递 linker metadata 或构建环境变量。
 - [x] `termbridge version` 输出 Version 与运行时信息，且不启动服务。
 - [x] local dashboard 通过服务端 runtime config 显示 Go Version。
@@ -74,7 +75,7 @@ go test ./cmd/... ./internal/...
 ## Risks
 
 1. 本机 Docker daemon 不可用，未执行真实 Docker image build/run；两个 Dockerfile 已移除 build args，但仍需验证镜像 `termbridge version` 与仓库版本一致。
-2. GitHub Release 名称来自 tag，资产名称来自 `VERSION`，工作流尚未验证两者相等；发布时必须确认 tag 为 `v$(cat VERSION)`。
+2. GitHub Release 名称来自 tag，资产名称来自 `VERSION`；干净工作目录运行 `task version:apply` 会创建对应 tag。若运行前不干净而跳过 tag，发布时必须确认 tag 为 `v$(cat VERSION)`。
 3. `VERSION`、Go `Version` 和 `web/package.json` 的同步依赖 `task version:apply`；应在 CI 中加入一致性检查，防止手工编辑造成漂移。
 
 ## Incomplete items
