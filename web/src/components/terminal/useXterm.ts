@@ -36,6 +36,8 @@ type XtermController = {
   scrollPageDown: () => void
   getScrollEdges: () => TerminalScrollEdges
   setScrollEdgesListener: (listener: ((edges: TerminalScrollEdges) => void) | null) => void
+  /** Replace stale terminal content with the next attach replay without letting old queued writes return. */
+  beginReplayRestore: () => void
   write: (data: Uint8Array) => void
   pendingBytes: () => number
   setTheme: (theme: AppTheme) => void
@@ -277,9 +279,12 @@ export function createXterm(
   const settleTimers: number[] = []
   const writeQueue: Uint8Array[] = []
   let writing = false
+  let writingBytes = 0
   let pending = 0
   let writeCount = 0
   let drainCount = 0
+  let replayRestorePending = false
+  let replayEpoch = 0
 
   terminal.loadAddon(fitAddon)
   terminal.loadAddon(webLinksAddon)
@@ -529,7 +534,7 @@ export function createXterm(
   }
 
   function drainWrites() {
-    if (writing) {
+    if (writing || replayRestorePending) {
       return
     }
     const next = writeQueue.shift()
@@ -537,9 +542,11 @@ export function createXterm(
       return
     }
     writing = true
+    writingBytes = next.byteLength
     terminal.write(next, () => {
       pending -= next.byteLength
       writing = false
+      writingBytes = 0
       drainCount += 1
       terminalDebug(
         'xterm.write.drained',
@@ -551,11 +558,64 @@ export function createXterm(
         },
         { sample: drainCount },
       )
+      finishReplayRestore()
       if (writeQueue.length === 0 && readOnly) {
         terminal.write(hideCursorSequence)
       }
       drainWrites()
     })
+  }
+
+  function discardQueuedWrites() {
+    let discardedBytes = 0
+    for (const chunk of writeQueue) {
+      discardedBytes += chunk.byteLength
+    }
+    writeQueue.length = 0
+    pending -= discardedBytes
+    if (pending < 0) {
+      pending = 0
+    }
+    return discardedBytes
+  }
+
+  function finishReplayRestore() {
+    if (disposed || !replayRestorePending || writing) {
+      return
+    }
+    replayRestorePending = false
+    terminal.reset()
+    terminalDebug(
+      'xterm.replay-restored',
+      diagnosticDetails({
+        replayEpoch,
+        pendingBytes: pending,
+        queuedChunks: writeQueue.length,
+        geometry: captureElementGeometry(hostElement),
+      }),
+    )
+    emitScrollEdges()
+  }
+
+  function startReplayRestore() {
+    if (disposed) {
+      return
+    }
+    replayEpoch += 1
+    const discardedBytes = discardQueuedWrites()
+    replayRestorePending = true
+    terminalDebug(
+      'xterm.replay-restore.begin',
+      diagnosticDetails({
+        replayEpoch,
+        discardedBytes,
+        inFlightBytes: writingBytes,
+        pendingBytes: pending,
+        queuedChunks: writeQueue.length,
+      }),
+    )
+    finishReplayRestore()
+    drainWrites()
   }
 
   /** Wait one paint frame so a PTY resize can be observed as a distinct change. */
@@ -752,6 +812,9 @@ export function createXterm(
         listener(getScrollEdges())
       }
     },
+    beginReplayRestore() {
+      startReplayRestore()
+    },
     write(data: Uint8Array) {
       writeCount += 1
       if (pending + data.byteLength > maxPendingBytes) {
@@ -791,6 +854,7 @@ export function createXterm(
         'xterm.dispose',
         diagnosticDetails({
           pendingBytes: pending,
+          inFlightBytes: writingBytes,
           queuedChunks: writeQueue.length,
           lastCols,
           lastRows,

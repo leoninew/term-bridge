@@ -129,4 +129,29 @@ describe('useTerminalSocket', () => {
 
     expect(sentControls(secondSocket)).toEqual([{ type: 'hello', cols: 0, rows: 0, nonce: '' }])
   })
+
+  it('ignores late events from a replaced socket', () => {
+    const onOutput = vi.fn()
+    const onControl = vi.fn()
+    const onError = vi.fn()
+    const terminal = useTerminalSocket(onOutput, onControl, onError)
+
+    terminal.connect('/local-api/sessions/session-1/ws')
+    const firstSocket = FakeWebSocket.instances[0]
+    firstSocket.open()
+
+    terminal.connect('/local-api/sessions/session-1/ws')
+    const secondSocket = FakeWebSocket.instances[1]
+    secondSocket.open()
+
+    firstSocket.onmessage?.({ data: new Uint8Array([1, 2, 3]).buffer } as MessageEvent<ArrayBuffer>)
+    firstSocket.onerror?.()
+    firstSocket.onclose?.({ code: 1006, reason: 'late', wasClean: false } as CloseEvent)
+
+    expect(onOutput).not.toHaveBeenCalled()
+    expect(onControl).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+    expect(terminal.status.value).toBe('connected')
+    expect(terminal.error.value).toBeNull()
+  })
 })

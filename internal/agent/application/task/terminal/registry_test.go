@@ -25,6 +25,16 @@ import (
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 )
 
+func TestRegistryUsesBoundedReplayDefaults(t *testing.T) {
+	registry := NewRegistry(Config{})
+	if registry.replayMaxBytes != 64*1024 {
+		t.Fatalf("replayMaxBytes = %d, want 65536", registry.replayMaxBytes)
+	}
+	if registry.replayChunkBytes != 64*1024 {
+		t.Fatalf("replayChunkBytes = %d, want 65536", registry.replayChunkBytes)
+	}
+}
+
 func TestCreateSessionExpandsHomeCwd(t *testing.T) {
 	root := t.TempDir()
 	home := t.TempDir()
@@ -422,6 +432,111 @@ replayDone:
 	if client.QueuedBytes() != 0 {
 		t.Fatalf("QueuedBytes() = %d, want released", client.QueuedBytes())
 	}
+	fake.finish(termpty.Result{ExitCode: 0})
+	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
+}
+
+func TestAttachQueuesReplayBeforeLaterLiveOutput(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{
+		Logger:           slog.Default(),
+		Cwd:              cwd,
+		Store:            state.NewStore(root),
+		LogDir:           filepath.Join(cwd, "logs"),
+		History:          history.Config{MaxLines: 10, MaxBytes: 4096, MaxLineBytes: 4096},
+		Manager:          &fakeManager{session: fake},
+		ClientQueueSize:  16,
+		ClientQueueBytes: 4096,
+		ReplayMaxBytes:   1024,
+		ReplayChunkBytes: 1024,
+	})
+	response, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{Name: "Replay then live", Command: []string{"go version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	fake.output <- []byte("REPLAY_OUTPUT\n")
+	waitHistoryContains(t, registry, response.WorkspaceId, response.SessionId, "REPLAY_OUTPUT")
+
+	client, err := registry.Attach(response.WorkspaceId, response.SessionId)
+	if err != nil {
+		t.Fatalf("Attach() error = %v", err)
+	}
+	fake.output <- []byte("LIVE_OUTPUT\n")
+
+	var frames []string
+	deadline := time.After(time.Second)
+	for {
+		select {
+		case outbound := <-client.Outbound():
+			if outbound.Kind == OutboundText {
+				frames = append(frames, outbound.Text.GetType())
+			} else {
+				frames = append(frames, string(outbound.Binary))
+			}
+			client.MarkSent(outbound)
+			if outbound.Kind == OutboundBinary && string(outbound.Binary) == "LIVE_OUTPUT\n" {
+				want := []string{
+					terminalproto.TypeStarted,
+					terminalproto.TypeReplayStarted,
+					"REPLAY_OUTPUT\n",
+					terminalproto.TypeReplayFinished,
+					"LIVE_OUTPUT\n",
+				}
+				if !slices.Equal(frames, want) {
+					t.Fatalf("outbound frames = %q, want %q", frames, want)
+				}
+				fake.finish(termpty.Result{ExitCode: 0})
+				waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
+				return
+			}
+		case <-deadline:
+			t.Fatalf("timed out waiting for live output; frames = %q", frames)
+		}
+	}
+}
+
+func TestAttachReplayFailureDoesNotPublishClient(t *testing.T) {
+	root := t.TempDir()
+	cwd := t.TempDir()
+	fake := newFakeSession()
+	registry := NewRegistry(Config{
+		Logger:           slog.Default(),
+		Cwd:              cwd,
+		Store:            state.NewStore(root),
+		LogDir:           filepath.Join(cwd, "logs"),
+		History:          history.Config{MaxLines: 10, MaxBytes: 4096, MaxLineBytes: 4096},
+		Manager:          &fakeManager{session: fake},
+		ClientQueueSize:  2,
+		ClientQueueBytes: 4096,
+		ReplayMaxBytes:   1024,
+		ReplayChunkBytes: 1024,
+	})
+	response, err := registry.CreateSession(context.Background(), &agent.CreateSessionReq{Name: "Replay queue failure", Command: []string{"go version"}})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	if _, err := registry.Attach(response.WorkspaceId, response.SessionId); err == nil {
+		t.Fatal("Attach() error = nil, want replay queue failure")
+	}
+
+	registry.mu.Lock()
+	runtime := registry.runtimes[response.SessionId]
+	registry.mu.Unlock()
+	if runtime == nil {
+		t.Fatal("runtime missing after replay queue failure")
+	}
+	runtime.mu.Lock()
+	clientCount := len(runtime.clients)
+	controllerClientID := runtime.controllerClientId
+	attachment := runtime.attachment
+	runtime.mu.Unlock()
+	if clientCount != 0 || controllerClientID != "" || attachment != AttachmentDetached {
+		t.Fatalf("runtime after failed attach: clients=%d controller=%q attachment=%q", clientCount, controllerClientID, attachment)
+	}
+
 	fake.finish(termpty.Result{ExitCode: 0})
 	waitExit(t, state.NewStore(root), response.WorkspaceId, response.SessionId)
 }

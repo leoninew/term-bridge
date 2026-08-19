@@ -24,7 +24,7 @@ const (
 	EnvPrefix       = "TERMBRIDGE"
 	EnvNameVariable = EnvPrefix + "_ENV"
 
-	DefaultTerminalReplayMaxBytes          int64 = 256 * 1024
+	DefaultTerminalReplayMaxBytes          int64 = 64 * 1024
 	DefaultTerminalReplayChunkBytes              = 64 * 1024
 	DefaultTerminalClientQueueMessages           = 64
 	DefaultTerminalClientQueueBytes              = 4 * 1024 * 1024

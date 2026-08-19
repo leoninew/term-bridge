@@ -22,6 +22,9 @@
     </div>
 
     <p v-if="replaying" class="terminal-message warning">{{ t('workbench.replayingHistory') }}</p>
+    <p v-else-if="replayTruncated" class="terminal-message warning">
+      {{ t('workbench.replayTruncated') }}
+    </p>
     <p v-if="isObserver" class="terminal-message warning">
       {{ t('workbench.terminalReadOnly') }}
       <button type="button" class="ml-2 underline" @click="requestTakeover">
@@ -69,6 +72,7 @@
   const terminalElement = ref<HTMLElement | null>(null)
   const themeStore = useThemeStore()
   const replaying = ref(false)
+  const replayTruncated = ref(false)
   const hasTrustedSize = ref(false)
   const scrollEdges = ref({ showTop: false, showBottom: false })
   const sessionStarted = ref(false)
@@ -191,15 +195,12 @@
       }
       if (message.type === 'replay_started') {
         replaying.value = true
+        replayTruncated.value = false
+        xterm?.beginReplayRestore()
       }
       if (message.type === 'replay_finished') {
         replaying.value = false
-        if (message.truncated) {
-          console.warn(
-            '[termbridge] terminal history replay truncated; only recent output is shown',
-            { sessionId: props.sessionId },
-          )
-        }
+        replayTruncated.value = message.truncated === true
       }
       if (message.type === 'error') {
         sessionStarted.value = true
@@ -464,6 +465,7 @@
       connectAttemptedForUrl = null
       sessionStarted.value = false
       replaying.value = false
+      replayTruncated.value = false
       connect('wsUrl-changed')
       void nextTick(() => scheduleTerminalFocus('wsUrl-changed'))
     },
@@ -482,6 +484,7 @@
       connectAttemptedForUrl = null
       sessionStarted.value = false
       replaying.value = false
+      replayTruncated.value = false
       connect('connection-enabled')
       if (props.active) {
         void nextTick(() => {

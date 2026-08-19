@@ -27,8 +27,11 @@ type SessionRuntime struct {
 	history  *history.Writer
 
 	mu sync.Mutex
+	// outputMu keeps the history snapshot used for attach replay contiguous with later live output.
+	// Lock order: outputMu -> controlMu -> resizeMu -> mu. Never wait for network I/O while held.
+	outputMu sync.Mutex
 	// controlMu serializes controller identity changes with controller-gated PTY ops.
-	// Lock order: controlMu -> resizeMu -> mu. Never hold controlMu across client queue waits.
+	// Lock order after outputMu: controlMu -> resizeMu -> mu. Never hold controlMu across client queue waits.
 	controlMu          sync.Mutex
 	resizeMu           sync.Mutex
 	clients            map[string]*Client
@@ -61,7 +64,13 @@ func (r *SessionRuntime) start() {
 }
 
 func (r *SessionRuntime) attach() (*Client, error) {
+	r.outputMu.Lock()
+	defer r.outputMu.Unlock()
+
 	r.controlMu.Lock()
+	// Keep the controller reservation private until the replay frames have all
+	// been queued. This prevents a concurrent controller change from putting a
+	// role frame ahead of this client's started/replay sequence.
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
@@ -76,23 +85,45 @@ func (r *SessionRuntime) attach() (*Client, error) {
 	}
 	client := &Client{id: id, runtime: r, queue: make(chan Outbound, r.registry.clientQueueSize)}
 	attachment := AttachmentAttached
-	// Reserve membership + controller under lock so concurrent attaches elect exactly one controller.
-	r.clients[id] = client
-	r.clientOrder = append(r.clientOrder, id)
+	// Reserve the controller under lock so concurrent attaches elect exactly one controller.
+	// The client itself stays private until its replay is completely queued.
 	controlRole := terminalproto.ControlRoleObserver
 	if r.controllerClientId == "" {
 		r.controllerClientId = id
 		controlRole = terminalproto.ControlRoleController
 	}
-	r.attachment = attachment
 	r.registry.logger.Info("terminal attach start", "session_id", r.session.Id, "client_id", id, "control_role", controlRole, "current_cols", r.current.Cols, "current_rows", r.current.Rows)
 	r.mu.Unlock()
-	r.controlMu.Unlock()
 
 	if err := r.enqueueReplay(client, attachment, controlRole); err != nil {
-		r.detachClient(id, "attach_replay_failed")
+		r.mu.Lock()
+		if r.controllerClientId == id {
+			r.controllerClientId = ""
+		}
+		if len(r.clients) == 0 && !r.closed {
+			r.attachment = AttachmentDetached
+		}
+		r.mu.Unlock()
+		r.controlMu.Unlock()
+		client.closeQueue()
 		return nil, err
 	}
+
+	r.mu.Lock()
+	if r.closed {
+		if r.controllerClientId == id {
+			r.controllerClientId = ""
+		}
+		r.mu.Unlock()
+		r.controlMu.Unlock()
+		client.closeQueue()
+		return nil, session.Closed()
+	}
+	r.clients[id] = client
+	r.clientOrder = append(r.clientOrder, id)
+	r.attachment = attachment
+	r.mu.Unlock()
+	r.controlMu.Unlock()
 
 	r.registry.logger.Info("terminal attach live", "session_id", r.session.Id, "client_id", id, "control_role", controlRole, "clients", len(r.clientsSnapshot()))
 	return client, nil
@@ -377,10 +408,12 @@ func (r *SessionRuntime) readLoop() {
 		n, err := r.pty.Read(buf)
 		if n > 0 {
 			chunk := copyBytes(buf[:n])
+			r.outputMu.Lock()
 			if _, writeErr := r.history.Write(chunk); writeErr != nil {
 				r.registry.logger.Warn("write web terminal history", "session_id", r.session.Id, "error_kind", apperrors.KindOf(writeErr))
 			}
 			r.publishBinary(chunk)
+			r.outputMu.Unlock()
 		}
 		if err != nil {
 			if !isClosedReadError(err) {
@@ -417,9 +450,12 @@ func (r *SessionRuntime) waitLoop() {
 		"elapsed", endedAt.Sub(startedAt),
 	)
 	exit := process.InterpretExit(result.Err, result.ExitCode, mode)
+	r.outputMu.Lock()
 	_ = r.history.Close()
+	historyTruncated := r.history.Truncated()
+	r.outputMu.Unlock()
 	var sessionUpdate *session.Session
-	if r.history.Truncated() {
+	if historyTruncated {
 		sess := r.session
 		sess.History.Truncated = true
 		sess.UpdatedAt = endedAt
@@ -460,8 +496,10 @@ func (r *SessionRuntime) waitLoop() {
 		)
 	}
 	exitCode := int32(exit.Code)
+	r.outputMu.Lock()
 	r.broadcastText(&agent.ServerControlMessage{Type: terminalproto.TypeExited, ExitCode: &exitCode, State: string(finalState), LifecycleState: string(finalState), AttachmentState: string(AttachmentDetached)})
 	r.closeClients()
+	r.outputMu.Unlock()
 	r.registry.removeRuntime(r.session.Id)
 	close(r.done)
 }

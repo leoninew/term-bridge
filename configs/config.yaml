@@ -24,7 +24,7 @@ terminal:
     max_bytes: 1048576
     max_line_bytes: 65536
   replay:
-    max_bytes: 262144
+    max_bytes: 65536
     chunk_bytes: 65536
   client:
     queue:

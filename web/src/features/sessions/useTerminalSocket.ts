@@ -17,9 +17,11 @@ export function useTerminalSocket(
   let binaryMessageCount = 0
   let controlMessageCount = 0
   let pendingResize: ClientControlMessage | null = null
+  let connectionGeneration = 0
 
   function connect(url: string) {
     close()
+    const generation = ++connectionGeneration
     status.value = 'connecting'
     error.value = null
     binaryMessageCount = 0
@@ -27,8 +29,12 @@ export function useTerminalSocket(
     const wsUrl = new URL(url, window.location.href).toString()
     terminalDebug('socket.connect', { path: wsUrl })
     const next = new WebSocket(wsUrl, terminalSubprotocol)
+    const isCurrent = () => connectionGeneration === generation && socket.value === next
     next.binaryType = 'arraybuffer'
     next.onopen = () => {
+      if (!isCurrent()) {
+        return
+      }
       status.value = 'connected'
       terminalDebug('socket.open', { path: wsUrl })
       sendControl({ type: 'hello', cols: 0, rows: 0, nonce: '' })
@@ -37,6 +43,9 @@ export function useTerminalSocket(
       }
     }
     next.onmessage = (event: MessageEvent<string | ArrayBuffer | Blob>) => {
+      if (!isCurrent()) {
+        return
+      }
       if (typeof event.data === 'string') {
         controlMessageCount += 1
         try {
@@ -76,12 +85,18 @@ export function useTerminalSocket(
       }
     }
     next.onerror = () => {
+      if (!isCurrent()) {
+        return
+      }
       status.value = 'error'
       error.value = 'Unable to open terminal connection.'
       terminalDebug('socket.error', { path: wsUrl }, { level: 'error' })
       onError(error.value)
     }
     next.onclose = (event) => {
+      if (!isCurrent()) {
+        return
+      }
       status.value = 'closed'
       terminalDebug('socket.close', {
         path: wsUrl,
@@ -141,6 +156,7 @@ export function useTerminalSocket(
   }
 
   function close() {
+    connectionGeneration += 1
     if (socket.value) {
       terminalDebug('socket.close.requested')
       socket.value.close()

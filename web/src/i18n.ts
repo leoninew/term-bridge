@@ -411,6 +411,7 @@ export const messages = {
       attachQuotaExceeded: '终端同时连接数已达上限，请关闭部分标签后再试。',
       attachingTerminal: '正在接入会话…',
       replayingHistory: '正在回放有限历史…',
+      replayTruncated: '当前仅显示最近终端输出，较早历史已截断。',
       terminalReadOnly: '只读模式：会话由其他设备或浏览器控制，',
       takeControl: '接管会话',
       observerControlledToast: '此会话正在由设备{device}控制，你可以使用底部按钮接管会话。',
@@ -974,6 +975,7 @@ export const messages = {
       attachQuotaExceeded: 'Terminal attach quota exceeded. Close some live tabs and try again.',
       attachingTerminal: 'Attaching session…',
       replayingHistory: 'Replaying bounded history…',
+      replayTruncated: 'Only recent terminal output is shown; earlier history was truncated.',
       terminalReadOnly: 'Read-only: controlled on another device or browser · ',
       takeControl: 'Take control',
       observerControlledToast:
