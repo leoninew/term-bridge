@@ -54,10 +54,12 @@ task install
 
 ### Local development
 
-Start the web UI, local Agent, and Cloud together:
+Start the local Agent, Cloud, and web UI in three terminals:
 
 ```bash
-task run
+task agent
+task cloud
+task web
 ```
 
 ### Common commands

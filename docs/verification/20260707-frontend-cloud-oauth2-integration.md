@@ -19,7 +19,7 @@ Review status: Accepted
 | Cloud token 不写入 Agent 本地 device state | 通过 | 连接摘要仍只保留非 token 信息；token 用于当前 device report。 |
 | 使用 `public_url` / `PublicUrl`，不恢复 `gate_url` / `GateURL` | 通过 | 当前连接 Cloud 使用 Cloud `public_url`，未恢复 Gate 语义。 |
 | 不执行 git 写操作 | 通过 | 只执行了 `git status` / `git diff` 等只读检查；未执行 add/commit/push/checkout/reset 等写操作。 |
-| Agent 侧 OAuth client 配置放到 `agent.oauth.*` | 通过 | Root config、env key、README、`.env.example`、`scripts/run.py` 与配置测试均使用 `agent.oauth.*` / `TERMBRIDGE_AGENT__OAUTH__*`。 |
+| Agent 侧 OAuth client 配置放到 `agent.oauth.*` | 通过 | Root config、env key、README、`.env.example` 与配置测试均使用 `agent.oauth.*` / `TERMBRIDGE_AGENT__OAUTH__*`。 |
 | Cloud 侧 OAuth client registry 是多 client 配置 | 通过 | Cloud 配置使用 `cloud.oauth.clients[]`，包含 `client_id`、`client_secret`、`redirect_url`、`scopes`。 |
 | Cloud token endpoint 校验 client secret | 通过 | Cloud token handler 按注册 client 校验 `client_id + redirect_uri + client_secret`；Agent backend 使用 `oauth2.AuthStyleInParams` 发送 secret。 |
 
@@ -39,7 +39,7 @@ Review status: Accepted
 - Agent backend：`/agent-api/cloud/connect` 支持接收 OAuth authorization code；使用 `golang.org/x/oauth2` 的 `oauth2.Config.Exchange` 换取 Cloud token；使用 `oauth2.AuthStyleInParams` 配合 Cloud token endpoint 的 form secret 校验。
 - Cloud backend：恢复/实现 Cloud 作为 OAuth2 Authorization Server 的 authorize/token 能力；Cloud OAuth config 改为 `cloud.oauth.clients[]` 多 client registry；token endpoint 校验 client secret；authorization code 一次性消费。
 - 配置：Agent OAuth client 配置归属为 `agent.oauth.*`；Cloud OAuth client registry 归属为 `cloud.oauth.clients[]`；浏览器 runtime config 只注入 public OAuth client 信息，不注入 `client_secret`。
-- 文档/示例：更新 `configs/config.yaml`、`configs/config.develop.yaml`、`.env.example`、`README.md`、`scripts/run.py` 中的 Agent OAuth 配置命名空间。
+- 文档/示例：更新 `configs/config.yaml`、`configs/config.develop.yaml`、`.env.example`、`README.md` 中的 Agent OAuth 配置命名空间。
 - 测试：补充/调整 config、Cloud OAuth token exchange、Agent callback/runtime config 等相关测试。
 
 ## Expected vs actual changed files
@@ -49,7 +49,7 @@ Review status: Accepted
 | Agent frontend OAuth 接入 | 需要改前端 helper、Agent callback route、dashboard 登录入口/API 调用 | 已改 `web/src/features/cloud/oauth.ts`、`web/src/views/agent/OAuthCallbackView.vue`、`web/src/features/agent/api.ts`、`web/src/router/index.ts`、dashboard 菜单相关代码。 |
 | Agent backend token exchange / device report | 需要改 Agent cloud connect handler 和 wiring | 已改 `internal/agent/api/handler/server.go`、`errors.go`、Agent bootstrap config/server/router 相关代码。 |
 | Cloud OAuth2 Authorization Server | 需要 Cloud authorize/token endpoint 与 client registry | 已改 `internal/cloud/api/handler/server.go`、`errors.go`、Cloud bootstrap config/server 和 Cloud handler tests。 |
-| 配置 | Agent client config 应为 `agent.oauth.*`；Cloud registry 应为 `cloud.oauth.clients[]` | 已改 `internal/shared/infrastructure/config/config.go`、`config_test.go`、`configs/config.yaml`、`configs/config.develop.yaml`、`.env.example`、`README.md`、`scripts/run.py`。 |
+| 配置 | Agent client config 应为 `agent.oauth.*`；Cloud registry 应为 `cloud.oauth.clients[]` | 已改 `internal/shared/infrastructure/config/config.go`、`config_test.go`、`configs/config.yaml`、`configs/config.develop.yaml`、`.env.example`、`README.md`。 |
 | Proto/generated contract | 不应为标准 OAuth redirect/token 新增 DTO | 当前 Agent connect 提交 code 未依赖新增 OAuth token DTO；工作区仍有历史/并行 generated 变更，属于已有 contract 变更集合。 |
 | 过程文档 | 需要 verification 文档 | 已创建本文档；同时将 requirement 中“前端获得 Cloud token”的旧表述修正为“前端获得 code，Agent backend 使用 oauth2.Exchange 换 token”。 |
 

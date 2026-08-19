@@ -1,6 +1,6 @@
 # 本地开发与 agent/cloud 部署拓扑验证
 
-最后修改时间: 2026-07-03 20:07:44
+最后修改时间: 2026-08-19 11:07:07
 
 Review status: Accepted
 
@@ -38,8 +38,7 @@ Review status: Accepted
    - 更新 `.gitignore`，允许提交 `configs/config.*.example.yaml`。
 
 2. 本地开发启动
-   - 更新 `Taskfile.yml`：`task run` 描述为同时启动 web/agent/cloud；`task agent` 和 `task cloud` 注入本地联调端口与 API base。
-   - 更新 `scripts/run.py`：默认注入本地联调环境变量，先执行 agent/cloud migrate，再启动 agent、cloud 与 web。
+   - 更新 `Taskfile.yml`：提供独立的 `task agent`、`task cloud` 与 `task web` 开发入口；各后端任务先执行对应 migrate，再启动热重载服务。
    - 更新 `web/vite.config.ts`：Vite 监听 `9030`，代理 `/agent-api` 到 agent `9031`，代理 `/cloud-api` 到 cloud `9032`。
    - 将本地 dev proxy 的 Vite 环境变量放入 `web/.env.development`，避免 `web/.env` 在 production build 中固化 `/agent-api` 和 `/cloud-api`。
 
@@ -70,7 +69,6 @@ Review status: Accepted
 - `.gitignore`
 - `README.md`
 - `Taskfile.yml`
-- `scripts/run.py`
 - `web/.env`
 - `web/.env.development`
 - `web/vite.config.ts`
@@ -147,13 +145,12 @@ yarn --cwd web format:check
 
 ## Missed or expanded scope
 
-- 未实际启动 `task run` 做浏览器端手工联调；本次验证覆盖配置、构建类型检查、lint、前端单元测试和 Go 测试。
+- 未实际启动 agent、cloud 与 web 三项开发任务做浏览器端手工联调；本次验证覆盖配置、构建类型检查、lint、前端单元测试和 Go 测试。
 - 未新增生产部署脚本、Kubernetes、systemd 或反向代理配置，符合 non-goal。
 - 未重构完整前端认证产品流，只在现有 API 层做 agent/cloud base 分流。
 
 ## Risks
 
-- `task run` 中 cloud 仍通过 `go run` 直接启动，不具备 agent 侧 Air 热重载能力；这符合当前最小实现，但开发体验后续可再优化。
 - 前端 runtime config 仍保留兼容字段 `apiBaseUrl`；如果部署同时设置 legacy `apiBaseUrl` 与新的 target-specific base，需要以 target-specific base 为准，目前代码已按此优先级处理。
 - 当前 cloud 登录相关 API 默认走 cloud client；如果后续产品要求 local mode 下某些认证动作仍由 agent 代理，需要再按具体流程拆分。
 

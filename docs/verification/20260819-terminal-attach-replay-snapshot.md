@@ -1,6 +1,6 @@
 # 终端 Attach 重放的快照恢复验证
 
-最后修改时间: 2026-08-19 10:53:41
+最后修改时间: 2026-08-19 11:00:45
 
 Review status: Accepted
 
@@ -46,7 +46,7 @@ Review status: Accepted
 | Agent runtime 与测试 | `internal/agent/application/task/terminal/{runtime,registry,registry_test}.go` | 符合计划。 |
 | 前端恢复与 socket | `TerminalView.vue`、`useXterm.ts`、`useTerminalSocket.ts`、对应测试、`i18n.ts` | 符合计划。 |
 | 过程文档 | requirement、plan、本 verification 文档 | 符合 SpecFlow 标准模式。 |
-| 无关暂存内容 | `scripts/run.py` 删除、`scripts/sync-windows-package.sh` 新增 | 不属于本任务，未纳入本次验收或建议提交。 |
+| 无关暂存内容 | 开发与打包 scripts 变更 | 不属于本任务，未纳入本次验收或建议提交。 |
 
 ## Acceptance checklist
 

@@ -92,7 +92,7 @@ Accepted
 | `internal/transport/http/gatewayapi/auth/*` | Expanded scope | strict JWT key hardening；JWT 用途保持 HS256。 |
 | `internal/transport/http/gatewayapi/server*.go`, `cloud_binding_test.go`, `tunnel_test.go` | Expanded scope | `JWTSecret` 从 string 改为 decoded `[]byte` 后同步调用点与测试。 |
 
-最新 `git status --short` 未显示此前提到的 `Taskfile.yml` / `scripts/run.py` 为当前未提交改动；本验证未将它们纳入交付范围。
+最新 `git status --short` 未显示此前提到的 `Taskfile.yml` / 开发启动入口为当前未提交改动；本验证未将它们纳入交付范围。
 
 ## Acceptance checklist
 

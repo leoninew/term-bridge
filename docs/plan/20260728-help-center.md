@@ -1,6 +1,6 @@
 # 前端 `/doc` 帮助中心与 Markdown 内容源实施计划
 
-最后修改时间: 2026-07-28 08:39:00
+最后修改时间: 2026-08-19 11:07:07
 
 Review status: Accepted
 
@@ -93,7 +93,7 @@ docs/user-guide/
 6. 选择直接命令并用真实 CLI contract 示例解释 `termbridge --cwd <项目目录> exec -- <命令>` 的语义，明确这用于运行 CLI 命令，不替代启动 TermBridge 产品的 launcher；
 7. 在浏览器终端确认 CLI 启动，再引导用户继续已有会话或创建快捷方式。
 
-Release 链接、平台 Asset 名称和 launcher 说明来自 `.github/workflows/release.yml`、`Taskfile.yml` 与 `scripts/package/termbridge.{cmd,sh}`；不得复用 README 中面向贡献者的 `task install`、`task run` 作为最终用户流程。
+Release 链接、平台 Asset 名称和 launcher 说明来自 `.github/workflows/release.yml`、`Taskfile.yml` 与 `scripts/package/termbridge.{cmd,sh}`；不得复用 README 中面向贡献者的 Task 开发命令作为最终用户流程。
 
 ### 2–5. 核心概念、CLI 会话、已有会话与 Workspace
 

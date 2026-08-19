@@ -83,13 +83,6 @@ tasks:
     cmds:
       - go run cmd/termbridge/main.go exec -- {{.CLI_ARGS}}
 
-  run:
-    desc: Start web, agent, and cloud development servers together
-    env:
-      TERMBRIDGE_ENV: development
-    cmds:
-      - uv run python scripts/run.py
-
   build:
     desc: Build web frontend and termbridge image
     cmds:
