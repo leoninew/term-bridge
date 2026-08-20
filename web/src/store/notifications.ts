@@ -8,6 +8,7 @@ export type AppToast = {
   kind: ToastKind
   title: string
   description?: string
+  durationMs?: number
 }
 
 export function errorMessage(err: unknown): string {
@@ -18,8 +19,8 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const toasts = ref<AppToast[]>([])
   let toastId = 0
 
-  function pushToast(kind: ToastKind, title: string, description?: string) {
-    toasts.value.push({ id: ++toastId, kind, title, description })
+  function pushToast(kind: ToastKind, title: string, description?: string, durationMs?: number) {
+    toasts.value.push({ id: ++toastId, kind, title, description, durationMs })
   }
 
   function notifyError(title: string, err: unknown) {

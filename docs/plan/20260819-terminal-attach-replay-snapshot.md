@@ -73,7 +73,7 @@ attach 的 client 将先完成控制权角色预留，但在 replay 的 `started
 
 保留现有 replay loading 状态，但其含义改为“正在以近期历史替换旧画面”。当 `replay_finished.truncated=true` 时，在终端外的现有消息区域显示当前仅恢复最近输出的反馈；不把说明文字写入终端数据流，也不继续仅依赖 console warning。
 
-该提示在下一次成功 replay 开始时重置。若产品实现采用常驻提示，文案必须说明“当前画面仅为最近输出”，不能暗示这是完整的 TUI 状态快照。
+该提示使用现有的自动消失通知展示，仅在当前可见会话的截断 replay 完成时出现一次，并在 3 秒后自动消失，避免长期占用终端界面；文案仍需说明这次恢复仅包含最近输出，不能暗示这是完整的 TUI 状态快照。
 
 ## Implementation steps
 

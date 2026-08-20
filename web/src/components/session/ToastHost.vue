@@ -8,7 +8,7 @@
       'border-[var(--color-danger-border)]': toast.kind === 'error',
       'border-[var(--color-primary-border)]': toast.kind === 'info',
     }"
-    :duration="5000"
+    :duration="toast.durationMs ?? 5000"
     @update:open="(open) => !open && notifications.dismissToast(toast.id)"
   >
     <ToastTitle class="text-sm font-semibold leading-snug text-[var(--color-text-strong)]">
