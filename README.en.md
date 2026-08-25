@@ -49,6 +49,12 @@ The Agent connects outbound to Cloud. The browser does not connect directly to t
 ### Install dependencies
 
 ```bash
+task deps
+```
+
+To install the CLI into the user-level Go bin directory:
+
+```bash
 task install
 ```
 

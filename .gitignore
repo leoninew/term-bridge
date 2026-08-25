@@ -17,6 +17,7 @@
 .playwright-cli
 
 data/
+coverage.out
 bin/
 dist/
 logs/

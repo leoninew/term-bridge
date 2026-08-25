@@ -50,6 +50,12 @@ Agent 出站连接 Cloud；浏览器不直连用户设备，也无需为设备�
 ### 安装依赖
 
 ```bash
+task deps
+```
+
+如需将 CLI 安装到用户级 Go bin 目录：
+
+```bash
 task install
 ```
 

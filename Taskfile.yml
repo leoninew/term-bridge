@@ -3,6 +3,19 @@ version: '3'
 vars:
   VERSION:
     sh: cat VERSION
+  BUF_VERSION: v1.65.0
+  PROTOC_GEN_GO_VERSION: v1.36.11
+  GOLANGCI_LINT_VERSION: v2.12.2
+  AIR_VERSION: v1.66.0
+  GO_CHECK_PACKAGES: ./cmd/... ./internal/...
+  GO_TEST_PACKAGES: ./cmd/... ./internal/... ./migrations/...
+  FIX_ENABLED: '{{if contains "--fix" .CLI_ARGS}}1{{end}}'
+  COVER_ENABLED: '{{if contains "--cov" .CLI_ARGS}}1{{end}}'
+  FIX_FORMAT_ARGS: '{{if eq .FIX_ENABLED "1"}}{{else}}--diff{{end}}'
+  FIX_LINT_ARGS: '{{if eq .FIX_ENABLED "1"}}--fix{{end}}'
+  COVER_ARGS: '{{if eq .COVER_ENABLED "1"}}-cover -coverprofile=coverage.out{{end}}'
+  WEB_LINT_TASK: '{{if eq .FIX_ENABLED "1"}}lint:fix{{else}}lint{{end}}'
+  WEB_FORMAT_TASK: '{{if eq .FIX_ENABLED "1"}}format:fix{{else}}format{{end}}'
 
 tasks:
   default:
@@ -20,41 +33,50 @@ tasks:
     cmds:
       - python scripts/version-calc.py --quiet --apply
 
-  install:
-    desc: Install web and Go dependencies, plus proto tooling into ./bin
+  deps:
+    desc: Download dependencies and install pinned tools into ./bin
     env:
       GOBIN: '{{.TASKFILE_DIR}}/bin'
-      PATH: '{{.TASKFILE_DIR}}/bin:${PATH}'
     cmds:
       - mkdir -p bin
-      - go install github.com/bufbuild/buf/cmd/buf@v1.65.0
-      - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
-      - cd web && yarn install
       - go mod download
-      - go mod tidy
+      - cd web && yarn install --frozen-lockfile
+      - go install github.com/bufbuild/buf/cmd/buf@{{.BUF_VERSION}}
+      - go install google.golang.org/protobuf/cmd/protoc-gen-go@{{.PROTOC_GEN_GO_VERSION}}
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+      - go install github.com/air-verse/air@{{.AIR_VERSION}}
 
-  proto:
-    desc: Generate Go and frontend TypeScript code from proto files via buf
+  install:
+    desc: Install the termbridge CLI for user-level use
+    cmds:
+      - go install ./cmd/termbridge
+
+  proto:deps:
+    desc: Update Buf module dependencies
     cmds:
       - ./bin/buf dep update
+
+  proto:
+    desc: Generate Go and frontend TypeScript code from proto files via ./bin/buf
+    cmds:
       - ./bin/buf generate --template buf.gen.yaml
       - cd web && ../bin/buf generate --template buf.gen.yaml
 
   check:
-    desc: Run frontend and backend checks
+    desc: Check frontend and Go format, lint, and static analysis; use -- --fix to apply fixes
     cmds:
+      - yarn --cwd web {{.WEB_LINT_TASK}}
+      - yarn --cwd web {{.WEB_FORMAT_TASK}}
       - yarn --cwd web typecheck
-      - yarn --cwd web lint:fix
-      - yarn --cwd web format:fix
-      - ./bin/golangci-lint fmt ./cmd/... ./internal/...
-      - ./bin/golangci-lint run ./cmd/... ./internal/...
+      - ./bin/golangci-lint config verify
+      - ./bin/golangci-lint fmt {{.FIX_FORMAT_ARGS}} {{.GO_CHECK_PACKAGES}}
+      - ./bin/golangci-lint run {{.FIX_LINT_ARGS}} {{.GO_CHECK_PACKAGES}}
 
   test:
-    desc: Run frontend and backend unit tests
+    desc: Run frontend and Go unit tests; use -- --cov to collect Go coverage
     cmds:
       - cd web && yarn test
-      - go test ./cmd/... ./internal/...
+      - go test {{.COVER_ARGS}} {{.GO_TEST_PACKAGES}}
 
   web:
     desc: Start web frontend on localhost:9030
@@ -68,7 +90,7 @@ tasks:
       TERMBRIDGE_ENV: development
     cmds:
       - go run cmd/termbridge/main.go migrate agent
-      - air -c .air.agent.toml -- {{.CLI_ARGS}}
+      - ./bin/air -c .air.agent.toml -- {{.CLI_ARGS}}
 
   cloud:
     desc: Run database migrations and start cloud backend with Air
@@ -76,7 +98,7 @@ tasks:
       TERMBRIDGE_ENV: development
     cmds:
       - go run cmd/termbridge/main.go migrate cloud
-      - air -c .air.cloud.toml -- {{.CLI_ARGS}}
+      - ./bin/air -c .air.cloud.toml -- {{.CLI_ARGS}}
 
   exec:
     desc: Run local command through termbridge exec
@@ -84,16 +106,18 @@ tasks:
       - go run cmd/termbridge/main.go exec -- {{.CLI_ARGS}}
 
   build:
-    desc: Build web frontend and termbridge image
+    desc: Build the termbridge binary
+    env:
+      CGO_ENABLED: '0'
     cmds:
       - mkdir -p bin
-      - CGO_ENABLED=0 go build -trimpath -o bin/termbridge ./cmd/termbridge
+      - go build -trimpath -o bin/termbridge ./cmd/termbridge
   docker:
-    desc: Build web frontend and termbridge image
+    desc: Build the termbridge Docker image
     cmds:
       - docker build -f Dockerfile.cn -t termbridge .
-  package:
-    desc: Build Windows, Linux, and macOS x64 portable zip packages
+  release:
+    desc: Build Windows, Linux, and macOS x64 portable release packages
     env:
       CGO_ENABLED: '0'
     vars:
@@ -138,7 +162,7 @@ tasks:
       - cd dist/package && zip -r ../termbridge-v{{.VERSION}}-macos-x64.zip termbridge-v{{.VERSION}}-macos-x64
 
   clean:
-    desc: Remove build outputs
+    desc: Remove build outputs and local development data
     cmds:
       - rm -rf web/dist bin dist
       - rm -rf data/agent.db*

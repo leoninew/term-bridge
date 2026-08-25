@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  package:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -46,15 +46,11 @@ jobs:
       - name: Install system tools
         run: sudo apt-get update && sudo apt-get install -y zip
 
-      - name: Install frontend deps
-        working-directory: web
-        run: yarn install --frozen-lockfile
+      - name: Install project dependencies
+        run: task deps
 
-      - name: Download Go modules
-        run: go mod download
-
-      - name: Package
-        run: task package
+      - name: Build release packages
+        run: task release
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

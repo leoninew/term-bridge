@@ -159,3 +159,5 @@ flowchart LR
 
 本文说明 **产品是什么、服务谁、模型与原则**。  
 阶段优先级、当前重点与后续规划见 [产品路线图](./roadmap.md)。
+
+云端 Agent 与 Cloud 之间的连接建立、请求中转、终端实时通信和断线恢复见 [云端客户端通信说明](./cloud-client-communication.md)。
