@@ -16,7 +16,7 @@ Accepted
 ## Goal
 
 1. 使用根目录 `VERSION` 记录 SemVer package 版本；`task version:apply` 从 Git 历史计算版本并同步更新 `VERSION`、Go `Version` 变量和 `web/package.json`；运行前工作目录干净时，为当前 `HEAD` 创建对应的轻量 Git tag。
-2. 使 `task build`、`task package`、`task docker` 直接编译已同步的源码元数据，不再通过 linker flags 或环境变量注入版本、commit 或构建时间。
+2. 使 `task build`、`task release`、`task docker` 直接编译已同步的源码元数据，不再通过 linker flags 或环境变量注入版本、commit 或构建时间。
 3. 提供 `termbridge version` 子命令，仅输出版本和运行时信息，不启动 Agent 或 Cloud 服务。
 4. 为三个 portable package 使用带版本号的目录和 ZIP 名称，并在包内携带 `VERSION`。
 5. 使首页 local dashboard 读取服务端注入的 Go Version，而不是前端 package 版本或占位文案。
@@ -31,7 +31,7 @@ Accepted
 ## User scenarios
 
 1. 开发者执行 `task version` 查看根据 Git 历史计算出的版本，并在干净工作目录执行 `task version:apply`，将该版本同步到全部跟踪的消费者并创建 `v<version>` tag。
-2. 开发者执行 `task build`、`task package` 或 `task docker` 时，产物使用已提交的 Go `Version`；portable package 名称为 `termbridge-v<version>-<platform>.zip`。
+2. 开发者执行 `task build`、`task release` 或 `task docker` 时，产物使用已提交的 Go `Version`；portable package 名称为 `termbridge-v<version>-<platform>.zip`。
 3. 用户运行 `termbridge version` 时，获得版本和运行时信息；local dashboard 显示服务端二进制 Version。
 
 ## Acceptance
@@ -39,7 +39,7 @@ Accepted
 - [x] 根目录 `VERSION` 仅保存 SemVer package 版本，并作为 portable package 命名来源。
 - [x] `task version:apply` 同步更新 `VERSION`、Go `Version` 变量和 `web/package.json`。
 - [x] `task version:apply` 在运行前工作目录干净时为当前 `HEAD` 创建 `v<version>` 轻量 tag；工作目录不干净时警告并跳过 tag。
-- [x] build、package、docker 不再接收 linker metadata 或构建环境变量。
+- [x] build、release、docker 不再接收 linker metadata 或构建环境变量。
 - [x] `termbridge version` 是正式版本查询子命令，且不接受无关参数。
 - [x] Dockerfile 与 Dockerfile.cn 编译仓库中已同步的 Go 版本变量。
 - [x] 浏览器 runtime config 与 local dashboard 显示 Go 二进制 Version。

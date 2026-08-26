@@ -1,6 +1,6 @@
 # term-bridge Taskfile 审查结果
 
-最后修改时间: 2026-08-25 22:30:05
+最后修改时间: 2026-08-26
 
 Review status: Accepted
 
@@ -22,4 +22,9 @@ Review status: Accepted
 
 ## 当前状态
 
-上述原始审查项已在本次 Taskfile 改进中完成，并由 `docs/verification/20260825-project-automation-review.md` 记录的检查、测试和 release 构建验证通过。`check` 保留原有 `./cmd/... ./internal/...` 范围，migrations 仅纳入 test。
+上述原始审查项已在本次 Taskfile 改进中完成，并由 `docs/verification/20260825-project-automation-review.md` 记录的检查、测试和 release 构建验证通过。质量门禁进一步收敛为：
+
+- `deps` 使用 `GOTOOLCHAIN=local` 安装固定版本的外部 Go 工具，不自动下载 Go 工具链。
+- `check` 和 `test` 在 `GOPROXY=off`、`GOSUMDB=off` 环境中运行；Go lint 同时使用 `--modules-download-mode=readonly`。
+- `check` 和 `test` 均覆盖 `./cmd/...`、`./internal/...` 和 `./migrations/...`；生成的 proto 文件继续由最小化路径排除规则处理。
+- golangci-lint 的超时由 Taskfile 的 `run --timeout` 参数控制，保持 v2 配置与执行入口职责一致。

@@ -63,9 +63,9 @@ task install
 Start the local Agent, Cloud, and web UI in three terminals:
 
 ```bash
-task agent
-task cloud
-task web
+task dev:agent
+task dev:cloud
+task dev:web
 ```
 
 ### Common commands

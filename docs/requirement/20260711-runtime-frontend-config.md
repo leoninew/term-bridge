@@ -42,7 +42,7 @@
 
 ### 开发者本地开发
 
-开发者在三个终端分别执行 `task agent`、`task cloud` 和 `task web`，并访问 `http://localhost:9030`。浏览器继续从 `web/.env.development` 读取 hybrid 配置；Vite 将 `/local-api/*` 代理到 `http://127.0.0.1:9031`，将 `/cloud-api/*` 代理到 `http://127.0.0.1:9032`，并在转发时使后端接收到 canonical API path。
+开发者在三个终端分别执行 `task dev:agent`、`task dev:cloud` 和 `task dev:web`，并访问 `http://localhost:9030`。浏览器继续从 `web/.env.development` 读取 hybrid 配置；Vite 将 `/local-api/*` 代理到 `http://127.0.0.1:9031`，将 `/cloud-api/*` 代理到 `http://127.0.0.1:9032`，并在转发时使后端接收到 canonical API path。
 
 ### 用户运行本地打包制品
 

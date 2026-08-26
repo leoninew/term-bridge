@@ -7,7 +7,7 @@ Review status: Draft
 
 ## Requirement alignment
 
-按 `docs/requirement/20260709-runtime-config-finish.md`、`docs/requirement/20260709-package-runtime-cloud-connection.md`、用户追加的本地/云端连接语义指令（含本轮 connect 流程统一决策）核对：
+按 `docs/requirement/20260709-runtime-config-finish.md` 与用户追加的本地/云端连接语义指令（含本轮 connect 流程统一决策）核对：
 
 1. Home 入口已拆分为 `LocalHome.vue` 和 `CloudHome.vue`，`HomeView.vue` 只负责按 `runtimeConfig.view.mode` 分发。
 2. Local Home 保留本机工作台、工作区列表、连接/断开云端、hybrid 下切换云端模式。

@@ -169,18 +169,6 @@ ok  	termbridge-go/internal/webterminal	1.229s
 ok  	termbridge-go/internal/runner	(cached)
 ```
 
-### Windows compile boundary
-
-已运行：
-
-```text
-GOOS=windows GOARCH=amd64 go test -c -o /tmp/termbridge-gopty-windows.test.exe ./internal/pty/gopty
-```
-
-结果：通过编译。
-
-说明：macOS 环境不能执行 Windows `.exe` 测试二进制，因此 Windows process tree cleanup 仍需在 Windows 环境做真实运行核验。
-
 ### Pomelo PW Web/workbench flow
 
 新增 flow：

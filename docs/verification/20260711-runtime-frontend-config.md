@@ -59,7 +59,6 @@
 | `yarn --cwd web lint` | 通过。 |
 | `yarn --cwd web build:local` | 通过。 |
 | `yarn --cwd web build:cloud` | 通过。 |
-| `task package` | 通过；生成包含 `.env.prod`、`.env.test` 的 Windows package ZIP。 |
 | `sh -n scripts/package/start.sh` | 通过。 |
 | `docker build -f Dockerfile -t termbridge-runtime-config-test .` | 通过。 |
 | `docker build -f Dockerfile.cn -t termbridge-runtime-config-cn-test .` | 通过。 |

@@ -64,9 +64,9 @@ task install
 在三个终端分别启动本机 Agent、Cloud 与 Web：
 
 ```bash
-task agent
-task cloud
-task web
+task dev:agent
+task dev:cloud
+task dev:web
 ```
 
 ### 常用命令

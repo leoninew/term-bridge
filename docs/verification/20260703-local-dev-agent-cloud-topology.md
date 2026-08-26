@@ -38,7 +38,7 @@ Review status: Accepted
    - 更新 `.gitignore`，允许提交 `configs/config.*.example.yaml`。
 
 2. 本地开发启动
-   - 更新 `Taskfile.yml`：提供独立的 `task agent`、`task cloud` 与 `task web` 开发入口；各后端任务先执行对应 migrate，再启动热重载服务。
+   - 更新 `Taskfile.yml`：提供独立的 `task dev:agent`、`task dev:cloud` 与 `task dev:web` 开发入口；各后端任务先执行对应 migrate，再启动热重载服务。
    - 更新 `web/vite.config.ts`：Vite 监听 `9030`，代理 `/agent-api` 到 agent `9031`，代理 `/cloud-api` 到 cloud `9032`。
    - 将本地 dev proxy 的 Vite 环境变量放入 `web/.env.development`，避免 `web/.env` 在 production build 中固化 `/agent-api` 和 `/cloud-api`。
 
