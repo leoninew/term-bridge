@@ -40,12 +40,16 @@ export class ApiContractMismatchError extends Error {
 
 export const apiClient = axios.create()
 export const localApiClient = apiClient
+export const localCloudApiClient = axios.create()
 export const cloudApiClient = axios.create()
 
 configureApiClient(apiClient, 'local')
+configureApiClient(localCloudApiClient, 'local-cloud')
 configureApiClient(cloudApiClient, 'cloud')
 
-function configureApiClient(client: typeof apiClient, target: RuntimeMode): void {
+type ApiTarget = RuntimeMode | 'local-cloud'
+
+function configureApiClient(client: typeof apiClient, target: ApiTarget): void {
   client.interceptors.request.use((cfg) => {
     const runtimeConfig = useRuntimeConfigStore().config
     cfg.baseURL =
@@ -72,7 +76,7 @@ function configureApiClient(client: typeof apiClient, target: RuntimeMode): void
       if (!error.response) {
         return Promise.reject(error)
       }
-      if (error.response.status === 401 && target === 'cloud') {
+      if (error.response.status === 401 && (target === 'cloud' || target === 'local-cloud')) {
         const cloudAuth = useCloudAuthStore()
         const runtimeConfig = useRuntimeConfigStore()
         cloudAuth.clearToken()

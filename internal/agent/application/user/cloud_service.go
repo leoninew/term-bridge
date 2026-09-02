@@ -7,8 +7,56 @@ import (
 	"time"
 
 	cloudproto "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/prototime"
 )
+
+type CloudOperation string
+
+const (
+	CloudOperationRegisterCurrentDevice CloudOperation = "register_current_device"
+	CloudOperationAuthMe                CloudOperation = "auth_me"
+	CloudOperationListDevices           CloudOperation = "list_devices"
+	CloudOperationExchangeOAuthCode     CloudOperation = "exchange_oauth_code"
+)
+
+type CloudUpstreamError struct {
+	Operation      CloudOperation
+	UpstreamStatus int
+	CloudError     *shared.ErrorResp
+	Cause          error
+}
+
+func NewCloudUpstreamError(operation CloudOperation, upstreamStatus int, cloudError *shared.ErrorResp, cause error) *CloudUpstreamError {
+	return &CloudUpstreamError{Operation: operation, UpstreamStatus: upstreamStatus, CloudError: cloudError, Cause: cause}
+}
+
+func (e *CloudUpstreamError) Error() string {
+	if e == nil {
+		return "cloud upstream error"
+	}
+	if e.CloudError != nil && strings.TrimSpace(e.CloudError.GetError()) != "" {
+		return e.CloudError.GetError()
+	}
+	if e.Cause != nil {
+		return e.Cause.Error()
+	}
+	return "cloud upstream error"
+}
+
+func (e *CloudUpstreamError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
+}
+
+func (e *CloudUpstreamError) CloudCode() string {
+	if e == nil || e.CloudError == nil {
+		return ""
+	}
+	return e.CloudError.GetCode()
+}
 
 type CloudApi interface {
 	RegisterCurrentDevice(ctx context.Context, cloudToken string, device Device) error

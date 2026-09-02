@@ -13,9 +13,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
 	filemodel "gitee.com/leoninew/TermBridge-go/internal/agent/model/task/file"
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	apperrors "gitee.com/leoninew/TermBridge-go/internal/shared/common/errors"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/requestid"
 	runtimeerr "gitee.com/leoninew/TermBridge-go/internal/shared/common/runtimeerr"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
@@ -25,7 +27,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const requestIdHeader = "X-Request-ID"
+const requestIdHeader = requestid.Header
 
 const (
 	errorCodeBadRequest         = "bad_request"
@@ -77,6 +79,41 @@ func (h *Handler) writeAPIErrorWithDetails(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		h.logAPIError(r, http.StatusInternalServerError, errorCodeInternal, requestId, err)
 		data, _ = json.Marshal(shared.ErrorResp{Code: errorCodeInternal, Error: errorMessageInternal, RequestId: requestId})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write(data)
+}
+
+func (h *Handler) writeCloudError(w http.ResponseWriter, r *http.Request, err error) {
+	var cloudErr *agentapp.CloudUpstreamError
+	if !errors.As(err, &cloudErr) {
+		h.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		return
+	}
+	if cloudErr.UpstreamStatus >= http.StatusMultipleChoices {
+		if cloudErr.CloudError != nil {
+			h.writeCloudResponse(w, r, cloudErr.UpstreamStatus, cloudErr.CloudError, err)
+			return
+		}
+		h.writeAPIError(w, r, cloudErr.UpstreamStatus, errorCodeUpstream, errorMessageUpstreamInvalid, err)
+		return
+	}
+	if cloudErr.UpstreamStatus != 0 {
+		h.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstreamInvalid, err)
+		return
+	}
+	h.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+}
+
+func (h *Handler) writeCloudResponse(w http.ResponseWriter, r *http.Request, status int, response *shared.ErrorResp, cause error) {
+	requestId := h.requestIdFor(w, r)
+	h.logAPIError(r, status, response.GetCode(), requestId, cause)
+	data, err := codec.MarshalProtoJSON(response)
+	if err != nil {
+		h.logAPIError(r, http.StatusInternalServerError, errorCodeInternal, requestId, err)
+		data, _ = json.Marshal(shared.ErrorResp{Code: errorCodeInternal, Error: errorMessageInternal, RequestId: requestId})
+		status = http.StatusInternalServerError
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -209,6 +246,15 @@ func (h *Handler) logAPIError(r *http.Request, status int, code string, requestI
 		"query", redactQuery(r.URL.Query()),
 		"status", status,
 		"code", code,
+	}
+	var cloudErr *agentapp.CloudUpstreamError
+	if errors.As(cause, &cloudErr) {
+		attrs = append(
+			attrs,
+			"operation", cloudErr.Operation,
+			"upstream_status", cloudErr.UpstreamStatus,
+			"cloud_code", cloudErr.CloudCode(),
+		)
 	}
 	if cause != nil {
 		attrs = append(attrs, "cause", cause.Error())

@@ -30,7 +30,7 @@ import type {
 } from '../../gen/proto/termbridge/cloud/v1/auth'
 import type { DeviceSummary, ListDevicesResp } from '../../gen/proto/termbridge/cloud/v1/device'
 import type { CloudConnectResp } from '../../gen/proto/termbridge/cloud/v1/session'
-import { localApiClient } from '../api/client'
+import { localApiClient, localCloudApiClient } from '../api/client'
 import { workspaceSessionPath, type ApiResult } from '../sessions/runtime'
 
 function cloudAuthorizationHeaders(cloudToken: string) {
@@ -43,21 +43,21 @@ export async function agentStatus(): Promise<AuthMeResp> {
 }
 
 export async function fetchCloudIdentityViaLocalApi(cloudToken: string): Promise<AuthMeResp> {
-  const response = await localApiClient.get<AuthMeResp>('/cloud/auth/me', {
+  const response = await localCloudApiClient.get<AuthMeResp>('/cloud/auth/me', {
     headers: cloudAuthorizationHeaders(cloudToken),
   })
   return response.data
 }
 
 export async function listCloudDevicesViaLocalApi(cloudToken: string): Promise<DeviceSummary[]> {
-  const response = await localApiClient.get<ListDevicesResp>('/cloud/devices', {
+  const response = await localCloudApiClient.get<ListDevicesResp>('/cloud/devices', {
     headers: cloudAuthorizationHeaders(cloudToken),
   })
   return response.data.items
 }
 
 export async function connectCloudWithToken(cloudToken: string): Promise<CloudConnectResp> {
-  const response = await localApiClient.post<CloudConnectResp>(
+  const response = await localCloudApiClient.post<CloudConnectResp>(
     '/cloud/connect',
     {},
     { headers: cloudAuthorizationHeaders(cloudToken) },

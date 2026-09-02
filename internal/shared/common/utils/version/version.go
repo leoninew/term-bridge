@@ -3,7 +3,7 @@ package version
 import "runtime"
 
 var (
-	Version = "0.115.0"
+	Version = "0.116.1"
 )
 
 type Info struct {

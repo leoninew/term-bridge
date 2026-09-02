@@ -1,11 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AxiosHeaders, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
+import {
+  AxiosError,
+  AxiosHeaders,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import type { BrowserRuntimeConfig } from '../../config'
+import { router } from '../../router'
+import { useCloudAuthStore } from '../../store/cloudAuth'
 import {
   ApiClientError,
   ApiContractMismatchError,
   localApiClient,
+  localCloudApiClient,
   apiClient,
   cloudApiClient,
   ensureRequestId,
@@ -15,7 +23,7 @@ import {
 
 vi.mock('../../router', () => ({
   router: {
-    currentRoute: { value: { name: 'local-sessions' } },
+    currentRoute: { value: { name: 'local-sessions', fullPath: '/sessions' } },
     push: vi.fn(),
   },
 }))
@@ -64,6 +72,7 @@ function stubBrowser(config: BrowserRuntimeConfig = runtimeConfig(), localStorag
 }
 
 beforeEach(() => {
+  vi.clearAllMocks()
   setActivePinia(createPinia())
   stubBrowser()
 })
@@ -87,6 +96,12 @@ function response(status: number, data: unknown): AxiosResponse {
     statusText: String(status),
     headers: {},
     config: requestConfig(),
+  }
+}
+
+function rejectedResponse(status: number, data: unknown) {
+  return async (config: InternalAxiosRequestConfig) => {
+    throw new AxiosError('Request failed', undefined, config, undefined, response(status, data))
   }
 }
 
@@ -180,6 +195,7 @@ describe('api client', () => {
         config,
       }),
     })
+
     const cloudResult = await cloudApiClient.get<string>('/auth/me', {
       adapter: async (config) => ({
         data: String(AxiosHeaders.from(config.headers).get('Authorization')),
@@ -192,6 +208,49 @@ describe('api client', () => {
 
     expect(localResult.data).toBe('undefined')
     expect(cloudResult.data).toBe('Bearer cloud-token')
+  })
+
+  it('clears Cloud credentials after a local Cloud relay 401', async () => {
+    const cloudAuth = useCloudAuthStore()
+    cloudAuth.setToken('cloud-token')
+
+    await expect(
+      localCloudApiClient.get('/cloud/devices', {
+        adapter: rejectedResponse(401, {
+          code: 'unauthorized',
+          error: 'Authentication is required.',
+          request_id: 'req_local_cloud_401',
+        }),
+      }),
+    ).rejects.toMatchObject({ status: 401, code: 'unauthorized', requestId: 'req_local_cloud_401' })
+
+    expect(cloudAuth.cloudToken).toBeNull()
+    expect(router.push).toHaveBeenCalledWith({
+      name: 'cloud-login',
+      query: { redirect: '/sessions' },
+    })
+  })
+
+  it('does not clear Cloud credentials after an OAuth exchange 401 on the ordinary local client', async () => {
+    const cloudAuth = useCloudAuthStore()
+    cloudAuth.setToken('cloud-token')
+
+    await expect(
+      localApiClient.post(
+        '/cloud/oauth/exchange',
+        {},
+        {
+          adapter: rejectedResponse(401, {
+            code: 'unauthorized',
+            error: 'Authentication is required.',
+            request_id: 'req_oauth_401',
+          }),
+        },
+      ),
+    ).rejects.toMatchObject({ status: 401, code: 'unauthorized', requestId: 'req_oauth_401' })
+
+    expect(cloudAuth.cloudToken).toBe('cloud-token')
+    expect(router.push).not.toHaveBeenCalled()
   })
 
   it('does not parse successful text responses as JSON', async () => {

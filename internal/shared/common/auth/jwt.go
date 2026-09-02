@@ -78,7 +78,7 @@ func (s TokenService) Verify(token string) (Claims, error) {
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return Claims{}, err
 	}
-	if claims.Sub == "" || claims.Exp < time.Now().Unix() {
+	if claims.Sub == "" || claims.Exp <= time.Now().Unix() {
 		return Claims{}, errors.New("token expired")
 	}
 	return claims, nil

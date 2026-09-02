@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,10 +13,12 @@ import (
 	agentapp "gitee.com/leoninew/TermBridge-go/internal/agent/application/user"
 	cloudapi "gitee.com/leoninew/TermBridge-go/internal/agent/infrastructure/cloudapi"
 	cloudv1 "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/cloud/v1"
+	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/codec"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/common/utils/prototime"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func testLocalDevice() agentapp.Device {
@@ -64,6 +67,9 @@ func TestCloudAuthMeForwardsCloudTokenFromAuthorizationHeader(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer cloud-token" {
 			t.Fatalf("cloud authorization = %q", got)
 		}
+		if got := r.Header.Get(requestIdHeader); got != "req_auth_me" {
+			t.Fatalf("cloud request ID = %q", got)
+		}
 		body, err := codec.MarshalProtoJSON(&cloudv1.AuthMeResp{Authenticated: true, User: &cloudv1.User{Id: "cloud-user", Email: "cloud@example.test"}})
 		if err != nil {
 			t.Fatalf("encode cloud auth me response: %v", err)
@@ -73,6 +79,68 @@ func TestCloudAuthMeForwardsCloudTokenFromAuthorizationHeader(t *testing.T) {
 	defer cloud.Close()
 	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
 	request := requestWithCloudToken(http.MethodGet, "/api/cloud/auth/me", "cloud-token")
+	request.Header.Set(requestIdHeader, "req_auth_me")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("cloud auth me status = %d; body=%s", response.Code, response.Body.String())
+	}
+	if got := response.Header().Get(requestIdHeader); got != "req_auth_me" {
+		t.Fatalf("local response request ID = %q", got)
+	}
+	var body cloudv1.AuthMeResp
+	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode cloud auth me response: %v", err)
+	}
+	if !body.GetAuthenticated() || body.GetUser().GetId() != "cloud-user" || body.GetUser().GetEmail() != "cloud@example.test" {
+		t.Fatalf("cloud auth me authenticated=%v user_id=%q email=%q", body.GetAuthenticated(), body.GetUser().GetId(), body.GetUser().GetEmail())
+	}
+}
+
+func TestCloudAuthMePropagatesGeneratedRequestId(t *testing.T) {
+	var cloudRequestId string
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cloudRequestId = r.Header.Get(requestIdHeader)
+		body, err := codec.MarshalProtoJSON(&cloudv1.AuthMeResp{Authenticated: true})
+		if err != nil {
+			t.Fatalf("encode cloud auth me response: %v", err)
+		}
+		_, _ = w.Write(body)
+	}))
+	defer cloud.Close()
+
+	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, requestWithCloudToken(http.MethodGet, "/api/cloud/auth/me", "cloud-token"))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("cloud auth me status = %d; body=%s", response.Code, response.Body.String())
+	}
+	if !strings.HasPrefix(cloudRequestId, "req_") {
+		t.Fatalf("generated cloud request ID = %q", cloudRequestId)
+	}
+	if got := response.Header().Get(requestIdHeader); got != cloudRequestId {
+		t.Fatalf("local response request ID = %q, want cloud request ID %q", got, cloudRequestId)
+	}
+}
+
+func TestCloudAuthMeKeepsNormalUnauthenticatedResponse(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get(requestIdHeader); got != "req_auth_false" {
+			t.Fatalf("cloud request ID = %q", got)
+		}
+		body, err := codec.MarshalProtoJSON(&cloudv1.AuthMeResp{Authenticated: false})
+		if err != nil {
+			t.Fatalf("encode cloud auth me response: %v", err)
+		}
+		_, _ = w.Write(body)
+	}))
+	defer cloud.Close()
+
+	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
+	request := requestWithCloudToken(http.MethodGet, "/api/cloud/auth/me", "cloud-token")
+	request.Header.Set(requestIdHeader, "req_auth_false")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
@@ -81,10 +149,10 @@ func TestCloudAuthMeForwardsCloudTokenFromAuthorizationHeader(t *testing.T) {
 	}
 	var body cloudv1.AuthMeResp
 	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode cloud auth me response: %v", err)
+		t.Fatalf("decode cloud auth me: %v", err)
 	}
-	if !body.GetAuthenticated() || body.GetUser().GetId() != "cloud-user" || body.GetUser().GetEmail() != "cloud@example.test" {
-		t.Fatalf("cloud auth me authenticated=%v user_id=%q email=%q", body.GetAuthenticated(), body.GetUser().GetId(), body.GetUser().GetEmail())
+	if body.GetAuthenticated() || body.GetUser() != nil {
+		t.Fatalf("cloud auth me = %#v", &body)
 	}
 }
 
@@ -112,30 +180,18 @@ func TestCloudAuthMeRejectsPost(t *testing.T) {
 	}
 }
 
-func TestCloudAuthMeSoftFailsWhenCloudIsUnavailable(t *testing.T) {
+func TestCloudAuthMePropagatesStructuredCloudError(t *testing.T) {
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error":"cloud failure"}`))
+		writeCloudErrorResponse(t, w, r, http.StatusServiceUnavailable, "cloud_unavailable", "Cloud is temporarily unavailable.")
 	}))
 	defer cloud.Close()
 	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
 	request := requestWithCloudToken(http.MethodGet, "/api/cloud/auth/me", "cloud-token")
+	request.Header.Set(requestIdHeader, "req_auth_error")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
-	if response.Code != http.StatusOK {
-		t.Fatalf("cloud auth me status = %d, want 200; body=%s", response.Code, response.Body.String())
-	}
-	var body cloudv1.AuthMeResp
-	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode cloud auth me: %v", err)
-	}
-	if body.GetAuthenticated() {
-		t.Fatalf("authenticated = true, want false when cloud is unavailable")
-	}
-	if body.GetUser() != nil {
-		t.Fatalf("user = %#v, want nil when cloud is unavailable", body.GetUser())
-	}
+	assertCloudErrorResponse(t, response, http.StatusServiceUnavailable, "req_auth_error", "cloud_unavailable", "Cloud is temporarily unavailable.", true)
 }
 
 func TestCloudDevicesForwardsCloudTokenFromAuthorizationHeader(t *testing.T) {
@@ -145,6 +201,9 @@ func TestCloudDevicesForwardsCloudTokenFromAuthorizationHeader(t *testing.T) {
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer cloud-token" {
 			t.Fatalf("cloud authorization = %q", got)
+		}
+		if got := r.Header.Get(requestIdHeader); got != "req_devices" {
+			t.Fatalf("cloud request ID = %q", got)
 		}
 		body, err := codec.MarshalProtoJSON(&cloudv1.ListDevicesResp{Items: []*cloudv1.DeviceSummary{{Id: "device-2", Name: "other-device", Online: true}}})
 		if err != nil {
@@ -156,9 +215,14 @@ func TestCloudDevicesForwardsCloudTokenFromAuthorizationHeader(t *testing.T) {
 
 	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, requestWithCloudToken(http.MethodGet, "/api/cloud/devices", "cloud-token"))
+	request := requestWithCloudToken(http.MethodGet, "/api/cloud/devices", "cloud-token")
+	request.Header.Set(requestIdHeader, "req_devices")
+	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
 		t.Fatalf("cloud devices status = %d; body=%s", response.Code, response.Body.String())
+	}
+	if got := response.Header().Get(requestIdHeader); got != "req_devices" {
+		t.Fatalf("local response request ID = %q", got)
 	}
 	var body cloudv1.ListDevicesResp
 	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
@@ -183,21 +247,39 @@ func TestCloudDevicesRequireCloudToken(t *testing.T) {
 	}
 }
 
-func TestCloudDevicesReportsCloudFailure(t *testing.T) {
+func TestCloudDevicesPropagatesStructuredCloudError(t *testing.T) {
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/devices" {
 			t.Fatalf("cloud request path = %s", r.URL.Path)
 		}
-		w.WriteHeader(http.StatusInternalServerError)
+		writeCloudErrorResponse(t, w, r, http.StatusUnauthorized, "unauthorized", "Authentication is required.")
 	}))
 	defer cloud.Close()
 
 	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, requestWithCloudToken(http.MethodGet, "/api/cloud/devices", "cloud-token"))
-	if response.Code != http.StatusBadGateway {
-		t.Fatalf("cloud devices status = %d, want 502; body=%s", response.Code, response.Body.String())
-	}
+	request := requestWithCloudToken(http.MethodGet, "/api/cloud/devices", "cloud-token")
+	request.Header.Set(requestIdHeader, "req_devices_error")
+	handler.ServeHTTP(response, request)
+	assertCloudErrorResponse(t, response, http.StatusUnauthorized, "req_devices_error", "unauthorized", "Authentication is required.", true)
+}
+
+func TestCloudDevicesKeepsMalformedUpstreamStatus(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get(requestIdHeader); got != "req_devices_invalid" {
+			t.Fatalf("cloud request ID = %q", got)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`not-json`))
+	}))
+	defer cloud.Close()
+
+	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
+	response := httptest.NewRecorder()
+	request := requestWithCloudToken(http.MethodGet, "/api/cloud/devices", "cloud-token")
+	request.Header.Set(requestIdHeader, "req_devices_invalid")
+	handler.ServeHTTP(response, request)
+	assertCloudErrorResponse(t, response, http.StatusInternalServerError, "req_devices_invalid", errorCodeUpstream, errorMessageUpstreamInvalid, false)
 }
 
 func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
@@ -214,6 +296,9 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer cloud-token" {
 			t.Fatalf("device report authorization = %q", got)
 		}
+		if got := r.Header.Get(requestIdHeader); got != "req_connect" {
+			t.Fatalf("cloud request ID = %q", got)
+		}
 		if err := decodeProtoJSONBody(r, &deviceReport); err != nil {
 			t.Fatalf("decode device report: %v", err)
 		}
@@ -222,10 +307,14 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 	defer cloud.Close()
 	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api"), LocalDevice: device, LocalDeviceStateDir: stateDir})
 	request := requestWithCloudToken(http.MethodPost, "/api/cloud/connect", "cloud-token")
+	request.Header.Set(requestIdHeader, "req_connect")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
 		t.Fatalf("cloud connect status = %d; body=%s", response.Code, response.Body.String())
+	}
+	if got := response.Header().Get(requestIdHeader); got != "req_connect" {
+		t.Fatalf("local response request ID = %q", got)
 	}
 	if deviceReport.GetId() != device.Id || deviceReport.GetName() != device.Name || deviceReport.GetPublicKey() != device.PublicKey {
 		t.Fatalf("device report id=%q name=%q public_key=%q", deviceReport.GetId(), deviceReport.GetName(), deviceReport.GetPublicKey())
@@ -237,6 +326,24 @@ func TestCloudConnectReportsCurrentDeviceWithCloudToken(t *testing.T) {
 	if body.CloudSession.GetPublicUrl() != cloud.URL+"/api" || body.CloudSession.GetDeviceId() != device.Id || body.CloudSession.GetDeviceName() != device.Name {
 		t.Fatalf("cloud session = %#v", body.CloudSession)
 	}
+}
+
+func TestCloudConnectPropagatesStructuredCloudError(t *testing.T) {
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/devices/current" {
+			t.Fatalf("cloud request path = %s", r.URL.Path)
+		}
+		writeCloudErrorResponse(t, w, r, http.StatusConflict, "device_conflict", "Device identity conflicts with an existing device.")
+	}))
+	defer cloud.Close()
+
+	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api"), LocalDevice: testLocalDevice()})
+	request := requestWithCloudToken(http.MethodPost, "/api/cloud/connect", "cloud-token")
+	request.Header.Set(requestIdHeader, "req_connect_error")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	assertCloudErrorResponse(t, response, http.StatusConflict, "req_connect_error", "device_conflict", "Device identity conflicts with an existing device.", true)
 }
 
 func TestCloudConnectDoesNotPersistLocalCloudSession(t *testing.T) {
@@ -341,6 +448,9 @@ func TestExchangeOAuthCodeReturnsAccessToken(t *testing.T) {
 		if r.URL.Path != "/api/oauth2/token" {
 			t.Fatalf("unexpected cloud token path = %s", r.URL.Path)
 		}
+		if got := r.Header.Get(requestIdHeader); got != "req_oauth" {
+			t.Fatalf("cloud request ID = %q", got)
+		}
 		if err := r.ParseForm(); err != nil {
 			t.Fatalf("parse token request form: %v", err)
 		}
@@ -353,9 +463,14 @@ func TestExchangeOAuthCodeReturnsAccessToken(t *testing.T) {
 	defer cloud.Close()
 	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"oauth-code"}`)))
+	request := httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"oauth-code"}`))
+	request.Header.Set(requestIdHeader, "req_oauth")
+	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
 		t.Fatalf("exchange status = %d; body=%s", response.Code, response.Body.String())
+	}
+	if got := response.Header().Get(requestIdHeader); got != "req_oauth" {
+		t.Fatalf("local response request ID = %q", got)
 	}
 	var body cloudv1.CloudOAuthExchangeResp
 	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
@@ -375,18 +490,17 @@ func TestExchangeOAuthCodeRequiresCode(t *testing.T) {
 	}
 }
 
-func TestExchangeOAuthCodeReturnsBadGatewayOnCloudError(t *testing.T) {
+func TestExchangeOAuthCodePropagatesStructuredCloudError(t *testing.T) {
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"error":"invalid_grant"}`))
+		writeCloudErrorResponse(t, w, r, http.StatusBadRequest, "invalid_authorization_code", "Authorization code is invalid.")
 	}))
 	defer cloud.Close()
 	handler := New(Config{Logger: slog.Default(), CloudService: testCloudService(cloud.URL + "/api")})
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"bad-code"}`)))
-	if response.Code != http.StatusBadGateway {
-		t.Fatalf("exchange status = %d, want 502; body=%s", response.Code, response.Body.String())
-	}
+	request := httptest.NewRequest(http.MethodPost, "/api/cloud/oauth/exchange", strings.NewReader(`{"code":"bad-code"}`))
+	request.Header.Set(requestIdHeader, "req_oauth_error")
+	handler.ServeHTTP(response, request)
+	assertCloudErrorResponse(t, response, http.StatusBadRequest, "req_oauth_error", "invalid_authorization_code", "Authorization code is invalid.", true)
 }
 
 func testCloudService(apiBaseURL string) *agentapp.CloudService {
@@ -399,4 +513,66 @@ func decodeProtoJSONBody(r *http.Request, message proto.Message) error {
 		return err
 	}
 	return codec.UnmarshalProtoJSON(data, message)
+}
+
+func writeCloudErrorResponse(t *testing.T, w http.ResponseWriter, r *http.Request, status int, code string, message string) {
+	t.Helper()
+	details, err := structpb.NewStruct(map[string]any{"reason": "test"})
+	if err != nil {
+		t.Fatalf("create Cloud error details: %v", err)
+	}
+	body, err := codec.MarshalProtoJSON(&shared.ErrorResp{
+		Code:      code,
+		Error:     message,
+		RequestId: r.Header.Get(requestIdHeader),
+		Details:   details,
+	})
+	if err != nil {
+		t.Fatalf("encode Cloud error response: %v", err)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write(body)
+}
+
+func assertCloudErrorResponse(t *testing.T, response *httptest.ResponseRecorder, status int, requestId string, code string, message string, expectDetails bool) {
+	t.Helper()
+	if response.Code != status {
+		t.Fatalf("response status = %d, want %d; body=%s", response.Code, status, response.Body.String())
+	}
+	if got := response.Header().Get(requestIdHeader); got != requestId {
+		t.Fatalf("local response request ID = %q, want %q", got, requestId)
+	}
+	var body shared.ErrorResp
+	if err := codec.UnmarshalProtoJSON(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode local error response: %v; body=%s", err, response.Body.String())
+	}
+	if body.GetCode() != code || body.GetError() != message || body.GetRequestId() != requestId {
+		t.Fatalf("local error response = %#v", &body)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(response.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("decode local error JSON: %v", err)
+	}
+	expectedFields := 3
+	if expectDetails {
+		expectedFields++
+	}
+	if len(raw) != expectedFields {
+		t.Fatalf("local error JSON fields = %#v", raw)
+	}
+	for _, field := range []string{"code", "error", "request_id"} {
+		if _, ok := raw[field]; !ok {
+			t.Fatalf("local error JSON missing %q: %#v", field, raw)
+		}
+	}
+	if !expectDetails {
+		if body.GetDetails() != nil {
+			t.Fatalf("local error details = %#v, want nil", body.GetDetails())
+		}
+		return
+	}
+	if body.GetDetails().GetFields()["reason"].GetStringValue() != "test" {
+		t.Fatalf("local error details = %#v", body.GetDetails())
+	}
 }

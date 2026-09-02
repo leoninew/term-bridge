@@ -19,6 +19,7 @@ import (
 	shared "gitee.com/leoninew/TermBridge-go/internal/gen/proto/termbridge/shared/v1"
 	"gitee.com/leoninew/TermBridge-go/internal/shared/application/quota"
 	sharedauth "gitee.com/leoninew/TermBridge-go/internal/shared/common/auth"
+	"gitee.com/leoninew/TermBridge-go/internal/shared/common/requestid"
 	terminalproto "gitee.com/leoninew/TermBridge-go/internal/shared/dto/protocol/terminal"
 )
 
@@ -67,7 +68,10 @@ func (h *Handler) Handler() http.Handler {
 	h.registerAgentRoutes(mux)
 	mux.HandleFunc("/api", h.writeNotFound)
 	mux.HandleFunc("/api/", h.writeNotFound)
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestId := h.requestIdFor(w, r)
+		mux.ServeHTTP(w, r.WithContext(requestid.With(r.Context(), requestId)))
+	})
 }
 
 func (h *Handler) registerCommonRoutes(mux *http.ServeMux) {
@@ -147,8 +151,7 @@ func (s *Handler) handleCloudConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	summary, err := s.config.CloudService.Connect(r.Context(), cloudToken, s.config.LocalDevice)
 	if err != nil {
-		s.config.Logger.Warn("cloud connect failed", "error", err)
-		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		s.writeCloudError(w, r, err)
 		return
 	}
 	s.persistLocalCloudSession(summary)
@@ -174,10 +177,7 @@ func (s *Handler) handleCloudAuthMe(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := s.config.CloudService.AuthMe(r.Context(), cloudToken)
 	if err != nil {
-		if s.config.Logger != nil {
-			s.config.Logger.Warn("cloud auth me failed", "error", err)
-		}
-		writeJSON(w, http.StatusOK, &cloudproto.AuthMeResp{Authenticated: false})
+		s.writeCloudError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
@@ -195,8 +195,7 @@ func (s *Handler) handleCloudDevices(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := s.config.CloudService.ListDevices(r.Context(), cloudToken)
 	if err != nil {
-		s.config.Logger.Warn("cloud device list failed", "error", err)
-		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		s.writeCloudError(w, r, err)
 		return
 	}
 	if result == nil {
@@ -552,8 +551,7 @@ func (s *Handler) handleExchangeOAuthCode(w http.ResponseWriter, r *http.Request
 	}
 	accessToken, err := s.exchangeCloudOAuthCode(r.Context(), code)
 	if err != nil {
-		s.config.Logger.Warn("cloud oauth token exchange failed", "error", err)
-		s.writeAPIError(w, r, http.StatusBadGateway, errorCodeUpstream, errorMessageUpstream, err)
+		s.writeCloudError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, &cloudproto.CloudOAuthExchangeResp{AccessToken: accessToken, TokenType: "bearer"})
